@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theo dõi đơn hàng - Bản đồ vận chuyển</title>
+
+    <!-- Giai đoạn 1: Nạp Leaflet Core (v1.9.4) qua CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Giai đoạn 2: Nạp Leaflet Routing Machine (v3.2.12) qua CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
+    <style>
+        /* Reset và thiết lập toàn cục */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+            background: #f8f9fa;
+        }
+
+        .order-tracking-page {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+
+        /* Header thông tin đơn hàng */
+        .order-header {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .order-header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+
+        .order-header .order-id {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .order-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #e8f4fd;
+            color: #1a73e8;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .order-status .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #1a73e8;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Khung chứa bản đồ - Giai đoạn 1: id="order-tracking-map", width 100%, height 500px */
+        .map-wrapper {
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            background: #fff;
+        }
+
+        #order-tracking-map {
+            width: 100%;
+            height: 500px;
+        }
+
+        /* Giai đoạn 2: Ẩn hoàn toàn bảng chỉ dẫn văn bản của Routing Machine */
+        .leaflet-routing-container {
+            display: none !important;
+        }
+
+        /* Thông tin điểm đến */
+        .order-info-footer {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .info-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .info-card .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+
+        .info-card .value {
+            font-size: 15px;
+            font-weight: 500;
+            color: #1a1a2e;
+        }
+
+        .info-card .coords {
+            font-size: 12px;
+            color: #adb5bd;
+            margin-top: 2px;
+        }
+
+        @media (max-width: 640px) {
+            .order-info-footer {
+                grid-template-columns: 1fr;
+            }
+            .order-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="order-tracking-page">
+        <!-- Header thông tin đơn hàng - Giai đoạn 4: Hiển thị dữ liệu JSON -->
+        <div class="order-header">
+            <div>
+                <h1>Theo dõi đơn hàng</h1>
+                <span class="order-id" id="orderIdDisplay">Mã đơn: Đang tải...</span>
+            </div>
+            <div class="order-status">
+                <span class="status-dot"></span>
+                <span id="orderStatusDisplay">Đang xử lý</span>
+            </div>
+        </div>
+
+        <!-- Giai đoạn 1: Khung chứa bản đồ với id="order-tracking-map" -->
+        <div class="map-wrapper">
+            <div id="order-tracking-map"></div>
+        </div>
+
+        <!-- Footer thông tin điểm đi/đến -->
+        <div class="order-info-footer">
+            <div class="info-card">
+                <div class="label">📍 Điểm lấy hàng</div>
+                <div class="value" id="pickupDisplay">Đang xác định...</div>
+                <div class="coords" id="pickupCoords"></div>
+            </div>
+            <div class="info-card">
+                <div class="label">📦 Điểm giao hàng</div>
+                <div class="value" id="dropoffDisplay">Đang xác định...</div>
+                <div class="coords" id="dropoffCoords"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Giai đoạn 1: Nạp Leaflet Core JS qua CDN -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Giai đoạn 2: Nạp Leaflet Routing Machine JS qua CDN -->
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        /**
+         * ====================================================================
+         *  HỆ THỐNG BẢN ĐỒ THEO DÕI ĐƠN HÀNG
+         *  Công nghệ: Leaflet.js + OpenStreetMap + OSRM (Routing)
+         *  Phiên bản: 1.0.0
+         * ====================================================================
+         */
+
+        (function() {
+            'use strict';
+
+            // ================================================================
+            // Giai đoạn 1: Khởi tạo bản đồ nền với OSM Tile Layer
+            // ================================================================
+
+            // Tọa độ trung tâm mặc định: Khu vực Hoàn Kiếm, Hà Nội
+            const DEFAULT_CENTER = [21.0285, 105.8544];
+            const DEFAULT_ZOOM = 13;
+
+            // Khởi tạo đối tượng bản đồ
+            const orderMap = L.map('order-tracking-map', {
+                center: DEFAULT_CENTER,
+                zoom: DEFAULT_ZOOM,
+                zoomControl: true
+            });
+
+            // Nạp lớp bản đồ nền từ OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(orderMap);
+
+            // ================================================================
+            // Giai đoạn 3: Tùy biến Icon Marker
+            // ================================================================
+
+            /**
+             * Tạo Icon tùy chỉnh cho Marker
+             * Sử dụng DivIcon để hiển thị biểu tượng SVG hiện đại,
+             * tránh phụ thuộc vào file ảnh bên ngoài
+             */
+            const pickupIcon = L.divIcon({
+                className: 'custom-marker-icon',
+                html: `
+                    <div style="
+                        width: 36px; height: 36px;
+                        background: #1a73e8;
+                        border: 3px solid #fff;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        font-size: 16px;
+                    ">🏪</div>
+                `,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18],
+                popupAnchor: [0, -20]
+            });
+
+            const dropoffIcon = L.divIcon({
+                className: 'custom-marker-icon',
+                html: `
+                    <div style="
+                        width: 36px; height: 36px;
+                        background: #e63946;
+                        border: 3px solid #fff;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        font-size: 16px;
+                    ">📦</div>
+                `,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18],
+                popupAnchor: [0, -20]
+            });
+
+            // Marker động (xe đang di chuyển) - dùng cho tracking realtime sau này
+            const vehicleIcon = L.divIcon({
+                className: 'custom-marker-icon',
+                html: `
+                    <div style="
+                        width: 28px; height: 28px;
+                        background: #f59e0b;
+                        border: 3px solid #fff;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        font-size: 14px;
+                    ">🚚</div>
+                `,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                popupAnchor: [0, -16]
+            });
+
+            // ================================================================
+            // Giai đoạn 4: Cấu trúc dữ liệu JSON đầu vào (mock data)
+            // ================================================================
+
+            /**
+             * Dữ liệu mẫu mô phỏng phản hồi từ Backend API
+             * Tuân thủ đúng định dạng JSON đã quy định:
+             * {
+             *   "order_id": "...",
+             *   "status": "...",
+             *   "coordinates": {
+             *     "pickup": { "latitude": ..., "longitude": ... },
+             *     "dropoff": { "latitude": ..., "longitude": ... }
+             *   }
+             * }
+             */
+            const mockOrderData = {
+                order_id: "521459",
+                status: "In Sorting Center",
+                coordinates: {
+                    pickup: {
+                        latitude: 21.028511,
+                        longitude: 105.854444
+                    },
+                    dropoff: {
+                        latitude: 21.036122,
+                        longitude: 105.786133
+                    }
+                }
+            };
+
+            // ================================================================
+            // Hàm tiện ích: Cập nhật giao diện thông tin đơn hàng
+            // ================================================================
+
+            function updateOrderUI(orderData) {
+                document.getElementById('orderIdDisplay').textContent = 'Mã đơn: #' + orderData.order_id;
+
+                const statusMap = {
+                    'In Sorting Center': 'Tại trung tâm phân loại',
+                    'Picked Up': 'Đã lấy hàng',
+                    'In Transit': 'Đang vận chuyển',
+                    'Out for Delivery': 'Đang giao hàng',
+                    'Delivered': 'Đã giao hàng'
+                };
+                document.getElementById('orderStatusDisplay').textContent =
+                    statusMap[orderData.status] || orderData.status;
+
+                const pickup = orderData.coordinates.pickup;
+                const dropoff = orderData.coordinates.dropoff;
+
+                document.getElementById('pickupDisplay').textContent =
+                    pickup.address || 'Kho hàng trung tâm';
+                document.getElementById('pickupCoords').textContent =
+                    pickup.latitude.toFixed(4) + ', ' + pickup.longitude.toFixed(4);
+
+                document.getElementById('dropoffDisplay').textContent =
+                    dropoff.address || 'Địa chỉ khách hàng';
+                document.getElementById('dropoffCoords').textContent =
+                    dropoff.latitude.toFixed(4) + ', ' + dropoff.longitude.toFixed(4);
+            }
+
+            // ================================================================
+            // Giai đoạn 2 & 3: Hàm khởi tạo Routing và vẽ tuyến đường
+            // ================================================================
+
+            /**
+             * Hàm điều khiển cốt lõi: Tiếp nhận tọa độ và vẽ tuyến đường
+             * @param {Object} pickup   - { lat: number, lng: number }
+             * @param {Object} dropoff  - { lat: number, lng: number }
+             * @param {Object} [orderData] - Dữ liệu đơn hàng để hiển thị popup
+             */
+            function initializeOrderRouting(pickup, dropoff, orderData) {
+                // Xóa route cũ nếu có (tránh chồng chéo khi gọi lại)
+                orderMap.eachLayer(function(layer) {
+                    if (layer instanceof L.Routing.Control) {
+                        orderMap.removeControl(layer);
+                    }
+                });
+
+                const routingControl = L.Routing.control({
+                    // Giai đoạn 2: Thiết lập waypoints - lưu ý thứ tự [lat, lng]
+                    waypoints: [
+                        L.latLng(pickup.lat, pickup.lng),
+                        L.latLng(dropoff.lat, dropoff.lng)
+                    ],
+
+                    // Giai đoạn 3: Cấu hình kiến trúc hình học đường vẽ (Polyline)
+                    lineOptions: {
+                        styles: [
+                            {
+                                color: '#3887be',
+                                opacity: 0.85,
+                                weight: 5
+                            }
+                        ],
+                        addWaypoints: false,
+                        extendToWaypoints: true,
+                        missingRouteTolerance: 10
+                    },
+
+                    // Giai đoạn 3: Tùy biến Marker với Icon riêng biệt
+                    createMarker: function(index, waypoint, numberOfWaypoints) {
+                        const totalPoints = numberOfWaypoints;
+                        const popupContent = orderData
+                            ? buildPopupContent(index, totalPoints, orderData)
+                            : null;
+
+                        if (index === 0) {
+                            // Điểm xuất phát - Icon kho hàng (màu xanh)
+                            const marker = L.marker(waypoint.latLng, { icon: pickupIcon });
+                            if (popupContent) {
+                                marker.bindPopup(popupContent, {
+                                    closeButton: true,
+                                    className: 'order-popup'
+                                });
+                            }
+                            return marker;
+                        } else if (index === totalPoints - 1) {
+                            // Điểm đích - Icon giao hàng (màu đỏ)
+                            const marker = L.marker(waypoint.latLng, { icon: dropoffIcon });
+                            if (popupContent) {
+                                marker.bindPopup(popupContent, {
+                                    closeButton: true,
+                                    className: 'order-popup'
+                                });
+                                // Tự động mở popup tại điểm đến
+                                marker.openPopup();
+                            }
+                            return marker;
+                        }
+                        return null;
+                    },
+
+                    // Giai đoạn 3: Tự động fitBounds khi tìm thấy tuyến đường
+                    routeWhileDragging: false,
+                    showAlternatives: false,
+                    fitSelectedRoutes: true
+                }).addTo(orderMap);
+
+                // Giai đoạn 3: Lắng nghe sự kiện routesfound để auto-fit bounds
+                routingControl.on('routesfound', function(e) {
+                    const routes = e.routes;
+                    if (routes && routes.length > 0) {
+                        // Tính toán bounds từ coordinates của tuyến đường
+                        const coordinates = routes[0].coordinates;
+                        if (coordinates && coordinates.length > 0) {
+                            const bounds = L.latLngBounds(coordinates);
+                            orderMap.fitBounds(bounds, {
+                                padding: [50, 50],
+                                maxZoom: 16
+                            });
+                        }
+                    }
+                });
+
+                return routingControl;
+            }
+
+            /**
+             * Xây dựng nội dung Popup cho Marker
+             */
+            function buildPopupContent(index, total, orderData) {
+                const order = orderData || {};
+                const statusMap = {
+                    'In Sorting Center': 'Đang phân loại tại trung tâm',
+                    'Picked Up': 'Đã được lấy từ kho',
+                    'In Transit': 'Đang trên đường vận chuyển',
+                    'Out for Delivery': 'Tài xế đang giao đến bạn',
+                    'Delivered': 'Đã giao thành công'
+                };
+
+                if (index === 0) {
+                    return `
+                        <div style="min-width: 200px;">
+                            <strong style="color:#1a73e8;font-size:16px;">🏪 Điểm lấy hàng</strong>
+                            <p style="margin:6px 0 2px;color:#333;font-size:13px;">
+                                ${order.order_id ? 'Đơn #' + order.order_id : ''}
+                            </p>
+                            <p style="margin:2px 0;color:#666;font-size:12px;">
+                                Trạng thái: ${statusMap[order.status] || order.status || 'Đang xử lý'}
+                            </p>
+                        </div>
+                    `;
+                } else if (index === total - 1) {
+                    return `
+                        <div style="min-width: 200px;">
+                            <strong style="color:#e63946;font-size:16px;">📦 Điểm giao hàng</strong>
+                            <p style="margin:6px 0 2px;color:#333;font-size:13px;">
+                                ${order.order_id ? 'Đơn #' + order.order_id : ''}
+                            </p>
+                            <p style="margin:2px 0;color:#666;font-size:12px;">
+                                Trạng thái: ${statusMap[order.status] || order.status || 'Đang xử lý'}
+                            </p>
+                        </div>
+                    `;
+                }
+                return null;
+            }
+
+            // ================================================================
+            // Hàm xử lý dữ liệu đầu vào chuẩn hóa
+            // Giai đoạn 4: Chuyển đổi từ JSON API thành định dạng Leaflet
+            // ================================================================
+
+            /**
+             * Hàm xử lý dữ liệu từ Backend
+             * Chuyển đổi từ định dạng JSON API (latitude/longitude)
+             * sang định dạng Leaflet (lat/lng)
+             *
+             * @param {Object} apiData - Dữ liệu từ API theo chuẩn:
+             * {
+             *   "order_id": "...",
+             *   "status": "...",
+             *   "coordinates": {
+             *     "pickup": { "latitude": ..., "longitude": ... },
+             *     "dropoff": { "latitude": ..., "longitude": ... }
+             *   }
+             * }
+             */
+            function processOrderData(apiData) {
+                if (!apiData || !apiData.coordinates) {
+                    console.error('❌ Dữ liệu đơn hàng không hợp lệ:', apiData);
+                    return null;
+                }
+
+                const pickup = apiData.coordinates.pickup;
+                const dropoff = apiData.coordinates.dropoff;
+
+                if (!pickup || !dropoff ||
+                    typeof pickup.latitude !== 'number' ||
+                    typeof pickup.longitude !== 'number' ||
+                    typeof dropoff.latitude !== 'number' ||
+                    typeof dropoff.longitude !== 'number') {
+                    console.error('❌ Tọa độ không hợp lệ:', { pickup, dropoff });
+                    return null;
+                }
+
+                return {
+                    orderData: apiData,
+                    pickup: {
+                        lat: pickup.latitude,
+                        lng: pickup.longitude
+                    },
+                    dropoff: {
+                        lat: dropoff.latitude,
+                        lng: dropoff.longitude
+                    }
+                };
+            }
+
+            // ================================================================
+            // Hàm khởi tạo toàn bộ hệ thống bản đồ
+            // ================================================================
+
+            function initMapFromAPI(apiData) {
+                const processed = processOrderData(apiData);
+                if (!processed) {
+                    // Fallback: hiển thị bản đồ nền không có route
+                    orderMap.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+                    return;
+                }
+
+                // Cập nhật giao diện thông tin đơn hàng
+                updateOrderUI(processed.orderData);
+
+                // Khởi tạo routing với tọa độ đã chuẩn hóa
+                initializeOrderRouting(
+                    processed.pickup,
+                    processed.dropoff,
+                    processed.orderData
+                );
+            }
+
+            // ================================================================
+            // KHU VỰC THỰC THI CHÍNH
+            // ================================================================
+
+            document.addEventListener('DOMContentLoaded', function() {
+                // Gọi hàm khởi tạo với dữ liệu mẫu (mô phỏng API)
+                initMapFromAPI(mockOrderData);
+
+                // Log thông tin debug
+                console.log('✅ Bản đồ theo dõi đơn hàng đã được khởi tạo thành công!');
+                console.log('📦 Dữ liệu đơn hàng:', mockOrderData);
+                console.log('📍 Điểm lấy hàng:', mockOrderData.coordinates.pickup);
+                console.log('📍 Điểm giao hàng:', mockOrderData.coordinates.dropoff);
+            });
+
+            /**
+             * ================================================================
+             *  HÀM PUBLIC API - Cho phép tích hợp với Backend thực tế
+             * ================================================================
+             *
+             *  Sử dụng từ bên ngoài:
+             *    window.OrderTrackingMap.updateFromAPI({
+             *      order_id: "123456",
+             *      status: "In Transit",
+             *      coordinates: {
+             *        pickup: { latitude: 21.0285, longitude: 105.8544 },
+             *        dropoff: { latitude: 21.0361, longitude: 105.7861 }
+             *      }
+             *    });
+             */
+            window.OrderTrackingMap = {
+                /**
+                 * Cập nhật bản đồ với dữ liệu mới từ API
+                 * @param {Object} apiData - Dữ liệu JSON từ Backend
+                 */
+                updateFromAPI: function(apiData) {
+                    if (apiData && apiData.coordinates) {
+                        initMapFromAPI(apiData);
+                    } else {
+                        console.warn('⚠️ Dữ liệu API không đúng định dạng:', apiData);
+                    }
+                },
+
+                /**
+                 * Lấy thông tin trạng thái hiện tại của bản đồ
+                 * @returns {Object} Thông tin bản đồ
+                 */
+                getMapInfo: function() {
+                    return {
+                        center: orderMap.getCenter(),
+                        zoom: orderMap.getZoom(),
+                        bounds: orderMap.getBounds()
+                    };
+                },
+
+                /**
+                 * Thiết lập lại bản đồ về trạng thái ban đầu
+                 */
+                resetMap: function() {
+                    orderMap.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+                }
+            };
+
+        })();
+    </script>
+
+</body>
+</html>
