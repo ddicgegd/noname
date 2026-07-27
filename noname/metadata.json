@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Remix: Remix: Remix: Creative Studio Showcase",
+  "description": "An interactive, modern portfolio landing page for Nora Kessler\u0027s Creative Studio. It features a staggered grid splash screen, elegant word-reveal entrance animations, a mobile-responsive sliding navigation panel, and an immersive cursor-driven spotlight reveal effect that blends two layers of visuals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
