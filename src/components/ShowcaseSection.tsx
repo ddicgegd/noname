@@ -181,23 +181,6 @@ export default function ShowcaseSection() {
 
   return (
     <section id="showcase" className="py-10 bg-transparent relative overflow-hidden select-none pointer-events-none">
-      {/* CSS stylesheet to run custom high-performance hardware-accelerated infinite marquee */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes marquee-scroll {
-          0% {
-            transform: translate3d(0, 0, 0);
-          }
-          100% {
-            transform: translate3d(-50%, 0, 0);
-          }
-        }
-        .animate-marquee {
-          display: flex;
-          width: max-content;
-          animation: marquee-scroll 28s linear infinite;
-        }
-      ` }} />
-
       {/* Dynamic background dot mesh */}
       <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(#C084FC 1px, transparent 1px)", backgroundSize: "32px 32px", opacity: 0.2 }} />
       

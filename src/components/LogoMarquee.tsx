@@ -61,24 +61,6 @@ export default function LogoMarquee() {
 
   return (
     <div className="relative w-full py-4 overflow-hidden bg-transparent pointer-events-none select-none">
-      {/* Dynamic Keyframes Injection */}
-      <style>{`
-        @keyframes marquee-scroll {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-        .marquee-track {
-          display: flex;
-          gap: 1.25rem;
-          width: max-content;
-          animation: marquee-scroll 32s linear infinite;
-        }
-      `}</style>
-
       {/* Marquee Wrapper with fading edges */}
       <div className="relative w-full overflow-hidden" style={maskStyle}>
         <div className="marquee-track px-4">

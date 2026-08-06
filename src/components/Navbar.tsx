@@ -457,11 +457,29 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
           window.scrollTo({ top: 0, behavior: "smooth" });
         }}
       >
-        <span className="material-symbols-outlined text-[#FF4D24] text-[26px] font-extrabold select-none">
-          auto_awesome
-        </span>
+        <svg className="w-7 h-7 select-none shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="synapseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FF7C4A" />
+              <stop offset="100%" stopColor="#FF4D24" />
+            </linearGradient>
+          </defs>
+          <circle cx="12" cy="12" r="4" fill="url(#synapseGrad)">
+            <animate attributeName="r" values="3.5;5;3.5" dur="2.5s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.85;1;0.85" dur="2.5s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="12" cy="12" r="7.5" stroke="#FF4D24" strokeWidth="1.2" strokeDasharray="3 5" opacity="0.7">
+            <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="7s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="12" cy="12" r="10" stroke="#FF7C4A" strokeWidth="0.8" strokeDasharray="8 12" opacity="0.45">
+            <animateTransform attributeName="transform" type="rotate" from="360 12 12" to="0 12 12" dur="11s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="12" cy="4.5" r="1.2" fill="#FF4D24" />
+          <circle cx="5.5" cy="15.8" r="1.2" fill="#FF4D24" />
+          <circle cx="18.5" cy="15.8" r="1.2" fill="#FF4D24" />
+        </svg>
         <span className="font-sans font-black text-sm text-slate-900 uppercase tracking-tight ml-1.5">
-          HORIZON<span className="text-[#FF4D24]">MOBILE</span>
+          SYNAPSE<span className="text-[#FF4D24]">DIGITAL</span>
         </span>
       </a>
 
@@ -478,7 +496,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
               <div 
                 key={link.label}
                 ref={megaMenuRef}
-                className="relative py-2"
+                className="py-2"
                 onMouseEnter={handleMegaMenuMouseEnter}
                 onMouseLeave={handleMegaMenuMouseLeave}
               >
@@ -502,14 +520,12 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
 
                 {/* MEGA MENU DROPDOWN PANEL */}
                 <div 
-                  className="absolute top-[calc(100%+12px)] left-1/2 w-[1160px] bg-white/95 backdrop-blur-3xl rounded-2xl border border-white/85 shadow-[0_40px_90px_-15px_rgba(0,0,0,0.18)] z-50 flex overflow-visible mega-menu-popup"
+                  className="absolute top-[calc(100%+12px)] left-1/2 w-[95vw] lg:w-[1160px] bg-white/95 backdrop-blur-3xl rounded-2xl border border-white/85 shadow-[0_40px_90px_-15px_rgba(0,0,0,0.18)] z-50 flex overflow-visible mega-menu-popup"
                   style={{ 
                     pointerEvents: showProductMegaMenu ? 'auto' : 'none',
                     opacity: showProductMegaMenu ? 1 : 0,
-                    transform: `translate(-38%, ${showProductMegaMenu ? '0px' : '12px'}) scale(${showProductMegaMenu ? 1 : 0.975})`,
-                    transition: showProductMegaMenu
-                      ? 'opacity 450ms cubic-bezier(0.16, 1, 0.3, 1), transform 450ms cubic-bezier(0.16, 1, 0.3, 1), border-color 450ms cubic-bezier(0.16, 1, 0.3, 1)'
-                      : 'opacity 800ms cubic-bezier(0.16, 1, 0.3, 1), transform 800ms cubic-bezier(0.16, 1, 0.3, 1), border-color 800ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    transform: `translate(-50%, ${showProductMegaMenu ? '0px' : '8px'}) scale(${showProductMegaMenu ? 1 : 0.985})`,
+                    transition: 'opacity 280ms cubic-bezier(0.16, 1, 0.3, 1), transform 280ms cubic-bezier(0.16, 1, 0.3, 1), border-color 280ms cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                 >
                   {/* Left Section: Pure Poster Image (With descriptive overlay, smooth scale-up on hover) */}
@@ -523,86 +539,6 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                     {/* Ambient Glow Bleeds (leaking outside the poster image container to top, left, and bottom) */}
                     <div className="absolute -top-6 -left-8 -bottom-6 right-4 bg-[#FF4D24]/20 blur-[40px] rounded-l-2xl pointer-events-none poster-behind-glow" />
                     <div className="absolute -top-3 -left-4 -bottom-3 right-2 bg-[#FF4D24]/15 blur-[15px] rounded-l-2xl pointer-events-none poster-behind-glow-tight" />
-
-                    {/* Keyframe styles for cosmic stars and shine sweep */}
-                    <style dangerouslySetInnerHTML={{ __html: `
-                      @keyframes cosmic-rise {
-                        0% {
-                          bottom: -30px;
-                          transform: translateX(0px) rotate(0deg) scale(0.3);
-                          opacity: 0;
-                        }
-                        15% {
-                          opacity: var(--star-opacity, 0.6);
-                        }
-                        50% {
-                          transform: translateX(calc(var(--star-drift, 0px) * 0.45)) rotate(120deg) scale(0.85);
-                        }
-                        85% {
-                          opacity: var(--star-opacity, 0.6);
-                        }
-                        100% {
-                          bottom: 135%;
-                          transform: translateX(var(--star-drift, 0px)) rotate(280deg) scale(1.3);
-                          opacity: 0;
-                        }
-                      }
-                      @keyframes cosmic-shine {
-                        0% {
-                          transform: translateX(-150%) skewX(-25deg);
-                        }
-                        100% {
-                          transform: translateX(150%) skewX(-25deg);
-                        }
-                      }
-                      .poster-shine {
-                        transform: translateX(-150%) skewX(-25deg);
-                      }
-                      .poster-glow-trigger:hover .poster-shine {
-                        animation: cosmic-shine 1.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-                      }
-                      .cosmic-stars-wrapper {
-                        opacity: 0.75;
-                        transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1);
-                      }
-                      .poster-glow-trigger:hover .cosmic-stars-wrapper {
-                        opacity: 1;
-                      }
-                      .cosmic-star-svg {
-                        filter: drop-shadow(0 0 4px rgba(255, 110, 40, 0.5));
-                        transition: filter 1.2s cubic-bezier(0.16, 1, 0.3, 1), transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
-                      }
-                      .poster-glow-trigger:hover .cosmic-star-svg {
-                        filter: drop-shadow(0 0 14px rgba(255, 110, 40, 1)) drop-shadow(0 0 4px rgba(255, 255, 255, 0.95)) brightness(1.7);
-                        transform: scale(1.35);
-                      }
-                      
-                      /* Ambient glows behind the top, left, and bottom edges */
-                      .poster-behind-glow, .poster-behind-glow-tight {
-                        opacity: 0;
-                        transform: scale(0.97);
-                        transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-                      }
-                      .poster-glow-trigger:hover .poster-behind-glow {
-                        opacity: 1;
-                        transform: scale(1.02);
-                      }
-                      .poster-glow-trigger:hover .poster-behind-glow-tight {
-                        opacity: 1;
-                        transform: scale(1.01);
-                      }
-                      
-                      /* Entire Mega Menu Popup Style */
-                      .mega-menu-popup {
-                        transition: border-color 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-                      }
-                      .mega-menu-popup:has(.poster-glow-trigger:hover) {
-                        border-color: rgba(255, 77, 36, 0.25);
-                      }
-                      .mega-menu-popup:has(.poster-glow-trigger:hover) .ambient-orange-pool {
-                        opacity: 1 !important;
-                      }
-                    `}} />
 
                     {/* Image and inner gradient overlays wrapped in an overflow-hidden container to protect rounded corners */}
                     <div className="absolute inset-0 overflow-hidden rounded-l-[2.1rem] z-10 pointer-events-none">

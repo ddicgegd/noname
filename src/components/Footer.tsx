@@ -12,11 +12,25 @@ export default function Footer({ onNavigate }: { onNavigate?: (page: "landing" |
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Brand Identity */}
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate?.("landing")}>
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-red-500 to-[#FF4D24] flex items-center justify-center shadow-md shadow-red-500/20">
-              <span className="material-symbols-outlined text-white text-[15px] font-bold">auto_awesome</span>
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-red-500 to-[#FF4D24] flex items-center justify-center shadow-md shadow-red-500/20 shrink-0">
+              <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="4" fill="white">
+                  <animate attributeName="r" values="3.5;5;3.5" dur="2.5s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.85;1;0.85" dur="2.5s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="12" cy="12" r="7.5" stroke="white" strokeWidth="1.2" strokeDasharray="3 5" opacity="0.7">
+                  <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="7s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="0.8" strokeDasharray="8 12" opacity="0.45">
+                  <animateTransform attributeName="transform" type="rotate" from="360 12 12" to="0 12 12" dur="11s" repeatCount="indefinite" />
+                </circle>
+                <circle cx="12" cy="4.5" r="1.2" fill="white" />
+                <circle cx="5.5" cy="15.8" r="1.2" fill="white" />
+                <circle cx="18.5" cy="15.8" r="1.2" fill="white" />
+              </svg>
             </div>
             <span className="font-sans font-black text-sm text-[#111111] tracking-tight">
-              HORIZON<span className="text-[#FF4D24]">MOBILE</span>
+              SYNAPSE<span className="text-[#FF4D24]">DIGITAL</span>
             </span>
           </div>
 
@@ -67,12 +81,12 @@ export default function Footer({ onNavigate }: { onNavigate?: (page: "landing" |
           {/* Company contact and registration details */}
           <div className="md:col-span-8 flex flex-col gap-1 text-[11px] text-slate-500 leading-relaxed">
             <span className="font-bold text-slate-700 text-[11.5px] uppercase tracking-wide">
-              Hệ thống Bán lẻ Điện thoại Di động Horizon Mobile Việt Nam
+              Hệ thống Bán lẻ Thiết bị Công nghệ Synapse Digital Việt Nam
             </span>
             <p className="flex flex-wrap gap-x-4 gap-y-1">
               <span>ĐKKD: 0109283746 - cấp ngày 15/08/2022 bởi Sở KH&ĐT TP.HCM.</span>
               <span>Hotline: 1900 6789</span>
-              <span>Email: support@horizonmobile.vn</span>
+              <span>Email: support@synapsedigital.vn</span>
             </p>
             <p className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-[#FF4D24] shrink-0" />
@@ -99,7 +113,7 @@ export default function Footer({ onNavigate }: { onNavigate?: (page: "landing" |
             </a>
 
             <div className="text-[10px] text-slate-500 md:text-right">
-              &copy; {currentYear} Horizon Mobile. All rights reserved.
+              &copy; {currentYear} Synapse Digital. All rights reserved.
             </div>
           </div>
         </div>
