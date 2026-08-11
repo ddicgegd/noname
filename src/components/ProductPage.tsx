@@ -642,6 +642,28 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
   const [sortBy, setSortBy] = useState<"banchay" | "giathap" | "giacao" | "khuyenmai" | "xemnhieu">("banchay");
   const [comparedProductIds, setComparedProductIds] = useState<string[]>([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(15);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(15);
+  }, [activeCategory, selectedBrand, searchQuery, sortBy, viewMode, erpPriceFilter, erpStockFilter]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => prev + 15);
+        }
+      },
+      { rootMargin: "400px" }
+    );
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+    return () => observer.disconnect();
+  }, [erpLoading, erpError, viewMode, visibleCount]);
+
   const comparedProducts = comparedProductIds.map(id => PRODUCTS.find(p => p.id === id)).filter((p): p is Product => !!p);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: "success" | "info" | "warning" }[]>([]);
   const [countdownTime, setCountdownTime] = useState({ hours: 4, minutes: 25, seconds: 12 });
@@ -912,10 +934,10 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
     erpStockFilter !== "all";
 
   return (
-    <div className="min-h-screen bg-background px-4 pb-24 pt-24 text-foreground sm:px-6 md:pt-[100px]">
+    <div className="min-h-screen bg-background px-4 pb-24 pt-16 md:pt-[72px] text-foreground sm:px-6">
       <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
         <Card className="overflow-hidden py-0">
-          <section className="relative min-h-[430px] overflow-hidden rounded-xl bg-zinc-950 text-white sm:min-h-[460px] lg:min-h-[500px]">
+          <section className="relative min-h-[480px] overflow-hidden rounded-xl bg-zinc-950 text-white sm:min-h-[510px] lg:min-h-[550px]">
             <AnimatePresence initial={false}>
               <motion.div
                 key={activeBannerIdx}
@@ -933,7 +955,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-black/5" />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 to-transparent" />
-                <div className="relative flex min-h-[430px] flex-col justify-end p-5 sm:min-h-[460px] sm:p-7 lg:min-h-[500px] lg:p-9">
+                <div className="relative flex min-h-[480px] flex-col justify-end p-5 sm:min-h-[510px] sm:p-7 lg:min-h-[550px] lg:p-9">
                   <div className="flex max-w-3xl flex-col gap-3 pb-3">
                     <div className="w-fit rounded-full bg-white px-2.5 py-1 text-xs font-medium text-zinc-950">
                       {BANNERS[activeBannerIdx]?.badge}
@@ -1271,9 +1293,20 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                     {sortItems.map((item) => {
                       const Icon = item.icon;
                       return (
-                        <TabsTrigger key={item.id} value={item.id}>
-                          <Icon data-icon="inline-start" />
-                          {item.label}
+                        <TabsTrigger 
+                          key={item.id} 
+                          value={item.id}
+                          className="relative z-10 data-active:bg-transparent data-active:shadow-none"
+                        >
+                          {sortBy === item.id && (
+                            <motion.div
+                              layoutId="sortTabIndicator"
+                              className="absolute inset-0 bg-background rounded-md shadow-sm -z-10"
+                              transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                            />
+                          )}
+                          <Icon data-icon="inline-start" className="relative z-20" />
+                          <span className="relative z-20">{item.label}</span>
                         </TabsTrigger>
                       );
                     })}
@@ -1323,7 +1356,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
             {!erpLoading && !erpError && (
               <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
                 <AnimatePresence mode="popLayout">
-                  {sortedFilteredProducts.map((rawProduct) => {
+                  {sortedFilteredProducts.slice(0, visibleCount).map((rawProduct, index) => {
                     const product = rawProduct as Product & {
                       priceInfo?: ReturnType<typeof getProductVNDDetails>;
                       mediaItems?: { url: string }[];
@@ -1341,10 +1374,10 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                       <motion.div
                         key={product.id}
                         layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        transition={{ duration: 0.2 }}
+                        initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.35, delay: Math.min((index % 15) * 0.05, 0.5), ease: [0.16, 1, 0.3, 1] }}
                       >
                         <Card
                           size="sm"
@@ -1377,11 +1410,14 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
 
                           <div className="aspect-[4/5] overflow-hidden rounded-t-xl bg-muted">
                             {imgSrc ? (
-                              <img
+                              <motion.img
                                 src={imgSrc}
                                 alt={product.name}
                                 className="size-full object-cover transition-transform duration-300 group-hover/card:scale-105"
                                 referrerPolicy="no-referrer"
+                                initial={{ opacity: 0, filter: "blur(4px)" }}
+                                animate={{ opacity: 1, filter: "blur(0px)" }}
+                                transition={{ duration: 0.6, delay: Math.min((index % 15) * 0.05, 0.5) + 0.35, ease: "easeOut" }}
                               />
                             ) : (
                               <div className="flex size-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
@@ -1487,6 +1523,9 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                   </Card>
                 )}
               </motion.div>
+            )}
+            {!erpLoading && !erpError && sortedFilteredProducts.length > visibleCount && (
+              <div ref={loadMoreRef} className="h-10 w-full shrink-0" />
             )}
           </section>
         </div>
