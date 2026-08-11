@@ -17,6 +17,7 @@ import {
   loadErpCatalog,
   loadGraphqlProductAttributes
 } from "../lib/productCatalog";
+import { getProductColorOptions } from "../lib/productColorSwatches";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1691,30 +1692,6 @@ const getProductVersions = (product: Product) => {
   }
 };
 
-const getProductColors = (product: Product, priceVND: string) => {
-  if (product.category === "ai") {
-    return [
-      { id: "c1", title: "Titanium Đen", label: "FP16 High Prec", price: priceVND },
-      { id: "c2", title: "Titanium Tự Nhiên", label: "INT8 Light Quant", price: priceVND },
-    ];
-  } else if (product.category === "compute") {
-    return [
-      { id: "c1", title: "NVIDIA H100 Core", label: "80GB VRAM Dedicated", price: priceVND },
-      { id: "c2", title: "NVIDIA A100 Core", label: "40GB VRAM Shared", price: priceVND },
-    ];
-  } else if (product.category === "storage") {
-    return [
-      { id: "c1", title: "Multi-Zone Sync", label: "3 AZ Redundant", price: priceVND },
-      { id: "c2", title: "Single-Zone Local", label: "LRS Cost Saving", price: priceVND },
-    ];
-  } else {
-    return [
-      { id: "c1", title: "Anycast Global", label: "DDoS Mitigation Layer", price: priceVND },
-      { id: "c2", title: "Unicast Local", label: "Basic DNS Defense", price: priceVND },
-    ];
-  }
-};
-
 const getSpecsForCategory = (category: string) => {
   if (category === "ai") {
     return [
@@ -1905,7 +1882,12 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
     : 0;
   const formattedDiscount = currentDiscountPct > 0 ? `Giảm ${currentDiscountPct}%` : (viewMode === "erp" ? "" : "Giá ưu đãi");
 
-  const colors = getProductColors(product, formattedCurrentPrice);
+  const colors = getProductColorOptions(product.category, formattedCurrentPrice);
+  const selectedVersion = versions.find((version) => version.id === activeVersion);
+  const selectedColor = colors.find((color) => color.id === activeColor);
+  const selectedOptionLabel = viewMode === "erp" && activeVar
+    ? `${activeVar.name}${activeVar.sku?.sku ? ` - SKU ${activeVar.sku.sku}` : ""}`
+    : [selectedVersion?.title, selectedColor?.title].filter(Boolean).join(" - ");
 
   const [favoriteActive, setFavoriteActive] = useState(false);
   const [voucherCollected, setVoucherCollected] = useState(false);
@@ -2344,15 +2326,15 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
 
         {/* Modal Main Scrollable Content */}
         <div className="flex-1 overflow-y-auto bg-muted/30 p-4 pb-28 scrollbar-thin sm:p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5 xl:gap-6 items-start">
             
             {/* LEFT COLUMN: Image Box, Highlights, Commitments */}
-            <div className="lg:col-span-7 flex flex-col gap-5">
+            <div className="lg:col-span-8 flex flex-col gap-5">
               
               {/* Product Visual Area + Gallery Thumbnails grouped tightly for space optimization */}
               <div className="flex flex-col gap-3">
                 {/* Product Visual & Image display area with 3D discount Ribbon */}
-                <div className="group relative flex h-[340px] min-h-[340px] flex-col items-center justify-center overflow-visible rounded-xl border bg-card p-0 shadow-sm transition-all hover:shadow-md sm:h-[420px] sm:min-h-[420px]">
+                <div className="group relative flex h-[390px] min-h-[390px] flex-col items-center justify-center overflow-visible rounded-xl border bg-card p-0 shadow-sm transition-all hover:shadow-md sm:h-[500px] sm:min-h-[500px]">
                   {formattedDiscount && (
                     <>
                       {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
@@ -2402,18 +2384,31 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                   )}
 
                   <div className="absolute inset-0 z-0 size-full overflow-hidden rounded-xl">
-                    {images[activeImgIdx] ? (
-                      <img
-                        src={images[activeImgIdx]}
-                        alt={product.name}
-                        className="size-full object-cover transition-all duration-500 group-hover:scale-105"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="flex size-full items-center justify-center bg-muted text-[12px] font-bold text-muted-foreground">
-                        Chưa có ảnh từ API
-                      </div>
-                    )}
+                    <AnimatePresence mode="wait">
+                      {images[activeImgIdx] ? (
+                        <motion.img
+                          key={`${product.id}-${activeImgIdx}`}
+                          src={images[activeImgIdx]}
+                          alt={product.name}
+                          className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                          initial={{ opacity: 0, scale: 1.04, x: 24, filter: "blur(10px)" }}
+                          animate={{ opacity: 1, scale: 1, x: 0, filter: "blur(0px)" }}
+                          exit={{ opacity: 0, scale: 0.985, x: -18, filter: "blur(8px)" }}
+                          transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                      ) : (
+                        <motion.div
+                          key="empty-image"
+                          className="flex size-full items-center justify-center bg-muted text-[12px] font-bold text-muted-foreground"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                        >
+                          Chưa có ảnh từ API
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                   
                   {/* Indicator Dots - overlay on the bottom */}
@@ -2435,17 +2430,23 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                     <button
                       key={idx}
                       onClick={() => setActiveImgIdx(idx)}
-                      className={`flex h-[48px] w-[68px] shrink-0 cursor-pointer items-center justify-center rounded-lg border bg-card p-[2px] shadow-xs transition-all ${
+                      className={`flex h-[56px] w-[84px] shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-transparent p-0 shadow-xs transition-all ${
                         activeImgIdx === idx 
-                          ? "scale-102 border-primary ring-1 ring-primary/30" 
-                          : "hover:scale-101 border-border hover:border-primary/40"
+                          ? "scale-102 ring-2 ring-primary/40" 
+                          : "hover:scale-101"
                       }`}
                     >
                       <img 
                         src={img} 
                         alt={`Thumbnail ${idx + 1}`}
-                        className="size-full rounded-[5px] object-cover"
+                        className="size-full rounded-lg object-cover"
                         referrerPolicy="no-referrer"
+                        onError={(event) => {
+                          const fallback = images[0] || getProductImage(product);
+                          if (event.currentTarget.src !== fallback) {
+                            event.currentTarget.src = fallback;
+                          }
+                        }}
                       />
                     </button>
                   ))}
@@ -2533,7 +2534,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
             </div>
 
             {/* RIGHT COLUMN: Pricing, Versions, Colors, Promo, Call To Action */}
-            <div className="lg:col-span-5 flex flex-col gap-5">
+            <div className="lg:col-span-4 flex flex-col gap-5">
               
               {/* Premium Pricing & Quick Info Box */}
               <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm">
@@ -2690,13 +2691,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                                 <span className="material-symbols-outlined text-[9px] font-black">check</span>
                               </div>
                             )}
-                            {/* Mini Thumbnail */}
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted p-0.5">
-                              <img 
-                                src={images[0]} 
-                                alt={color.title}
-                                className="size-full object-contain"
-                                referrerPolicy="no-referrer"
+                            <div className="flex size-7 shrink-0 items-center justify-center">
+                              <span
+                                className={`size-5 rounded-full ${color.swatchClass}`}
+                                aria-hidden="true"
                               />
                             </div>
                             <div className="flex flex-col min-w-0">
@@ -2811,23 +2809,35 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                   </div>
                 </div>
 
-                {/* Left/Right Carousel Control Arrows */}
+                {/* Left/Right Carousel Control Zones */}
                 <button
                   onClick={() => setAccPage(prev => Math.max(0, prev - 1))}
                   disabled={accPage === 0}
-                  className="absolute left-1.5 top-[55%] z-20 flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border bg-card font-bold text-muted-foreground shadow-md transition-all hover:bg-muted active:scale-95 disabled:pointer-events-none disabled:opacity-0"
+                  className={`absolute inset-y-14 left-0 z-20 flex w-16 items-center justify-start rounded-l-xl bg-gradient-to-r from-background/95 via-background/65 to-transparent pl-2 text-primary shadow-[inset_18px_0_28px_rgba(255,77,36,0.08)] backdrop-blur-sm transition-all duration-300 ${
+                    accPage === 0
+                      ? "pointer-events-none opacity-0"
+                      : "cursor-pointer opacity-0 hover:opacity-100 active:scale-[0.99] group-hover/carousel:opacity-100"
+                  }`}
                   aria-label="Previous Page"
                 >
-                  <span className="material-symbols-outlined text-[16px] font-bold">chevron_left</span>
+                  <span className="flex size-8 items-center justify-center rounded-full border bg-card/85 shadow-sm backdrop-blur-md">
+                    <span className="material-symbols-outlined text-[16px] font-bold">west</span>
+                  </span>
                 </button>
 
                 <button
                   onClick={() => setAccPage(prev => Math.min(Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1, prev + 1))}
                   disabled={accPage === Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1}
-                  className="absolute right-1.5 top-[55%] z-20 flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border bg-card font-bold text-muted-foreground shadow-md transition-all hover:bg-muted active:scale-95 disabled:pointer-events-none disabled:opacity-0"
+                  className={`absolute inset-y-14 right-0 z-20 flex w-16 items-center justify-end rounded-r-xl bg-gradient-to-l from-background/95 via-background/65 to-transparent pr-2 text-primary shadow-[inset_-18px_0_28px_rgba(255,77,36,0.08)] backdrop-blur-sm transition-all duration-300 ${
+                    accPage === Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1
+                      ? "pointer-events-none opacity-0"
+                      : "cursor-pointer opacity-0 hover:opacity-100 active:scale-[0.99] group-hover/carousel:opacity-100"
+                  }`}
                   aria-label="Next Page"
                 >
-                  <span className="material-symbols-outlined text-[16px] font-bold">chevron_right</span>
+                  <span className="flex size-8 items-center justify-center rounded-full border bg-card/85 shadow-sm backdrop-blur-md">
+                    <span className="material-symbols-outlined text-[16px] font-bold">east</span>
+                  </span>
                 </button>
 
                 {/* Horizontal Grid of accessory items - Paginated (3 items per page in a beautiful single-column stack) */}
@@ -2839,7 +2849,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                       return (
                         <div
                           key={item.id}
-                          className="relative flex h-[100px] items-center gap-3 overflow-visible rounded-xl border bg-card p-2.5 text-card-foreground transition-all hover:border-primary/40 hover:shadow-md sm:h-[115px] sm:gap-4 sm:p-3"
+                          className="relative flex h-[108px] items-center gap-3 overflow-visible rounded-xl border bg-card p-2.5 text-card-foreground transition-all hover:border-primary/40 hover:shadow-md sm:h-[124px] sm:gap-4 sm:p-3"
                         >
                           {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
                           <div className="absolute -top-1.5 left-[-4px] h-[22px] bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] text-white text-[9.5px] font-black px-2 rounded-br-md rounded-tr-sm shadow-[1px_1px_3px_rgba(0,0,0,0.15)] flex items-center justify-center z-20 select-none">
@@ -2848,11 +2858,11 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                           {/* 3D Fold Corner for Left Ribbon */}
                           <div className="absolute top-[16px] left-[-4px] w-[4px] h-[4px] bg-[#B43C00] z-10" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
                           {/* Left side: Product Image in a matching aspect ratio container */}
-                          <div className="relative flex h-[54px] w-[76px] shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted p-[2px] shadow-2xs sm:h-[68px] sm:w-[96px]">
+                          <div className="relative -my-2.5 -ml-2.5 flex h-[calc(100%+1.25rem)] w-[116px] shrink-0 items-center justify-center overflow-hidden rounded-l-xl bg-transparent p-0 sm:-my-3 sm:-ml-3 sm:h-[calc(100%+1.5rem)] sm:w-[136px]">
                             <img
                               src={item.img}
                               alt={item.name}
-                              className="size-full rounded-[10px] object-cover transition-transform duration-500 hover:scale-105"
+                              className="size-full object-cover transition-transform duration-500 hover:scale-105"
                               referrerPolicy="no-referrer"
                             />
                           </div>
@@ -3098,7 +3108,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
         </div>
 
         {/* Floating bottom actions bar with 3D discount ribbon */}
-        <div className="absolute bottom-5 left-1/2 z-30 flex w-[calc(100%-3rem)] max-w-[850px] -translate-x-1/2 items-center justify-between overflow-visible rounded-xl border bg-card/95 p-3 shadow-xl backdrop-blur-md transition-all duration-300 sm:w-[85%]">
+        <div className="absolute bottom-5 left-1/2 z-30 flex w-[calc(100%-3rem)] max-w-[850px] -translate-x-1/2 items-center justify-between overflow-visible rounded-xl border border-white/45 bg-background/55 p-3 shadow-[0_20px_60px_rgba(255,77,36,0.22),0_8px_28px_rgba(0,0,0,0.14)] backdrop-blur-2xl backdrop-saturate-150 transition-all duration-300 sm:w-[85%]">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-r from-primary/16 via-background/70 to-background/50" />
           {formattedDiscount && (
             <>
               {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
@@ -3111,12 +3122,12 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
           )}
           
           {/* Left segment: Image, Name, Price */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="hidden size-10 shrink-0 items-center justify-center rounded-lg border bg-muted p-0.5 sm:flex">
+          <div className="relative -my-3 -ml-3 flex min-w-0 items-center gap-3 self-stretch">
+            <div className="hidden h-full w-20 shrink-0 items-center justify-center overflow-hidden rounded-l-xl bg-transparent p-0 sm:flex">
               <img 
                 src={images[0]} 
                 alt={product.name} 
-                className="size-full object-contain"
+                className="size-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -3124,6 +3135,11 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
               <h4 className="font-sans font-bold text-[12px] text-foreground truncate max-w-[140px] md:max-w-[280px] hidden md:block">
                 {viewMode === "erp" ? product.name : `${product.name} Cloud Server`}
               </h4>
+              {selectedOptionLabel && (
+                <span className="hidden max-w-[140px] truncate text-[10px] font-bold leading-none text-muted-foreground md:block md:max-w-[280px]">
+                  Đã chọn: {selectedOptionLabel}
+                </span>
+              )}
               <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2">
                 <span className="font-sans font-extrabold text-[13px] sm:text-[14.5px] text-primary leading-tight">
                   {formattedCurrentPrice}
@@ -3136,7 +3152,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
           </div>
 
           {/* Right segment: Buttons */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="relative flex items-center gap-2 shrink-0">
             <button 
               onClick={(e) => {
                 if (onAddToCart) {
