@@ -935,8 +935,15 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
     erpStockFilter !== "all";
 
   return (
-    <div className="min-h-screen bg-background px-4 pb-24 pt-16 md:pt-[72px] text-foreground sm:px-6">
-      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+    <div className="min-h-screen bg-background px-4 pb-24 pt-16 md:pt-[72px] text-foreground sm:px-6 relative z-0">
+      {/* Ambient background glow - Fixed so it persists during infinite scroll */}
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vh] rounded-full bg-[#C084FC]/15 blur-[120px] mix-blend-normal opacity-75" />
+        <div className="absolute top-[30%] right-[-10%] w-[40vw] h-[60vh] rounded-full bg-[#FF9A9E]/15 blur-[120px] mix-blend-normal opacity-75" />
+        <div className="absolute bottom-[-10%] left-[20%] w-[60vw] h-[50vh] rounded-full bg-[#C084FC]/15 blur-[120px] mix-blend-normal opacity-75" />
+      </div>
+
+      <main className="mx-auto flex w-full max-w-[1760px] flex-col gap-4">
         <Card className="overflow-hidden py-0">
           <section className="relative min-h-[480px] overflow-hidden rounded-xl bg-zinc-950 text-white sm:min-h-[510px] lg:min-h-[550px]">
             <AnimatePresence initial={false}>
@@ -2310,7 +2317,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
   }, [showSpecsPopup, activeVar, viewMode, activeTab]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden p-2 [perspective:1400px] sm:p-3">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden p-2 pt-10 sm:p-3 sm:pt-12 md:pt-[64px] [perspective:1400px]">
       {/* Backdrop overlay */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -2327,7 +2334,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
         animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0, filter: "blur(0px)" }}
         exit={{ opacity: 0, scale: 0.9, y: 32, rotateX: -5, filter: "blur(12px)" }}
         transition={{ type: "spring", stiffness: 230, damping: 24, mass: 0.85 }}
-        className="relative z-10 flex h-[96vh] w-[98vw] max-w-[1880px] flex-col overflow-hidden rounded-2xl border bg-background text-foreground shadow-2xl md:h-[98vh] md:w-[99vw]"
+        className="relative z-10 flex h-full max-h-[calc(100vh-3rem)] w-[98vw] max-w-[1880px] flex-col overflow-hidden rounded-2xl border bg-background text-foreground shadow-2xl md:max-h-[calc(100vh-4.5rem)] md:w-[99vw]"
       >
         <motion.div
           aria-hidden="true"
@@ -2337,87 +2344,89 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
           transition={{ duration: 0.7, ease: "easeOut" }}
         />
         
-        {/* Header bar with Breadcrumb, Title & Social elements */}
-        <div className="relative shrink-0 border-b bg-card px-4 py-3 sm:px-6">
-          
-          {/* Breadcrumb line */}
-          <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5 mb-1 select-none overflow-x-auto whitespace-nowrap scrollbar-none">
-            <span className="hover:text-primary cursor-pointer">Trang chủ</span>
-            <span>/</span>
-            <span className="hover:text-primary cursor-pointer">
-              {viewMode === "erp" ? (product.specs.find(s => s.label === "Nhóm Danh mục")?.value || "Sản phẩm") : "Đồng hồ thông minh"}
-            </span>
-            <span>/</span>
-            <span className="truncate font-bold text-foreground">{product.name}</span>
-          </div>
+        {/* Modal Main Scrollable Content Wrapper */}
+        <div className="relative flex-1 min-h-0">
+          <AnimatePresence>
+            {showTopFade && (
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="pointer-events-none absolute left-0 right-0 top-0 z-20 h-12 bg-gradient-to-b from-background/60 to-transparent" 
+              />
+            )}
+          </AnimatePresence>
 
-          {/* Title & Reviews Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pr-8">
-            <div>
-              <h1 className="font-sans font-bold text-sm sm:text-base text-foreground leading-tight flex flex-wrap items-center gap-2">
-                <span>
-                  {viewMode === "erp" 
-                    ? `${product.name} ${activeVar ? `| Phiên bản: ${activeVar.name}` : ""}` 
-                    : `${product.name} Cloud Server (5G) Viền Titan Dây Cao Su Size S/M | Chính hãng Cloud Việt Nam`}
-                </span>
-                <span className="text-[9px] font-black uppercase bg-primary text-white px-1.5 py-0.5 rounded-sm">
-                  {viewMode === "erp" ? "CHÍNH HÃNG HORIZON" : "CHÍNH HÃNG APPLET"}
-                </span>
-              </h1>
+          <div 
+            ref={contentRef}
+            onScroll={handleModalScroll}
+            className="h-full overflow-y-auto bg-muted/30 pb-28 scrollbar-thin"
+          >
+            {/* Header bar with Breadcrumb, Title & Social elements */}
+            <div className="relative shrink-0 border-b bg-card px-4 py-3 sm:px-6 mb-4 sm:mb-6">
               
-              {/* Stars & Reviews */}
-              <div className="flex items-center gap-4 mt-1">
-                <div className="flex items-center gap-0.5 text-primary select-none">
-                  <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                  <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                  <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                  <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                  <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                  <span className="text-muted-foreground text-[11.5px] font-bold ml-1">5 (1 đánh giá)</span>
+              {/* Breadcrumb line */}
+              <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5 mb-1 select-none overflow-x-auto whitespace-nowrap scrollbar-none">
+                &nbsp;
+              </div>
+
+              {/* Title & Reviews Row */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pr-8">
+                <div>
+                  <h1 className="font-sans font-bold text-sm sm:text-base text-foreground leading-tight flex flex-wrap items-center gap-2">
+                    <span>
+                      {viewMode === "erp" 
+                        ? `${product.name} ${activeVar ? `| Phiên bản: ${activeVar.name}` : ""}` 
+                        : `${product.name} Cloud Server (5G) Viền Titan Dây Cao Su Size S/M | Chính hãng Cloud Việt Nam`}
+                    </span>
+                    <span className="text-[9px] font-black uppercase bg-primary text-white px-1.5 py-0.5 rounded-sm">
+                      {viewMode === "erp" ? "CHÍNH HÃNG HORIZON" : "CHÍNH HÃNG APPLET"}
+                    </span>
+                  </h1>
+                  
+                  {/* Stars & Reviews */}
+                  <div className="flex items-center gap-4 mt-1">
+                    <div className="flex items-center gap-0.5 text-primary select-none">
+                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
+                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
+                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
+                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
+                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
+                      <span className="text-muted-foreground text-[11.5px] font-bold ml-1">5 (1 đánh giá)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Social Share & Actions */}
+                <div className="flex shrink-0 select-none items-center gap-2 self-start text-[11px] font-bold text-muted-foreground sm:self-center">
+                  <button className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary">
+                    <span className="material-symbols-outlined text-[16px] text-primary">chat_bubble</span>
+                    <span>Hỏi đáp</span>
+                  </button>
+                  <span className="text-border">|</span>
+                  <button 
+                    onClick={() => {
+                      const specsEl = document.getElementById("specs-section");
+                      if (specsEl) {
+                        specsEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }
+                      setShowSpecsPopup(true);
+                    }}
+                    className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-primary">info</span>
+                    <span>Thông số</span>
+                  </button>
+                  <span className="text-border">|</span>
+                  <button className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary">
+                    <span className="material-symbols-outlined text-[16px] text-primary">compare_arrows</span>
+                    <span>So sánh</span>
+                  </button>
                 </div>
               </div>
+
+
             </div>
 
-            {/* Social Share & Actions */}
-            <div className="flex shrink-0 select-none items-center gap-2 self-start text-[11px] font-bold text-muted-foreground sm:self-center">
-              <button className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary">
-                <span className="material-symbols-outlined text-[16px] text-primary">chat_bubble</span>
-                <span>Hỏi đáp</span>
-              </button>
-              <span className="text-border">|</span>
-              <button 
-                onClick={() => {
-                  const specsEl = document.getElementById("specs-section");
-                  if (specsEl) {
-                    specsEl.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }
-                  setShowSpecsPopup(true);
-                }}
-                className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary"
-              >
-                <span className="material-symbols-outlined text-[16px] text-primary">info</span>
-                <span>Thông số</span>
-              </button>
-              <span className="text-border">|</span>
-              <button className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary">
-                <span className="material-symbols-outlined text-[16px] text-primary">compare_arrows</span>
-                <span>So sánh</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Close button inside header */}
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-3 z-20 flex size-7 cursor-pointer items-center justify-center rounded-full border bg-background text-muted-foreground transition-all hover:bg-muted active:scale-95"
-          >
-            <span className="material-symbols-outlined text-[15px] font-black">close</span>
-          </button>
-        </div>
-
-        {/* Modal Main Scrollable Content */}
-        <div className="flex-1 overflow-y-auto bg-muted/30 p-4 pb-28 scrollbar-thin sm:p-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5 xl:gap-6 items-start">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5 xl:gap-6 items-start lg:items-stretch px-4 sm:px-6">
             
             {/* LEFT COLUMN: Image Box, Highlights, Commitments */}
             <div className="lg:col-span-8 flex flex-col gap-5">
@@ -2547,44 +2556,44 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
               {/* Product Commitments Section */}
               {viewMode !== "erp" && (
               <div className="flex flex-col gap-2">
-                <h4 className="font-sans font-bold text-[12px] uppercase text-foreground tracking-wider flex items-center gap-1.5 select-none">
-                  <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
+                <h4 className="font-sans font-bold text-[14px] uppercase text-foreground tracking-wider flex items-center gap-1.5 select-none">
+                  <span className="material-symbols-outlined text-primary text-[20px]">verified</span>
                   Cam kết sản phẩm
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {/* Commitment 1 */}
                   <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                    <span className="material-symbols-outlined text-emerald-500 text-[18px] font-bold shrink-0 mt-0.5">verified</span>
+                    <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">verified</span>
                     <div className="flex flex-col">
-                      <span className="font-sans font-extrabold text-[12px] text-foreground">Chính hãng Cloud Việt Nam</span>
-                      <span className="mt-0.5 text-[10.5px] font-medium leading-relaxed text-muted-foreground">Hàng chính hãng Cloud, Mới 100% đầy đủ chứng chỉ bảo mật và cam kết SLA doanh nghiệp 99.99%.</span>
+                      <span className="font-sans font-extrabold text-[14px] text-foreground">Chính hãng Cloud Việt Nam</span>
+                      <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Hàng chính hãng Cloud, Mới 100% đầy đủ chứng chỉ bảo mật và cam kết SLA doanh nghiệp 99.99%.</span>
                     </div>
                   </div>
 
                   {/* Commitment 2 */}
                   <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                    <span className="material-symbols-outlined text-emerald-500 text-[18px] font-bold shrink-0 mt-0.5">published_with_changes</span>
+                    <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">published_with_changes</span>
                     <div className="flex flex-col">
-                      <span className="font-sans font-extrabold text-[12px] text-foreground">1 Đổi 1 trong 30 ngày</span>
-                      <span className="mt-0.5 text-[10.5px] font-medium leading-relaxed text-muted-foreground">Đổi trả tài nguyên hoặc bồi hoàn tức thì nếu có lỗi từ phần cứng vật lý hoặc xung đột tài nguyên.</span>
+                      <span className="font-sans font-extrabold text-[14px] text-foreground">1 Đổi 1 trong 30 ngày</span>
+                      <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Đổi trả tài nguyên hoặc bồi hoàn tức thì nếu có lỗi từ phần cứng vật lý hoặc xung đột tài nguyên.</span>
                     </div>
                   </div>
 
                   {/* Commitment 3 */}
                   <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                    <span className="material-symbols-outlined text-emerald-500 text-[18px] font-bold shrink-0 mt-0.5">shield</span>
+                    <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">shield</span>
                     <div className="flex flex-col">
-                      <span className="font-sans font-extrabold text-[12px] text-foreground">Bảo mật Cloud Shield</span>
-                      <span className="mt-0.5 text-[10.5px] font-medium leading-relaxed text-muted-foreground">Đi kèm lá chắn phòng thủ nâng cao, ngăn chặn DDoS và hỗ trợ di trú dữ liệu miễn phí 24/7.</span>
+                      <span className="font-sans font-extrabold text-[14px] text-foreground">Bảo mật Cloud Shield</span>
+                      <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Đi kèm lá chắn phòng thủ nâng cao, ngăn chặn DDoS và hỗ trợ di trú dữ liệu miễn phí 24/7.</span>
                     </div>
                   </div>
 
                   {/* Commitment 4 */}
                   <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                    <span className="material-symbols-outlined text-emerald-500 text-[18px] font-bold shrink-0 mt-0.5">receipt_long</span>
+                    <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">receipt_long</span>
                     <div className="flex flex-col">
-                      <span className="font-sans font-extrabold text-[12px] text-foreground">Đã bao gồm thuế VAT</span>
-                      <span className="mt-0.5 text-[10.5px] font-medium leading-relaxed text-muted-foreground">Giá sản phẩm đã bao gồm VAT 10%, hỗ trợ hoàn thuế VAT - Tax Refund cho doanh nghiệp.</span>
+                      <span className="font-sans font-extrabold text-[14px] text-foreground">Đã bao gồm thuế VAT</span>
+                      <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Giá sản phẩm đã bao gồm VAT 10%, hỗ trợ hoàn thuế VAT - Tax Refund cho doanh nghiệp.</span>
                     </div>
                   </div>
                 </div>
@@ -2592,7 +2601,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
               )}
 
               {/* Product Technical Specs Section */}
-              <div id="specs-section" className="mt-2 select-none rounded-xl border bg-card p-4 shadow-sm">
+              <div id="specs-section" className="mt-2 select-none rounded-xl border bg-card p-4 shadow-sm sticky top-4 z-20">
                 <div className="flex justify-between items-center mb-3 pb-2 border-b border-border">
                   <h4 className="font-sans font-bold text-[12px] uppercase text-foreground tracking-wider flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[18px] text-muted-foreground">settings_suggest</span>
@@ -2631,21 +2640,21 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
               <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm">
                 <div className="flex items-baseline justify-between flex-wrap gap-2">
                   <div className="flex items-baseline gap-2.5">
-                    <span className="font-sans font-black text-2xl text-primary leading-none">
+                    <span className="font-sans font-black text-[28px] text-primary leading-none">
                       {formattedCurrentPrice}
                     </span>
-                    <span className="font-sans font-medium text-[12px] text-muted-foreground line-through leading-none">
+                    <span className="font-sans font-medium text-[14px] text-muted-foreground line-through leading-none">
                       {formattedCurrentOldPrice}
                     </span>
                   </div>
-                  <span className="select-none rounded-full bg-secondary px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wider text-secondary-foreground">
+                  <span className="select-none rounded-full bg-secondary px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-secondary-foreground">
                     Trả góp 0%
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between border-t pt-2.5 text-[11px] font-semibold text-muted-foreground">
+                <div className="flex items-center justify-between border-t pt-2.5 text-[13px] font-semibold text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px] text-emerald-500">verified</span>
+                    <span className="material-symbols-outlined text-[16px] text-emerald-500">verified</span>
                     Giá đã bao gồm VAT
                   </span>
                   <span className="flex cursor-pointer items-center gap-0.5 text-primary hover:underline">
@@ -2656,8 +2665,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
 
               {/* Minimalist Member Promotion Bar */}
               <div className="flex select-none items-center gap-2 rounded-xl border bg-secondary p-3 text-secondary-foreground shadow-sm">
-                <span className="material-symbols-outlined text-primary text-[16px] font-bold">loyalty</span>
-                  <span className="text-[11px] font-bold leading-snug">
+                <span className="material-symbols-outlined text-primary text-[18px] font-bold">loyalty</span>
+                  <span className="text-[13px] font-bold leading-snug">
                   Tiết kiệm thêm tới <span className="font-extrabold">230.000đ</span> cho Smember. <span className="cursor-pointer font-black underline transition-colors hover:text-foreground">Đăng ký ngay</span>
                 </span>
               </div>
@@ -2665,10 +2674,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
               {/* Version Selection Grid / ERP Dynamic Variants Selector */}
               {viewMode === "erp" ? (
                 <div className="flex flex-col gap-2">
-                  <h4 className="flex items-center justify-between font-sans text-[11.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <h4 className="flex items-center justify-between font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
                     <span>Chọn cấu hình biến thể (ERP):</span>
                     {loadingVariants && (
-                      <span className="text-[10px] text-primary animate-pulse">Đang nạp...</span>
+                      <span className="text-[11px] text-primary animate-pulse">Đang nạp...</span>
                     )}
                   </h4>
                   {loadingVariants ? (
@@ -2677,7 +2686,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                       <div className="h-[52px] bg-muted animate-pulse rounded-xl" />
                     </div>
                   ) : erpVariants.length === 0 ? (
-                    <div className="text-[11px] text-muted-foreground p-3 bg-muted/50 rounded-xl border border-dashed border-slate-200">
+                    <div className="text-[12px] text-muted-foreground p-3 bg-muted/50 rounded-xl border border-dashed border-slate-200">
                       Không tìm thấy cấu hình biến thể nào cho sản phẩm này.
                     </div>
                   ) : (
@@ -2702,16 +2711,16 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                           >
                             {isSelected && (
                               <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
-                                <span className="material-symbols-outlined text-[9px] font-black">check</span>
+                                <span className="material-symbols-outlined text-[10px] font-black">check</span>
                               </div>
                             )}
-                            <span className={`font-sans text-[11.5px] font-bold ${isSelected ? "font-black text-foreground" : "text-foreground"}`}>
+                            <span className={`font-sans text-[13px] font-bold ${isSelected ? "font-black text-foreground" : "text-foreground"}`}>
                               {variant.name}
                             </span>
-                            <span className="text-[9.5px] font-medium text-muted-foreground block mt-0.5 truncate">
+                            <span className="text-[11px] font-medium text-muted-foreground block mt-0.5 truncate">
                               {optsStr || variant.sku?.sku}
                             </span>
-                            <span className="text-[10px] font-bold text-primary mt-1">
+                            <span className="text-[11.5px] font-bold text-primary mt-1">
                               {varPriceStr}
                             </span>
                           </button>
@@ -2724,7 +2733,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 <>
                   {/* Version Selection Grid */}
                   <div className="flex flex-col gap-2">
-                    <h4 className="flex items-center justify-between font-sans text-[11.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <h4 className="flex items-center justify-between font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
                       <span>Chọn phiên bản:</span>
                     </h4>
                     <div className="grid grid-cols-2 gap-2">
@@ -2742,13 +2751,13 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                           >
                             {isSelected && (
                               <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
-                                <span className="material-symbols-outlined text-[9px] font-black">check</span>
+                                <span className="material-symbols-outlined text-[10px] font-black">check</span>
                               </div>
                             )}
-                            <span className={`font-sans text-[11.5px] font-bold ${isSelected ? "font-black text-foreground" : "text-foreground"}`}>
+                            <span className={`font-sans text-[13px] font-bold ${isSelected ? "font-black text-foreground" : "text-foreground"}`}>
                               {ver.title}
                             </span>
-                            <span className="text-[9.5px] font-medium text-muted-foreground block mt-0.5 truncate">
+                            <span className="text-[11px] font-medium text-muted-foreground block mt-0.5 truncate">
                               {ver.desc}
                             </span>
                           </button>
@@ -2759,7 +2768,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
 
                   {/* Color Selection Grid */}
                   <div className="flex flex-col gap-2">
-                    <h4 className="font-sans text-[11.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <h4 className="font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
                     Màu sắc: <span className="font-extrabold text-foreground">{colors.find(c => c.id === activeColor)?.title}</span>
                     </h4>
                     <div className="grid grid-cols-2 gap-2">
@@ -2779,7 +2788,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                           >
                             {isSelected && (
                               <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
-                                <span className="material-symbols-outlined text-[9px] font-black">check</span>
+                                <span className="material-symbols-outlined text-[10px] font-black">check</span>
                               </div>
                             )}
                             <div className="flex size-7 shrink-0 items-center justify-center">
@@ -2789,10 +2798,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                               />
                             </div>
                             <div className="flex flex-col min-w-0">
-                              <span className="font-sans font-bold text-[11px] text-foreground leading-tight truncate">
+                              <span className="font-sans font-bold text-[13px] text-foreground leading-tight truncate">
                                 {color.title}
                               </span>
-                              <span className="text-[9px] font-medium text-muted-foreground mt-0.5 leading-none">
+                              <span className="text-[10.5px] font-medium text-muted-foreground mt-0.5 leading-none">
                                 {formattedColorPrice}
                               </span>
                             </div>
@@ -2870,93 +2879,92 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
 
               {/* Frequently Bought Together (Phụ kiện mua cùng / Đề xuất mua kèm) Section */}
               {viewMode !== "erp" && (
-              <div className="group/carousel relative flex select-none flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm">
+              <div className="flex select-none flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sticky top-6 z-20">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h4 className="font-sans font-bold text-[11.5px] uppercase text-foreground tracking-wider flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-primary text-[18px]">add_circle</span>
                     Phụ kiện mua cùng
                   </h4>
-                  <div className="flex rounded-lg border bg-muted p-0.5">
-                    <button
-                      onClick={() => { setAccTab("watch"); setAccPage(0); }}
-                      className={`px-2.5 py-1 rounded-md text-[9.5px] font-bold transition-all cursor-pointer ${
-                        accTab === "watch"
-                          ? "bg-card text-primary shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      Phụ kiện Watch
-                    </button>
-                    <button
-                      onClick={() => { setAccTab("cloud"); setAccPage(0); }}
-                      className={`px-2.5 py-1 rounded-md text-[9.5px] font-bold transition-all cursor-pointer ${
-                        accTab === "cloud"
-                          ? "bg-card text-primary shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      Dịch vụ Cloud
-                    </button>
+                  {/* Page indicator dots moved to header */}
+                  <div className="flex items-center justify-center gap-1.5 select-none">
+                    {Array.from({ length: Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setAccPage(idx)}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${accPage === idx ? "w-3 bg-primary" : "w-1.5 bg-muted-foreground/35"}`}
+                        aria-label={`Go to page ${idx + 1}`}
+                      />
+                    ))}
                   </div>
                 </div>
 
-                {/* Left/Right Carousel Control Zones */}
-                <button
-                  onClick={() => setAccPage(prev => Math.max(0, prev - 1))}
-                  disabled={accPage === 0}
-                  className={`absolute inset-y-14 left-0 z-20 flex w-16 items-center justify-start rounded-l-xl bg-gradient-to-r from-background/95 via-background/65 to-transparent pl-2 text-primary shadow-[inset_18px_0_28px_rgba(255,77,36,0.08)] backdrop-blur-sm transition-all duration-300 ${
-                    accPage === 0
-                      ? "pointer-events-none opacity-0"
-                      : "cursor-pointer opacity-0 hover:opacity-100 active:scale-[0.99] group-hover/carousel:opacity-100"
-                  }`}
-                  aria-label="Previous Page"
-                >
-                  <span className="flex size-8 items-center justify-center rounded-full border bg-card/85 shadow-sm backdrop-blur-md">
-                    <span className="material-symbols-outlined text-[16px] font-bold">west</span>
-                  </span>
-                </button>
+                {/* Left/Right Carousel Control Zones & Grid Wrapper */}
+                <div className="group/carousel relative -mx-4 px-4">
+                  <button
+                    onClick={() => setAccPage(prev => Math.max(0, prev - 1))}
+                    disabled={accPage === 0}
+                    className={`group/btn absolute inset-y-0 left-0 z-20 flex w-16 items-center justify-start rounded-l-xl bg-gradient-to-r from-card via-card/70 to-transparent pl-3 text-primary transition-all duration-500 ${
+                      accPage === 0
+                        ? "pointer-events-none opacity-0"
+                        : "cursor-pointer opacity-0 hover:opacity-100 active:scale-[0.99] group-hover/carousel:opacity-100"
+                    }`}
+                    aria-label="Previous Page"
+                  >
+                    <span className="flex size-9 items-center justify-center rounded-full border border-primary/20 bg-background/90 shadow-[0_4px_14px_rgba(0,0,0,0.08)] backdrop-blur-md transition-transform duration-300 group-hover/btn:scale-110">
+                      <span className="material-symbols-outlined text-[18px] font-bold">west</span>
+                    </span>
+                  </button>
 
-                <button
-                  onClick={() => setAccPage(prev => Math.min(Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1, prev + 1))}
-                  disabled={accPage === Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1}
-                  className={`absolute inset-y-14 right-0 z-20 flex w-16 items-center justify-end rounded-r-xl bg-gradient-to-l from-background/95 via-background/65 to-transparent pr-2 text-primary shadow-[inset_-18px_0_28px_rgba(255,77,36,0.08)] backdrop-blur-sm transition-all duration-300 ${
-                    accPage === Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1
-                      ? "pointer-events-none opacity-0"
-                      : "cursor-pointer opacity-0 hover:opacity-100 active:scale-[0.99] group-hover/carousel:opacity-100"
-                  }`}
-                  aria-label="Next Page"
-                >
-                  <span className="flex size-8 items-center justify-center rounded-full border bg-card/85 shadow-sm backdrop-blur-md">
-                    <span className="material-symbols-outlined text-[16px] font-bold">east</span>
-                  </span>
-                </button>
+                  <button
+                    onClick={() => setAccPage(prev => Math.min(Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1, prev + 1))}
+                    disabled={accPage === Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1}
+                    className={`group/btn absolute inset-y-0 right-0 z-20 flex w-16 items-center justify-end rounded-r-xl bg-gradient-to-l from-card via-card/70 to-transparent pr-3 text-primary transition-all duration-500 ${
+                      accPage === Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1
+                        ? "pointer-events-none opacity-0"
+                        : "cursor-pointer opacity-0 hover:opacity-100 active:scale-[0.99] group-hover/carousel:opacity-100"
+                    }`}
+                    aria-label="Next Page"
+                  >
+                    <span className="flex size-9 items-center justify-center rounded-full border border-primary/20 bg-background/90 shadow-[0_4px_14px_rgba(0,0,0,0.08)] backdrop-blur-md transition-transform duration-300 group-hover/btn:scale-110">
+                      <span className="material-symbols-outlined text-[18px] font-bold">east</span>
+                    </span>
+                  </button>
 
-                {/* Horizontal Grid of accessory items - Paginated (3 items per page in a beautiful single-column stack) */}
-                <div className="grid grid-cols-1 gap-4 px-2">
-                  {(accTab === "watch" ? watchAccessories : cloudAccessories)
-                    .slice(accPage * 3, (accPage + 1) * 3)
-                    .map((item) => {
-                      const isAdded = addedAccs.includes(item.id);
-                      return (
-                        <div
-                          key={item.id}
-                          className="relative flex h-[108px] items-center gap-3 overflow-visible rounded-xl border bg-card p-2.5 text-card-foreground transition-all hover:border-primary/40 hover:shadow-md sm:h-[124px] sm:gap-4 sm:p-3"
-                        >
-                          {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
-                          <div className="absolute -top-1.5 left-[-4px] h-[22px] bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] text-white text-[9.5px] font-black px-2 rounded-br-md rounded-tr-sm shadow-[1px_1px_3px_rgba(0,0,0,0.15)] flex items-center justify-center z-20 select-none">
-                            {calculateAccDiscount(item.price, item.oldPrice)}
-                          </div>
-                          {/* 3D Fold Corner for Left Ribbon */}
-                          <div className="absolute top-[16px] left-[-4px] w-[4px] h-[4px] bg-[#B43C00] z-10" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
-                          {/* Left side: Product Image in a matching aspect ratio container */}
-                          <div className="relative -my-2.5 -ml-2.5 flex h-[calc(100%+1.25rem)] w-[116px] shrink-0 items-center justify-center overflow-hidden rounded-l-xl bg-transparent p-0 sm:-my-3 sm:-ml-3 sm:h-[calc(100%+1.5rem)] sm:w-[136px]">
-                            <img
-                              src={item.img}
-                              alt={item.name}
-                              className="size-full object-cover transition-transform duration-500 hover:scale-105"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
+                  {/* Horizontal Grid of accessory items - Paginated (3 items per page in a beautiful single-column stack) */}
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={accPage}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ duration: 0.2 }}
+                      className="grid grid-cols-1 gap-3 px-1 sm:px-2 w-full"
+                    >
+                      {(accTab === "watch" ? watchAccessories : cloudAccessories)
+                        .slice(accPage * 3, (accPage + 1) * 3)
+                        .map((item) => {
+                          const isAdded = addedAccs.includes(item.id);
+                          return (
+                          <div
+                            key={item.id}
+                            className="relative flex h-[96px] items-center gap-2.5 overflow-visible rounded-xl border bg-card p-2 text-card-foreground transition-all hover:border-primary/40 hover:shadow-md sm:h-[112px] sm:gap-3 sm:p-2.5"
+                          >
+                            {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
+                            <div className="absolute -top-1.5 left-[-4px] h-[22px] bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] text-white text-[9.5px] font-black px-2 rounded-br-md rounded-tr-sm shadow-[1px_1px_3px_rgba(0,0,0,0.15)] flex items-center justify-center z-20 select-none">
+                              {calculateAccDiscount(item.price, item.oldPrice)}
+                            </div>
+                            {/* 3D Fold Corner for Left Ribbon */}
+                            <div className="absolute top-[16px] left-[-4px] w-[4px] h-[4px] bg-[#B43C00] z-10" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
+                            
+                            {/* Left side: Product Image in a matching aspect ratio container */}
+                            <div className="relative -my-2 -ml-2 flex h-[calc(100%+1rem)] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-l-xl bg-transparent p-0 sm:-my-2.5 sm:-ml-2.5 sm:h-[calc(100%+1.25rem)] sm:w-[120px]">
+                              <img
+                                src={item.img}
+                                alt={item.name}
+                                className="size-full object-cover transition-transform duration-500 hover:scale-105"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
 
                           {/* Right side: Information and Add action */}
                           <div className="flex-1 flex flex-col justify-between min-w-0 h-full py-0.5">
@@ -3009,31 +3017,19 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                           </div>
                         </div>
                       );
-                    })}
-                </div>
-
-                {/* Page indicator dots */}
-                <div className="flex items-center justify-center gap-1.5 mt-1.5 select-none">
-                  {Array.from({ length: Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) }).map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setAccPage(idx)}
-                      className={`h-1.5 rounded-full transition-all duration-300 ${accPage === idx ? "w-3 bg-primary" : "w-1.5 bg-muted-foreground/35"}`}
-                      aria-label={`Go to page ${idx + 1}`}
-                    />
-                  ))}
-                </div>
+                      })}
+                    </motion.div>
+                  </AnimatePresence>
+              </div>
               </div>
               )}
-
-
 
             </div>
 
           </div>
 
           {/* 2. ĐÁNH GIÁ & NHẬN XÉT SECTION (CellphoneS style but with premium airiness) */}
-          <div className="mb-4 rounded-xl border bg-card p-5 shadow-sm sm:p-6">
+          <div className="mt-6 sm:mt-8 rounded-xl border bg-card p-5 shadow-sm sm:p-6">
             <h2 className="font-sans font-bold text-sm sm:text-base text-foreground mb-5 flex items-center gap-2 select-none">
               <span className="material-symbols-outlined text-primary font-black text-[20px]">reviews</span>
               <span>Đánh giá & nhận xét {viewMode === "erp" ? product.name : `${product.name} Cloud Server`}</span>
@@ -3198,8 +3194,18 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
 
         </div>
 
+          <AnimatePresence>
+            {showBottomFade && (
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 h-12 bg-gradient-to-t from-background/60 to-transparent" 
+              />
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Floating bottom actions bar with 3D discount ribbon */}
-        <div className="absolute bottom-5 left-1/2 z-30 flex w-[calc(100%-3rem)] max-w-[850px] -translate-x-1/2 items-center justify-between overflow-visible rounded-xl border border-white/20 bg-background/20 p-3 shadow-[0_20px_60px_rgba(255,77,36,0.11),0_8px_28px_rgba(0,0,0,0.07)] backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 sm:w-[85%]">
+        <div className="absolute bottom-5 left-1/2 z-30 flex h-[72px] w-[calc(100%-3rem)] max-w-[850px] -translate-x-1/2 items-center justify-between overflow-visible rounded-xl border border-white/20 bg-background/20 p-3 shadow-[0_20px_60px_rgba(255,77,36,0.11),0_8px_28px_rgba(0,0,0,0.07)] backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 sm:w-[85%]">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 via-transparent to-transparent" />
           {formattedDiscount && (
             <>
@@ -3244,6 +3250,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
 
           {/* Right segment: Buttons */}
           <div className="relative flex items-center gap-2 shrink-0">
+
+
             <button 
               onClick={(e) => {
                 if (onAddToCart) {
