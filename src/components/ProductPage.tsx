@@ -50,6 +50,7 @@ import {
   TrendingDownIcon,
   TrendingUpIcon,
   XIcon,
+  PlusIcon,
   ZapIcon,
 } from "lucide-react";
 
@@ -491,14 +492,14 @@ const getProductImage = (product: { id: string; category: string }) => {
 };
 
 const getProductVNDDetails = (id: string) => {
-  const mappings: Record<string, { present: string; old: string; discount: string; smember: string }> = {
-    "nexus-ai": { present: "12.500.000đ", old: "14.000.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 125.000đ" },
+  const mappings: Record<string, { present: string; old?: string; discount?: string; smember?: string }> = {
+    "nexus-ai": { present: "12.500.000đ", old: "14.000.000đ", discount: "Giảm 10%" },
     "aero-compute": { present: "33.890.000đ", old: "34.990.000đ", discount: "Giảm 3%", smember: "Smember giảm đến 339.000đ" },
     "glacier-storage": { present: "450.000đ", old: "500.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 15.000đ" },
-    "mesh-network": { present: "2.150.000đ", old: "2.500.000đ", discount: "Giảm 14%", smember: "Smember giảm đến 50.000đ" },
+    "mesh-network": { present: "2.150.000đ", old: "2.500.000đ", discount: "Giảm 14%" },
     "vision-ai": { present: "8.900.000đ", old: "9.900.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 99.000đ" },
     "tensor-tpu": { present: "48.990.000đ", old: "52.000.000đ", discount: "Giảm 5%", smember: "Smember giảm đến 489.000đ" },
-    "chrono-db": { present: "15.200.000đ", old: "16.500.000đ", discount: "Giảm 7%", smember: "Smember giảm đến 150.000đ" },
+    "chrono-db": { present: "15.200.000đ", old: "16.500.000đ", discount: "Giảm 7%" },
     "edge-gateway": { present: "3.600.000đ", old: "4.000.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 36.000đ" },
     "audiosynth-ai": { present: "7.200.000đ", old: "8.000.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 72.000đ" },
     "quantum-vm": { present: "29.500.000đ", old: "32.000.000đ", discount: "Giảm 8%", smember: "Smember giảm đến 295.000đ" },
@@ -1426,23 +1427,23 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                             )}
                           </div>
 
-                          <CardHeader className="px-3">
+                          <CardHeader className="px-3 pb-0">
                             <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <CardTitle className="line-clamp-2">
+                              <div className="min-w-0 flex-1">
+                                <CardTitle className="line-clamp-1">
                                   {viewMode === "erp" ? product.name : `${product.name} Cloud Platform`}
                                 </CardTitle>
-                                <CardDescription className="line-clamp-1 text-xs leading-5">
+                                <CardDescription className="line-clamp-1 text-[11px] mt-0.5 leading-tight">
                                   {product.desc || "Dịch vụ hạ tầng đã đồng bộ từ ERP."}
                                 </CardDescription>
                               </div>
-                              {product.tag && <Badge variant="outline">{product.tag}</Badge>}
+                              {product.tag && <Badge variant="outline" className="shrink-0">{product.tag}</Badge>}
                             </div>
                           </CardHeader>
 
                           <CardContent className="flex flex-1 flex-col gap-2 px-3">
                             <div className="flex flex-wrap items-baseline gap-2">
-                              <span className="text-base font-medium text-primary">{vndInfo.present}</span>
+                              <span className="text-base font-semibold text-primary">{vndInfo.present}</span>
                               {vndInfo.old && <span className="text-sm text-muted-foreground line-through">{vndInfo.old}</span>}
                             </div>
 
@@ -1454,13 +1455,21 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                               ))}
                             </div>
 
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <BadgeCheckIcon />
-                              <span className="truncate">{vndInfo.smember}</span>
+                            <div className="mt-auto flex min-h-4 items-center">
+                              {vndInfo.smember && (
+                                <motion.div
+                                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                                  transition={{ duration: 5, ease: "linear", repeat: Infinity }}
+                                  className="flex w-fit items-center gap-1.5 rounded border border-[#C084FC]/20 bg-gradient-to-r from-[#C084FC]/20 via-[#FF9A9E]/20 to-[#C084FC]/20 bg-[length:200%_auto] px-1.5 py-0.5"
+                                >
+                                  <BadgeCheckIcon className="size-3.5 text-[#C084FC]" />
+                                  <span className="truncate text-[11px] font-medium text-foreground/80">{vndInfo.smember}</span>
+                                </motion.div>
+                              )}
                             </div>
                           </CardContent>
 
-                          <CardFooter className="justify-between gap-2 bg-background px-3 py-2">
+                          <CardFooter className="justify-between gap-2 bg-background px-3 py-1.5">
                             <div className="flex items-center gap-1.5 text-xs">
                               <StarIcon className="fill-primary text-primary" />
                               <span className="font-medium">5.0</span>
@@ -1469,7 +1478,8 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                               {viewMode !== "erp" && (
                                 <Button
                                   variant={compared ? "default" : "outline"}
-                                  size="icon-xs"
+                                  size="sm"
+                                  className="h-7 px-3 text-xs"
                                   aria-label={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
                                   title={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
                                   onClick={(event) => {
@@ -1483,24 +1493,10 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                                     }
                                   }}
                                 >
-                                  <SlidersHorizontalIcon />
+                                  <SlidersHorizontalIcon className="mr-1.5 size-3.5" />
+                                  {compared ? "Đã so sánh" : "So sánh"}
                                 </Button>
                               )}
-                              <Button
-                                size="icon-sm"
-                                aria-label="Thêm vào giỏ hàng"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onAddToCart?.(
-                                    viewMode === "erp" ? product.name : `${product.name} Cloud Platform`,
-                                    vndInfo.present,
-                                    event
-                                  );
-                                  showToast(`Đã thêm ${product.name} vào giỏ hàng!`, "success");
-                                }}
-                              >
-                                <ShoppingCartIcon />
-                              </Button>
                             </div>
                           </CardFooter>
                         </Card>
@@ -1531,39 +1527,75 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
         </div>
       </main>
 
-      {comparedProductIds.length > 0 && (
-        <Card className="fixed bottom-4 left-1/2 z-40 w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 shadow-lg">
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <Badge>So sánh {comparedProductIds.length}/3</Badge>
-              <div className="flex items-center gap-2">
-                {comparedProducts.map((product) => (
-                  <div key={product.id} className="relative size-10 overflow-hidden rounded-lg border bg-muted">
-                    <img src={getProductImage(product)} alt={product.name} className="size-full object-cover" referrerPolicy="no-referrer" />
-                  </div>
-                ))}
+      <AnimatePresence>
+        {comparedProductIds.length > 0 && (
+          <motion.div
+            initial={{ y: 150, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 150, opacity: 0, scale: 0.9 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed bottom-8 left-0 right-0 z-50 mx-auto w-fit"
+          >
+            <div className="flex items-center gap-5 rounded-full border border-white/20 bg-background/70 p-3 pr-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-3xl dark:border-white/10 dark:bg-black/60">
+              
+              <div className="flex items-center pl-2">
+                <div className="mr-5 flex -space-x-4">
+                  {comparedProducts.map((product, i) => (
+                    <motion.div 
+                      key={product.id} 
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="relative size-12 overflow-hidden rounded-full border-[3px] border-background bg-muted shadow-sm ring-1 ring-black/5 dark:border-zinc-900"
+                      style={{ zIndex: 10 - i }}
+                    >
+                      <img src={getProductImage(product)} alt={product.name} className="size-full object-cover" referrerPolicy="no-referrer" />
+                    </motion.div>
+                  ))}
+                  {Array.from({ length: Math.max(0, 3 - comparedProducts.length) }).map((_, i) => (
+                    <div 
+                      key={`empty-${i}`} 
+                      className="relative flex size-12 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted/50 text-muted-foreground dark:border-zinc-800"
+                      style={{ zIndex: 5 - i }}
+                    >
+                       <PlusIcon className="size-5 opacity-40" />
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="hidden flex-col sm:flex">
+                   <span className="text-base font-semibold leading-none">So sánh</span>
+                   <span className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">{comparedProductIds.length} / 3 Sản phẩm</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pl-3 border-l border-border/50">
+                <Button
+                  className="h-10 rounded-full px-5 text-sm"
+                  onClick={() => {
+                    if (comparedProductIds.length < 2) {
+                      showToast("Vui lòng chọn ít nhất 2 sản phẩm để so sánh.", "warning");
+                    } else {
+                      setShowCompareModal(true);
+                    }
+                  }}
+                >
+                  <SlidersHorizontalIcon data-icon="inline-start" />
+                  So sánh ngay
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="size-10 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10" 
+                  onClick={() => setComparedProductIds([])}
+                  title="Xóa tất cả"
+                >
+                  <XIcon />
+                </Button>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                onClick={() => {
-                  if (comparedProductIds.length < 2) {
-                    showToast("Vui lòng chọn ít nhất 2 sản phẩm để so sánh.", "warning");
-                  } else {
-                    setShowCompareModal(true);
-                  }
-                }}
-              >
-                <SlidersHorizontalIcon data-icon="inline-start" />
-                So sánh ngay
-              </Button>
-              <Button variant="ghost" onClick={() => setComparedProductIds([])}>
-                Xóa
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Dialog open={showCompareModal} onOpenChange={setShowCompareModal}>
         <DialogContent className="max-h-[86vh] max-w-5xl overflow-hidden p-0 sm:max-w-5xl">
@@ -1574,44 +1606,64 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="h-[68vh]">
-            <div className="grid min-w-[720px] grid-cols-[180px_repeat(3,minmax(160px,1fr))] text-sm">
-              <div className="border-b border-r bg-muted/50 p-3 font-medium">Thông số</div>
-              {comparedProducts.map((product) => (
-                <div key={product.id} className="border-b border-r p-3">
-                  <div className="flex items-center gap-3">
-                    <img src={getProductImage(product)} alt={product.name} className="size-12 rounded-lg object-cover" referrerPolicy="no-referrer" />
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{product.name}</div>
-                      <div className="text-primary">{getProductVNDDetails(product.id).present}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {Array.from({ length: 3 - comparedProducts.length }).map((_, index) => (
-                <div key={index} className="border-b border-r p-3 text-muted-foreground">Chưa chọn</div>
-              ))}
-
-              {[
-                { label: "Phân loại", get: (p: Product) => p.category },
-                { label: "Hãng", get: (p: Product) => getProductBrand(p.id) },
-                { label: "Giá", get: (p: Product) => getProductVNDDetails(p.id).present },
-                { label: "Đặc quyền", get: (p: Product) => getProductVNDDetails(p.id).smember },
-                { label: "Thông số 1", get: (p: Product) => p.specs[0]?.value || "Tiêu chuẩn" },
-                { label: "Thông số 2", get: (p: Product) => p.specs[1]?.value || "Tiêu chuẩn" },
-                { label: "Thông số 3", get: (p: Product) => p.specs[2]?.value || "Tiêu chuẩn" },
-              ].map((row) => (
-                <React.Fragment key={row.label}>
-                  <div className="border-b border-r bg-muted/30 p-3 font-medium">{row.label}</div>
-                  {comparedProducts.map((product) => (
-                    <div key={`${row.label}-${product.id}`} className="border-b border-r p-3">
-                      {row.get(product)}
-                    </div>
+            <div className="min-w-[800px]">
+              <table className="w-full text-left text-sm">
+                <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur shadow-sm">
+                  <tr>
+                    <th className="w-[180px] p-4 align-top font-medium text-muted-foreground">
+                      <div className="mt-2 uppercase tracking-wider text-xs">Thông số</div>
+                    </th>
+                    {comparedProducts.map((product) => (
+                      <th key={product.id} className="w-[calc((100%-180px)/3)] p-4 font-normal">
+                        <div className="flex flex-col gap-3">
+                           <div className="relative aspect-video w-full overflow-hidden rounded-lg border bg-muted shadow-sm">
+                             <img src={getProductImage(product)} alt={product.name} className="size-full object-cover" referrerPolicy="no-referrer" />
+                           </div>
+                           <div className="space-y-1">
+                             <div className="font-semibold text-base line-clamp-1">{product.name}</div>
+                             <div className="text-primary font-medium">{getProductVNDDetails(product.id).present}</div>
+                           </div>
+                           <Button variant="outline" size="sm" className="w-full h-8 text-xs text-muted-foreground mt-2" onClick={() => setComparedProductIds(comparedProductIds.filter(id => id !== product.id))}>
+                             <XIcon data-icon="inline-start" className="size-3" />
+                             Xóa khỏi bảng
+                           </Button>
+                        </div>
+                      </th>
+                    ))}
+                    {Array.from({ length: 3 - comparedProducts.length }).map((_, index) => (
+                      <th key={`empty-${index}`} className="w-[calc((100%-180px)/3)] p-4 font-normal">
+                         <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/60 bg-muted/20 text-muted-foreground/50">
+                           <PlusIcon className="size-6" />
+                           <span className="text-xs font-medium uppercase tracking-wider">Trống</span>
+                         </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {[
+                    { label: "Phân loại", get: (p: Product) => <Badge variant="secondary" className="uppercase tracking-wider text-[10px]">{p.category}</Badge> },
+                    { label: "Thương hiệu", get: (p: Product) => getProductBrand(p.id) },
+                    { label: "Mức giá", get: (p: Product) => <span className="font-semibold text-primary">{getProductVNDDetails(p.id).present}</span> },
+                    { label: "Đặc quyền", get: (p: Product) => getProductVNDDetails(p.id).smember ? <span className="text-[#C084FC]">{getProductVNDDetails(p.id).smember}</span> : "-" },
+                    { label: "Thông số 1", get: (p: Product) => p.specs[0]?.value || "-" },
+                    { label: "Thông số 2", get: (p: Product) => p.specs[1]?.value || "-" },
+                    { label: "Thông số 3", get: (p: Product) => p.specs[2]?.value || "-" },
+                  ].map((row) => (
+                    <tr key={row.label} className="transition-colors hover:bg-muted/30 even:bg-muted/10">
+                      <td className="p-4 font-medium text-muted-foreground">{row.label}</td>
+                      {comparedProducts.map((product) => (
+                        <td key={`${row.label}-${product.id}`} className="p-4 font-medium">
+                          {row.get(product)}
+                        </td>
+                      ))}
+                      {Array.from({ length: 3 - comparedProducts.length }).map((_, index) => (
+                        <td key={`${row.label}-empty-${index}`} className="p-4 text-muted-foreground/30">-</td>
+                      ))}
+                    </tr>
                   ))}
-                  {Array.from({ length: 3 - comparedProducts.length }).map((_, index) => (
-                    <div key={`${row.label}-${index}`} className="border-b border-r p-3 text-muted-foreground">-</div>
-                  ))}
-                </React.Fragment>
-              ))}
+                </tbody>
+              </table>
             </div>
           </ScrollArea>
           <div className="flex justify-end gap-2 border-t p-4">
