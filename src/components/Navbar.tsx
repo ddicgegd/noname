@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2 } from "lucide-react";
+import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp } from "lucide-react";
 
 interface CartItem {
   id: string;
@@ -241,6 +241,11 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showCartMenu, setShowCartMenu] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
+  
+  // Search state
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const readUser = () => {
@@ -324,8 +329,6 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const navLinks = [
     { label: "Sản phẩm", href: "/p" },
     { label: "Báo cáo Xác thực", href: "auth-report" },
-    { label: "Showcase", href: "#showcase" },
-    { label: "Pricing", href: "#pricing" },
   ];
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, label: string, href: string) => {
@@ -447,8 +450,9 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
 
   return (
     <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[66%] max-w-[1300px] rounded-full border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.05)] z-50 flex justify-between items-center py-3 px-6">
-      {/* Brand Logo */}
-      <a
+      <div className="flex items-center gap-24 lg:gap-32">
+        {/* Brand Logo */}
+        <a
         className="font-display text-headline-md tracking-tighter text-primary flex items-center gap-2 scale-95 active:scale-90 transition-transform cursor-pointer"
         href="#"
         onClick={(e) => {
@@ -509,10 +513,10 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       clearTimeout(megaMenuTimeoutRef.current);
                     }
                   }}
-                  className={`font-medium transition-colors duration-300 font-sans text-sm scale-95 active:scale-90 transition-transform cursor-pointer select-none outline-none ${
+                  className={`transition-colors duration-300 font-sans text-base scale-95 active:scale-90 transition-transform cursor-pointer select-none outline-none ${
                     (isActive || showProductMegaMenu)
                       ? "text-[#FF4D24] font-bold" 
-                      : "text-[#555555] hover:text-primary"
+                      : "text-[#555555] hover:text-primary font-medium"
                   }`}
                 >
                   {link.label}
@@ -520,88 +524,17 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
 
                 {/* MEGA MENU DROPDOWN PANEL */}
                 <div 
-                  className="absolute top-[calc(100%+12px)] left-1/2 w-[95vw] lg:w-[1160px] bg-white/95 backdrop-blur-3xl rounded-2xl border border-white/85 shadow-[0_40px_90px_-15px_rgba(0,0,0,0.18)] z-50 flex overflow-visible mega-menu-popup"
+                  className="absolute top-[calc(100%+12px)] right-0 w-[95vw] lg:w-[820px] bg-white/95 backdrop-blur-3xl rounded-2xl border border-white/85 shadow-[0_40px_90px_-15px_rgba(0,0,0,0.18)] z-50 flex overflow-visible mega-menu-popup"
                   style={{ 
                     pointerEvents: showProductMegaMenu ? 'auto' : 'none',
                     opacity: showProductMegaMenu ? 1 : 0,
-                    transform: `translate(-50%, ${showProductMegaMenu ? '0px' : '8px'}) scale(${showProductMegaMenu ? 1 : 0.985})`,
+                    transform: `translate(0, ${showProductMegaMenu ? '0px' : '8px'}) scale(${showProductMegaMenu ? 1 : 0.985})`,
                     transition: 'opacity 280ms cubic-bezier(0.16, 1, 0.3, 1), transform 280ms cubic-bezier(0.16, 1, 0.3, 1), border-color 280ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    transformOrigin: 'top right'
                   }}
                 >
-                  {/* Left Section: Pure Poster Image (With descriptive overlay, smooth scale-up on hover) */}
-                  <div 
-                    className="w-[260px] shrink-0 relative bg-slate-950 group/poster poster-glow-trigger cursor-pointer select-none rounded-l-2xl overflow-visible"
-                    onClick={() => {
-                      onNavigate("product");
-                      setShowProductMegaMenu(false);
-                    }}
-                  >
-                    {/* Ambient Glow Bleeds (leaking outside the poster image container to top, left, and bottom) */}
-                    <div className="absolute -top-6 -left-8 -bottom-6 right-4 bg-[#FF4D24]/20 blur-[40px] rounded-l-2xl pointer-events-none poster-behind-glow" />
-                    <div className="absolute -top-3 -left-4 -bottom-3 right-2 bg-[#FF4D24]/15 blur-[15px] rounded-l-2xl pointer-events-none poster-behind-glow-tight" />
-
-                    {/* Image and inner gradient overlays wrapped in an overflow-hidden container to protect rounded corners */}
-                    <div className="absolute inset-0 overflow-hidden rounded-l-[2.1rem] z-10 pointer-events-none">
-                      <img 
-                        src="https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?auto=format&fit=crop&w=600&q=80" 
-                        alt="Samsung Galaxy S26 Ultra Poster" 
-                        className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover/poster:scale-105"
-                        referrerPolicy="no-referrer"
-                      />
-                      {/* Subtle premium gradient overlay to blend image borders */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
-                    </div>
-                    
-                    {/* Cosmic Floating Stars (Overflow-visible to float all the way up and outside the container!) */}
-                    <div className="absolute inset-0 pointer-events-none overflow-visible z-20 cosmic-stars-wrapper">
-                      {COSMIC_STARS_DATA.map((star, idx) => (
-                        <div
-                          key={idx}
-                          className="absolute"
-                          style={{
-                            left: star.left,
-                            width: `${star.size}px`,
-                            height: `${star.size}px`,
-                            animation: `cosmic-rise ${star.duration} linear infinite`,
-                            animationDelay: star.delay,
-                            color: "#fff4ec",
-                            opacity: 0,
-                            '--star-opacity': star.opacity,
-                            '--star-drift': star.drift,
-                          } as React.CSSProperties}
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full cosmic-star-svg">
-                            <path d="M12 0 Q12 12 0 12 Q12 12 12 24 Q12 12 24 12 Q12 12 12 0 Z" />
-                          </svg>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Sweeping Shine Sweep Effect */}
-                    <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-l-2xl">
-                      <div 
-                        className="w-[120px] h-[200%] bg-gradient-to-r from-transparent via-white/20 to-transparent absolute -top-[50%] left-0 poster-shine"
-                      />
-                    </div>
-                    
-                    {/* Glowing Inner Border Overlay */}
-                    <div className="absolute inset-0 rounded-l-2xl border border-white/10 group-hover/poster:border-[#FF4D24]/40 group-hover/poster:shadow-[inset_0_0_30px_rgba(255,77,36,0.2)] transition-all duration-700 pointer-events-none z-30" />
-
-                    <div className="absolute inset-x-0 bottom-0 p-6 z-30 text-left">
-                      <span className="text-[10px] font-black tracking-widest text-[#FF4D24] uppercase font-sans">
-                        SẢN PHẨM MỚI
-                      </span>
-                      <h4 className="text-white text-base font-black tracking-tight mt-1 mb-2 font-display">
-                        Khám Phá S26 Ultra
-                      </h4>
-                      <p className="text-slate-300 text-[11px] font-medium flex items-center gap-1 group-hover/poster:text-[#FF4D24] transition-colors duration-200">
-                        Xem toàn bộ sản phẩm →
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Right Section: Categories with Rich Ambient Glow Bleeding over from the Poster Image */}
-                  <div className="relative flex-1 p-8 pl-10 bg-white/75 flex flex-col justify-center overflow-hidden rounded-r-2xl">
+                  {/* Right Section: Categories with Rich Ambient Glow */}
+                  <div className="relative flex-1 p-8 bg-white/75 flex flex-col justify-center overflow-hidden rounded-2xl">
                         {/* Stronger ambient color bleed matching the poster colors */}
                         <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-cyan-500/8 via-indigo-500/2 to-transparent pointer-events-none" />
                         
@@ -665,10 +598,10 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
               key={link.label}
               href={link.href}
               onClick={(e) => handleLinkClick(e, link.label, link.href)}
-              className={`font-medium transition-colors duration-300 font-sans text-sm scale-95 active:scale-90 transition-transform ${
+              className={`transition-colors duration-300 font-sans text-base scale-95 active:scale-90 transition-transform ${
                 isActive 
                   ? "text-[#FF4D24] font-bold" 
-                  : "text-[#555555] hover:text-primary"
+                  : "text-[#555555] hover:text-primary font-medium"
               }`}
             >
               {link.label}
@@ -676,9 +609,116 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
           );
         })}
       </div>
+      </div>
 
-      {/* Action Area (Cart, CTA, and Profile) */}
-      <div className="flex items-center gap-3">
+      {/* Action Area (Search, Cart, CTA, and Profile) */}
+      <div className="flex items-center gap-4">
+        {/* Expanding Search */}
+        <div className="relative flex items-center">
+          <motion.div
+            initial={false}
+            animate={{ 
+              width: isSearchExpanded ? 300 : 48,
+              backgroundColor: isSearchExpanded ? "#ffffff" : "transparent",
+              borderColor: isSearchExpanded ? "#cbd5e1" : "transparent"
+            }}
+            whileHover={!isSearchExpanded ? { backgroundColor: "rgba(255, 255, 255, 0.45)" } : {}}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
+            className="flex items-center overflow-hidden rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.04)] relative"
+            style={{ height: '48px' }}
+          >
+            {/* Fixed-width icon container to prevent jumping */}
+            <div 
+              className="w-12 h-12 shrink-0 flex items-center justify-center cursor-pointer z-10"
+              onClick={() => {
+                if (!isSearchExpanded) {
+                  setIsSearchExpanded(true);
+                  setTimeout(() => searchInputRef.current?.focus(), 50);
+                } else if (searchQuery.trim() === "") {
+                  setIsSearchExpanded(false);
+                } else {
+                  onNavigate("product");
+                }
+              }}
+            >
+              <Search 
+                size={22} 
+                className={`transition-colors ${isSearchExpanded ? 'text-slate-400 hover:text-slate-600' : 'text-[#555555] hover:text-[#FF4D24]'}`}
+              />
+            </div>
+            
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Tìm kiếm sản phẩm..."
+              className="w-full h-full bg-transparent border-none outline-none text-base text-slate-700 placeholder:text-slate-400 pr-5"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onBlur={() => {
+                if (searchQuery.trim() === "") {
+                  setIsSearchExpanded(false);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onNavigate("product");
+                } else if (e.key === 'Escape') {
+                  setIsSearchExpanded(false);
+                  setSearchQuery("");
+                }
+              }}
+            />
+          </motion.div>
+
+          <AnimatePresence>
+            {isSearchExpanded && (
+              <motion.div 
+                initial={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
+                animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
+                exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
+                transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
+                className="absolute right-0 top-full mt-4 w-[380px] sm:w-[460px] rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-5 z-50 origin-top-right overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
+                <div className="flex flex-col gap-3">
+                  <span className="text-[14px] font-extrabold text-[#111111] uppercase tracking-wide font-display mb-2">Từ khóa phổ biến</span>
+                  
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors" onClick={() => onNavigate("product")}>
+                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                        <TrendingUp size={14} className="text-slate-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-slate-800">Aero Compute Server</p>
+                      </div>
+                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">🔥 HOT</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors" onClick={() => onNavigate("product")}>
+                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                        <TrendingUp size={14} className="text-slate-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-slate-800">Nexus AI Model</p>
+                      </div>
+                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">🔥 HOT</span>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors" onClick={() => onNavigate("product")}>
+                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                        <Search size={14} className="text-slate-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-600">Glacier Storage 100TB</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Shopping Cart Button */}
         <div className="relative" ref={cartRef}>
           <motion.button 
@@ -693,15 +733,15 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
             } : {}}
             transition={{ duration: 0.7, ease: "easeInOut" }}
             onClick={() => setShowCartMenu(!showCartMenu)}
-            className={`text-[#555555] hover:text-[#FF4D24] transition-colors duration-300 flex items-center justify-center p-2 rounded-full relative cursor-pointer ${
+            className={`text-[#555555] hover:text-[#FF4D24] transition-colors duration-300 flex items-center justify-center w-12 h-12 rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.04)] relative cursor-pointer ${
               isBouncing 
-                ? "bg-red-50 text-[#FF4D24] ring-2 ring-[#FF4D24]/30" 
-                : "hover:bg-white/45"
+                ? "bg-red-50 text-[#FF4D24] ring-2 ring-[#FF4D24]/30 border-transparent" 
+                : "hover:bg-white/45 bg-transparent border-transparent hover:border-slate-300"
             }`}
           >
-            <ShoppingCart size={20} className="stroke-[2]" />
+            <ShoppingCart size={24} className="stroke-[2]" />
             {cartItems.length > 0 && (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#FF4D24] rounded-full ring-2 ring-white" />
+              <span className="absolute top-2 right-2 w-3 h-3 bg-[#FF4D24] rounded-full ring-2 ring-white" />
             )}
           </motion.button>
 
@@ -709,195 +749,207 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
           <AnimatePresence>
             {showCartMenu && (
               <motion.div 
-                initial={{ opacity: 0, y: 12, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute right-0 mt-2.5 w-[380px] sm:w-[440px] rounded-2xl border border-white/70 bg-white/95 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.12)] p-5 z-50 origin-top-right"
+                initial={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
+                animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
+                exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
+                transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
+                className="absolute right-0 mt-4 w-[380px] sm:w-[460px] rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-5 z-50 origin-top-right overflow-hidden"
               >
-                <div className="flex items-center justify-between mb-4 pb-2.5 border-b border-slate-100/80">
-                  <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[#FF4D24] text-sm font-bold">shopping_bag</span>
-                    <span className="text-xs font-bold text-[#111111] uppercase tracking-wider">Giỏ hàng của bạn</span>
+                {/* Decorative background glows */}
+                <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
+
+                {/* Header */}
+                <div className="flex flex-col gap-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[14px] font-extrabold text-[#111111] uppercase tracking-wide font-display">Giỏ hàng của bạn</span>
+                    <span className="text-[10px] bg-[#FF4D24]/10 text-[#FF4D24] font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider">
+                      {cartItems.length} sản phẩm
+                    </span>
                   </div>
-                  <span className="text-[10px] bg-[#FF4D24]/10 text-[#FF4D24] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
-                    {cartItems.length} sản phẩm
-                  </span>
+
+                  {/* Free Shipping Progress Bar */}
+                  <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-3 border border-red-100 flex flex-col gap-2 relative overflow-hidden shadow-inner">
+                    <div className="flex justify-between items-end">
+                      <span className="text-[11px] font-bold text-[#FF4D24]">Miễn phí giao hàng</span>
+                      <span className="text-[10px] font-bold text-[#FF4D24]/70">Còn $15.00 nữa</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white rounded-full overflow-hidden shadow-sm">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: '75%' }}
+                        transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+                        className="h-full bg-gradient-to-r from-[#FF7C4A] to-[#FF4D24] rounded-full relative"
+                      >
+                         <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
+                      </motion.div>
+                    </div>
+                  </div>
                 </div>
                 
                 {/* Item list */}
                 {groupedCartItems.length > 0 ? (
-                  <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-1 hide-scrollbar">
-                    {groupedCartItems.map((group) => {
+                  <div className="flex flex-col gap-2.5 max-h-[280px] overflow-y-auto p-2 px-3 -mx-3 custom-scrollbar relative z-10">
+                    <AnimatePresence initial={false}>
+                    {groupedCartItems.map((group, index) => {
                       const groupKey = `${group.name}-${group.price}`;
                       const isSelected = selectedGroupKeys.includes(groupKey);
                       
                       return (
-                        <div 
+                        <motion.div 
+                          layout
+                          initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                          animate={{ opacity: 1, x: 0, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+                          whileHover={{ y: -2, scale: 1.01 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 30, delay: index * 0.04 }}
                           key={groupKey} 
                           onClick={(e) => {
                             const target = e.target as HTMLElement;
-                            if (target.closest('.qty-controls')) {
-                              return;
-                            }
+                            if (target.closest('.qty-controls')) return;
                             setSelectedGroupKeys(prev => 
-                              prev.includes(groupKey)
-                                ? prev.filter(k => k !== groupKey)
-                                : [...prev, groupKey]
+                              prev.includes(groupKey) ? prev.filter(k => k !== groupKey) : [...prev, groupKey]
                             );
                           }}
-                          className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-300 relative overflow-hidden bg-white cursor-pointer select-none ${
+                          className={`flex items-center gap-3 p-3 rounded-2xl border transition-all duration-300 relative overflow-hidden bg-white cursor-pointer select-none ${
                             isSelected 
-                              ? "border-[#FF4D24] shadow-[0_6px_20px_rgba(255,77,36,0.08)] bg-gradient-to-r from-[#FF4D24]/[0.01] to-transparent ring-2 ring-[#FF4D24]/10" 
-                              : "border-slate-100 opacity-55 hover:opacity-100"
+                              ? "border-[#FF4D24] shadow-[0_4px_16px_rgba(255,77,36,0.1)] ring-1 ring-[#FF4D24]/40" 
+                              : "border-transparent shadow-sm hover:shadow-md hover:border-slate-200"
                           }`}
                         >
-                          {/* Left: Custom Checkbox for Selecting Individual Items */}
-                          <div className="flex items-center justify-center shrink-0 pl-1">
-                            <div className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center transition-all duration-200 ${
-                              isSelected 
-                                ? "border-[#FF4D24] bg-[#FF4D24]" 
-                                : "border-slate-300 hover:border-[#FF4D24]/60"
+                          {isSelected && <div className="absolute inset-0 bg-gradient-to-r from-[#FF4D24]/[0.02] to-transparent pointer-events-none" />}
+                          
+                          {/* Left: Custom Checkbox */}
+                          <div className="flex items-center justify-center shrink-0 z-10">
+                            <div className={`w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                              isSelected ? "border-[#FF4D24] bg-[#FF4D24] shadow-sm" : "border-slate-300 bg-slate-50 group-hover:border-slate-400"
                             }`}>
-                              <span className={`material-symbols-outlined text-white text-[12px] font-black transition-transform duration-200 ${
-                                isSelected ? "scale-100" : "scale-0"
-                              }`}>
-                                check
-                              </span>
+                              <span className={`material-symbols-outlined text-white text-[10px] font-black transition-transform duration-300 ${
+                                isSelected ? "scale-100 rotate-0" : "scale-0 -rotate-45"
+                              }`}>check</span>
                             </div>
                           </div>
 
                           {/* Product Icon */}
-                          <div className={`w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-[18px] shadow-inner shrink-0 select-none transition-opacity ${!isSelected ? 'opacity-50' : ''}`}>
+                          <div className={`w-11 h-11 rounded-[10px] bg-slate-50 flex items-center justify-center text-[20px] shrink-0 select-none transition-opacity z-10 shadow-inner border border-slate-100 ${!isSelected ? 'opacity-60 grayscale-[30%]' : ''}`}>
                             {group.icon}
                           </div>
 
                           {/* Product details */}
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-[11.5px] font-black text-[#111111] truncate transition-all ${!isSelected ? 'text-slate-400' : ''}`}>{group.name}</p>
-                            <p className="text-[10px] text-emerald-600 font-bold mt-0.5 flex items-center gap-1 select-none">
-                              <span className={`inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ${!isSelected ? 'opacity-40' : ''}`}></span>
-                              Giao nhanh 2h
+                          <div className="flex-1 min-w-0 z-10">
+                            <p className={`text-[12px] font-bold text-slate-800 truncate transition-all ${!isSelected ? 'text-slate-500 font-medium' : ''}`}>{group.name}</p>
+                            <p className="text-[9.5px] text-emerald-600 font-bold flex items-center gap-1.5 select-none mt-0.5">
+                              <span className="flex h-1.5 w-1.5 relative">
+                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 ${!isSelected ? 'hidden' : ''}`}></span>
+                                <span className={`relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500 ${!isSelected ? 'opacity-40' : ''}`}></span>
+                              </span>
+                              Giao hỏa tốc 2h
                             </p>
-                            <p className={`text-[11px] font-mono font-bold mt-0.5 transition-all ${
+                          </div>
+
+                          {/* Right: Quantity Controls */}
+                          <div className="flex flex-col items-end gap-1.5 z-10">
+                            <p className={`text-[12px] font-mono font-black transition-all ${
                               isSelected ? "text-[#FF4D24]" : "text-slate-400 line-through"
                             }`}>{group.price}</p>
-                          </div>
-
-                          {/* Right: Quantity Controls & Integrated Smart Trash Bin */}
-                          <div className={`qty-controls flex items-center bg-slate-50 border border-slate-100 rounded-lg p-0.5 select-none shrink-0 transition-all ${
-                            !isSelected ? 'opacity-30 pointer-events-none' : ''
-                          }`}>
-                            {/* Decrement / Smart Trash button */}
-                            <button
-                              onClick={() => {
-                                if (onRemoveCartItem) {
-                                  // Remove one occurrence by ID
-                                  onRemoveCartItem(group.ids[group.ids.length - 1]);
-                                }
-                              }}
-                              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white text-slate-400 hover:text-rose-600 active:scale-90 transition-all duration-150 cursor-pointer"
-                              title="Giảm số lượng"
-                            >
-                              <span className="text-xs font-black font-sans">-</span>
-                            </button>
-
-                            {/* Quantity display */}
-                            <div className="min-w-5 text-center font-mono font-black text-[11px] text-[#111111] px-0.5">
-                              {group.quantity}
+                            <div className={`qty-controls flex items-center bg-slate-50 border border-slate-100 rounded-lg p-0.5 select-none shrink-0 transition-all ${
+                              !isSelected ? 'opacity-30 pointer-events-none' : ''
+                            }`}>
+                              <button
+                                onClick={() => onRemoveCartItem && onRemoveCartItem(group.ids[group.ids.length - 1])}
+                                className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-white text-slate-500 hover:text-rose-600 active:scale-90 transition-all shadow-sm cursor-pointer"
+                              ><span className="text-sm font-black">-</span></button>
+                              <div className="min-w-5 text-center font-mono font-bold text-[11px] text-slate-800">{group.quantity}</div>
+                              <button
+                                onClick={() => onAddToCart && onAddToCart(group.name, group.price)}
+                                className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-white text-slate-500 hover:text-emerald-600 active:scale-90 transition-all shadow-sm cursor-pointer"
+                              ><span className="text-sm font-black">+</span></button>
                             </div>
-
-                            {/* Increment button */}
-                            <button
-                              onClick={() => {
-                                if (onAddToCart) {
-                                  onAddToCart(group.name, group.price);
-                                }
-                              }}
-                              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white text-slate-400 hover:text-emerald-600 active:scale-90 transition-all duration-150 cursor-pointer"
-                              title="Tăng số lượng"
-                            >
-                              <span className="text-xs font-black font-sans">+</span>
-                            </button>
                           </div>
-                        </div>
+                        </motion.div>
                       );
                     })}
+                    </AnimatePresence>
                   </div>
                 ) : (
-                  <div className="py-10 text-center flex flex-col items-center justify-center gap-2 text-slate-400">
-                    <span className="material-symbols-outlined text-3xl opacity-40">shopping_cart_off</span>
-                    <span className="text-xs font-medium">Giỏ hàng hiện tại đang trống</span>
-                  </div>
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} 
+                    className="py-12 text-center flex flex-col items-center justify-center gap-3 text-slate-400 relative z-10 bg-white/40 rounded-2xl border border-white/60 shadow-inner"
+                  >
+                    <motion.div 
+                      animate={{ y: [0, -8, 0] }} 
+                      transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                      className="text-4xl opacity-50"
+                    >
+                      <span className="material-symbols-outlined">shopping_cart_off</span>
+                    </motion.div>
+                    <span className="text-[13px] font-medium text-slate-500">Giỏ hàng của bạn đang trống</span>
+                  </motion.div>
                 )}
   
-                <div className="my-3 border-t border-slate-100" />
+                <div className="my-4 border-t border-slate-200/60 w-[calc(100%+40px)] -ml-5" />
   
-                {/* Advanced Pricing & Invoice Information Breakdown */}
-                <div className="flex flex-col gap-1.5 text-xs text-slate-600 mb-4 bg-slate-50/60 p-3 rounded-xl border border-slate-100/80">
+                {/* Advanced Pricing Breakdown */}
+                <div className="flex flex-col gap-2 text-[12px] text-slate-600 mb-4 relative z-10 px-1">
                   <div className="flex items-center justify-between">
-                    <span>Tạm tính (Subtotal):</span>
-                    <span className="font-mono font-semibold text-slate-800">{formatPrice(calculateTotalValue())}</span>
+                    <span className="font-medium text-slate-500">Tạm tính:</span>
+                    <span className="font-mono font-bold text-slate-800">{formatPrice(calculateTotalValue())}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1 text-red-600">
-                      <span className="material-symbols-outlined text-[11px] font-bold">sell</span>
-                      Ưu đãi hội viên Smember (5%):
+                    <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                      <span className="material-symbols-outlined text-[12px] font-bold">local_offer</span>
+                      Khuyến mãi Smember:
                     </span>
-                    <span className="font-mono font-bold text-red-600">-{formatPrice(calculateTotalValue() * 0.05)}</span>
+                    <span className="font-mono font-bold text-emerald-600">-{formatPrice(calculateTotalValue() * 0.05)}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span>Thuế VAT (10%):</span>
-                    <span className="font-mono font-semibold text-slate-800">{formatPrice(calculateTotalValue() * 0.10)}</span>
-                  </div>
-                  <div className="my-1.5 border-t border-dashed border-slate-200" />
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-[#111111] uppercase tracking-wide">Tổng tiền thanh toán:</span>
-                    <span className="text-[14px] font-black text-[#FF4D24] font-mono">
-                      {formatPrice(calculateTotalValue() * 1.05)}
-                    </span>
+                  
+                  <div className="bg-[#FF4D24] rounded-xl p-3.5 mt-1.5 text-white shadow-[0_8px_16px_rgba(255,77,36,0.2)] relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/20 rounded-full blur-[24px] pointer-events-none" />
+                    <div className="flex items-center justify-between relative z-10">
+                      <span className="text-[11px] font-extrabold uppercase tracking-widest text-white/90">Tổng thanh toán</span>
+                      <span className="text-lg font-black font-mono tracking-tight">{formatPrice(calculateTotalValue() * 1.05)}</span>
+                    </div>
                   </div>
                 </div>
   
-                <div className="flex gap-2">
-                  <button 
+                <div className="flex gap-2.5 relative z-10">
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                     onClick={() => setShowCartMenu(false)}
-                    className="flex-1 border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 font-sans text-xs font-bold py-2.5 rounded-xl transition-all duration-200 cursor-pointer text-center"
+                    className="flex-[0.8] rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 font-bold text-xs py-2.5 transition-colors text-center shadow-sm cursor-pointer"
                   >
-                    Đóng lại
-                  </button>
+                    Đóng
+                  </motion.button>
 
-                  {/* Smart Trash Bin Button - Aligned in the middle */}
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                     onClick={handleDeleteSelected}
                     disabled={getSelectedItemsCount() === 0}
-                    className="flex-none px-4 border border-rose-200 hover:border-rose-300 bg-rose-50 hover:bg-rose-100 disabled:opacity-40 disabled:hover:bg-rose-50 disabled:cursor-not-allowed text-rose-600 font-sans text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-                    title="Xóa các sản phẩm đã chọn"
+                    className="flex-none px-3.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                    title="Xóa đã chọn"
                   >
                     <Trash2 size={14} className="stroke-[2.5]" />
                     {getSelectedItemsCount() > 0 && (
-                      <span className="bg-rose-600 text-white text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center animate-pulse">
-                        {getSelectedItemsCount()}
-                      </span>
+                      <span>{getSelectedItemsCount()}</span>
                     )}
-                  </button>
+                  </motion.button>
 
-                  <button 
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                     onClick={() => {
                       const totalSelected = selectedGroupKeys.length;
                       if (totalSelected === 0) {
                         alert("Vui lòng tích chọn sản phẩm bạn muốn thanh toán!");
                         return;
                       }
-                      alert(`Cảm ơn bạn đã trải nghiệm mua sắm! Đơn hàng của bạn trị giá ${formatPrice(calculateTotalValue() * 1.05)} đang được xử lý.`);
+                      alert(`Đơn hàng trị giá ${formatPrice(calculateTotalValue() * 1.05)} đang được xử lý.`);
                       setShowCartMenu(false);
                     }}
                     disabled={cartItems.length === 0}
-                    className="flex-[1.5] bg-[#FF4D24] hover:bg-[#E03C15] text-white disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed font-sans text-xs font-black py-2.5 rounded-xl transition-all duration-200 cursor-pointer text-center shadow-md shadow-red-500/10 flex items-center justify-center gap-1.5"
+                    className="flex-[1.2] bg-[#111111] text-white disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed font-sans text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer hover:bg-black"
                   >
-                    <span>Thanh toán ngay</span>
-                    <span className="material-symbols-outlined text-[13px] font-bold">arrow_forward</span>
-                  </button>
+                    <span>Thanh toán</span>
+                    <span className="material-symbols-outlined text-[14px] font-bold">arrow_forward</span>
+                  </motion.button>
                 </div>
               </motion.div>
             )}
@@ -909,13 +961,13 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
           <button
             id="navbar-account-button"
             onClick={() => setShowAccountMenu(!showAccountMenu)}
-            className="flex items-center gap-2 bg-white/40 text-[#111111] border border-white/60 shadow-sm backdrop-blur-md font-sans text-sm font-semibold pl-2.5 pr-4 py-1.5 rounded-full hover:bg-white/60 transition-all duration-300 scale-95 active:scale-90 cursor-pointer select-none"
+            className="flex items-center gap-2.5 bg-white/40 text-[#111111] border border-white/60 shadow-sm backdrop-blur-md font-sans text-base font-semibold pl-3 pr-5 py-2 rounded-full hover:bg-white/60 transition-all duration-300 scale-95 active:scale-90 cursor-pointer select-none"
           >
             {/* Elegant glassmorphism circle with a user icon */}
-            <div className="w-6 h-6 rounded-full bg-slate-950/5 flex items-center justify-center text-[#111111]/80">
-              <User size={13} className="stroke-[2.5]" />
+            <div className="w-8 h-8 rounded-full bg-slate-950/5 flex items-center justify-center text-[#111111]/80">
+              <User size={16} className="stroke-[2.5]" />
             </div>
-            <span className="font-semibold text-sm text-[#111111] tracking-tight">Tài khoản</span>
+            <span className="font-semibold text-base text-[#111111] tracking-tight">Tài khoản</span>
           </button>
 
           {/* Account Dropdown Menu */}

@@ -11,7 +11,6 @@ import FeatureOne from "./components/FeatureOne";
 import ShowcaseSection from "./components/ShowcaseSection";
 import PricingSection from "./components/PricingSection";
 import ProductPage from "./components/ProductPage";
-import Footer from "./components/Footer";
 import RegisterPage from "./components/RegisterPage";
 import AuthReportDashboard from "./components/AuthReportDashboard";
 import ProfilePage from "./components/ProfilePage";
@@ -328,8 +327,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* 6. Standard Professional Footer (Hidden on focused registration, report screen, or profile page) */}
-      {currentPage !== "register" && currentPage !== "auth-report" && currentPage !== "profile" && <Footer onNavigate={navigate} />}
 
       {/* Floating Flying Elements Animation */}
       <AnimatePresence>

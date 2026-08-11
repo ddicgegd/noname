@@ -3108,8 +3108,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
         </div>
 
         {/* Floating bottom actions bar with 3D discount ribbon */}
-        <div className="absolute bottom-5 left-1/2 z-30 flex w-[calc(100%-3rem)] max-w-[850px] -translate-x-1/2 items-center justify-between overflow-visible rounded-xl border border-white/45 bg-background/55 p-3 shadow-[0_20px_60px_rgba(255,77,36,0.22),0_8px_28px_rgba(0,0,0,0.14)] backdrop-blur-2xl backdrop-saturate-150 transition-all duration-300 sm:w-[85%]">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-r from-primary/16 via-background/70 to-background/50" />
+        <div className="absolute bottom-5 left-1/2 z-30 flex w-[calc(100%-3rem)] max-w-[850px] -translate-x-1/2 items-center justify-between overflow-visible rounded-xl border border-white/20 bg-background/20 p-3 shadow-[0_20px_60px_rgba(255,77,36,0.11),0_8px_28px_rgba(0,0,0,0.07)] backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 sm:w-[85%]">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 via-transparent to-transparent" />
           {formattedDiscount && (
             <>
               {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
