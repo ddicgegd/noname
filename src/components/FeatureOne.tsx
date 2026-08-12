@@ -49,9 +49,9 @@ export default function FeatureOne() {
           <div className="w-full md:w-1/2 bg-white/20 relative overflow-hidden flex items-center justify-center p-4 sm:p-8 border-t md:border-t-0 md:border-l border-white/40 min-h-[450px]">
             {/* Deep glowing background gradients */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#FF4D24]/10 via-white/50 to-[#326578]/10" />
-            <div className="absolute inset-0 overflow-hidden opacity-20">
-              <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-[#FF4D24]/20 rounded-full blur-[100px]" />
-              <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-[#326578]/20 rounded-full blur-[100px]" />
+            <div className="absolute inset-0 overflow-hidden opacity-30">
+              <div className="absolute top-0 left-0 w-[60%] h-[80%] bg-[#FF4D24]/20 rounded-full blur-[120px] -translate-x-1/4 -translate-y-1/4" />
+              <div className="absolute bottom-0 right-0 w-[60%] h-[80%] bg-[#326578]/20 rounded-full blur-[120px] translate-x-1/4 translate-y-1/4" />
             </div>
 
             {/* Glowing Glass Card */}
@@ -213,7 +213,9 @@ export default function FeatureOne() {
           <div className="w-full md:w-1/2 bg-white/10 relative overflow-hidden flex items-center justify-center p-4 sm:p-8 border-t md:border-t-0 md:border-r border-white/40 min-h-[450px]">
             {/* Deep glowing background gradients */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#FF4D24]/20 via-transparent to-[#326578]/10" />
-            <div className="absolute inset-0 opacity-30 mix-blend-soft-light" style={{ backgroundImage: "radial-gradient(circle at 50% 50%, #ffffff 0%, transparent 100%)" }} />
+            <div className="absolute inset-0 overflow-hidden opacity-40">
+              <div className="absolute top-1/2 left-1/2 w-[80%] h-[120%] bg-white/40 rounded-full blur-[150px] -translate-x-1/2 -translate-y-1/2" />
+            </div>
 
             {/* Glowing Glass Card */}
             <motion.div
