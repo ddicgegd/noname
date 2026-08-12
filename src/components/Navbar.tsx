@@ -523,18 +523,20 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                 </a>
 
                 {/* MEGA MENU DROPDOWN PANEL */}
-                <div 
-                  className="absolute top-[calc(100%+12px)] right-0 w-[95vw] lg:w-[820px] bg-white/95 backdrop-blur-3xl rounded-2xl border border-white/85 shadow-[0_40px_90px_-15px_rgba(0,0,0,0.18)] z-50 flex overflow-visible mega-menu-popup"
-                  style={{ 
-                    pointerEvents: showProductMegaMenu ? 'auto' : 'none',
-                    opacity: showProductMegaMenu ? 1 : 0,
-                    transform: `translate(0, ${showProductMegaMenu ? '0px' : '8px'}) scale(${showProductMegaMenu ? 1 : 0.985})`,
-                    transition: 'opacity 280ms cubic-bezier(0.16, 1, 0.3, 1), transform 280ms cubic-bezier(0.16, 1, 0.3, 1), border-color 280ms cubic-bezier(0.16, 1, 0.3, 1)',
-                    transformOrigin: 'top right'
-                  }}
-                >
+                <AnimatePresence>
+                  {showProductMegaMenu && (
+                    <motion.div 
+                      initial={{ opacity: 0, clipPath: "circle(0% at 10% -20px)", filter: "blur(10px)" }}
+                      animate={{ opacity: 1, clipPath: "circle(150% at 10% -20px)", filter: "blur(0px)" }}
+                      exit={{ opacity: 0, clipPath: "circle(0% at 10% -20px)", filter: "blur(10px)" }}
+                      transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
+                      className="absolute top-[calc(100%+4px)] right-0 w-[95vw] lg:w-[820px] bg-white/95 backdrop-blur-3xl rounded-[24px] border border-white/70 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] z-50 flex overflow-hidden mega-menu-popup"
+                    >
+                  {/* Decorative background glows */}
+                  <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
+
                   {/* Right Section: Categories with Rich Ambient Glow */}
-                  <div className="relative flex-1 p-8 bg-white/75 flex flex-col justify-center overflow-hidden rounded-2xl">
+                  <div className="relative flex-1 p-8 bg-white/75 flex flex-col justify-center overflow-hidden rounded-[24px]">
                         {/* Stronger ambient color bleed matching the poster colors */}
                         <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-cyan-500/8 via-indigo-500/2 to-transparent pointer-events-none" />
                         
@@ -554,10 +556,10 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                                 key={colIdx} 
                                 className="flex flex-col gap-2.5"
                               >
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 font-sans border-b border-slate-100 pb-2 h-11 flex items-end mb-2 w-full whitespace-nowrap">
+                                <h4 className="text-[13px] font-black uppercase tracking-[0.12em] text-slate-400 font-sans border-b border-slate-100 pb-2 h-11 flex items-end mb-2 w-full whitespace-nowrap">
                                   {col.title}
                                 </h4>
-                                <div className={isBrandCol ? "grid grid-cols-2 gap-x-4 gap-y-1.5" : "flex flex-col gap-1.5"}>
+                                <div className={isBrandCol ? "grid grid-cols-2 gap-x-4 gap-y-2" : "flex flex-col gap-2"}>
                                   {col.items.map((item, itemIdx) => (
                                     <a
                                       key={itemIdx}
@@ -567,16 +569,16 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                                         onNavigate("product");
                                         setShowProductMegaMenu(false);
                                       }}
-                                      className="text-[12.5px] text-slate-600 hover:text-primary font-medium flex items-center justify-between gap-1 h-7 transition-all hover:translate-x-1 duration-200 outline-none"
+                                      className="text-[15px] text-slate-600 hover:text-primary font-medium flex items-center justify-between gap-1 py-1 h-auto transition-all hover:translate-x-1 duration-200 outline-none"
                                     >
-                                      <span className={`transition-colors truncate ${isBrandCol ? 'max-w-[130px]' : 'max-w-none'}`}>{item.name}</span>
+                                      <span className={`transition-colors truncate ${isBrandCol ? 'max-w-[150px]' : 'max-w-none'}`}>{item.name}</span>
                                       {item.tag === "HOT" && (
-                                        <span className="text-[8px] font-black tracking-widest px-1 py-0.5 rounded bg-red-500 text-white leading-none uppercase shrink-0 scale-90">
+                                        <span className="text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded bg-red-500 text-white leading-none uppercase shrink-0 scale-90">
                                           HOT
                                         </span>
                                       )}
                                       {item.tag === "MỚI" && (
-                                        <span className="text-[8px] font-black tracking-widest px-1 py-0.5 rounded bg-blue-500 text-white leading-none uppercase shrink-0 scale-90 font-sans">
+                                        <span className="text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded bg-blue-500 text-white leading-none uppercase shrink-0 scale-90 font-sans">
                                           MỚI
                                         </span>
                                       )}
@@ -588,8 +590,10 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                           })}
                         </div>
                       </div>
-                  </div>
-                </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             );
           }
 
@@ -961,7 +965,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
           <button
             id="navbar-account-button"
             onClick={() => setShowAccountMenu(!showAccountMenu)}
-            className="flex items-center gap-2.5 bg-white/40 text-[#111111] border border-white/60 shadow-sm backdrop-blur-md font-sans text-base font-semibold pl-3 pr-5 py-2 rounded-full hover:bg-white/60 transition-all duration-300 scale-95 active:scale-90 cursor-pointer select-none"
+            className="flex items-center gap-2.5 bg-white/40 text-[#111111] border border-white/60 shadow-sm backdrop-blur-md font-sans text-base font-semibold pl-3 pr-5 py-2 rounded-full hover:bg-white/60 transition-all duration-300 active:scale-95 cursor-pointer select-none"
           >
             {/* Elegant glassmorphism circle with a user icon */}
             <div className="w-8 h-8 rounded-full bg-slate-950/5 flex items-center justify-center text-[#111111]/80">
@@ -974,14 +978,17 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
           <AnimatePresence>
             {showAccountMenu && (
               <motion.div 
-                initial={{ opacity: 0, y: 12, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute right-0 mt-2.5 w-72 rounded-2xl border border-white/70 bg-white/95 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.12)] p-4 z-50 flex flex-col gap-1.5 origin-top-right"
+                initial={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
+                animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
+                exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
+                transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
+                className="absolute right-0 mt-4 w-64 rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
               >
+                {/* Decorative background glows */}
+                <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
+
                 {/* User Quick Info Card with Elegant Avatar & Smember VIP Badge */}
-                <div className="p-3 mb-2 bg-slate-50/60 rounded-xl border border-slate-100/80 flex items-center gap-3">
+                <div className="p-2.5 mb-1.5 bg-slate-50/60 rounded-xl border border-slate-100/80 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#FF4D24] to-[#FF7C4A] flex items-center justify-center text-white font-black text-sm shadow-md select-none overflow-hidden">
                     {loggedInUser ? (
                       loggedInUser.avatarUrl ? (
@@ -1018,7 +1025,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       setShowAccountMenu(false);
                       onNavigate("profile");
                     }}
-                    className="group w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
                   >
                     <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
                     <span className="font-extrabold text-[#FF4D24]">Xem trang cá nhân</span>
@@ -1029,7 +1036,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       setShowAccountMenu(false);
                       onNavigate("register");
                     }}
-                    className="group w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
                   >
                     <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
                     <span className="font-extrabold text-[#FF4D24]">Đăng ký / Đăng nhập</span>
@@ -1041,7 +1048,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                     setShowAccountMenu(false);
                     onNavigate(loggedInUser ? "profile" : "register");
                   }}
-                  className="group w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
+                  className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
                 >
                   <Settings size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
                   <span>Thiết lập tài khoản</span>
@@ -1056,7 +1063,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       onNavigate("register");
                     }
                   }}
-                  className="group w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
+                  className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
                 >
                   <CreditCard size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
                   <span>Gói đăng ký</span>
@@ -1073,7 +1080,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       setLoggedInUser(null);
                       onNavigate("register");
                     }}
-                    className="group w-full flex items-center gap-3 px-3 py-2.5 text-xs font-black text-rose-600 hover:bg-rose-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-rose-100"
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-rose-100"
                   >
                     <LogOut size={15} className="text-rose-600" />
                     <span>Đăng xuất tài khoản</span>
@@ -1084,7 +1091,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       setShowAccountMenu(false);
                       onNavigate("register");
                     }}
-                    className="group w-full flex items-center gap-3 px-3 py-2.5 text-xs font-black text-[#FF4D24] hover:bg-red-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-red-100"
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-[#FF4D24] hover:bg-red-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-red-100"
                   >
                     <LogOut size={15} className="text-[#FF4D24]" />
                     <span>Đăng nhập tài khoản khác</span>
