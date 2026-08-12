@@ -21,7 +21,7 @@ export default function FeatureOne() {
 
   return (
     <section id="features" className="py-16 px-4 sm:px-8 md:px-16 relative">
-      <div className="max-w-[1440px] mx-auto bg-white/40 backdrop-blur-2xl rounded-[20px] border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className="w-full max-w-[95vw] 2xl:max-w-[1800px] mx-auto bg-white/40 backdrop-blur-2xl rounded-[20px] border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)] overflow-hidden">
         
         {/* FIRST FEATURE: Tell Horizon your SaaS idea... */}
         <div className="flex flex-col md:flex-row min-h-[596px]">
