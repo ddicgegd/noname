@@ -530,13 +530,13 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       animate={{ opacity: 1, clipPath: "circle(150% at 20% -20px)", filter: "blur(0px)" }}
                       exit={{ opacity: 0, clipPath: "circle(0% at 20% -20px)", filter: "blur(10px)" }}
                       transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[95vw] lg:w-[1150px] bg-white/95 backdrop-blur-3xl rounded-[24px] border border-white/70 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] z-50 flex overflow-hidden mega-menu-popup"
+                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[95vw] lg:w-[1300px] xl:w-[1350px] bg-white/95 backdrop-blur-3xl rounded-[24px] border border-white/70 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] z-50 flex overflow-hidden mega-menu-popup"
                     >
                   {/* Decorative background glows */}
                   <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
 
                   {/* Left Section: Poster */}
-                  <div className="relative shrink-0 w-[280px] overflow-hidden group" style={{ aspectRatio: '10/14' }}>
+                  <div className="relative shrink-0 w-[336px] overflow-hidden group" style={{ aspectRatio: '10/14' }}>
                     <img src="https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?q=80&w=800&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Galaxy Z Fold6" />
                     
                     {/* Dark gradient overlay for text readability */}
