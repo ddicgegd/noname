@@ -47,15 +47,15 @@ export default function FeatureOne() {
 
           {/* Right Side: Interactive Mockup Box */}
           <div className="w-full md:w-1/2 bg-white/20 relative overflow-hidden flex items-center justify-center p-4 sm:p-8 border-t md:border-t-0 md:border-l border-white/40 min-h-[450px]">
-            {/* Gradients */}
+            {/* Deep glowing background gradients */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#FF4D24]/10 via-white/50 to-[#326578]/10" />
             <div className="absolute inset-0 overflow-hidden opacity-20">
               <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-[#FF4D24]/20 rounded-full blur-[100px]" />
               <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-[#326578]/20 rounded-full blur-[100px]" />
             </div>
 
-            {/* Interactive Chat Card */}
-            <div className="relative z-10 w-full max-w-[420px] bg-white/40 backdrop-blur-[32px] rounded-2xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden">
+            {/* Glowing Glass Card */}
+            <div className="relative z-10 w-full max-w-[480px] bg-white/40 backdrop-blur-[32px] rounded-2xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden">
               {/* Custom Interactive Tabs */}
               <div className="flex items-center justify-center p-4 border-b border-white/10 bg-white/20">
                 <div className="flex p-1 rounded-full border border-white/20 backdrop-blur-md bg-white/40">
@@ -106,7 +106,7 @@ export default function FeatureOne() {
                       {/* User Message */}
                       <div className="flex gap-3 flex-row-reverse items-start">
                         <div className="flex-1 flex flex-col items-end">
-                          <div className="bg-primary rounded-2xl rounded-tr-sm p-3.5 shadow-sm inline-block max-w-[85%] text-left border border-primary/20">
+                          <div className="bg-[#FF4D24]/80 backdrop-blur-md rounded-2xl rounded-tr-sm p-3.5 shadow-sm inline-block max-w-[85%] text-left border border-white/20">
                             <p className="text-sm text-white font-medium">
                               Build a metrics dashboard with a database backend.
                             </p>
@@ -171,20 +171,6 @@ export default function FeatureOne() {
 
                 {/* Static Preview and Mock Input Area */}
                 <div className="pt-4 mt-auto">
-                  {/* Generated Preview Block */}
-                  <div className="mb-4 bg-white/40 backdrop-blur-md rounded-xl p-3 border border-white/60 shadow-sm flex items-center justify-between cursor-pointer hover:bg-white/60 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center border border-green-500/20">
-                        <span className="material-symbols-outlined text-green-600 text-[18px]">check_circle</span>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-[#111111]">Dashboard Generated</p>
-                        <p className="text-[10px] text-[#555555]">3 components, 1 database schema</p>
-                      </div>
-                    </div>
-                    <span className="material-symbols-outlined text-[#111111] text-[16px]">open_in_new</span>
-                  </div>
-
                   {/* Simulated Chat Input Area */}
                   <div className="p-2 bg-white/70 backdrop-blur-xl rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] flex items-center gap-2 transition-all">
                     <button className="w-8 h-8 rounded-full flex items-center justify-center text-[#555555] hover:bg-black/5 transition-colors">
@@ -231,7 +217,7 @@ export default function FeatureOne() {
 
             {/* Glowing Glass Card */}
             <motion.div
-              className="relative z-10 w-full max-w-[380px] bg-white/60 backdrop-blur-[40px] rounded-3xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15)] p-6 sm:p-8 overflow-hidden"
+              className="relative z-10 w-full max-w-[440px] bg-white/60 backdrop-blur-[40px] rounded-3xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15)] p-6 sm:p-8 overflow-hidden"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
