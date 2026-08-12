@@ -106,7 +106,7 @@ export default function FeatureOne() {
                       {/* User Message */}
                       <div className="flex gap-3 flex-row-reverse items-start">
                         <div className="flex-1 flex flex-col items-end">
-                          <div className="bg-[#111111] rounded-2xl rounded-tr-sm p-3.5 shadow-sm inline-block max-w-[85%] text-left">
+                          <div className="bg-primary rounded-2xl rounded-tr-sm p-3.5 shadow-sm inline-block max-w-[85%] text-left border border-primary/20">
                             <p className="text-sm text-white font-medium">
                               Build a metrics dashboard with a database backend.
                             </p>
@@ -193,7 +193,7 @@ export default function FeatureOne() {
                     <div className="flex-1 text-[13px] text-[#555555] font-medium opacity-70">
                       Ask Horizon to build...
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-[#111111] flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-transform">
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-transform">
                       <span className="material-symbols-outlined text-white text-[16px]">
                         arrow_upward
                       </span>
