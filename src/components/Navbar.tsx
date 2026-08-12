@@ -530,13 +530,27 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       animate={{ opacity: 1, clipPath: "circle(150% at 20% -20px)", filter: "blur(0px)" }}
                       exit={{ opacity: 0, clipPath: "circle(0% at 20% -20px)", filter: "blur(10px)" }}
                       transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[95vw] lg:w-[1050px] bg-white/95 backdrop-blur-3xl rounded-[24px] border border-white/70 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] z-50 flex overflow-hidden mega-menu-popup"
+                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[95vw] lg:w-[1150px] p-2.5 bg-white/95 backdrop-blur-3xl rounded-[28px] border border-white/70 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] z-50 flex gap-2.5 overflow-hidden mega-menu-popup"
                     >
                   {/* Decorative background glows */}
                   <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
 
+                  {/* Left Section: Poster */}
+                  <div className="relative shrink-0 rounded-[20px] overflow-hidden group" style={{ aspectRatio: '10/14' }}>
+                    <img src="https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?q=80&w=800&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Galaxy Z Fold6" />
+                    
+                    {/* Dark gradient overlay for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6 pointer-events-none">
+                      <span className="text-white font-black text-2xl leading-tight drop-shadow-md">Galaxy Z Fold6</span>
+                      <span className="text-white/90 text-sm mt-1.5 font-medium drop-shadow">Sức mạnh mở ra tiềm năng</span>
+                    </div>
+
+                    {/* Interactive hover glow */}
+                    <div className="absolute inset-0 bg-[#FF4D24]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none mix-blend-overlay" />
+                  </div>
+
                   {/* Right Section: Categories with Rich Ambient Glow */}
-                  <div className="relative flex-1 p-8 bg-white/75 flex flex-col justify-center overflow-hidden rounded-[24px]">
+                  <div className="relative flex-1 p-6 bg-white/75 flex flex-col justify-center overflow-hidden rounded-[20px]">
                         {/* Stronger ambient color bleed matching the poster colors */}
                         <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-cyan-500/8 via-indigo-500/2 to-transparent pointer-events-none" />
                         
