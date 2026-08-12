@@ -88,16 +88,15 @@ export default function FeatureOne() {
                       className="space-y-4"
                     >
                       {/* Bot Message */}
-                      <div className="flex gap-3">
-                        <div className="w-7 h-7 rounded-full bg-[#FF4D24]/20 shrink-0 border border-white/40 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-primary text-[14px] font-bold">
-                            auto_awesome
+                      <div className="flex gap-3 items-start">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF4D24] to-[#ff7a59] shrink-0 shadow-sm flex items-center justify-center">
+                          <span className="material-symbols-outlined text-white text-[16px]">
+                            smart_toy
                           </span>
                         </div>
-                        <div className="flex-1 space-y-1.5">
-                          <div className="h-1.5 w-20 bg-black/40 rounded-full" />
-                          <div className="bg-white/40 rounded-2xl rounded-tl-none p-3 border border-white/60">
-                            <p className="text-xs text-[#111111] font-semibold leading-relaxed">
+                        <div className="flex-1">
+                          <div className="bg-white/60 backdrop-blur-md rounded-2xl rounded-tl-sm p-3.5 border border-white/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] inline-block">
+                            <p className="text-sm text-[#111111] font-medium leading-relaxed">
                               I can generate full UI routes and configure Firestore. What features should your SaaS include?
                             </p>
                           </div>
@@ -105,16 +104,10 @@ export default function FeatureOne() {
                       </div>
 
                       {/* User Message */}
-                      <div className="flex gap-3 flex-row-reverse">
-                        <div className="w-7 h-7 rounded-full bg-[#326578]/20 shrink-0 border border-white/40 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-tertiary text-[14px] font-bold">
-                            person
-                          </span>
-                        </div>
-                        <div className="flex-1 space-y-1.5 flex flex-col items-end">
-                          <div className="h-1.5 w-16 bg-black/40 rounded-full" />
-                          <div className="bg-[#FF4D24]/10 rounded-2xl rounded-tr-none p-3 border border-[#FF4D24]/20 w-3/4">
-                            <p className="text-xs text-[#FF4D24] font-semibold">
+                      <div className="flex gap-3 flex-row-reverse items-start">
+                        <div className="flex-1 flex flex-col items-end">
+                          <div className="bg-[#111111] rounded-2xl rounded-tr-sm p-3.5 shadow-sm inline-block max-w-[85%] text-left">
+                            <p className="text-sm text-white font-medium">
                               Build a metrics dashboard with a database backend.
                             </p>
                           </div>
@@ -177,29 +170,30 @@ export default function FeatureOne() {
                 </AnimatePresence>
 
                 {/* Static Preview and Mock Input Area */}
-                <div className="space-y-4 pt-4 border-t border-black/5 mt-auto">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="h-16 bg-white/30 rounded-xl border border-white/40 flex items-center justify-center hover:bg-white/50 transition-colors">
-                      <span className="material-symbols-outlined text-[#555555]/40">
-                        dashboard
-                      </span>
+                <div className="pt-4 mt-auto">
+                  {/* Generated Preview Block */}
+                  <div className="mb-4 bg-white/40 backdrop-blur-md rounded-xl p-3 border border-white/60 shadow-sm flex items-center justify-between cursor-pointer hover:bg-white/60 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center border border-green-500/20">
+                        <span className="material-symbols-outlined text-green-600 text-[18px]">check_circle</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-[#111111]">Dashboard Generated</p>
+                        <p className="text-[10px] text-[#555555]">3 components, 1 database schema</p>
+                      </div>
                     </div>
-                    <div className="h-16 bg-white/30 rounded-xl border border-white/40 flex items-center justify-center hover:bg-white/50 transition-colors">
-                      <span className="material-symbols-outlined text-[#555555]/40">
-                        bar_chart
-                      </span>
-                    </div>
+                    <span className="material-symbols-outlined text-[#111111] text-[16px]">open_in_new</span>
                   </div>
 
                   {/* Simulated Chat Input Area */}
-                  <div className="p-1.5 bg-white/40 rounded-full border border-white/60 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#555555]/50 text-[18px] ml-2 cursor-pointer hover:text-primary">
-                      add_circle
-                    </span>
-                    <div className="flex-1 text-[11px] text-[#555555] font-medium">
-                      Type a new capability...
+                  <div className="p-2 bg-white/70 backdrop-blur-xl rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] flex items-center gap-2 transition-all">
+                    <button className="w-8 h-8 rounded-full flex items-center justify-center text-[#555555] hover:bg-black/5 transition-colors">
+                      <span className="material-symbols-outlined text-[18px]">attach_file</span>
+                    </button>
+                    <div className="flex-1 text-[13px] text-[#555555] font-medium opacity-70">
+                      Ask Horizon to build...
                     </div>
-                    <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-transform">
+                    <div className="w-8 h-8 rounded-full bg-[#111111] flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-transform">
                       <span className="material-symbols-outlined text-white text-[16px]">
                         arrow_upward
                       </span>
