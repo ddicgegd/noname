@@ -526,11 +526,11 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                 <AnimatePresence>
                   {showProductMegaMenu && (
                     <motion.div 
-                      initial={{ opacity: 0, clipPath: "circle(0% at 10% -20px)", filter: "blur(10px)" }}
-                      animate={{ opacity: 1, clipPath: "circle(150% at 10% -20px)", filter: "blur(0px)" }}
-                      exit={{ opacity: 0, clipPath: "circle(0% at 10% -20px)", filter: "blur(10px)" }}
+                      initial={{ opacity: 0, clipPath: "circle(0% at 20% -20px)", filter: "blur(10px)" }}
+                      animate={{ opacity: 1, clipPath: "circle(150% at 20% -20px)", filter: "blur(0px)" }}
+                      exit={{ opacity: 0, clipPath: "circle(0% at 20% -20px)", filter: "blur(10px)" }}
                       transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                      className="absolute top-[calc(100%+4px)] right-0 w-[95vw] lg:w-[820px] bg-white/95 backdrop-blur-3xl rounded-[24px] border border-white/70 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] z-50 flex overflow-hidden mega-menu-popup"
+                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[95vw] lg:w-[1050px] bg-white/95 backdrop-blur-3xl rounded-[24px] border border-white/70 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] z-50 flex overflow-hidden mega-menu-popup"
                     >
                   {/* Decorative background glows */}
                   <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
