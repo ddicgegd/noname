@@ -55,7 +55,7 @@ export default function FeatureOne() {
             </div>
 
             {/* Glowing Glass Card */}
-            <div className="relative z-10 w-full max-w-[480px] bg-white/40 backdrop-blur-[32px] rounded-2xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden">
+            <div className="relative z-10 w-[80%] max-w-2xl bg-white/40 backdrop-blur-[32px] rounded-2xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden">
               {/* Custom Interactive Tabs */}
               <div className="flex items-center justify-center p-4 border-b border-white/10 bg-white/20">
                 <div className="flex p-1 rounded-full border border-white/20 backdrop-blur-md bg-white/40">
@@ -219,7 +219,7 @@ export default function FeatureOne() {
 
             {/* Glowing Glass Card */}
             <motion.div
-              className="relative z-10 w-full max-w-[440px] bg-white/60 backdrop-blur-[40px] rounded-3xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15)] p-6 sm:p-8 overflow-hidden"
+              className="relative z-10 w-[80%] max-w-2xl bg-white/60 backdrop-blur-[40px] rounded-3xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15)] p-6 sm:p-8 overflow-hidden"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
