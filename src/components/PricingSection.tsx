@@ -63,7 +63,7 @@ export default function PricingSection() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Column 1: Copywriting */}
           <motion.div
-            className="p-8 sm:p-10 flex flex-col justify-center bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.02)]"
+            className="p-8 sm:p-10 flex flex-col justify-center h-full bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.02)]"
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
@@ -81,7 +81,7 @@ export default function PricingSection() {
           {PRICING_PLANS.map((plan) => (
             <div key={plan.id} className="flex flex-col h-full">
               <motion.div
-                className="p-8 sm:p-10 bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)] flex flex-col relative overflow-hidden group h-full cursor-pointer"
+                className="p-8 sm:p-10 bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)] flex flex-col relative overflow-hidden group h-full min-h-[550px] cursor-pointer"
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
