@@ -536,7 +536,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                   <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
 
                   {/* Left Section: Poster */}
-                  <div className="relative shrink-0 rounded-[20px] overflow-hidden group" style={{ aspectRatio: '10/14' }}>
+                  <div className="relative shrink-0 w-[260px] md:w-[280px] rounded-[20px] overflow-hidden group" style={{ aspectRatio: '10/14' }}>
                     <img src="https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?q=80&w=800&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Galaxy Z Fold6" />
                     
                     {/* Dark gradient overlay for text readability */}
