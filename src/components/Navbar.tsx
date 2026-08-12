@@ -536,17 +536,14 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                   <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
 
                   {/* Left Section: Poster */}
-                  <div className="relative shrink-0 w-[336px] overflow-hidden group" style={{ aspectRatio: '10/14' }}>
-                    <img src="https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?q=80&w=800&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Galaxy Z Fold6" />
+                  <div className="relative shrink-0 w-[336px] overflow-hidden" style={{ aspectRatio: '10/14' }}>
+                    <img src="https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?q=80&w=800&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover" alt="Galaxy Z Fold6" />
                     
                     {/* Dark gradient overlay for text readability */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6 pointer-events-none">
                       <span className="text-white font-black text-2xl leading-tight drop-shadow-md">Galaxy Z Fold6</span>
                       <span className="text-white/90 text-sm mt-1.5 font-medium drop-shadow">Sức mạnh mở ra tiềm năng</span>
                     </div>
-
-                    {/* Interactive hover glow */}
-                    <div className="absolute inset-0 bg-[#FF4D24]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none mix-blend-overlay" />
                   </div>
 
                   {/* Right Section: Categories with Rich Ambient Glow */}
