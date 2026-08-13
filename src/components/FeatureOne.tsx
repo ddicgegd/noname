@@ -3,13 +3,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
 type TabType = "chat" | "idea" | "narration";
 
 export default function FeatureOne() {
   const [activeTab, setActiveTab] = useState<TabType>("chat");
+  const [inputValue, setInputValue] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<{ file: File; url: string; isImage: boolean } | null>(null);
+  const [messages, setMessages] = useState<{ sender: 'bot' | 'user', text: string, file: string | null, imageUrl?: string }[]>([
+    { sender: 'bot', text: 'I can generate full UI routes and configure Firestore. What features should your SaaS include?', file: null },
+    { sender: 'user', text: 'Build a metrics dashboard with a database backend.', file: null }
+  ]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const isImage = file.type.startsWith("image/");
+      const url = URL.createObjectURL(file);
+      setUploadedFile({ file, url, isImage });
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (!inputValue.trim() && !uploadedFile) return;
+    setMessages(prev => [...prev, {
+      sender: 'user',
+      text: inputValue,
+      file: uploadedFile ? uploadedFile.file.name : null,
+      imageUrl: uploadedFile?.isImage ? uploadedFile.url : undefined
+    }]);
+    setInputValue('');
+    setUploadedFile(null);
+    setActiveTab("chat");
+  };
 
   const handleScrollToPricing = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
@@ -85,34 +113,50 @@ export default function FeatureOne() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.3 }}
-                      className="space-y-4"
+                      className="space-y-4 max-h-[300px] overflow-y-auto pr-2"
                     >
-                      {/* Bot Message */}
-                      <div className="flex gap-3 items-start">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF4D24] to-[#ff7a59] shrink-0 shadow-sm flex items-center justify-center">
-                          <span className="material-symbols-outlined text-white text-[16px]">
-                            smart_toy
-                          </span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="bg-white/60 backdrop-blur-md rounded-2xl rounded-tl-sm p-3.5 border border-white/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] inline-block">
-                            <p className="text-sm text-[#111111] font-medium leading-relaxed">
-                              I can generate full UI routes and configure Firestore. What features should your SaaS include?
-                            </p>
+                      {messages.map((msg, idx) => (
+                        msg.sender === 'bot' ? (
+                          <div key={idx} className="flex gap-3 items-start">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF4D24] to-[#ff7a59] shrink-0 shadow-sm flex items-center justify-center">
+                              <span className="material-symbols-outlined text-white text-[16px]">
+                                smart_toy
+                              </span>
+                            </div>
+                            <div className="flex-1">
+                              <div className="bg-white/60 backdrop-blur-md rounded-2xl rounded-tl-sm p-3.5 border border-white/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] inline-block">
+                                <p className="text-sm text-[#111111] font-medium leading-relaxed">
+                                  {msg.text}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-
-                      {/* User Message */}
-                      <div className="flex gap-3 flex-row-reverse items-start">
-                        <div className="flex-1 flex flex-col items-end">
-                          <div className="bg-[#FF4D24]/80 backdrop-blur-md rounded-2xl rounded-tr-sm p-3.5 shadow-sm inline-block max-w-[85%] text-left border border-white/20">
-                            <p className="text-sm text-white font-medium">
-                              Build a metrics dashboard with a database backend.
-                            </p>
+                        ) : (
+                          <div key={idx} className="flex gap-3 flex-row-reverse items-start">
+                            <div className="flex-1 flex flex-col items-end">
+                              <div className="bg-[#FF4D24]/80 backdrop-blur-md rounded-2xl rounded-tr-sm p-3.5 shadow-sm inline-block max-w-[85%] text-left border border-white/20">
+                                {msg.file && (
+                                  msg.imageUrl ? (
+                                    <div className="mb-2 rounded overflow-hidden max-w-[200px] border border-white/20 bg-white/10">
+                                      <img src={msg.imageUrl} alt="attachment" className="w-full h-auto object-cover" />
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5 mb-2 bg-white/20 p-1.5 rounded text-white text-xs">
+                                      <span className="material-symbols-outlined text-[14px]">description</span>
+                                      <span className="truncate max-w-[120px]">{msg.file}</span>
+                                    </div>
+                                  )
+                                )}
+                                {msg.text && (
+                                  <p className="text-sm text-white font-medium">
+                                    {msg.text}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
+                        )
+                      ))}
                     </motion.div>
                   )}
 
@@ -171,18 +215,70 @@ export default function FeatureOne() {
 
                 {/* Static Preview and Mock Input Area */}
                 <div className="pt-4 mt-auto">
+                  {/* File preview if uploaded */}
+                  <AnimatePresence>
+                    {uploadedFile && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="mb-2 flex items-center gap-2 bg-white/80 backdrop-blur-md rounded-lg p-2 border border-white/60 shadow-sm w-fit max-w-full"
+                      >
+                        {uploadedFile.isImage ? (
+                          <div className="w-6 h-6 rounded shrink-0 overflow-hidden bg-black/5">
+                            <img src={uploadedFile.url} alt="preview" className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <span className="material-symbols-outlined text-primary text-[16px]">description</span>
+                        )}
+                        <span className="text-xs text-[#111111] font-medium truncate max-w-[150px]">
+                          {uploadedFile.file.name}
+                        </span>
+                        <button 
+                          onClick={() => setUploadedFile(null)}
+                          className="w-5 h-5 rounded-full hover:bg-black/5 flex items-center justify-center ml-1"
+                        >
+                          <span className="material-symbols-outlined text-[14px] text-[#555555]">close</span>
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
                   {/* Simulated Chat Input Area */}
-                  <div className="p-2 bg-white/70 backdrop-blur-xl rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] flex items-center gap-2 transition-all">
-                    <button className="w-8 h-8 rounded-full flex items-center justify-center text-[#555555] hover:bg-black/5 transition-colors">
-                      <span className="material-symbols-outlined text-[18px]">attach_file</span>
-                    </button>
-                    <div className="flex-1 text-[13px] text-[#555555] font-medium opacity-70">
-                      Ask Horizon to build...
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-transform">
-                      <span className="material-symbols-outlined text-white text-[16px]">
-                        arrow_upward
-                      </span>
+                  <div className="p-3 bg-white/70 backdrop-blur-xl rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] flex flex-col gap-2 transition-all relative z-20 pointer-events-auto cursor-text" onClick={() => document.getElementById('chat-textarea')?.focus()}>
+                    <textarea
+                      id="chat-textarea"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      placeholder="Ask Horizon to build..."
+                      className="w-full min-h-[44px] max-h-[120px] resize-none text-[13px] text-[#111111] font-medium placeholder:text-[#555555] placeholder:opacity-70 bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-1 custom-scrollbar leading-relaxed pointer-events-auto"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                    />
+                    <div className="flex items-center justify-between mt-1">
+                      <label className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer pointer-events-auto ${uploadedFile ? 'text-primary bg-primary/10' : 'text-[#555555] hover:bg-black/5'}`}>
+                        <input 
+                          type="file" 
+                          accept="image/*,.pdf,.doc,.docx,.txt"
+                          onChange={handleFileChange} 
+                          style={{ display: "none" }}
+                        />
+                        <span className="material-symbols-outlined text-[18px]">attach_file</span>
+                      </label>
+                      
+                      <button 
+                        onClick={handleSendMessage}
+                        disabled={!inputValue.trim() && !uploadedFile}
+                        className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto"
+                      >
+                        <span className="material-symbols-outlined text-white text-[16px]">
+                          arrow_upward
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>
