@@ -6,6 +6,8 @@
 import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import type { CSSProperties, MouseEvent } from "react";
+import ClawMachine from "./ClawMachine";
+
 
 
 interface PricingPlan {
@@ -279,13 +281,7 @@ function HoloCard({ plan }: { plan: PricingPlan }) {
               </li>
             ))}
           </ul>
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            className={plan.buttonClass}
-          >
-            {plan.buttonText}
-          </motion.button>
+
         </div>
       </div>
     </div>
@@ -298,18 +294,13 @@ export default function PricingSection() {
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <motion.div
-            className="p-8 sm:p-10 flex flex-col justify-center h-full bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.02)]"
+            className="bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.02)] overflow-hidden h-full min-h-[550px]"
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <h2 className="font-display text-3xl sm:text-4xl font-bold leading-tight text-[#111111] mb-4">
-              Simple, transparent pricing.
-            </h2>
-            <p className="font-sans text-base text-[#555555] mb-6">
-              Choose the plan that fits your ambition. No hidden setup fees or complex contracts.
-            </p>
+            <ClawMachine />
           </motion.div>
 
           {PRICING_PLANS.map((plan) => (
