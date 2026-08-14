@@ -295,9 +295,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     if (megaMenuTimeoutRef.current) {
       clearTimeout(megaMenuTimeoutRef.current);
     }
-    megaMenuTimeoutRef.current = setTimeout(() => {
-      setShowProductMegaMenu(true);
-    }, 150); // More responsive entry delay to feel snappy
+    setShowProductMegaMenu(true);
   };
 
   const handleMegaMenuMouseLeave = () => {
