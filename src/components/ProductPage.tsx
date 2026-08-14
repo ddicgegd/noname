@@ -1290,16 +1290,34 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                             </div>
 
                             <div className="mt-auto flex min-h-4 items-center">
-                              {vndInfo.smember && (
-                                <motion.div
-                                  animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                                  transition={{ duration: 5, ease: "linear", repeat: Infinity }}
-                                  className="flex w-fit items-center gap-1.5 rounded border border-[#C084FC]/20 bg-gradient-to-r from-[#C084FC]/20 via-[#FF9A9E]/20 to-[#C084FC]/20 bg-[length:200%_auto] px-1.5 py-0.5"
-                                >
-                                  <BadgeCheckIcon className="size-3.5 text-[#C084FC]" />
-                                  <span className="truncate text-[11px] font-medium text-foreground/80">{vndInfo.smember}</span>
-                                </motion.div>
-                              )}
+                              {vndInfo.smember && (() => {
+                                const isCyan = index % 2 === 0;
+                                return (
+                                  <motion.div
+                                    animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                                    transition={{ duration: 4, ease: "linear", repeat: Infinity }}
+                                    className={`relative overflow-hidden flex w-fit items-center gap-1.5 rounded border px-1.5 py-0.5 bg-[length:200%_auto] ${
+                                      isCyan
+                                        ? "border-[#38BDF8]/18 dark:border-[#38BDF8]/25 bg-gradient-to-r from-[#38BDF8]/18 via-[#818CF8]/22 to-[#38BDF8]/18 bg-white/50 dark:bg-black/20 shadow-[0_2px_8px_rgba(56,189,248,0.08)]"
+                                        : "border-[#C084FC]/18 dark:border-[#C084FC]/25 bg-gradient-to-r from-[#C084FC]/18 via-[#FF9A9E]/22 to-[#C084FC]/18 bg-white/50 dark:bg-black/20 shadow-[0_2px_8px_rgba(192,132,252,0.08)]"
+                                    }`}
+                                  >
+                                    <motion.span
+                                      className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-white/55 to-transparent -skew-x-12"
+                                      animate={{ x: ["-130%", "230%"] }}
+                                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: (index % 3) * 0.5 }}
+                                    />
+                                    <BadgeCheckIcon
+                                      className={`size-3.5 shrink-0 relative z-10 ${
+                                        isCyan ? "text-[#0284C7] dark:text-[#38BDF8]" : "text-[#9333EA] dark:text-[#C084FC]"
+                                      }`}
+                                    />
+                                    <span className="truncate text-[11px] font-medium text-foreground/90 relative z-10">
+                                      {vndInfo.smember}
+                                    </span>
+                                  </motion.div>
+                                );
+                              })()}
                             </div>
                           </CardContent>
 
