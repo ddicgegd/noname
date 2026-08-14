@@ -86,7 +86,7 @@ const CATEGORIES: MegaMenuCategory[] = [
         ]
       },
       {
-        title: "Hãng máy tính bảng",
+        title: "Máy tính bảng",
         items: [
           { name: "iPad" },
           { name: "Samsung" },
@@ -528,47 +528,47 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       animate={{ opacity: 1, clipPath: "circle(150% at 20% -20px)", filter: "blur(0px)" }}
                       exit={{ opacity: 0, clipPath: "circle(0% at 20% -20px)", filter: "blur(10px)" }}
                       transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[95vw] lg:w-[1300px] xl:w-[1350px] bg-white/95 backdrop-blur-3xl rounded-[24px] border border-white/70 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] z-50 flex overflow-hidden mega-menu-popup"
+                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[92vw] lg:w-[1040px] xl:w-[1080px] bg-white/95 backdrop-blur-3xl rounded-[20px] border-0 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.12),0_8px_24px_rgba(0,0,0,0.04)] z-50 flex overflow-hidden mega-menu-popup"
                     >
                   {/* Decorative background glows */}
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-[#FF4D24]/15 rounded-full blur-[40px] pointer-events-none -z-10" />
 
-                  {/* Left Section: Poster */}
-                  <div className="relative shrink-0 w-[336px] overflow-hidden" style={{ aspectRatio: '10/14' }}>
+                  {/* Left Section: Poster (scaled down 20%) */}
+                  <div className="relative shrink-0 w-[268px] overflow-hidden" style={{ aspectRatio: '10/14' }}>
                     <img src="https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?q=80&w=800&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover" alt="Galaxy Z Fold6" />
                     
                     {/* Dark gradient overlay for text readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6 pointer-events-none">
-                      <span className="text-white font-black text-2xl leading-tight drop-shadow-md">Galaxy Z Fold6</span>
-                      <span className="text-white/90 text-sm mt-1.5 font-medium drop-shadow">Sức mạnh mở ra tiềm năng</span>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-5 pointer-events-none">
+                      <span className="text-white font-black text-xl leading-tight drop-shadow-md">Galaxy Z Fold6</span>
+                      <span className="text-white/90 text-xs mt-1 font-medium drop-shadow">Sức mạnh mở ra tiềm năng</span>
                     </div>
                   </div>
 
-                  {/* Right Section: Categories with Rich Ambient Glow */}
-                  <div className="relative flex-1 p-8 bg-transparent flex flex-col justify-center overflow-hidden">
+                  {/* Right Section: Categories with Rich Ambient Glow (scaled down 20%) */}
+                  <div className="relative flex-1 py-6 pl-5 pr-7 bg-transparent flex flex-col justify-center overflow-hidden">
                         {/* Stronger ambient color bleed matching the poster colors */}
                         <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-cyan-500/8 via-indigo-500/2 to-transparent pointer-events-none" />
                         
                         {/* Ambient color light pools reflecting the vibrant cyan and indigo hues of the poster */}
-                        <div className="absolute left-0 top-[15%] w-[350px] h-[350px] rounded-full bg-cyan-500/8 blur-[90px] pointer-events-none" />
-                        <div className="absolute left-[25%] bottom-[5%] w-[300px] h-[300px] rounded-full bg-indigo-500/6 blur-[80px] pointer-events-none" />
+                        <div className="absolute left-0 top-[15%] w-[280px] h-[280px] rounded-full bg-cyan-500/8 blur-[70px] pointer-events-none" />
+                        <div className="absolute left-[25%] bottom-[5%] w-[240px] h-[240px] rounded-full bg-indigo-500/6 blur-[60px] pointer-events-none" />
                         
                         {/* Orange/peach ambient light pool that blends in when hovering the poster */}
-                        <div className="absolute left-[-10%] top-[20%] w-[450px] h-[450px] rounded-full bg-[#FF4D24]/20 blur-[100px] pointer-events-none opacity-0 transition-opacity duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] ambient-orange-pool" />
+                        <div className="absolute left-[-10%] top-[20%] w-[360px] h-[360px] rounded-full bg-[#FF4D24]/20 blur-[80px] pointer-events-none opacity-0 transition-opacity duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] ambient-orange-pool" />
 
                         {/* Right grid: Columns of Phone & Tablet subcategories (Optimized widths & spacing with perfectly aligned header baselines) */}
-                        <div className="relative z-10 grid grid-cols-[2.2fr_1.2fr_1.5fr_1.2fr_1.5fr] gap-x-6 gap-y-3.5 w-full items-start">
+                        <div className="relative z-10 grid grid-cols-[1.75fr_0.95fr_1.35fr_0.85fr_1.55fr] gap-x-4 gap-y-2.5 w-full items-start">
                           {CATEGORIES[0]?.columns.map((col, colIdx) => {
                             const isBrandCol = colIdx === 0; // "Hãng điện thoại"
                             return (
                               <div 
                                 key={colIdx} 
-                                className="flex flex-col gap-2.5"
+                                className="flex flex-col gap-2"
                               >
-                                <h4 className="text-[13px] font-black uppercase tracking-[0.12em] text-slate-400 font-sans border-b border-slate-100 pb-2 h-11 flex items-end mb-2 w-full whitespace-nowrap">
+                                <h4 className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400 font-sans border-b border-slate-100 pb-1.5 h-8 flex items-end mb-1.5 w-full whitespace-nowrap">
                                   {col.title}
                                 </h4>
-                                <div className={isBrandCol ? "grid grid-cols-2 gap-x-4 gap-y-2" : "flex flex-col gap-2"}>
+                                <div className={isBrandCol ? "grid grid-cols-2 gap-x-2.5 gap-y-1.5" : "flex flex-col gap-1.5"}>
                                   {col.items.map((item, itemIdx) => (
                                     <a
                                       key={itemIdx}
@@ -578,16 +578,16 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                                         onNavigate("product");
                                         setShowProductMegaMenu(false);
                                       }}
-                                      className="text-[15px] text-slate-600 hover:text-primary font-medium flex items-center justify-between gap-1 py-1 h-auto transition-all hover:translate-x-1 duration-200 outline-none"
+                                      className="text-[12.5px] text-slate-600 hover:text-primary font-medium flex items-center justify-between gap-1 py-0.5 h-auto transition-all hover:translate-x-0.5 duration-200 outline-none"
                                     >
-                                      <span className={`transition-colors truncate ${isBrandCol ? 'max-w-[150px]' : 'max-w-none'}`}>{item.name}</span>
+                                      <span className={`transition-colors truncate ${isBrandCol ? 'max-w-[100px]' : 'max-w-[140px]'}`}>{item.name}</span>
                                       {item.tag === "HOT" && (
-                                        <span className="text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded bg-red-500 text-white leading-none uppercase shrink-0 scale-90">
+                                        <span className="text-[9px] font-black tracking-wider px-1 py-0.5 rounded bg-red-500 text-white leading-none uppercase shrink-0">
                                           HOT
                                         </span>
                                       )}
                                       {item.tag === "MỚI" && (
-                                        <span className="text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded bg-blue-500 text-white leading-none uppercase shrink-0 scale-90 font-sans">
+                                        <span className="text-[9px] font-black tracking-wider px-1 py-0.5 rounded bg-blue-500 text-white leading-none uppercase shrink-0 font-sans">
                                           MỚI
                                         </span>
                                       )}

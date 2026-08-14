@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, LayoutGroup } from "motion/react";
+import { cn } from "@/lib/utils";
 import {
   type Product,
 } from "../lib/productCatalog";
@@ -41,6 +42,7 @@ import {
   XIcon,
   PlusIcon,
   ZapIcon,
+  Loader2Icon,
 } from "lucide-react";
 
 const PRODUCTS: Product[] = [
@@ -980,18 +982,18 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
         </Card>
 
         <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FilterIcon />
+          <aside className="flex flex-col gap-4 lg:sticky lg:top-[max(1.25rem,calc(50vh-365px))] lg:self-start max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
+            <Card size="sm" className="py-0 overflow-hidden shadow-xs">
+              <CardHeader className="py-2.5 px-3 border-b border-border/40">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <FilterIcon className="size-4 text-primary" />
                   Bộ lọc
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <div className="text-xs font-medium text-muted-foreground">Danh mục</div>
-                  <div className="flex flex-col gap-1">
+              <CardContent className="flex flex-col gap-2.5 py-3 px-3">
+                <div className="flex flex-col gap-1.5">
+                  <div className="text-[11px] font-semibold text-muted-foreground">Danh mục</div>
+                  <div className="flex flex-col gap-0.5">
                     {categoryItems.map((category) => {
                       const Icon = category.icon;
                       const isActive = activeCategory === category.id;
@@ -999,14 +1001,14 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                         <Button
                           key={category.id}
                           variant={isActive ? "default" : "ghost"}
-                          className="justify-between"
+                          className="justify-between h-7 text-xs py-1 px-2"
                           onClick={() => setActiveCategory(category.id)}
                         >
-                          <span className="inline-flex items-center gap-2">
-                            <Icon data-icon="inline-start" />
+                          <span className="inline-flex items-center gap-1.5">
+                            <Icon data-icon="inline-start" className="size-3.5" />
                             {category.label}
                           </span>
-                          <Badge variant={isActive ? "secondary" : "outline"}>{getCategoryCount(category.id)}</Badge>
+                          <Badge variant={isActive ? "secondary" : "outline"} className="text-[10px] h-4 px-1.5">{getCategoryCount(category.id)}</Badge>
                         </Button>
                       );
                     })}
@@ -1014,21 +1016,23 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                 </div>
 
                 <Separator />
-                <div className="flex flex-col gap-2">
-                  <div className="text-xs font-medium text-muted-foreground">Hãng hạ tầng</div>
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1.5">
+                  <div className="text-[11px] font-semibold text-muted-foreground">Hãng hạ tầng</div>
+                  <div className="grid grid-cols-2 gap-1.5">
                     <Button
                       variant={selectedBrand === null ? "default" : "outline"}
                       size="sm"
+                      className="h-7 text-xs px-2"
                       onClick={() => setSelectedBrand(null)}
                     >
                       Tất cả
                     </Button>
-                    {BRANDS.slice(0, 7).map((brand) => (
+                    {BRANDS.map((brand) => (
                       <Button
                         key={brand.name}
                         variant={selectedBrand === brand.name ? "default" : "outline"}
                         size="sm"
+                        className="h-7 text-xs px-2"
                         onClick={() => setSelectedBrand(brand.name)}
                       >
                         <span className="truncate">{brand.name}</span>
@@ -1039,119 +1043,81 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
 
                 <Separator />
                 <div className="flex flex-col gap-2">
-                  <Button
-                    variant="ghost"
-                    className="justify-between px-0"
-                    onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <SlidersHorizontalIcon data-icon="inline-start" />
-                      Bộ lọc nâng cao
-                    </span>
-                    <ChevronRightIcon data-icon="inline-end" className={isAdvancedExpanded ? "rotate-90" : ""} />
-                  </Button>
-                  {isAdvancedExpanded && (
-                    <div className="flex flex-col gap-2">
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { id: "all", label: "Tất cả" },
-                          { id: "hourly", label: "Theo giờ" },
-                          { id: "usage", label: "Lưu lượng" },
-                        ].map((item) => (
-                          <Button
-                            key={item.id}
-                            variant={selectedPricingModel === item.id ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setSelectedPricingModel(item.id as any)}
-                          >
-                            {item.label}
-                          </Button>
-                        ))}
-                      </div>
+                  <div className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                    <SlidersHorizontalIcon className="size-3.5" />
+                    Bộ lọc nâng cao
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="text-[10px] text-muted-foreground">Hình thức thanh toán</div>
+                    <div className="grid grid-cols-3 gap-1">
                       {[
-                        { key: "gpu", active: selectedGPU, label: "GPU Boost", setter: setSelectedGPU, icon: ServerIcon },
-                        { key: "sla", active: selectedSLA, label: "SLA 99.99%+", setter: setSelectedSLA, icon: ShieldCheckIcon },
-                        { key: "latency", active: selectedLatency, label: "Độ trễ thấp", setter: setSelectedLatency, icon: ZapIcon },
-                      ].map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <Button
-                            key={item.key}
-                            variant={item.active ? "default" : "outline"}
-                            className="justify-start"
-                            onClick={() => item.setter(!item.active)}
-                          >
-                            <Icon data-icon="inline-start" />
-                            {item.label}
-                          </Button>
-                        );
-                      })}
-                      <div className="flex flex-wrap gap-2">
-                        {["New", "Popular", "Updated"].map((tag) => (
-                          <Button
-                            key={tag}
-                            variant={selectedTags.includes(tag) ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => {
-                              setSelectedTags(
-                                selectedTags.includes(tag)
-                                  ? selectedTags.filter((item) => item !== tag)
-                                  : [...selectedTags, tag]
-                              );
-                            }}
-                          >
-                            {tag === "Popular" ? "Hot" : tag}
-                          </Button>
-                        ))}
-                      </div>
+                        { id: "all", label: "Tất cả" },
+                        { id: "hourly", label: "Theo giờ" },
+                        { id: "usage", label: "Lưu lượng" },
+                      ].map((item) => (
+                        <Button
+                          key={item.id}
+                          variant={selectedPricingModel === item.id ? "default" : "outline"}
+                          size="sm"
+                          className="h-6.5 text-[11px] px-1"
+                          onClick={() => setSelectedPricingModel(item.id as any)}
+                        >
+                          {item.label}
+                        </Button>
+                      ))}
                     </div>
-                  )}
+
+                    <div className="text-[10px] text-muted-foreground mt-0.5">Tính năng & Tiêu chuẩn</div>
+                    {[
+                      { key: "gpu", active: selectedGPU, label: "GPU Boost", setter: setSelectedGPU, icon: ServerIcon },
+                      { key: "sla", active: selectedSLA, label: "SLA 99.99%+", setter: setSelectedSLA, icon: ShieldCheckIcon },
+                      { key: "latency", active: selectedLatency, label: "Độ trễ thấp", setter: setSelectedLatency, icon: ZapIcon },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Button
+                          key={item.key}
+                          variant={item.active ? "default" : "outline"}
+                          size="sm"
+                          className="justify-start h-6.5 text-[11px] px-2"
+                          onClick={() => item.setter(!item.active)}
+                        >
+                          <Icon data-icon="inline-start" className="size-3" />
+                          {item.label}
+                        </Button>
+                      );
+                    })}
+
+                    <div className="text-[10px] text-muted-foreground mt-0.5">Nhãn nổi bật</div>
+                    <div className="flex flex-wrap gap-1">
+                      {["New", "Popular", "Updated"].map((tag) => (
+                        <Button
+                          key={tag}
+                          variant={selectedTags.includes(tag) ? "default" : "outline"}
+                          size="sm"
+                          className="h-6.5 text-[11px] px-2"
+                          onClick={() => {
+                            setSelectedTags(
+                              selectedTags.includes(tag)
+                                ? selectedTags.filter((item) => item !== tag)
+                                : [...selectedTags, tag]
+                            );
+                          }}
+                        >
+                          {tag === "Popular" ? "Hot" : tag}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
-              <CardFooter className="justify-between">
-                <Button variant="outline" onClick={handleReset}>
-                  <RefreshCcwIcon data-icon="inline-start" />
+              <CardFooter className="bg-transparent border-t border-border/40 py-2.5 px-3 justify-between">
+                <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={handleReset}>
+                  <RefreshCcwIcon data-icon="inline-start" className="size-3" />
                   Đặt lại
                 </Button>
-                <Badge variant="secondary">{sortedFilteredProducts.length} sản phẩm</Badge>
+                <Badge variant="secondary" className="text-[11px] font-medium">{sortedFilteredProducts.length} sản phẩm</Badge>
               </CardFooter>
-            </Card>
-
-            <Card id="voucher-section">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <GiftIcon />
-                  Voucher
-                </CardTitle>
-                <CardDescription>Mã ưu đãi cho hóa đơn cloud.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                {[
-                  { id: "HORIZONNEW", title: "Thành viên mới", desc: "Giảm 10%, tối đa 500K", collected: voucher1Collected, setCollected: setVoucher1Collected },
-                  { id: "HORIZONGPU", title: "Khởi tạo vGPU", desc: "Tặng 200K tín dụng cấu hình", collected: voucher2Collected, setCollected: setVoucher2Collected },
-                ].map((voucher) => (
-                  <div key={voucher.id} className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
-                    <div className="min-w-0">
-                      <div className="font-medium">{voucher.title}</div>
-                      <div className="text-xs text-muted-foreground">{voucher.desc}</div>
-                      <div className="mt-1 font-mono text-xs">{voucher.id}</div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={voucher.collected ? "secondary" : "default"}
-                      disabled={voucher.collected}
-                      onClick={(event) => {
-                        voucher.setCollected(true);
-                        showToast(`Nhận mã ${voucher.id} thành công!`, "success");
-                        onSpawnStars?.(event.clientX, event.clientY, "#111111");
-                        onFlyToAccount?.(event.clientX, event.clientY, "🎟️", "#111111", "rgba(17,17,17,0.3)");
-                      }}
-                    >
-                      {voucher.collected ? "Đã có" : "Lấy"}
-                    </Button>
-                  </div>
-                ))}
-              </CardContent>
             </Card>
           </aside>
 
@@ -1166,17 +1132,9 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                         <TabsTrigger
                           key={item.id}
                           value={item.id}
-                          className="relative z-10 data-active:bg-transparent data-active:shadow-none"
                         >
-                          {sortBy === item.id && (
-                            <motion.div
-                              layoutId="sortTabIndicator"
-                              className="absolute inset-0 bg-background rounded-md shadow-sm -z-10"
-                              transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                            />
-                          )}
-                          <Icon data-icon="inline-start" className="relative z-20" />
-                          <span className="relative z-20">{item.label}</span>
+                          <Icon data-icon="inline-start" />
+                          <span>{item.label}</span>
                         </TabsTrigger>
                       );
                     })}
@@ -1202,175 +1160,184 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
               </div>
             )}
 
-            <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
-                <AnimatePresence mode="popLayout">
-                  {sortedFilteredProducts.map((product, index) => {
-                    const vndInfo = getProductVNDDetails(product);
-                    const imgSrc = getProductImage(product);
-                    const specs = product.specs || [];
-                    const compared = comparedProductIds.includes(product.id);
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+              {sortedFilteredProducts.map((product, index) => {
+                const vndInfo = getProductVNDDetails(product);
+                const imgSrc = getProductImage(product);
+                const specs = product.specs || [];
+                const compared = comparedProductIds.includes(product.id);
 
-                    return (
-                      <motion.div
-                        key={product.id}
-                        layout
-                        initial={{ opacity: 0, y: 15, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.35, delay: Math.min((index % 15) * 0.05, 0.5), ease: [0.16, 1, 0.3, 1] }}
-                      >
-                        <Card
-                          size="sm"
-                          className="group relative h-full cursor-pointer gap-2 overflow-visible py-0 transition-shadow hover:shadow-md"
-                          onClick={() => {
-                            const productSku = getProductHashSku(product);
-                            setProductHashSku(productSku);
-                            setActiveHashSku(productSku);
-                            setSelectedProduct(product);
-                          }}
-                        >
-                          {vndInfo.discount && (
-                            <>
-                              <div className="absolute -top-2 left-[-4px] h-[21px] bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] text-white text-[9px] font-black px-1.5 rounded-br-lg rounded-tr-sm shadow-[2px_2px_4px_rgba(0,0,0,0.15)] flex items-center justify-center z-30 select-none">
-                                {vndInfo.discount}
-                              </div>
-                              <div className="absolute top-[13px] left-[-4px] size-1 bg-destructive z-20" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
-                            </>
-                          )}
-
-                          <div className="absolute -top-2 right-[-4px] h-[21px] bg-[#E1EBFD] text-[#2F80ED] text-[9px] font-black px-1.5 rounded-bl-lg rounded-tl-sm shadow-[-2px_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center z-30 select-none">
-                            Trả góp 0%
+                return (
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className="h-full"
+                  >
+                    <Card
+                      size="sm"
+                      className="group relative h-full cursor-pointer gap-2 overflow-visible py-0 transition-shadow hover:shadow-md"
+                      onClick={() => {
+                        const productSku = getProductHashSku(product);
+                        setProductHashSku(productSku);
+                        setActiveHashSku(productSku);
+                        setSelectedProduct(product);
+                      }}
+                    >
+                      {vndInfo.discount && (
+                        <>
+                          <div className="absolute -top-2 left-[-4px] h-[21px] bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] text-white text-[9px] font-black px-1.5 rounded-br-lg rounded-tr-sm shadow-[2px_2px_4px_rgba(0,0,0,0.15)] flex items-center justify-center z-30 select-none">
+                            {vndInfo.discount}
                           </div>
-                          <div className="absolute top-[13px] right-[-4px] size-1 bg-[#1d5fb5] z-20" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />
+                          <div className="absolute top-[13px] left-[-4px] size-1 bg-destructive z-20" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
+                        </>
+                      )}
 
-                          <div className="aspect-[4/5] overflow-hidden rounded-t-xl bg-muted">
-                            {imgSrc ? (
-                              <motion.img
-                                src={imgSrc}
-                                alt={product.name}
-                                className="size-full object-cover transition-transform duration-300 group-hover/card:scale-105"
-                                referrerPolicy="no-referrer"
-                                initial={{ opacity: 0, filter: "blur(4px)" }}
-                                animate={{ opacity: 1, filter: "blur(0px)" }}
-                                transition={{ duration: 0.6, delay: Math.min((index % 15) * 0.05, 0.5) + 0.35, ease: "easeOut" }}
-                              />
-                            ) : (
-                              <div className="flex size-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                                Chưa có ảnh từ API
-                              </div>
-                            )}
+                      <div className="absolute -top-2 right-[-4px] h-[21px] bg-[#E1EBFD] text-[#2F80ED] text-[9px] font-black px-1.5 rounded-bl-lg rounded-tl-sm shadow-[-2px_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center z-30 select-none">
+                        Trả góp 0%
+                      </div>
+                      <div className="absolute top-[13px] right-[-4px] size-1 bg-[#1d5fb5] z-20" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />
+
+                      <div className="aspect-[4/5] overflow-hidden rounded-t-xl bg-muted">
+                        {imgSrc ? (
+                          <img
+                            src={imgSrc}
+                            alt={product.name}
+                            className="size-full object-cover transition-transform duration-300 group-hover/card:scale-105"
+                            referrerPolicy="no-referrer"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex size-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                            Chưa có ảnh từ API
                           </div>
+                        )}
+                      </div>
 
-                          <CardHeader className="px-3 pb-0">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <CardTitle className="line-clamp-1">
-                                  {`${product.name} Cloud Platform`}
-                                </CardTitle>
-                                <CardDescription className="line-clamp-1 text-[11px] mt-0.5 leading-tight">
-                                  {product.desc}
-                                </CardDescription>
-                              </div>
-                              {product.tag && <Badge variant="outline" className="shrink-0">{product.tag}</Badge>}
-                            </div>
-                          </CardHeader>
+                      <CardHeader className="px-3 pb-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <CardTitle className="line-clamp-1">
+                              {`${product.name} Cloud Platform`}
+                            </CardTitle>
+                            <CardDescription className="line-clamp-1 text-[11px] mt-0.5 leading-tight">
+                              {product.desc}
+                            </CardDescription>
+                          </div>
+                          {product.tag && <Badge variant="outline" className="shrink-0">{product.tag}</Badge>}
+                        </div>
+                      </CardHeader>
 
-                          <CardContent className="flex flex-1 flex-col gap-2 px-3">
-                            <div className="flex flex-wrap items-baseline gap-2">
-                              <span className="text-base font-semibold text-primary">{vndInfo.present}</span>
-                              {vndInfo.old && <span className="text-sm text-muted-foreground line-through">{vndInfo.old}</span>}
-                            </div>
+                      <CardContent className="flex flex-1 flex-col gap-2 px-3">
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <span className="text-base font-semibold text-primary">{vndInfo.present}</span>
+                          {vndInfo.old && <span className="text-sm text-muted-foreground line-through">{vndInfo.old}</span>}
+                        </div>
 
-                            <div className="flex flex-wrap gap-1.5">
-                              {specs.slice(0, 2).map((spec, index) => (
-                                <Badge key={`${spec.label}-${index}`} variant="secondary">
-                                  {spec.value.length > 22 ? `${spec.value.slice(0, 22)}...` : spec.value}
-                                </Badge>
-                              ))}
-                            </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {specs.slice(0, 2).map((spec, specIdx) => (
+                            <Badge key={`${spec.label}-${specIdx}`} variant="secondary">
+                              {spec.value.length > 22 ? `${spec.value.slice(0, 22)}...` : spec.value}
+                            </Badge>
+                          ))}
+                        </div>
 
-                            <div className="mt-auto flex min-h-4 items-center">
-                              {vndInfo.smember && (() => {
-                                const isCyan = index % 2 === 0;
-                                return (
-                                  <motion.div
-                                    animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                                    transition={{ duration: 4, ease: "linear", repeat: Infinity }}
-                                    className={`relative overflow-hidden flex w-fit items-center gap-1.5 rounded border px-1.5 py-0.5 bg-[length:200%_auto] ${
-                                      isCyan
-                                        ? "border-[#38BDF8]/18 dark:border-[#38BDF8]/25 bg-gradient-to-r from-[#38BDF8]/18 via-[#818CF8]/22 to-[#38BDF8]/18 bg-white/50 dark:bg-black/20 shadow-[0_2px_8px_rgba(56,189,248,0.08)]"
-                                        : "border-[#C084FC]/18 dark:border-[#C084FC]/25 bg-gradient-to-r from-[#C084FC]/18 via-[#FF9A9E]/22 to-[#C084FC]/18 bg-white/50 dark:bg-black/20 shadow-[0_2px_8px_rgba(192,132,252,0.08)]"
-                                    }`}
-                                  >
-                                    <motion.span
-                                      className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-white/55 to-transparent -skew-x-12"
-                                      animate={{ x: ["-130%", "230%"] }}
-                                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: (index % 3) * 0.5 }}
-                                    />
-                                    <BadgeCheckIcon
-                                      className={`size-3.5 shrink-0 relative z-10 ${
-                                        isCyan ? "text-[#0284C7] dark:text-[#38BDF8]" : "text-[#9333EA] dark:text-[#C084FC]"
-                                      }`}
-                                    />
-                                    <span className="truncate text-[11px] font-medium text-foreground/90 relative z-10">
-                                      {vndInfo.smember}
-                                    </span>
-                                  </motion.div>
-                                );
-                              })()}
-                            </div>
-                          </CardContent>
-
-                          <CardFooter className="justify-between gap-2 bg-background px-3 py-1.5">
-                            <div className="flex items-center gap-1.5 text-xs">
-                              <StarIcon className="fill-primary text-primary" />
-                              <span className="font-medium">5.0</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant={compared ? "default" : "outline"}
-                                size="sm"
-                                className="h-7 px-3 text-xs"
-                                aria-label={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
-                                title={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (compared) {
-                                    setComparedProductIds(comparedProductIds.filter((id) => id !== product.id));
-                                  } else if (comparedProductIds.length >= 3) {
-                                    showToast("Bạn chỉ có thể so sánh tối đa 3 sản phẩm.", "warning");
-                                  } else {
-                                    setComparedProductIds([...comparedProductIds, product.id]);
-                                  }
-                                }}
+                        <div className="mt-auto flex min-h-4 items-center">
+                          {vndInfo.smember && (() => {
+                            const isCyan = index % 2 === 0;
+                            return (
+                              <motion.div
+                                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                                transition={{ duration: 4, ease: "linear", repeat: Infinity }}
+                                className={`relative overflow-hidden flex w-fit items-center gap-1.5 rounded border px-1.5 py-0.5 bg-[length:200%_auto] ${
+                                  isCyan
+                                    ? "border-[#38BDF8]/18 dark:border-[#38BDF8]/25 bg-gradient-to-r from-[#38BDF8]/18 via-[#818CF8]/22 to-[#38BDF8]/18 bg-white/50 dark:bg-black/20 shadow-[0_2px_8px_rgba(56,189,248,0.08)]"
+                                    : "border-[#C084FC]/18 dark:border-[#C084FC]/25 bg-gradient-to-r from-[#C084FC]/18 via-[#FF9A9E]/22 to-[#C084FC]/18 bg-white/50 dark:bg-black/20 shadow-[0_2px_8px_rgba(192,132,252,0.08)]"
+                                }`}
                               >
-                                <SlidersHorizontalIcon className="mr-1.5 size-3.5" />
-                                {compared ? "Đã so sánh" : "So sánh"}
-                              </Button>
-                            </div>
-                          </CardFooter>
-                        </Card>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
+                                <motion.span
+                                  className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-white/55 to-transparent -skew-x-12"
+                                  animate={{ x: ["-130%", "230%"] }}
+                                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: (index % 3) * 0.5 }}
+                                />
+                                <BadgeCheckIcon
+                                  className={`size-3.5 shrink-0 relative z-10 ${
+                                    isCyan ? "text-[#0284C7] dark:text-[#38BDF8]" : "text-[#9333EA] dark:text-[#C084FC]"
+                                  }`}
+                                />
+                                <span className="truncate text-[11px] font-medium text-foreground/90 relative z-10">
+                                  {vndInfo.smember}
+                                </span>
+                              </motion.div>
+                            );
+                          })()}
+                        </div>
+                      </CardContent>
 
-                {sortedFilteredProducts.length === 0 && (
-                  <Card className="col-span-full">
-                    <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-                      <SearchIcon className="text-muted-foreground" />
-                      <CardTitle>Không tìm thấy sản phẩm</CardTitle>
-                      <CardDescription>Thử đổi từ khóa hoặc đặt lại bộ lọc.</CardDescription>
-                      <Button variant="outline" onClick={handleReset}>
-                        <RefreshCcwIcon data-icon="inline-start" />
-                        Thiết lập lại bộ lọc
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </motion.div>
+                      <CardFooter className="justify-between gap-2 bg-background px-3 py-1.5">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <StarIcon className="fill-primary text-primary" />
+                          <span className="font-medium">5.0</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant={compared ? "default" : "outline"}
+                            size="sm"
+                            className="h-7 px-3 text-xs"
+                            aria-label={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
+                            title={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (compared) {
+                                setComparedProductIds(comparedProductIds.filter((id) => id !== product.id));
+                              } else if (comparedProductIds.length >= 3) {
+                                showToast("Bạn chỉ có thể so sánh tối đa 3 sản phẩm.", "warning");
+                              } else {
+                                setComparedProductIds([...comparedProductIds, product.id]);
+                              }
+                            }}
+                          >
+                            <SlidersHorizontalIcon className="mr-1.5 size-3.5" />
+                            {compared ? "Đã so sánh" : "So sánh"}
+                          </Button>
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+
+              {sortedFilteredProducts.length === 0 && (
+                <Card className="col-span-full">
+                  <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                    <SearchIcon className="text-muted-foreground" />
+                    <CardTitle>Không tìm thấy sản phẩm</CardTitle>
+                    <CardDescription>Thử đổi từ khóa hoặc đặt lại bộ lọc.</CardDescription>
+                    <Button variant="outline" onClick={handleReset}>
+                      <RefreshCcwIcon data-icon="inline-start" />
+                      Thiết lập lại bộ lọc
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
             {hasMoreCatalogProducts && (
-              <div ref={loadMoreRef} className="h-10 w-full shrink-0" />
+              <div ref={loadMoreRef} className="flex justify-center items-center py-6 w-full min-h-[56px]">
+                {isCatalogLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center gap-2 rounded-full bg-card/90 backdrop-blur-md px-4 py-2 text-xs font-medium text-muted-foreground border border-border/60 shadow-xs"
+                  >
+                    <Loader2Icon className="size-3.5 animate-spin text-primary" />
+                    <span>Đang tải thêm 15 sản phẩm...</span>
+                  </motion.div>
+                )}
+              </div>
             )}
           </section>
         </div>
