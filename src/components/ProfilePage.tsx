@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { 
   User, Lock, Mail, ChevronDown, ChevronUp, CheckCircle, 
   Eye, EyeOff, AlertCircle, RefreshCw, ArrowRight, Phone,
-  Shield, Check, X, Sliders, ShoppingBag, Truck, Package, 
+  Shield, Check, X, Sliders, ShoppingBag, ClipboardList, Truck, Package, 
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle
 } from "lucide-react";
 import { apiRequest } from "../lib/api";
@@ -636,45 +636,45 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const activeOrder = orders.find(o => o.id === selectedOrderId);
 
   return (
-    <div className="relative pt-28 pb-24 min-h-screen w-full bg-[#FBFDFF] font-sans text-slate-800 flex flex-col justify-start overflow-hidden">
+    <div className="relative pt-24 pb-4 h-screen w-full bg-[#FBFDFF] font-sans text-slate-800 flex flex-col justify-start overflow-hidden">
       
       {/* Ambient background glowing lights (Đánh ánh sáng ám mạnh mẽ hơn) */}
       <div className="absolute top-[-5%] left-1/4 w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-indigo-400/35 via-purple-300/25 to-[#FF4D24]/20 blur-[140px] pointer-events-none select-none z-0 animate-pulse" style={{ animationDuration: '8s' }} />
       <div className="absolute top-[30%] right-[-10%] w-[500px] h-[500px] rounded-full bg-gradient-to-br from-indigo-400/30 to-purple-400/30 blur-[120px] pointer-events-none select-none z-0" />
       <div className="absolute bottom-[5%] left-[-10%] w-[550px] h-[550px] rounded-full bg-gradient-to-tr from-[#FF4D24]/15 via-indigo-400/30 to-blue-400/25 blur-[130px] pointer-events-none select-none z-0" />
       
-      <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-10 xl:px-12 space-y-8">
+      <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-10 xl:px-12 flex-1 min-h-0 flex flex-col space-y-4 pb-2">
         
         {/* Minimal Navigation Breadcrumb and top control actions (Optimized & Unified) */}
-        <div className="flex flex-col gap-5 border-b border-slate-100 pb-7 select-none">
+        <div className="shrink-0 flex flex-col gap-3.5 border-b border-slate-100 pb-4 select-none">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-400">
-            <span className="hover:text-black cursor-pointer transition-colors" onClick={() => onNavigate("landing")}>Horizon Global</span>
+            <span className="hover:text-black cursor-pointer transition-colors" onClick={() => onNavigate("landing")}>Trang chủ</span>
             <span>/</span>
             <span className="text-[#FF4D24] font-semibold">Cổng tài khoản</span>
           </div>
 
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {!isLoading && token && user ? (
               /* Unified User Info & Title when logged in */
-              <div className="flex items-center gap-5">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-2xl shadow-sm shrink-0 select-none border-2 border-white ring-4 ring-indigo-50">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl shadow-sm shrink-0 select-none border-2 border-white ring-4 ring-indigo-50">
                   {user.fullName ? user.fullName.charAt(0).toUpperCase() : "H"}
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-0.5">
                   <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none">{user.fullName || "Hội viên Horizon"}</h1>
-                    <span className="text-xs font-bold font-mono text-[#FF4D24] bg-red-50 px-2 py-1 rounded-lg uppercase border border-red-100">Live Portal</span>
+                    <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">{user.fullName || "Hội viên Horizon"}</h1>
+                    <span className="text-xs font-bold font-mono text-[#FF4D24] bg-red-50 px-2 py-0.5 rounded-md uppercase border border-red-100">Live Portal</span>
                   </div>
-                  <p className="text-sm text-slate-500 font-medium">
+                  <p className="text-xs text-slate-500 font-medium">
                     Tên đăng nhập: <span className="font-mono font-bold text-indigo-600">@{user.username || "username"}</span> • Email: <span className="font-semibold text-slate-600">{user.email || "N/A"}</span>
                   </p>
                 </div>
               </div>
             ) : (
               /* Simple Page Title when loading or not logged in */
-              <div className="space-y-1.5">
-                <h1 className="text-3xl font-extrabold text-[#111111] tracking-tight">Cổng thông tin & Đơn hàng</h1>
-                <p className="text-sm text-slate-400 font-medium">Quản lý thiết lập cá nhân & bảo mật tài khoản thành viên</p>
+              <div className="space-y-1">
+                <h1 className="text-2xl font-extrabold text-[#111111] tracking-tight">Cổng thông tin & Đơn hàng</h1>
+                <p className="text-xs text-slate-400 font-medium">Quản lý thiết lập cá nhân & bảo mật tài khoản thành viên</p>
               </div>
             )}
 
@@ -687,14 +687,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     setSuccessMsg("");
                     setIsAccountsCenterOpen(true);
                   }}
-                  className="px-5 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-bold rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm shadow-indigo-100/40 active:scale-95"
+                  className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm shadow-indigo-100/40 active:scale-95"
                 >
-                  <Sliders className="w-4 h-4" />
+                  <Sliders className="w-3.5 h-3.5" />
                   <span>Quản lý bảo mật</span>
                 </button>
                 <button 
                   onClick={handleLogout}
-                  className="px-5 py-3 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-sm font-bold rounded-2xl transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer active:scale-95"
                 >
                   <span>Đăng xuất</span>
                 </button>
@@ -732,36 +732,36 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           </div>
         ) : (
           /* Main Account Center Dashboard (Focusing on Orders and Delivery Progress) */
-          <div className="space-y-8 text-left">
+          <div className="flex-1 min-h-0 flex flex-col text-left">
             
             {/* Core Section: Split View for Orders and Delivery Tracker */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-10 items-start">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-stretch">
               
-              {/* Left Side: Order list history (Sản phẩm đã mua) */}
-              <div className="lg:col-span-5 space-y-5">
-                <div className="flex items-center justify-between px-1">
+              {/* Left Side: Order list history (Thông tin đơn hàng) */}
+              <div className="lg:col-span-5 h-full flex flex-col space-y-3 min-h-0">
+                <div className="shrink-0 flex items-center justify-between px-1">
                   <div className="flex items-center gap-2">
-                    <ShoppingBag className="w-4 h-4 text-[#FF4D24]" />
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Sản phẩm đã mua</h3>
+                    <ClipboardList className="w-4 h-4 text-[#FF4D24]" />
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Thông tin đơn hàng</h3>
                   </div>
-                  <span className="text-[11px] text-slate-400 font-bold font-mono bg-slate-100 px-2 py-0.5 rounded-full">{orders.length} Đơn hàng</span>
+                  <span className="text-[11px] text-indigo-600 font-bold font-mono bg-indigo-50 border border-indigo-100/80 px-2.5 py-0.5 rounded-full">{orders.length} Đơn hàng</span>
                 </div>
 
-                <div className="relative overflow-hidden rounded-2xl">
+                <div className="flex-1 min-h-0 relative overflow-hidden rounded-2xl">
                   {/* Scrollable Container with Smooth Translucent Masking */}
                   <div 
                     onScroll={handleScroll}
-                    className="hide-scrollbar space-y-4 max-h-[560px] overflow-y-auto py-1 transition-all duration-300"
+                    className="hide-scrollbar space-y-3.5 h-full overflow-y-auto py-1 transition-all duration-300"
                     style={{
                       maskImage: `linear-gradient(to bottom, 
                         transparent 0%, 
-                        black ${showTopFade ? "20%" : "0%"}, 
-                        black ${showBottomFade ? "80%" : "100%"}, 
+                        black ${showTopFade ? "15%" : "0%"}, 
+                        black ${showBottomFade ? "85%" : "100%"}, 
                         transparent 100%)`,
                       WebkitMaskImage: `linear-gradient(to bottom, 
                         transparent 0%, 
-                        black ${showTopFade ? "20%" : "0%"}, 
-                        black ${showBottomFade ? "80%" : "100%"}, 
+                        black ${showTopFade ? "15%" : "0%"}, 
+                        black ${showBottomFade ? "85%" : "100%"}, 
                         transparent 100%)`
                     }}
                   >
@@ -776,13 +776,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <div
                             key={item.id}
                             onClick={() => setSelectedOrderId(item.id)}
-                            className={`p-4 rounded-2xl border text-left cursor-pointer transition-all ${
+                            className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
                               isSelected 
                                 ? "bg-white border-indigo-600 shadow-[0_10px_25px_rgba(79,70,229,0.04)] ring-2 ring-indigo-600/10" 
                                 : "bg-white border-slate-200 hover:border-slate-300"
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-3 mb-2 pb-2 border-b border-slate-50">
+                            <div className="flex items-start justify-between gap-2 mb-1.5 pb-1.5 border-b border-slate-50">
                               <div>
                                 <span className="text-[9.5px] font-bold text-slate-400 font-mono uppercase">MÃ ĐƠN: {item.id}</span>
                                 <p className="text-[10px] text-slate-400 mt-0.5">Ngày mua: {item.date}</p>
@@ -796,11 +796,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               </span>
                             </div>
 
-                            <h4 className="text-xs font-bold text-slate-900 leading-snug line-clamp-2 min-h-[32px] mb-2">
+                            <h4 className="text-xs font-bold text-slate-900 leading-snug line-clamp-2 min-h-[30px] mb-1.5">
                               {item.name}
                             </h4>
 
-                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50/60">
+                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-50/60">
                               <span className="text-[11px] text-slate-500">Tổng thanh toán:</span>
                               <span className="text-xs font-black text-indigo-600 font-mono">{item.price}</span>
                             </div>
@@ -810,116 +810,125 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     )}
                   </div>
                 </div>
-
-                {/* Secure Gateway Guarantee */}
-                <div className="bg-slate-50 border border-slate-200/50 rounded-2xl p-4 space-y-2 text-xs text-slate-500">
-                  <div className="flex items-center gap-1.5 text-slate-800 font-bold">
-                    <Shield className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Chứng chỉ mua sắm bảo mật ERP</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed">
-                    Hệ thống phân phối và giao nhận tự động đồng bộ hóa với hệ thống quản trị kho hàng đa tầng bảo mật của Horizon.
-                  </p>
-                </div>
               </div>
 
               {/* Right Side: Live Delivery Tracking progress timeline (Quá trình vận chuyển) */}
-              <div className="lg:col-span-7 space-y-5">
-                <div className="flex items-center justify-between px-1">
+              <div className="lg:col-span-7 h-full flex flex-col space-y-3 min-h-0">
+                <div className="shrink-0 flex items-center justify-between px-1">
                   <div className="flex items-center gap-2">
                     <Truck className="w-4 h-4 text-indigo-600" />
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Hành trình giao hàng</h3>
                   </div>
-                  <span className="text-[11px] text-slate-400 font-bold font-mono bg-slate-100 px-2.5 py-0.5 rounded-full">Thời gian thực (Live)</span>
                 </div>
 
-                {activeOrder ? (
-                  <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 space-y-6 shadow-sm">
-                    
-                    {/* Header info of selected Order */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-                      <div>
-                        <span className="text-[9.5px] font-bold text-slate-400 font-mono block">VẬN CHUYỂN BỞI</span>
-                        <p className="text-xs font-black text-slate-900">{activeOrder.carrier}</p>
+                <AnimatePresence mode="wait">
+                  {activeOrder ? (
+                    <motion.div
+                      key={activeOrder.id}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+                      className="flex-1 min-h-0 bg-white border border-slate-200/80 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col"
+                    >
+                      
+                      {/* Header info of selected Order */}
+                      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div>
+                          <span className="text-[9.5px] font-bold text-slate-400 font-mono block">VẬN CHUYỂN BỞI</span>
+                          <p className="text-xs font-black text-slate-900">{activeOrder.carrier}</p>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] font-bold text-slate-400 font-mono block sm:text-right">MÃ VẬN ĐƠN (TRACKING)</span>
+                          <p className="text-xs font-bold font-mono text-indigo-600 select-all sm:text-right">{activeOrder.trackingNumber}</p>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-[9.5px] font-bold text-slate-400 font-mono block sm:text-right">MÃ VẬN ĐƠN (TRACKING)</span>
-                        <p className="text-xs font-bold font-mono text-indigo-600 select-all sm:text-right">{activeOrder.trackingNumber}</p>
-                      </div>
-                    </div>
 
-                    {/* Timeline Tracker Wrapper with Scroll & Smooth Fade Masks */}
-                    <div className="relative overflow-hidden">
-                      <div
-                        ref={stepsContainerRef}
-                        onScroll={handleStepsScroll}
-                        className="hide-scrollbar relative max-h-[480px] overflow-y-auto py-2 pl-6 space-y-6 transition-all duration-300"
-                        style={{
-                          maskImage: `linear-gradient(to bottom, 
-                            transparent 0%, 
-                            black ${showStepsTopFade ? "20%" : "0%"}, 
-                            black ${showStepsBottomFade ? "80%" : "100%"}, 
-                            transparent 100%)`,
-                          WebkitMaskImage: `linear-gradient(to bottom, 
-                            transparent 0%, 
-                            black ${showStepsTopFade ? "20%" : "0%"}, 
-                            black ${showStepsBottomFade ? "80%" : "100%"}, 
-                            transparent 100%)`
-                        }}
-                      >
-                        
-                        {/* Left line axis */}
-                        <div className="absolute left-2.5 top-2.5 bottom-2.5 w-0.5 bg-slate-100" />
+                      {/* Timeline Tracker Wrapper with Scroll & Smooth Fade Masks - Auto-fills available height */}
+                      <div className="flex-1 min-h-0 relative overflow-hidden">
+                        <div
+                          ref={stepsContainerRef}
+                          onScroll={handleStepsScroll}
+                          className="hide-scrollbar relative h-full overflow-y-auto py-1 pl-9 space-y-4 transition-all duration-300"
+                          style={{
+                            maskImage: `linear-gradient(to bottom, 
+                              transparent 0%, 
+                              black ${showStepsTopFade ? "15%" : "0%"}, 
+                              black ${showStepsBottomFade ? "85%" : "100%"}, 
+                              transparent 100%)`,
+                            WebkitMaskImage: `linear-gradient(to bottom, 
+                              transparent 0%, 
+                              black ${showStepsTopFade ? "15%" : "0%"}, 
+                              black ${showStepsBottomFade ? "85%" : "100%"}, 
+                              transparent 100%)`
+                          }}
+                        >
+                          
+                          {/* Left line axis */}
+                          <div className="absolute left-[16px] top-2 bottom-2 w-0.5 bg-slate-100" />
 
-                        {activeOrder.deliverySteps.map((step, idx) => {
-                          return (
-                            <div key={idx} className="relative text-left">
-                              
-                              {/* Milestone Dot Indicator */}
-                              <div className={`absolute -left-[20px] top-1 w-2.5 h-2.5 rounded-full border-2 transition-all duration-300 ${
-                                step.active 
-                                  ? "bg-[#FF4D24] border-white ring-4 ring-[#FF4D24]/20 scale-125" 
-                                  : step.completed 
-                                    ? "bg-indigo-600 border-indigo-600" 
-                                    : "bg-slate-200 border-slate-200"
-                              }`} />
+                          {activeOrder.deliverySteps.map((step, idx) => {
+                            return (
+                              <motion.div
+                                key={idx}
+                                initial={{ opacity: 0, x: -8 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.2, delay: idx * 0.03, ease: "easeOut" }}
+                                className="relative text-left"
+                              >
+                                
+                                {/* Milestone Dot Indicator - Centered perfectly at x = 17px */}
+                                <div className={`absolute left-[-19px] -translate-x-1/2 top-1 w-2.5 h-2.5 rounded-full border-2 transition-all duration-300 ${
+                                  step.active 
+                                    ? "bg-[#FF4D24] border-white ring-4 ring-[#FF4D24]/20 scale-125" 
+                                    : step.completed 
+                                      ? "bg-indigo-600 border-indigo-600" 
+                                      : "bg-slate-200 border-slate-200"
+                                }`} />
 
-                              <div className="space-y-0.5">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                                  <h4 className={`text-xs font-bold ${step.active ? "text-[#FF4D24] font-black" : step.completed ? "text-slate-900" : "text-slate-400"}`}>
-                                    {step.title}
-                                  </h4>
-                                  <span className="text-[10px] text-slate-400 font-mono font-medium shrink-0">
-                                    {step.time}
-                                  </span>
+                                <div className="space-y-0.5">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                    <h4 className={`text-xs font-bold ${step.active ? "text-[#FF4D24] font-black" : step.completed ? "text-slate-900" : "text-slate-400"}`}>
+                                      {step.title}
+                                    </h4>
+                                    <span className="text-[10px] text-slate-400 font-mono font-medium shrink-0">
+                                      {step.time}
+                                    </span>
+                                  </div>
+                                  <p className={`text-[11px] leading-relaxed ${step.completed ? "text-slate-500" : "text-slate-400"}`}>
+                                    {step.desc}
+                                  </p>
                                 </div>
-                                <p className={`text-[11px] leading-relaxed ${step.completed ? "text-slate-500" : "text-slate-400"}`}>
-                                  {step.desc}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
+                              </motion.div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Shipping address details block */}
-                    <div className="pt-4 border-t border-slate-100 space-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">Địa chỉ giao nhận hàng</span>
+                      {/* Shipping address details block */}
+                      <div className="shrink-0 pt-3 border-t border-slate-100 space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">Địa chỉ giao nhận hàng</span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-700 leading-relaxed pl-4 bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                          {activeOrder.shippingAddress}
+                        </p>
                       </div>
-                      <p className="text-xs font-semibold text-slate-700 leading-relaxed pl-5 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                        {activeOrder.shippingAddress}
-                      </p>
-                    </div>
 
-                  </div>
-                ) : (
-                  <div className="bg-white border border-slate-200/60 rounded-2xl p-12 text-center text-slate-400 text-xs">
-                    Vui lòng chọn một đơn hàng ở danh sách bên trái để theo dõi hành trình chi tiết.
-                  </div>
-                )}
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="empty-state"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex-1 min-h-0 bg-white border border-slate-200/60 rounded-2xl p-12 text-center text-slate-400 text-xs flex items-center justify-center"
+                    >
+                      Vui lòng chọn một đơn hàng ở danh sách bên trái để theo dõi hành trình chi tiết.
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
             </div>
