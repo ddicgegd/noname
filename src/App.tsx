@@ -14,6 +14,7 @@ import ProductPage from "./components/ProductPage";
 import RegisterPage from "./components/RegisterPage";
 import AuthReportDashboard from "./components/AuthReportDashboard";
 import ProfilePage from "./components/ProfilePage";
+import TermsPage from "./components/TermsPage";
 import { AnimatePresence, motion } from "motion/react";
 
 interface CartItem {
@@ -47,12 +48,17 @@ interface RisingStar {
 }
 
 export default function App() {
-  const getPageFromPath = (path: string): "landing" | "product" | "register" | "auth-report" | "profile" => {
+  const getPageFromPath = (path: string): "landing" | "product" | "auth" | "auth-report" | "profile" | "terms" => {
     const cleanPath = path.toLowerCase().replace(/\/$/, "");
-    if (cleanPath === "/p" || cleanPath === "/product") return "product";
-    if (cleanPath === "/auth-report" || cleanPath === "/diagnostic") return "auth-report";
-    if (cleanPath === "/profile" || cleanPath === "/account" || cleanPath === "/accounts") return "profile";
-    if (cleanPath === "/register" || cleanPath === "/signup") return "register";
+    if (["/p", "/product"].includes(cleanPath)) return "product";
+    if (["/auth-report", "/diagnostic"].includes(cleanPath)) return "auth-report";
+    if (["/profile", "/account", "/accounts"].includes(cleanPath)) return "profile";
+    if (["/verify-email", "/verify"].includes(cleanPath)) {
+      window.history.replaceState({}, "", "/auth#login" + window.location.search);
+      return "auth";
+    }
+    if (cleanPath === "/auth") return "auth";
+    if (["/terms", "/privacy"].includes(cleanPath)) return "terms";
     return "landing";
   };
 
@@ -62,13 +68,26 @@ export default function App() {
       case "product": return "/p";
       case "auth-report": return "/auth-report";
       case "profile": return "/profile";
-      case "register": return "/register";
+      case "auth": {
+        const hash = window.location.hash.toLowerCase();
+        if (hash === "#register") return "/auth#register";
+        if (hash === "#verify") return "/auth#verify";
+        return "/auth#login";
+      }
+      case "terms": return "/terms";
       default: return "/";
     }
   };
 
-  const [currentPage, setCurrentPage] = useState<"landing" | "product" | "register" | "auth-report" | "profile">((() => {
-    return getPageFromPath(window.location.pathname);
+  const [currentPage, setCurrentPage] = useState<"landing" | "product" | "auth" | "auth-report" | "profile" | "terms">((() => {
+    const page = getPageFromPath(window.location.pathname);
+    if (page === "auth") {
+      const hash = window.location.hash.toLowerCase();
+      if (!["#login", "#register", "#verify"].includes(hash)) {
+        window.history.replaceState({}, "", "/auth#login");
+      }
+    }
+    return page;
   }));
 
   const [activeBrand, setActiveBrand] = useState("Samsung");
@@ -84,20 +103,41 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [currentPage]);
 
-  // Sync with browser back/forward buttons
+  // Sync with browser back/forward buttons & hash changes
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPage(getPageFromPath(window.location.pathname));
+      const page = getPageFromPath(window.location.pathname);
+      setCurrentPage(page);
+      if (page === "auth") {
+        const hash = window.location.hash.toLowerCase();
+        if (!["#login", "#register", "#verify"].includes(hash)) {
+          window.history.replaceState({}, "", "/auth#login");
+        }
+      }
     };
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.addEventListener("hashchange", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("hashchange", handlePopState);
+    };
   }, []);
 
   // Custom navigate function to sync with address bar
-  const navigate = (page: "landing" | "product" | "register" | "auth-report" | "profile") => {
+  const navigate = (page: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms") => {
     setCurrentPage(page);
-    const targetPath = getPathFromPage(page);
-    if (window.location.pathname !== targetPath) {
+    let targetPath = getPathFromPage(page);
+    if (page === "auth") {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === "#register") {
+        targetPath = "/auth#register";
+      } else if (hash === "#verify") {
+        targetPath = "/auth#verify";
+      } else {
+        targetPath = "/auth#login";
+      }
+    }
+    if (window.location.pathname + window.location.hash !== targetPath) {
       window.history.pushState({}, "", targetPath);
     }
   };
@@ -248,7 +288,7 @@ export default function App() {
       <SplashScreen />
 
       {/* 2. Synchronized Top Floating Glassmorphism Navbar */}
-      {currentPage !== "register" && currentPage !== "auth-report" && (
+      {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && (
         <Navbar 
           currentPage={currentPage}
           onNavigate={navigate}
@@ -314,15 +354,25 @@ export default function App() {
           >
             <ProfilePage onNavigate={navigate} />
           </motion.div>
-        ) : (
+        ) : currentPage === "auth" ? (
           <motion.div
-            key="register"
+            key="auth"
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
             <RegisterPage onNavigate={navigate} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="terms"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+          >
+            <TermsPage onNavigate={navigate} />
           </motion.div>
         )}
       </AnimatePresence>

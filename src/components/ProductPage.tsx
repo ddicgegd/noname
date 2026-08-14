@@ -6,31 +6,20 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  type ErpAttribute,
-  type ErpCategory,
-  type ErpProduct,
   type Product,
-  createErpProductDetail,
-  getAttributeProductId,
-  getErpCategoryCount,
-  getSortedErpProducts,
-  loadErpCatalog,
-  loadGraphqlProductAttributes
 } from "../lib/productCatalog";
-import { getProductColorOptions } from "../lib/productColorSwatches";
+import { getProductColorOptions, type ProductColorOption } from "../lib/productColorSwatches";
+import { searchAttributesForProductSku, searchProductsForCatalog } from "../services/merchandiseService";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   BadgeCheckIcon,
-  BoxesIcon,
   BrainCircuitIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -465,7 +454,10 @@ const PRODUCTS: Product[] = [
   }
 ];
 
-const getProductImage = (product: { id: string; category: string }) => {
+const getProductImage = (product: Product | { id: string; category: string; mediaUrls?: string[] }) => {
+  if (product.mediaUrls && product.mediaUrls.length > 0) {
+    return product.mediaUrls[0];
+  }
   if (product.category === "ai") {
     if (product.id === "nexus-ai") return "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=400&auto=format&fit=crop";
     if (product.id === "vision-ai") return "https://images.unsplash.com/photo-1527474305487-b87b222841cc?q=80&w=400&auto=format&fit=crop";
@@ -491,7 +483,7 @@ const getProductImage = (product: { id: string; category: string }) => {
   return "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop";
 };
 
-const getProductVNDDetails = (id: string) => {
+const getProductVNDDetails = (productOrId: string | Product) => {
   const mappings: Record<string, { present: string; old?: string; discount?: string; smember?: string }> = {
     "nexus-ai": { present: "12.500.000đ", old: "14.000.000đ", discount: "Giảm 10%" },
     "aero-compute": { present: "33.890.000đ", old: "34.990.000đ", discount: "Giảm 3%", smember: "Smember giảm đến 339.000đ" },
@@ -514,11 +506,34 @@ const getProductVNDDetails = (id: string) => {
     "aurora-sql": { present: "18.600.000đ", old: "20.000.000đ", discount: "Giảm 7%", smember: "Smember giảm đến 186.000đ" }
   };
 
-  return mappings[id] || { present: "5.000.000đ", old: "5.500.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 50.000đ" };
+  const id = typeof productOrId === "string" ? productOrId : productOrId.id;
+  const fallback = mappings[id] || { present: "5.000.000đ", old: "5.500.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 50.000đ" };
+
+  if (typeof productOrId === "string") {
+    return fallback;
+  }
+
+  return {
+    present: productOrId.price?.endsWith("đ") ? productOrId.price : fallback.present,
+    old: productOrId.oldPrice ?? fallback.old ?? "",
+    discount: productOrId.discount ?? fallback.discount ?? "",
+    smember: productOrId.smember ?? fallback.smember ?? ""
+  };
 };
 
 const getProductHashSku = (product: Product) => {
-  return product.specs.find((spec) => spec.label === "Mã SKU Sản phẩm")?.value || product.id;
+  return product.sku || product.specs.find((spec) => spec.label === "Mã SKU Sản phẩm")?.value || product.id;
+};
+
+const MAIN_GRID_PRODUCTS = PRODUCTS.filter((product) => product.id === "tensor-tpu");
+
+const getCurrentHashSku = () => decodeURIComponent(window.location.hash.slice(1).trim());
+
+const setProductHashSku = (sku: string) => {
+  const encodedSku = encodeURIComponent(sku);
+  if (window.location.pathname !== "/p" || window.location.hash !== `#${encodedSku}`) {
+    window.history.pushState({ modal: "product-detail", productSku: sku }, "", `/p#${encodedSku}`);
+  }
 };
 
 interface ProductPageProps {
@@ -527,7 +542,7 @@ interface ProductPageProps {
     itemPrice: string,
     clickEvent?: React.MouseEvent | { clientX: number; clientY: number }
   ) => void;
-  onNavigate?: (page: "landing" | "product" | "auth-report" | "profile" | "register") => void;
+  onNavigate?: (page: "landing" | "product" | "auth-report" | "profile" | "auth" | "terms") => void;
   onFlyEffect?: (
     startX: number,
     startY: number,
@@ -546,87 +561,102 @@ interface ProductPageProps {
 }
 
 export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductPageProps) {
-  const [viewMode, setViewMode] = useState<"cloud" | "erp">("cloud");
-  const [gatewayUrl, setGatewayUrl] = useState(() => localStorage.getItem("horizon_api_base_url") || "https://mummified-escapable-proven.ngrok-free.dev");
-  const [erpProducts, setErpProducts] = useState<ErpProduct[]>([]);
-  const [erpCategories, setErpCategories] = useState<ErpCategory[]>([]);
-  const [erpAttributes, setErpAttributes] = useState<ErpAttribute[]>([]);
-  const [erpLoading, setErpLoading] = useState(false);
-  const [erpError, setErpError] = useState<string | null>(null);
-  const [erpRefreshTrigger, setErpRefreshTrigger] = useState(0);
-  const [erpPriceFilter, setErpPriceFilter] = useState<"all" | "under1m" | "1to5m" | "over5m">("all");
-  const [erpStockFilter, setErpStockFilter] = useState<"all" | "available" | "outofstock">("all");
-  const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [activeHashSku, setActiveHashSku] = useState(getCurrentHashSku);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-  const selectedErpCategorySku = activeCategory === "all"
-    ? undefined
-    : erpCategories.find((category) => category.name === activeCategory)?.skuInfo?.sku;
 
   useEffect(() => {
-    if (viewMode === "erp") {
-      let cancelled = false;
-      setErpLoading(true);
-      setErpError(null);
+    const syncHashSku = () => setActiveHashSku(getCurrentHashSku());
+    window.addEventListener("hashchange", syncHashSku);
+    window.addEventListener("popstate", syncHashSku);
 
-      loadErpCatalog({
-        keyword: searchQuery,
-        categorySku: selectedErpCategorySku
-      })
-        .then(({ categories, products, attributes }) => {
-          if (cancelled) return;
-          setErpCategories(categories);
-          setErpProducts(products);
-          setErpAttributes(attributes);
-        })
-        .catch((error) => {
-          if (cancelled) return;
-          setErpError(error instanceof Error ? error.message : "Không thể tải danh mục ERP.");
-        })
-        .finally(() => {
-          if (!cancelled) setErpLoading(false);
-        });
+    return () => {
+      window.removeEventListener("hashchange", syncHashSku);
+      window.removeEventListener("popstate", syncHashSku);
+    };
+  }, []);
 
-      return () => {
-        cancelled = true;
-      };
-    }
-  }, [viewMode, erpRefreshTrigger, searchQuery, selectedErpCategorySku]);
-
-  // Automatically select/open a product if there is a 'sku' query parameter in the URL on load or when lists load
   useEffect(() => {
-    if (viewMode === "erp" && erpProducts.length > 0 && erpAttributes.length > 0) {
-      const params = new URLSearchParams(window.location.search);
-      const hashSku = decodeURIComponent(window.location.hash.slice(1).trim());
-      const skuParam = params.get("sku") || hashSku;
-      if (skuParam) {
-        // Find matching attribute in ERP data
-        const matchedAttr = erpAttributes.find(a => a.sku?.sku?.toLowerCase() === skuParam.toLowerCase());
-        if (matchedAttr) {
-          const parentProductId = getAttributeProductId(matchedAttr);
-          const parentProduct = erpProducts.find(p => p.id === parentProductId);
-          if (parentProduct && (!selectedProduct || selectedProduct.id !== parentProduct.id)) {
-            handleSelectErpProduct(parentProduct);
-          }
-        }
+    if (!activeHashSku) {
+      if (selectedProduct) {
+        setSelectedProduct(null);
       }
+      return;
     }
-  }, [viewMode, erpProducts, erpAttributes]);
+
+    const matchedCloudProduct = catalogProducts.find((product) =>
+      getProductHashSku(product).toLowerCase() === activeHashSku.toLowerCase()
+    ) || PRODUCTS.find((product) => getProductHashSku(product).toLowerCase() === activeHashSku.toLowerCase());
+
+    if (matchedCloudProduct) {
+      if (!selectedProduct || selectedProduct.id !== matchedCloudProduct.id) {
+        setSelectedProduct(matchedCloudProduct);
+      }
+      return;
+    }
+  }, [activeHashSku, catalogProducts, selectedProduct]);
 
   useEffect(() => {
-    const hashSku = decodeURIComponent(window.location.hash.slice(1).trim());
-    if (!hashSku || selectedProduct || viewMode === "erp") return;
+    if (!activeHashSku || selectedProduct) return;
 
-    const matchedProduct = PRODUCTS.find((product) => getProductHashSku(product).toLowerCase() === hashSku.toLowerCase());
+    const matchedProduct = catalogProducts.find((product) => getProductHashSku(product).toLowerCase() === activeHashSku.toLowerCase())
+      || PRODUCTS.find((product) => getProductHashSku(product).toLowerCase() === activeHashSku.toLowerCase());
     if (matchedProduct) {
       setSelectedProduct(matchedProduct);
+      return;
     }
-  }, [selectedProduct, viewMode]);
 
-  const handleSelectErpProduct = (p: ErpProduct) => {
-    setSelectedProduct(createErpProductDetail(p, erpAttributes));
-  };
+    setSelectedProduct({
+      id: activeHashSku,
+      sku: activeHashSku,
+      name: activeHashSku,
+      category: "compute",
+      icon: "developer_board",
+      iconColor: "text-sky-500",
+      desc: activeHashSku,
+      price: "5.000.000đ",
+      oldPrice: "5.500.000đ",
+      discount: "Giảm 10%",
+      bgColor: "bg-sky-500/10",
+      longDesc: "Sản phẩm từ hệ thống merchandise.",
+      specs: [{ label: "Mã SKU Sản phẩm", value: activeHashSku }]
+    });
+  }, [activeHashSku, catalogProducts, selectedProduct]);
+
+  useEffect(() => {
+    const productSku = selectedProduct ? getProductHashSku(selectedProduct) : activeHashSku;
+    if (!productSku || !selectedProduct || selectedProduct.attributeOptions?.length) return;
+
+    let cancelled = false;
+    searchAttributesForProductSku(productSku)
+      .then((attributeOptions) => {
+        if (cancelled || attributeOptions.length === 0) return;
+        setSelectedProduct((current) => {
+          if (!current || getProductHashSku(current).toLowerCase() !== productSku.toLowerCase()) {
+            return current;
+          }
+          return { ...current, attributeOptions };
+        });
+        setCatalogProducts((current) =>
+          current.map((product) =>
+            getProductHashSku(product).toLowerCase() === productSku.toLowerCase()
+              ? { ...product, attributeOptions }
+              : product
+          )
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn("Không thể tải thuộc tính sản phẩm merchandise qua GraphQL.", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeHashSku, selectedProduct]);
 
   // Advanced search options and attributes states
   const [selectedPricingModel, setSelectedPricingModel] = useState<"all" | "hourly" | "usage">("all");
@@ -634,7 +664,6 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
   const [selectedSLA, setSelectedSLA] = useState(false);
   const [selectedLatency, setSelectedLatency] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
 
   // CellphoneS-style custom states for premium catalog experience
@@ -643,18 +672,64 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
   const [sortBy, setSortBy] = useState<"banchay" | "giathap" | "giacao" | "khuyenmai" | "xemnhieu">("banchay");
   const [comparedProductIds, setComparedProductIds] = useState<string[]>([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(15);
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [hasMoreCatalogProducts, setHasMoreCatalogProducts] = useState(true);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setVisibleCount(15);
-  }, [activeCategory, selectedBrand, searchQuery, sortBy, viewMode, erpPriceFilter, erpStockFilter]);
+    let cancelled = false;
+    setIsCatalogLoading(true);
+
+    const filter: Record<string, any> = {
+      page: catalogPage,
+      size: 15
+    };
+
+    searchProductsForCatalog(filter)
+      .then(({ products, totalElements }) => {
+        if (cancelled) return;
+        setCatalogProducts((current) => {
+          if (catalogPage === 1) {
+            return products.length > 0 ? products : MAIN_GRID_PRODUCTS;
+          }
+
+          const seen = new Set(current.map((product) => getProductHashSku(product).toLowerCase()));
+          const nextProducts = products.filter((product) => {
+            const sku = getProductHashSku(product).toLowerCase();
+            if (seen.has(sku)) return false;
+            seen.add(sku);
+            return true;
+          });
+          return [...current, ...nextProducts];
+        });
+        setHasMoreCatalogProducts(totalElements > 0 ? catalogPage * 15 < totalElements : products.length > 0);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn("Không thể tải sản phẩm merchandise qua GraphQL.", error);
+          if (catalogPage === 1) {
+            setCatalogProducts(MAIN_GRID_PRODUCTS);
+          }
+          setHasMoreCatalogProducts(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsCatalogLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [catalogPage]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => prev + 15);
+        if (entries[0].isIntersecting && hasMoreCatalogProducts && !isCatalogLoading) {
+          setCatalogPage((prev) => prev + 1);
         }
       },
       { rootMargin: "400px" }
@@ -663,9 +738,9 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
       observer.observe(loadMoreRef.current);
     }
     return () => observer.disconnect();
-  }, [erpLoading, erpError, viewMode, visibleCount]);
+  }, [hasMoreCatalogProducts, isCatalogLoading]);
 
-  const comparedProducts = comparedProductIds.map(id => PRODUCTS.find(p => p.id === id)).filter((p): p is Product => !!p);
+  const comparedProducts = comparedProductIds.map(id => catalogProducts.find(p => p.id === id) || PRODUCTS.find(p => p.id === id)).filter((p): p is Product => !!p);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: "success" | "info" | "warning" }[]>([]);
   const [countdownTime, setCountdownTime] = useState({ hours: 4, minutes: 25, seconds: 12 });
 
@@ -747,61 +822,24 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
   }, []);
 
   const getCategoryCount = (cat: string) => {
-    if (viewMode === "erp") {
-      return getErpCategoryCount(cat, erpProducts);
-    } else {
-      if (cat === "all") return PRODUCTS.length;
-      return PRODUCTS.filter((p) => p.category === cat).length;
-    }
+    if (cat === "all") return catalogProducts.length;
+    return catalogProducts.filter((p) => p.category === cat).length;
   };
 
-  // Intercept browser back/mouse back button to close the product details modal
-  useEffect(() => {
-    if (selectedProduct) {
-      const sku = getProductHashSku(selectedProduct);
-      const encodedSku = encodeURIComponent(sku);
-      if (window.location.hash !== `#${encodedSku}`) {
-        window.history.pushState({ modal: "product-detail", sku }, "", `/p#${encodedSku}`);
-      }
-
-      const handlePopState = (event: PopStateEvent) => {
-        setSelectedProduct(null);
-      };
-
-      window.addEventListener("popstate", handlePopState);
-
-      return () => {
-        window.removeEventListener("popstate", handlePopState);
-      };
-    }
-  }, [selectedProduct]);
-
   // Filter products dynamically based on search query, categories, and advanced attributes/specs
-  const filteredProducts = viewMode === "erp"
-    ? []
-    : PRODUCTS.filter((product) => {
+  const filteredProducts = catalogProducts.filter((product) => {
         // 1. Category filter
         const matchesCategory = activeCategory === "all" || product.category === activeCategory;
 
         // 1.1 Brand filter
         const matchesBrand = !selectedBrand || getProductBrand(product.id) === selectedBrand;
 
-        // 2. Search query matching name, description, long description, category, tag, or specs
-        const query = searchQuery.trim().toLowerCase();
-        const matchesSearch = !query ||
-          product.name.toLowerCase().includes(query) ||
-          product.desc.toLowerCase().includes(query) ||
-          product.longDesc.toLowerCase().includes(query) ||
-          product.category.toLowerCase().includes(query) ||
-          (product.tag && product.tag.toLowerCase().includes(query)) ||
-          product.specs.some(spec => 
-            spec.label.toLowerCase().includes(query) ||
-            spec.value.toLowerCase().includes(query)
-          );
+        // 2. Keyword search is handled by the merchandise API request.
+        const matchesSearch = true;
 
         // 3. Pricing model filter (Hourly vs Usage-based)
         const isHourly = product.price.toLowerCase().includes("hr") || product.id.includes("compute") || product.id.includes("tpu");
-        const matchesPricingModel = 
+        const matchesPricingModel =
           selectedPricingModel === "all" ||
           (selectedPricingModel === "hourly" && isHourly) ||
           (selectedPricingModel === "usage" && !isHourly);
@@ -817,20 +855,12 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
         return matchesCategory && matchesBrand && matchesSearch && matchesPricingModel && matchesGPU && matchesSLA && matchesLatency && matchesTags;
       });
 
-  const sortedFilteredProducts = viewMode === "erp"
-    ? getSortedErpProducts(erpProducts, erpAttributes, {
-        activeCategory,
-        searchQuery,
-        erpPriceFilter,
-        erpStockFilter,
-        sortBy
-      })
-    : [...filteredProducts].sort((a, b) => {
-        const priceA = parseInt(getProductVNDDetails(a.id).present.replace(/\./g, "").replace("đ", ""), 10) || 0;
-        const priceB = parseInt(getProductVNDDetails(b.id).present.replace(/\./g, "").replace("đ", ""), 10) || 0;
+  const sortedFilteredProducts = [...filteredProducts].sort((a, b) => {
+        const priceA = parseInt(getProductVNDDetails(a).present.replace(/\./g, "").replace("đ", ""), 10) || 0;
+        const priceB = parseInt(getProductVNDDetails(b).present.replace(/\./g, "").replace("đ", ""), 10) || 0;
 
-        const discountPctA = parseInt(getProductVNDDetails(a.id).discount.replace(/\D/g, ""), 10) || 0;
-        const discountPctB = parseInt(getProductVNDDetails(b.id).discount.replace(/\D/g, ""), 10) || 0;
+        const discountPctA = parseInt(getProductVNDDetails(a).discount.replace(/\D/g, ""), 10) || 0;
+        const discountPctB = parseInt(getProductVNDDetails(b).discount.replace(/\D/g, ""), 10) || 0;
 
         if (sortBy === "giathap") {
           return priceA - priceB;
@@ -856,51 +886,23 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
 
   const [voucher1Collected, setVoucher1Collected] = useState(false);
   const [voucher2Collected, setVoucher2Collected] = useState(false);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   const handleReset = () => {
-    setSearchQuery("");
     setActiveCategory("all");
-    setActiveTag(null);
     setSelectedPricingModel("all");
     setSelectedGPU(false);
     setSelectedSLA(false);
     setSelectedLatency(false);
     setSelectedTags([]);
-    setErpPriceFilter("all");
-    setErpStockFilter("all");
   };
 
-  // Preset filter tags tailored for the High-End Cloud/AI platform
-  const PRESET_TAGS = [
-    { label: "GPU Cloud", search: "GPU" },
-    { label: "S3 Storage", search: "S3" },
-    { label: "AI Models", search: "AI" },
-    { label: "Low Latency", search: "ms" },
-    { label: "High SLA", search: "SLA" },
-    { label: "WASM Edge", search: "WASM" }
+  const categoryItems = [
+    { id: "all", label: "Tất cả", icon: Grid2X2Icon },
+    { id: "ai", label: "AI Models", icon: BrainCircuitIcon },
+    { id: "compute", label: "GPU VM", icon: ServerIcon },
+    { id: "storage", label: "S3 Storage", icon: DatabaseIcon },
+    { id: "network", label: "Edge CDN", icon: NetworkIcon },
   ];
-
-  const categoryItems = viewMode === "erp"
-    ? [
-        { id: "all", label: "Tất cả vật tư", icon: BoxesIcon },
-        ...erpCategories.map((category) => ({
-          id: category.name,
-          label: category.name === "Electronics"
-            ? "Thiết bị điện tử"
-            : category.name === "Clothing"
-              ? "Thời trang"
-              : "Gia dụng",
-          icon: BoxesIcon,
-        })),
-      ]
-    : [
-        { id: "all", label: "Tất cả", icon: Grid2X2Icon },
-        { id: "ai", label: "AI Models", icon: BrainCircuitIcon },
-        { id: "compute", label: "GPU VM", icon: ServerIcon },
-        { id: "storage", label: "S3 Storage", icon: DatabaseIcon },
-        { id: "network", label: "Edge CDN", icon: NetworkIcon },
-      ];
 
   const sortItems = [
     { id: "banchay", label: "Bán chạy", icon: TrendingUpIcon },
@@ -910,29 +912,14 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
     { id: "xemnhieu", label: "Xem nhiều", icon: SparklesIcon },
   ];
 
-  const searchSuggestions = viewMode === "erp"
-    ? [
-        { query: "Smartphone", label: "Điện thoại" },
-        { query: "Laptop", label: "Laptop" },
-        { query: "T-Shirt", label: "Áo thun" },
-      ]
-    : [
-        { query: "GPU", label: "GPU Cloud" },
-        { query: "SLA", label: "SLA 99.99%" },
-        { query: "AI", label: "AI Models" },
-      ];
-
   const isAnyFilterActive =
-    searchQuery !== "" ||
     activeCategory !== "all" ||
     selectedBrand !== null ||
     selectedPricingModel !== "all" ||
     selectedGPU ||
     selectedSLA ||
     selectedLatency ||
-    selectedTags.length > 0 ||
-    erpPriceFilter !== "all" ||
-    erpStockFilter !== "all";
+    selectedTags.length > 0;
 
   return (
     <div className="min-h-screen bg-background px-4 pb-24 pt-16 md:pt-[72px] text-foreground sm:px-6 relative z-0">
@@ -1000,68 +987,8 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                   <FilterIcon />
                   Bộ lọc
                 </CardTitle>
-                <CardDescription>Thu hẹp catalog theo nhu cầu triển khai.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
-                <Tabs
-                  value={viewMode}
-                  onValueChange={(value) => {
-                    setViewMode(value as "cloud" | "erp");
-                    setActiveCategory("all");
-                  }}
-                >
-                  <TabsList className="w-full">
-                    <TabsTrigger value="cloud">Cloud</TabsTrigger>
-                    <TabsTrigger value="erp">ERP</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="cloud" className="sr-only">Cloud catalog</TabsContent>
-                  <TabsContent value="erp" className="sr-only">ERP catalog</TabsContent>
-                </Tabs>
-
-                <div className="relative">
-                  <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    onFocus={() => setIsSearchFocused(true)}
-                    onBlur={() => setTimeout(() => setIsSearchFocused(false), 160)}
-                    className="pl-8 pr-8"
-                    placeholder="Tìm sản phẩm, SLA, GPU..."
-                  />
-                  {searchQuery && (
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className="absolute right-1 top-1/2 -translate-y-1/2"
-                      aria-label="Xóa tìm kiếm"
-                      onClick={() => setSearchQuery("")}
-                    >
-                      <XIcon />
-                    </Button>
-                  )}
-                  {isSearchFocused && (
-                    <Card className="absolute left-0 right-0 top-[calc(100%+0.5rem)] overflow-visible p-2 shadow-md">
-                      <div className="flex flex-wrap gap-1">
-                        {searchSuggestions.map((suggestion) => (
-                          <Button
-                            key={suggestion.query}
-                            variant="outline"
-                            size="xs"
-                            onMouseDown={() => {
-                              setSearchQuery(suggestion.query);
-                              setIsSearchFocused(false);
-                            }}
-                          >
-                            {suggestion.label}
-                          </Button>
-                        ))}
-                      </div>
-                    </Card>
-                  )}
-                </div>
-
-                <Separator />
-
                 <div className="flex flex-col gap-2">
                   <div className="text-xs font-medium text-muted-foreground">Danh mục</div>
                   <div className="flex flex-col gap-1">
@@ -1086,165 +1013,100 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                   </div>
                 </div>
 
-                {viewMode === "cloud" ? (
-                  <>
-                    <Separator />
+                <Separator />
+                <div className="flex flex-col gap-2">
+                  <div className="text-xs font-medium text-muted-foreground">Hãng hạ tầng</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant={selectedBrand === null ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedBrand(null)}
+                    >
+                      Tất cả
+                    </Button>
+                    {BRANDS.slice(0, 7).map((brand) => (
+                      <Button
+                        key={brand.name}
+                        variant={selectedBrand === brand.name ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedBrand(brand.name)}
+                      >
+                        <span className="truncate">{brand.name}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="ghost"
+                    className="justify-between px-0"
+                    onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <SlidersHorizontalIcon data-icon="inline-start" />
+                      Bộ lọc nâng cao
+                    </span>
+                    <ChevronRightIcon data-icon="inline-end" className={isAdvancedExpanded ? "rotate-90" : ""} />
+                  </Button>
+                  {isAdvancedExpanded && (
                     <div className="flex flex-col gap-2">
-                      <div className="text-xs font-medium text-muted-foreground">Hãng hạ tầng</div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          variant={selectedBrand === null ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setSelectedBrand(null)}
-                        >
-                          Tất cả
-                        </Button>
-                        {BRANDS.slice(0, 7).map((brand) => (
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: "all", label: "Tất cả" },
+                          { id: "hourly", label: "Theo giờ" },
+                          { id: "usage", label: "Lưu lượng" },
+                        ].map((item) => (
                           <Button
-                            key={brand.name}
-                            variant={selectedBrand === brand.name ? "default" : "outline"}
+                            key={item.id}
+                            variant={selectedPricingModel === item.id ? "default" : "outline"}
                             size="sm"
-                            onClick={() => setSelectedBrand(brand.name)}
+                            onClick={() => setSelectedPricingModel(item.id as any)}
                           >
-                            <span className="truncate">{brand.name}</span>
+                            {item.label}
+                          </Button>
+                        ))}
+                      </div>
+                      {[
+                        { key: "gpu", active: selectedGPU, label: "GPU Boost", setter: setSelectedGPU, icon: ServerIcon },
+                        { key: "sla", active: selectedSLA, label: "SLA 99.99%+", setter: setSelectedSLA, icon: ShieldCheckIcon },
+                        { key: "latency", active: selectedLatency, label: "Độ trễ thấp", setter: setSelectedLatency, icon: ZapIcon },
+                      ].map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <Button
+                            key={item.key}
+                            variant={item.active ? "default" : "outline"}
+                            className="justify-start"
+                            onClick={() => item.setter(!item.active)}
+                          >
+                            <Icon data-icon="inline-start" />
+                            {item.label}
+                          </Button>
+                        );
+                      })}
+                      <div className="flex flex-wrap gap-2">
+                        {["New", "Popular", "Updated"].map((tag) => (
+                          <Button
+                            key={tag}
+                            variant={selectedTags.includes(tag) ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                              setSelectedTags(
+                                selectedTags.includes(tag)
+                                  ? selectedTags.filter((item) => item !== tag)
+                                  : [...selectedTags, tag]
+                              );
+                            }}
+                          >
+                            {tag === "Popular" ? "Hot" : tag}
                           </Button>
                         ))}
                       </div>
                     </div>
-
-                    <Separator />
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        variant="ghost"
-                        className="justify-between px-0"
-                        onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <SlidersHorizontalIcon data-icon="inline-start" />
-                          Bộ lọc nâng cao
-                        </span>
-                        <ChevronRightIcon data-icon="inline-end" className={isAdvancedExpanded ? "rotate-90" : ""} />
-                      </Button>
-                      {isAdvancedExpanded && (
-                        <div className="flex flex-col gap-2">
-                          <div className="grid grid-cols-3 gap-2">
-                            {[
-                              { id: "all", label: "Tất cả" },
-                              { id: "hourly", label: "Theo giờ" },
-                              { id: "usage", label: "Lưu lượng" },
-                            ].map((item) => (
-                              <Button
-                                key={item.id}
-                                variant={selectedPricingModel === item.id ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setSelectedPricingModel(item.id as any)}
-                              >
-                                {item.label}
-                              </Button>
-                            ))}
-                          </div>
-                          {[
-                            { key: "gpu", active: selectedGPU, label: "GPU Boost", setter: setSelectedGPU, icon: ServerIcon },
-                            { key: "sla", active: selectedSLA, label: "SLA 99.99%+", setter: setSelectedSLA, icon: ShieldCheckIcon },
-                            { key: "latency", active: selectedLatency, label: "Độ trễ thấp", setter: setSelectedLatency, icon: ZapIcon },
-                          ].map((item) => {
-                            const Icon = item.icon;
-                            return (
-                              <Button
-                                key={item.key}
-                                variant={item.active ? "default" : "outline"}
-                                className="justify-start"
-                                onClick={() => item.setter(!item.active)}
-                              >
-                                <Icon data-icon="inline-start" />
-                                {item.label}
-                              </Button>
-                            );
-                          })}
-                          <div className="flex flex-wrap gap-2">
-                            {["New", "Popular", "Updated"].map((tag) => (
-                              <Button
-                                key={tag}
-                                variant={selectedTags.includes(tag) ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedTags(
-                                    selectedTags.includes(tag)
-                                      ? selectedTags.filter((item) => item !== tag)
-                                      : [...selectedTags, tag]
-                                  );
-                                }}
-                              >
-                                {tag === "Popular" ? "Hot" : tag}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <Separator />
-                    <div className="flex flex-col gap-2">
-                      <div className="text-xs font-medium text-muted-foreground">ERP</div>
-                      <Select
-                        items={[
-                          { label: "Tất cả mức giá", value: "all" },
-                          { label: "Dưới 1.000.000đ", value: "under1m" },
-                          { label: "1.000.000đ - 5.000.000đ", value: "1to5m" },
-                          { label: "Trên 5.000.000đ", value: "over5m" },
-                        ]}
-                        value={erpPriceFilter}
-                        onValueChange={(value) => setErpPriceFilter(value as any)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectGroup>
-                            {[
-                              { label: "Tất cả mức giá", value: "all" },
-                              { label: "Dưới 1.000.000đ", value: "under1m" },
-                              { label: "1.000.000đ - 5.000.000đ", value: "1to5m" },
-                              { label: "Trên 5.000.000đ", value: "over5m" },
-                            ].map((item) => (
-                              <SelectItem key={item.value} value={item.value}>
-                                {item.label}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        items={[
-                          { label: "Tất cả trạng thái", value: "all" },
-                          { label: "Còn hàng", value: "available" },
-                          { label: "Hết hàng", value: "outofstock" },
-                        ]}
-                        value={erpStockFilter}
-                        onValueChange={(value) => setErpStockFilter(value as any)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectGroup>
-                            {[
-                              { label: "Tất cả trạng thái", value: "all" },
-                              { label: "Còn hàng", value: "available" },
-                              { label: "Hết hàng", value: "outofstock" },
-                            ].map((item) => (
-                              <SelectItem key={item.value} value={item.value}>
-                                {item.label}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                )}
+                  )}
+                </div>
               </CardContent>
               <CardFooter className="justify-between">
                 <Button variant="outline" onClick={handleReset}>
@@ -1301,8 +1163,8 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                     {sortItems.map((item) => {
                       const Icon = item.icon;
                       return (
-                        <TabsTrigger 
-                          key={item.id} 
+                        <TabsTrigger
+                          key={item.id}
                           value={item.id}
                           className="relative z-10 data-active:bg-transparent data-active:shadow-none"
                         >
@@ -1330,7 +1192,6 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
 
             {isAnyFilterActive && (
               <div className="flex flex-wrap gap-2">
-                {searchQuery && <Badge variant="secondary">"{searchQuery}"</Badge>}
                 {activeCategory !== "all" && <Badge variant="secondary">{activeCategory}</Badge>}
                 {selectedBrand && <Badge variant="secondary">{selectedBrand}</Badge>}
                 {selectedPricingModel !== "all" && <Badge variant="secondary">{selectedPricingModel === "hourly" ? "Theo giờ" : "Lưu lượng"}</Badge>}
@@ -1341,40 +1202,11 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
               </div>
             )}
 
-            {viewMode === "erp" && erpLoading && (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-                  <RefreshCcwIcon className="animate-spin text-primary" />
-                  <CardTitle>Đang tải dữ liệu sản phẩm ERP</CardTitle>
-                  <CardDescription>Đang gọi GraphQL gateway đã cấu hình.</CardDescription>
-                </CardContent>
-              </Card>
-            )}
-
-            {viewMode === "erp" && erpError && !erpLoading && (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-                  <Badge variant="destructive">ERP error</Badge>
-                  <CardTitle>Không thể tải dữ liệu sản phẩm thật</CardTitle>
-                  <CardDescription>{erpError}</CardDescription>
-                </CardContent>
-              </Card>
-            )}
-
-            {!erpLoading && !erpError && (
-              <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+            <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
                 <AnimatePresence mode="popLayout">
-                  {sortedFilteredProducts.slice(0, visibleCount).map((rawProduct, index) => {
-                    const product = rawProduct as Product & {
-                      priceInfo?: ReturnType<typeof getProductVNDDetails>;
-                      mediaItems?: { url: string }[];
-                    };
-                    const vndInfo = viewMode === "erp"
-                      ? product.priceInfo || getProductVNDDetails(product.id)
-                      : getProductVNDDetails(product.id);
-                    const imgSrc = viewMode === "erp"
-                      ? product.mediaItems?.[0]?.url || ""
-                      : getProductImage(product);
+                  {sortedFilteredProducts.map((product, index) => {
+                    const vndInfo = getProductVNDDetails(product);
+                    const imgSrc = getProductImage(product);
                     const specs = product.specs || [];
                     const compared = comparedProductIds.includes(product.id);
 
@@ -1391,11 +1223,10 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                           size="sm"
                           className="group relative h-full cursor-pointer gap-2 overflow-visible py-0 transition-shadow hover:shadow-md"
                           onClick={() => {
-                            if (viewMode === "erp") {
-                              handleSelectErpProduct(rawProduct as ErpProduct);
-                            } else {
-                              setSelectedProduct(product);
-                            }
+                            const productSku = getProductHashSku(product);
+                            setProductHashSku(productSku);
+                            setActiveHashSku(productSku);
+                            setSelectedProduct(product);
                           }}
                         >
                           {vndInfo.discount && (
@@ -1407,14 +1238,10 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                             </>
                           )}
 
-                          {viewMode !== "erp" && (
-                            <>
-                              <div className="absolute -top-2 right-[-4px] h-[21px] bg-[#E1EBFD] text-[#2F80ED] text-[9px] font-black px-1.5 rounded-bl-lg rounded-tl-sm shadow-[-2px_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center z-30 select-none">
-                                Trả góp 0%
-                              </div>
-                              <div className="absolute top-[13px] right-[-4px] size-1 bg-[#1d5fb5] z-20" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />
-                            </>
-                          )}
+                          <div className="absolute -top-2 right-[-4px] h-[21px] bg-[#E1EBFD] text-[#2F80ED] text-[9px] font-black px-1.5 rounded-bl-lg rounded-tl-sm shadow-[-2px_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center z-30 select-none">
+                            Trả góp 0%
+                          </div>
+                          <div className="absolute top-[13px] right-[-4px] size-1 bg-[#1d5fb5] z-20" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />
 
                           <div className="aspect-[4/5] overflow-hidden rounded-t-xl bg-muted">
                             {imgSrc ? (
@@ -1438,10 +1265,10 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <CardTitle className="line-clamp-1">
-                                  {viewMode === "erp" ? product.name : `${product.name} Cloud Platform`}
+                                  {`${product.name} Cloud Platform`}
                                 </CardTitle>
                                 <CardDescription className="line-clamp-1 text-[11px] mt-0.5 leading-tight">
-                                  {product.desc || "Dịch vụ hạ tầng đã đồng bộ từ ERP."}
+                                  {product.desc}
                                 </CardDescription>
                               </div>
                               {product.tag && <Badge variant="outline" className="shrink-0">{product.tag}</Badge>}
@@ -1482,28 +1309,26 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                               <span className="font-medium">5.0</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              {viewMode !== "erp" && (
-                                <Button
-                                  variant={compared ? "default" : "outline"}
-                                  size="sm"
-                                  className="h-7 px-3 text-xs"
-                                  aria-label={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
-                                  title={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    if (compared) {
-                                      setComparedProductIds(comparedProductIds.filter((id) => id !== product.id));
-                                    } else if (comparedProductIds.length >= 3) {
-                                      showToast("Bạn chỉ có thể so sánh tối đa 3 sản phẩm.", "warning");
-                                    } else {
-                                      setComparedProductIds([...comparedProductIds, product.id]);
-                                    }
-                                  }}
-                                >
-                                  <SlidersHorizontalIcon className="mr-1.5 size-3.5" />
-                                  {compared ? "Đã so sánh" : "So sánh"}
-                                </Button>
-                              )}
+                              <Button
+                                variant={compared ? "default" : "outline"}
+                                size="sm"
+                                className="h-7 px-3 text-xs"
+                                aria-label={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
+                                title={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (compared) {
+                                    setComparedProductIds(comparedProductIds.filter((id) => id !== product.id));
+                                  } else if (comparedProductIds.length >= 3) {
+                                    showToast("Bạn chỉ có thể so sánh tối đa 3 sản phẩm.", "warning");
+                                  } else {
+                                    setComparedProductIds([...comparedProductIds, product.id]);
+                                  }
+                                }}
+                              >
+                                <SlidersHorizontalIcon className="mr-1.5 size-3.5" />
+                                {compared ? "Đã so sánh" : "So sánh"}
+                              </Button>
                             </div>
                           </CardFooter>
                         </Card>
@@ -1526,8 +1351,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                   </Card>
                 )}
               </motion.div>
-            )}
-            {!erpLoading && !erpError && sortedFilteredProducts.length > visibleCount && (
+            {hasMoreCatalogProducts && (
               <div ref={loadMoreRef} className="h-10 w-full shrink-0" />
             )}
           </section>
@@ -1544,12 +1368,12 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
             className="fixed bottom-8 left-0 right-0 z-50 mx-auto w-fit"
           >
             <div className="flex items-center gap-5 rounded-full border border-white/20 bg-background/70 p-3 pr-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-3xl dark:border-white/10 dark:bg-black/60">
-              
+
               <div className="flex items-center pl-2">
                 <div className="mr-5 flex -space-x-4">
                   {comparedProducts.map((product, i) => (
-                    <motion.div 
-                      key={product.id} 
+                    <motion.div
+                      key={product.id}
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="relative size-12 overflow-hidden rounded-full border-[3px] border-background bg-muted shadow-sm ring-1 ring-black/5 dark:border-zinc-900"
@@ -1559,8 +1383,8 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                     </motion.div>
                   ))}
                   {Array.from({ length: Math.max(0, 3 - comparedProducts.length) }).map((_, i) => (
-                    <div 
-                      key={`empty-${i}`} 
+                    <div
+                      key={`empty-${i}`}
                       className="relative flex size-12 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted/50 text-muted-foreground dark:border-zinc-800"
                       style={{ zIndex: 5 - i }}
                     >
@@ -1568,7 +1392,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                     </div>
                   ))}
                 </div>
-                
+
                 <div className="hidden flex-col sm:flex">
                    <span className="text-base font-semibold leading-none">So sánh</span>
                    <span className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">{comparedProductIds.length} / 3 Sản phẩm</span>
@@ -1589,10 +1413,10 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                   <SlidersHorizontalIcon data-icon="inline-start" />
                   So sánh ngay
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="size-10 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10" 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-10 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                   onClick={() => setComparedProductIds([])}
                   title="Xóa tất cả"
                 >
@@ -1628,7 +1452,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                            </div>
                            <div className="space-y-1">
                              <div className="font-semibold text-base line-clamp-1">{product.name}</div>
-                             <div className="text-primary font-medium">{getProductVNDDetails(product.id).present}</div>
+                             <div className="text-primary font-medium">{getProductVNDDetails(product).present}</div>
                            </div>
                            <Button variant="outline" size="sm" className="w-full h-8 text-xs text-muted-foreground mt-2" onClick={() => setComparedProductIds(comparedProductIds.filter(id => id !== product.id))}>
                              <XIcon data-icon="inline-start" className="size-3" />
@@ -1651,8 +1475,8 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
                   {[
                     { label: "Phân loại", get: (p: Product) => <Badge variant="secondary" className="uppercase tracking-wider text-[10px]">{p.category}</Badge> },
                     { label: "Thương hiệu", get: (p: Product) => getProductBrand(p.id) },
-                    { label: "Mức giá", get: (p: Product) => <span className="font-semibold text-primary">{getProductVNDDetails(p.id).present}</span> },
-                    { label: "Đặc quyền", get: (p: Product) => getProductVNDDetails(p.id).smember ? <span className="text-[#C084FC]">{getProductVNDDetails(p.id).smember}</span> : "-" },
+                    { label: "Mức giá", get: (p: Product) => <span className="font-semibold text-primary">{getProductVNDDetails(p).present}</span> },
+                    { label: "Đặc quyền", get: (p: Product) => getProductVNDDetails(p).smember ? <span className="text-[#C084FC]">{getProductVNDDetails(p).smember}</span> : "-" },
                     { label: "Thông số 1", get: (p: Product) => p.specs[0]?.value || "-" },
                     { label: "Thông số 2", get: (p: Product) => p.specs[1]?.value || "-" },
                     { label: "Thông số 3", get: (p: Product) => p.specs[2]?.value || "-" },
@@ -1705,14 +1529,13 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
             product={selectedProduct}
             onClose={() => {
               setSelectedProduct(null);
+              setActiveHashSku("");
               window.history.replaceState(null, "", "/p");
             }}
             onAddToCart={onAddToCart}
             onFlyEffect={onFlyEffect}
             onSpawnStars={onSpawnStars}
             onFlyToAccount={onFlyToAccount}
-            viewMode={viewMode}
-            gatewayUrl={gatewayUrl}
           />
         )}
       </AnimatePresence>
@@ -1764,6 +1587,17 @@ const getProductImagesList = (product: Product, allowFallback = true) => {
 };
 
 const getProductVersions = (product: Product) => {
+  if (product.attributeOptions && product.attributeOptions.length > 0) {
+    return product.attributeOptions.slice(0, 6).map((attribute, index) => {
+      const optionDesc = attribute.variantOptions?.flatMap((option) => option.values || []).join(", ");
+      return {
+        id: attribute.id || `api-v${index + 1}`,
+        title: attribute.name || `Phiên bản ${index + 1}`,
+        desc: optionDesc || attribute.statusProduct || attribute.sku || "API option"
+      };
+    });
+  }
+
   if (product.category === "ai") {
     return [
       { id: "v1", title: "API Standard", desc: "FP16 Model Server" },
@@ -1846,6 +1680,88 @@ const calculateAccDiscount = (priceStr: string, oldPriceStr: string) => {
   return "Giảm 10%";
 };
 
+const formatVndFromApiValue = (value?: number | null) => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return "";
+  }
+  const normalized = value < 100000 ? value * 24000 : value;
+  return Math.round(normalized).toLocaleString("vi-VN") + "đ";
+};
+
+const getApiAttributePriceDetails = (attribute?: NonNullable<Product["attributeOptions"]>[number]) => {
+  if (!attribute) return null;
+
+  const present = formatVndFromApiValue(attribute.salePrice ?? attribute.price);
+  const old = attribute.price && attribute.salePrice && attribute.salePrice < attribute.price
+    ? formatVndFromApiValue(attribute.price)
+    : "";
+  const discount = attribute.price && attribute.salePrice && attribute.salePrice < attribute.price
+    ? `Giảm ${Math.round(((attribute.price - attribute.salePrice) / attribute.price) * 100)}%`
+    : "";
+
+  if (!present) return null;
+  return { present, old, discount };
+};
+
+const getAttributeVariantValue = (
+  attribute: NonNullable<Product["attributeOptions"]>[number],
+  pattern: RegExp
+) => {
+  return attribute.variantOptions
+    ?.find((option) => pattern.test(option.name || ""))
+    ?.values?.[0] || "";
+};
+
+const getColorSwatchClass = (colorName: string) => {
+  const normalized = colorName.toLowerCase();
+  if (/đen|black/.test(normalized)) return "bg-zinc-950";
+  if (/trắng|white/.test(normalized)) return "bg-stone-200";
+  if (/sa mạc|desert|gold|vàng/.test(normalized)) return "bg-amber-200";
+  if (/tự nhiên|natural|titan|xám|gray|grey/.test(normalized)) return "bg-stone-400";
+  if (/xanh|blue/.test(normalized)) return "bg-sky-500";
+  return "bg-stone-300";
+};
+
+const slugifySpecId = (value: string, index: number) => {
+  const normalized = value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || `api-spec-${index + 1}`;
+};
+
+type ProductSpecSection = {
+  id: string;
+  title: string;
+  items: { label: string; value: string }[];
+};
+
+const getApiSpecificationSections = (
+  attribute?: NonNullable<Product["attributeOptions"]>[number]
+): ProductSpecSection[] => {
+  if (!attribute?.specifications?.length) return [];
+
+  return attribute.specifications
+    .map((group, groupIndex) => {
+      const title = group.groupName || `Thông số ${groupIndex + 1}`;
+      const items = (group.specifications || [])
+        .map((spec) => ({
+          label: spec.key || "",
+          value: spec.value || ""
+        }))
+        .filter((spec) => spec.label || spec.value);
+
+      return {
+        id: slugifySpecId(title, groupIndex),
+        title,
+        items
+      };
+    })
+    .filter((section) => section.items.length > 0);
+};
+
 interface ProductDetailModalProps {
   product: Product;
   onClose: () => void;
@@ -1869,67 +1785,15 @@ interface ProductDetailModalProps {
     color?: string,
     shadowColor?: string
   ) => void;
-  viewMode?: "cloud" | "erp";
-  gatewayUrl?: string;
 }
 
-function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpawnStars, onFlyToAccount, viewMode, gatewayUrl }: ProductDetailModalProps) {
-  const images = getProductImagesList(product, viewMode !== "erp");
+function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductDetailModalProps) {
+  const images = getProductImagesList(product);
   const versions = getProductVersions(product);
-  
-  const baseVndInfo = getProductVNDDetails(product.id);
-  const erpProductPriceInt = parseInt((product.price || "").replace(/\./g, "").replace("đ", ""), 10) || 0;
-  const basePriceInt = viewMode === "erp"
-    ? erpProductPriceInt
-    : parseInt(baseVndInfo.present.replace(/\./g, "").replace("đ", ""), 10) || 5000000;
-  const baseOldPriceInt = viewMode === "erp"
-    ? 0
-    : parseInt(baseVndInfo.old.replace(/\./g, "").replace("đ", ""), 10) || 5500000;
 
-  const productSku = product.specs.find(s => s.label === "Mã SKU Sản phẩm")?.value || "";
-  const [erpVariants, setErpVariants] = useState<any[]>([]);
-  const [loadingVariants, setLoadingVariants] = useState(false);
-  const [selectedVariantIdx, setSelectedVariantIdx] = useState<number>(0);
-
-  useEffect(() => {
-    if (viewMode === "erp" && productSku) {
-      setLoadingVariants(true);
-      loadGraphqlProductAttributes(productSku)
-      .then(list => {
-        setErpVariants(list);
-        if (list.length > 0) {
-          const params = new URLSearchParams(window.location.search);
-          const skuParam = params.get("sku");
-          let initialIdx = 0;
-          if (skuParam) {
-            const foundIdx = list.findIndex((v: any) => v.sku?.sku?.toLowerCase() === skuParam.toLowerCase());
-            if (foundIdx !== -1) {
-              initialIdx = foundIdx;
-            }
-          }
-          setSelectedVariantIdx(initialIdx);
-        }
-      })
-      .catch(err => {
-        console.error("Error fetching product variants", err);
-      })
-      .finally(() => {
-        setLoadingVariants(false);
-      });
-    }
-  }, [viewMode, productSku, gatewayUrl]);
-
-  const activeVar = viewMode === "erp" && erpVariants.length > 0 ? erpVariants[selectedVariantIdx] : null;
-
-  // Sync URL query parameters with active variant sku
-  useEffect(() => {
-    if (viewMode === "erp" && activeVar) {
-      const skuVal = activeVar.sku?.sku;
-      if (skuVal) {
-        window.history.replaceState({ modal: "product-detail", sku: skuVal }, "", `/p#${encodeURIComponent(skuVal)}`);
-      }
-    }
-  }, [viewMode, activeVar]);
+  const baseVndInfo = getProductVNDDetails(product);
+  const basePriceInt = parseInt(baseVndInfo.present.replace(/\./g, "").replace("đ", ""), 10) || 5000000;
+  const baseOldPriceInt = parseInt(baseVndInfo.old.replace(/\./g, "").replace("đ", ""), 10) || 5500000;
 
   const getVersionModifier = (verId: string) => {
     if (verId === "v2") {
@@ -1961,43 +1825,71 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
   const [activeVersion, setActiveVersion] = useState(versions[0]?.id || "v1");
   const [activeColor, setActiveColor] = useState("c1");
 
-  const erpPriceInt = activeVar ? Math.round(activeVar.salePrice * 24000) : 0;
-  const erpOldPriceInt = activeVar ? Math.round(activeVar.price * 24000) : 0;
+  const versionIds = versions.map((version) => version.id).join("|");
+  useEffect(() => {
+    if (versions.length > 0 && !versions.some((version) => version.id === activeVersion)) {
+      setActiveVersion(versions[0].id);
+    }
+  }, [activeVersion, versionIds, versions]);
 
-  const currentPriceInt = viewMode === "erp" && activeVar
-    ? erpPriceInt
+  const selectedAttribute = product.attributeOptions?.find((attribute) => attribute.id === activeVersion);
+  const apiPriceDetails = getApiAttributePriceDetails(selectedAttribute);
+  const apiPriceInt = apiPriceDetails
+    ? parseInt(apiPriceDetails.present.replace(/\./g, "").replace("đ", ""), 10)
+    : 0;
+  const apiOldPriceInt = apiPriceDetails?.old
+    ? parseInt(apiPriceDetails.old.replace(/\./g, "").replace("đ", ""), 10)
+    : 0;
+
+  const currentPriceInt = apiPriceDetails
+    ? apiPriceInt
     : basePriceInt + getVersionModifier(activeVersion) + getColorModifier(activeColor);
-
-  const currentOldPriceInt = viewMode === "erp" && activeVar
-    ? erpOldPriceInt
+  const currentOldPriceInt = apiPriceDetails
+    ? (apiOldPriceInt || apiPriceInt)
     : baseOldPriceInt + getVersionModifier(activeVersion) + getColorModifier(activeColor);
 
   const formattedCurrentPrice = currentPriceInt > 0 ? currentPriceInt.toLocaleString("vi-VN") + "đ" : "";
   const formattedCurrentOldPrice = currentOldPriceInt > 0 ? currentOldPriceInt.toLocaleString("vi-VN") + "đ" : "";
-  
+
   const currentDiscountPct = currentOldPriceInt > currentPriceInt
     ? Math.round(((currentOldPriceInt - currentPriceInt) / currentOldPriceInt) * 100)
     : 0;
-  const formattedDiscount = currentDiscountPct > 0 ? `Giảm ${currentDiscountPct}%` : (viewMode === "erp" ? "" : "Giá ưu đãi");
+  const formattedDiscount = currentDiscountPct > 0 ? `Giảm ${currentDiscountPct}%` : "Giá ưu đãi";
 
-  const colors = getProductColorOptions(product.category, formattedCurrentPrice);
+  const apiColors = product.attributeOptions
+    ?.map((attribute) => {
+      const color = getAttributeVariantValue(attribute, /color|màu/i);
+      const version = getAttributeVariantValue(attribute, /version|phiên bản|dung lượng/i);
+      const priceDetails = getApiAttributePriceDetails(attribute);
+      if (!color || !priceDetails) return null;
+      return {
+        id: attribute.id,
+        title: color,
+        label: version || attribute.name,
+        price: priceDetails.present,
+        swatchClass: getColorSwatchClass(color)
+      };
+    })
+    .filter((color): color is ProductColorOption => Boolean(color));
+  const colors: ProductColorOption[] = apiColors && apiColors.length > 0
+    ? apiColors.slice(0, 6)
+    : getProductColorOptions(product.category, formattedCurrentPrice);
+  const colorIds = colors.map((color) => color.id).join("|");
+  useEffect(() => {
+    if (colors.length > 0 && !colors.some((color) => color.id === activeColor)) {
+      setActiveColor(colors[0].id);
+    }
+  }, [activeColor, colorIds, colors]);
   const selectedVersion = versions.find((version) => version.id === activeVersion);
   const selectedColor = colors.find((color) => color.id === activeColor);
-  const selectedOptionLabel = viewMode === "erp" && activeVar
-    ? `${activeVar.name}${activeVar.sku?.sku ? ` - SKU ${activeVar.sku.sku}` : ""}`
-    : [selectedVersion?.title, selectedColor?.title].filter(Boolean).join(" - ");
+  const selectedOptionLabel = [selectedVersion?.title, selectedColor?.title].filter(Boolean).join(" - ");
 
   const [favoriteActive, setFavoriteActive] = useState(false);
   const [voucherCollected, setVoucherCollected] = useState(false);
 
-  const [accTab, setAccTab] = useState<"watch" | "cloud" >(() => viewMode === "erp" ? "cloud" : "watch");
+  const [accTab, setAccTab] = useState<"watch" | "cloud" >("watch");
   const [addedAccs, setAddedAccs] = useState<string[]>([]);
   const [accPage, setAccPage] = useState(0);
-
-  useEffect(() => {
-    setAccTab(viewMode === "erp" ? "cloud" : "watch");
-    setAccPage(0);
-  }, [viewMode]);
 
   const watchAccessories = [
     {
@@ -2152,37 +2044,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, showSpecsPopup]);
 
-  type SpecSection = {
-    id: string;
-    title: string;
-    items: { label: string; value: string }[];
-  };
-
-  const normalizeTextValue = (value: unknown) => {
-    if (value === null || value === undefined) return "";
-    return String(value).trim();
-  };
-
-  const erpTechnicalSpecSections: SpecSection[] = viewMode === "erp" && activeVar?.specifications?.length
-    ? activeVar.specifications
-        .map((group: any, gIdx: number) => {
-          const items = (group.specifications || [])
-            .map((spec: any) => ({
-              label: normalizeTextValue(spec.name || spec.key),
-              value: normalizeTextValue(spec.value || spec.data)
-            }))
-            .filter((item: { label: string; value: string }) => item.label && item.value);
-
-          return {
-            id: `erp-technical-${gIdx}`,
-            title: normalizeTextValue(group.groupName) || "Thông số kỹ thuật",
-            items
-          };
-        })
-        .filter((section: SpecSection) => section.items.length > 0)
-    : [];
-
-  const cloudSpecSections: SpecSection[] = [
+  const cloudSpecSections: ProductSpecSection[] = [
     {
       id: "man-hinh",
       title: "Màn hình",
@@ -2253,9 +2115,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
     }
   ];
 
-  const specSections: SpecSection[] = viewMode === "erp"
-    ? erpTechnicalSpecSections
-    : cloudSpecSections;
+  const apiSpecSections = getApiSpecificationSections(selectedAttribute);
+  const specSections: ProductSpecSection[] = apiSpecSections.length > 0 ? apiSpecSections : cloudSpecSections;
 
   const [activeTab, setActiveTab] = useState(() => specSections[0]?.id || "man-hinh");
   const contentRef = useRef<HTMLDivElement>(null);
@@ -2267,9 +2128,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
         setActiveTab(specSections[0].id);
       }
     }
-  }, [activeVar, viewMode]);
+  }, [activeTab, specSections]);
 
-  const vndInfo = getProductVNDDetails(product.id);
+  const displayedSpecs = specSections.flatMap((section) => section.items).slice(0, 7);
+  const vndInfo = getProductVNDDetails(product);
 
   const handleModalScroll = () => {
     if (!contentRef.current) return;
@@ -2314,7 +2176,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
       setShowTopFade(false);
       setShowBottomFade(false);
     }
-  }, [showSpecsPopup, activeVar, viewMode, activeTab]);
+  }, [showSpecsPopup, activeTab]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden p-2 pt-10 sm:p-3 sm:pt-12 md:pt-[64px] [perspective:1400px]">
@@ -2343,26 +2205,26 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
           animate={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
         />
-        
+
         {/* Modal Main Scrollable Content Wrapper */}
         <div className="relative flex-1 min-h-0">
           <AnimatePresence>
             {showTopFade && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="pointer-events-none absolute left-0 right-0 top-0 z-20 h-12 bg-gradient-to-b from-background/60 to-transparent" 
+                className="pointer-events-none absolute left-0 right-0 top-0 z-20 h-12 bg-gradient-to-b from-background/60 to-transparent"
               />
             )}
           </AnimatePresence>
 
-          <div 
+          <div
             ref={contentRef}
             onScroll={handleModalScroll}
             className="h-full overflow-y-auto bg-muted/30 pb-28 scrollbar-thin"
           >
             {/* Header bar with Breadcrumb, Title & Social elements */}
             <div className="relative shrink-0 border-b bg-card px-4 py-3 sm:px-6 mb-4 sm:mb-6">
-              
+
               {/* Breadcrumb line */}
               <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5 mb-1 select-none overflow-x-auto whitespace-nowrap scrollbar-none">
                 &nbsp;
@@ -2373,15 +2235,13 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 <div>
                   <h1 className="font-sans font-bold text-sm sm:text-base text-foreground leading-tight flex flex-wrap items-center gap-2">
                     <span>
-                      {viewMode === "erp" 
-                        ? `${product.name} ${activeVar ? `| Phiên bản: ${activeVar.name}` : ""}` 
-                        : `${product.name} Cloud Server (5G) Viền Titan Dây Cao Su Size S/M | Chính hãng Cloud Việt Nam`}
+                      {`${product.name} Cloud Server (5G) Viền Titan Dây Cao Su Size S/M | Chính hãng Cloud Việt Nam`}
                     </span>
                     <span className="text-[9px] font-black uppercase bg-primary text-white px-1.5 py-0.5 rounded-sm">
-                      {viewMode === "erp" ? "CHÍNH HÃNG HORIZON" : "CHÍNH HÃNG APPLET"}
+                      CHÍNH HÃNG APPLET
                     </span>
                   </h1>
-                  
+
                   {/* Stars & Reviews */}
                   <div className="flex items-center gap-4 mt-1">
                     <div className="flex items-center gap-0.5 text-primary select-none">
@@ -2402,7 +2262,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                     <span>Hỏi đáp</span>
                   </button>
                   <span className="text-border">|</span>
-                  <button 
+                  <button
                     onClick={() => {
                       const specsEl = document.getElementById("specs-section");
                       if (specsEl) {
@@ -2427,10 +2287,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5 xl:gap-6 items-start lg:items-stretch px-4 sm:px-6">
-            
+
             {/* LEFT COLUMN: Image Box, Highlights, Commitments */}
             <div className="lg:col-span-8 flex flex-col gap-5">
-              
+
               {/* Product Visual Area + Gallery Thumbnails grouped tightly for space optimization */}
               <div className="flex flex-col gap-3">
                 {/* Product Visual & Image display area with 3D discount Ribbon */}
@@ -2447,41 +2307,20 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                   )}
 
                   {/* Floating specs features badges */}
-                  {viewMode === "erp" ? (
-                    <div className="absolute top-3.5 left-3.5 flex flex-col gap-1.5 z-10 select-none">
-                      <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-                        <span className="material-symbols-outlined text-[11px] font-bold text-primary">category</span>
-                        {product.specs.find(s => s.label === "Nhóm Danh mục")?.value || "Sản phẩm ERP"}
-                      </span>
-                      {activeVar?.sku?.sku && (
-                        <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-                          <span className="material-symbols-outlined text-[11px] font-bold text-primary">qr_code</span>
-                          SKU: {activeVar.sku.sku}
-                        </span>
-                      )}
-                      {activeVar?.statusProduct && (
-                      <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-                        <span className="material-symbols-outlined text-[11px] font-bold text-primary">inventory</span>
-                        {activeVar.statusProduct === "AVAILABLE" ? "Còn hàng" : activeVar.statusProduct}
-                      </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="absolute top-3.5 left-3.5 flex flex-col gap-1.5 z-10 select-none">
-                      <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-                        <span className="material-symbols-outlined text-[11px] font-bold text-primary">bolt</span>
-                        72 giờ
-                      </span>
-                      <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-                        <span className="material-symbols-outlined text-[11px] font-bold text-primary">ecg</span>
-                        Nhịp tim
-                      </span>
-                      <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-                        <span className="material-symbols-outlined text-[11px] font-bold text-primary">sim_card</span>
-                        eSim
-                      </span>
-                    </div>
-                  )}
+                  <div className="absolute top-3.5 left-3.5 flex flex-col gap-1.5 z-10 select-none">
+                    <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
+                      <span className="material-symbols-outlined text-[11px] font-bold text-primary">bolt</span>
+                      72 giờ
+                    </span>
+                    <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
+                      <span className="material-symbols-outlined text-[11px] font-bold text-primary">ecg</span>
+                      Nhịp tim
+                    </span>
+                    <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
+                      <span className="material-symbols-outlined text-[11px] font-bold text-primary">sim_card</span>
+                      eSim
+                    </span>
+                  </div>
 
                   <div className="absolute inset-0 z-0 size-full overflow-hidden rounded-xl">
                     <AnimatePresence mode="wait">
@@ -2510,14 +2349,14 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                       )}
                     </AnimatePresence>
                   </div>
-                  
+
                   {/* Indicator Dots - overlay on the bottom */}
                   {images.length > 0 && (
                   <div className="absolute bottom-3 z-10 flex select-none items-center gap-1.5 rounded-full border bg-card/90 px-2.5 py-1 shadow-sm backdrop-blur-sm">
                     {images.map((_, idx) => (
-                      <span 
+                      <span
                         key={idx}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${activeImgIdx === idx ? "w-3 bg-primary" : "w-1.5 bg-muted-foreground/35"}`} 
+                        className={`h-1.5 rounded-full transition-all duration-300 ${activeImgIdx === idx ? "w-3 bg-primary" : "w-1.5 bg-muted-foreground/35"}`}
                       />
                     ))}
                   </div>
@@ -2531,13 +2370,13 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                       key={idx}
                       onClick={() => setActiveImgIdx(idx)}
                       className={`flex h-[56px] w-[84px] shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-transparent p-0 shadow-xs transition-all ${
-                        activeImgIdx === idx 
-                          ? "scale-102 ring-2 ring-primary/40" 
+                        activeImgIdx === idx
+                          ? "scale-102 ring-2 ring-primary/40"
                           : "hover:scale-101"
                       }`}
                     >
-                      <img 
-                        src={img} 
+                      <img
+                        src={img}
                         alt={`Thumbnail ${idx + 1}`}
                         className="size-full rounded-lg object-cover"
                         referrerPolicy="no-referrer"
@@ -2553,52 +2392,49 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 </div>
               </div>
 
-              {/* Product Commitments Section */}
-              {viewMode !== "erp" && (
               <div className="flex flex-col gap-2">
-                <h4 className="font-sans font-bold text-[14px] uppercase text-foreground tracking-wider flex items-center gap-1.5 select-none">
-                  <span className="material-symbols-outlined text-primary text-[20px]">verified</span>
-                  Cam kết sản phẩm
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {/* Commitment 1 */}
-                  <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                    <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">verified</span>
-                    <div className="flex flex-col">
-                      <span className="font-sans font-extrabold text-[14px] text-foreground">Chính hãng Cloud Việt Nam</span>
-                      <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Hàng chính hãng Cloud, Mới 100% đầy đủ chứng chỉ bảo mật và cam kết SLA doanh nghiệp 99.99%.</span>
+                  <h4 className="font-sans font-bold text-[14px] uppercase text-foreground tracking-wider flex items-center gap-1.5 select-none">
+                    <span className="material-symbols-outlined text-primary text-[20px]">verified</span>
+                    Cam kết sản phẩm
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Commitment 1 */}
+                    <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
+                      <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">verified</span>
+                      <div className="flex flex-col">
+                        <span className="font-sans font-extrabold text-[14px] text-foreground">Chính hãng Cloud Việt Nam</span>
+                        <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Hàng chính hãng Cloud, Mới 100% đầy đủ chứng chỉ bảo mật và cam kết SLA doanh nghiệp 99.99%.</span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Commitment 2 */}
-                  <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                    <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">published_with_changes</span>
-                    <div className="flex flex-col">
-                      <span className="font-sans font-extrabold text-[14px] text-foreground">1 Đổi 1 trong 30 ngày</span>
-                      <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Đổi trả tài nguyên hoặc bồi hoàn tức thì nếu có lỗi từ phần cứng vật lý hoặc xung đột tài nguyên.</span>
+                    {/* Commitment 2 */}
+                    <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
+                      <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">published_with_changes</span>
+                      <div className="flex flex-col">
+                        <span className="font-sans font-extrabold text-[14px] text-foreground">1 Đổi 1 trong 30 ngày</span>
+                        <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Đổi trả tài nguyên hoặc bồi hoàn tức thì nếu có lỗi từ phần cứng vật lý hoặc xung đột tài nguyên.</span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Commitment 3 */}
-                  <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                    <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">shield</span>
-                    <div className="flex flex-col">
-                      <span className="font-sans font-extrabold text-[14px] text-foreground">Bảo mật Cloud Shield</span>
-                      <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Đi kèm lá chắn phòng thủ nâng cao, ngăn chặn DDoS và hỗ trợ di trú dữ liệu miễn phí 24/7.</span>
+                    {/* Commitment 3 */}
+                    <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
+                      <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">shield</span>
+                      <div className="flex flex-col">
+                        <span className="font-sans font-extrabold text-[14px] text-foreground">Bảo mật Cloud Shield</span>
+                        <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Đi kèm lá chắn phòng thủ nâng cao, ngăn chặn DDoS và hỗ trợ di trú dữ liệu miễn phí 24/7.</span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Commitment 4 */}
-                  <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                    <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">receipt_long</span>
-                    <div className="flex flex-col">
-                      <span className="font-sans font-extrabold text-[14px] text-foreground">Đã bao gồm thuế VAT</span>
-                      <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Giá sản phẩm đã bao gồm VAT 10%, hỗ trợ hoàn thuế VAT - Tax Refund cho doanh nghiệp.</span>
+                    {/* Commitment 4 */}
+                    <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
+                      <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">receipt_long</span>
+                      <div className="flex flex-col">
+                        <span className="font-sans font-extrabold text-[14px] text-foreground">Đã bao gồm thuế VAT</span>
+                        <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Giá sản phẩm đã bao gồm VAT 10%, hỗ trợ hoàn thuế VAT - Tax Refund cho doanh nghiệp.</span>
+                      </div>
                     </div>
                   </div>
-                </div>
               </div>
-              )}
 
               {/* Product Technical Specs Section */}
               <div id="specs-section" className="mt-2 select-none rounded-xl border bg-card p-4 shadow-sm sticky top-4 z-20">
@@ -2607,7 +2443,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                     <span className="material-symbols-outlined text-[18px] text-muted-foreground">settings_suggest</span>
                     Thông số kỹ thuật
                   </h4>
-                  <button 
+                  <button
                     onClick={() => setShowSpecsPopup(true)}
                     className="flex cursor-pointer items-center gap-0.5 text-[11px] font-bold text-muted-foreground hover:text-primary"
                   >
@@ -2616,16 +2452,16 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                   </button>
                 </div>
                 <div className="divide-y divide-border">
-                  {(viewMode === "erp" ? specSections.flatMap((section) => section.items).slice(0, 6) : getSpecsForCategory(product.category)).length > 0 ? (
-                    (viewMode === "erp" ? specSections.flatMap((section) => section.items).slice(0, 6) : getSpecsForCategory(product.category)).map((spec, sIdx) => (
+                  {displayedSpecs.length > 0 ? (
+                    displayedSpecs.map((spec, sIdx) => (
                       <div key={sIdx} className="grid grid-cols-12 px-1 py-2 text-[11.5px] transition-colors hover:bg-muted/50">
-                        <span className="col-span-5 font-medium text-muted-foreground">{spec.label}</span>
-                        <span className="col-span-7 text-foreground font-semibold">{spec.value}</span>
+                        {spec.label && <span className="col-span-5 font-medium text-muted-foreground">{spec.label}</span>}
+                        <span className={`${spec.label ? "col-span-7" : "col-span-12"} text-foreground font-semibold`}>{spec.value}</span>
                       </div>
                     ))
                   ) : (
                     <div className="text-[11.5px] py-3 px-1 text-muted-foreground font-semibold">
-                      Chưa có dữ liệu specifications từ API.
+                      Chưa có dữ liệu thông số kỹ thuật.
                     </div>
                   )}
                 </div>
@@ -2635,7 +2471,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
 
             {/* RIGHT COLUMN: Pricing, Versions, Colors, Promo, Call To Action */}
             <div className="lg:col-span-4 flex flex-col gap-5">
-              
+
               {/* Premium Pricing & Quick Info Box */}
               <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm">
                 <div className="flex items-baseline justify-between flex-wrap gap-2">
@@ -2671,147 +2507,99 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 </span>
               </div>
 
-              {/* Version Selection Grid / ERP Dynamic Variants Selector */}
-              {viewMode === "erp" ? (
-                <div className="flex flex-col gap-2">
-                  <h4 className="flex items-center justify-between font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
-                    <span>Chọn cấu hình biến thể (ERP):</span>
-                    {loadingVariants && (
-                      <span className="text-[11px] text-primary animate-pulse">Đang nạp...</span>
-                    )}
-                  </h4>
-                  {loadingVariants ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="h-[52px] bg-muted animate-pulse rounded-xl" />
-                      <div className="h-[52px] bg-muted animate-pulse rounded-xl" />
-                    </div>
-                  ) : erpVariants.length === 0 ? (
-                    <div className="text-[12px] text-muted-foreground p-3 bg-muted/50 rounded-xl border border-dashed border-slate-200">
-                      Không tìm thấy cấu hình biến thể nào cho sản phẩm này.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {erpVariants.map((variant, idx) => {
-                        const isSelected = selectedVariantIdx === idx;
-                        const optsStr = variant.variantOptions 
-                          ? variant.variantOptions.map((o: any) => `${o.name}: ${o.values.join(", ")}`).join(", ") 
-                          : "";
-                        const varPriceVnd = variant.salePrice ? Math.round(variant.salePrice * 24000) : 0;
-                        const varPriceStr = varPriceVnd > 0 ? (varPriceVnd.toLocaleString("vi-VN") + "đ") : "Liên hệ";
-                        
-                        return (
-                          <button
-                            key={variant.id || idx}
-                            onClick={() => setSelectedVariantIdx(idx)}
-                            className={`relative p-3 rounded-xl border text-left flex flex-col justify-center min-h-[52px] cursor-pointer transition-all ${
-                              isSelected 
-                                ? "border-primary bg-secondary ring-1 ring-primary/30 shadow-sm" 
-                                : "border-border bg-card hover:border-primary/40"
-                            }`}
-                          >
-                            {isSelected && (
-                              <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
-                                <span className="material-symbols-outlined text-[10px] font-black">check</span>
-                              </div>
-                            )}
-                            <span className={`font-sans text-[13px] font-bold ${isSelected ? "font-black text-foreground" : "text-foreground"}`}>
-                              {variant.name}
-                            </span>
-                            <span className="text-[11px] font-medium text-muted-foreground block mt-0.5 truncate">
-                              {optsStr || variant.sku?.sku}
-                            </span>
-                            <span className="text-[11.5px] font-bold text-primary mt-1">
-                              {varPriceStr}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+              {/* Version Selection Grid */}
+              <div className="flex flex-col gap-2">
+                <h4 className="flex items-center justify-between font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span>Chọn phiên bản:</span>
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {versions.map((ver) => {
+                    const isSelected = activeVersion === ver.id;
+                    return (
+                      <button
+                        key={ver.id}
+                        onClick={() => {
+                          setActiveVersion(ver.id);
+                          if (product.attributeOptions?.some((attribute) => attribute.id === ver.id)) {
+                            setActiveColor(ver.id);
+                          }
+                        }}
+                        className={`relative p-3 rounded-xl border text-left flex flex-col justify-center min-h-[52px] cursor-pointer transition-all ${
+                          isSelected
+                            ? "border-primary bg-secondary ring-1 ring-primary/30 shadow-sm"
+                            : "border-border bg-card hover:border-primary/40"
+                        }`}
+                      >
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
+                            <span className="material-symbols-outlined text-[10px] font-black">check</span>
+                          </div>
+                        )}
+                        <span className={`font-sans text-[13px] font-bold ${isSelected ? "font-black text-foreground" : "text-foreground"}`}>
+                          {ver.title}
+                        </span>
+                        <span className="text-[11px] font-medium text-muted-foreground block mt-0.5 truncate">
+                          {ver.desc}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : (
-                <>
-                  {/* Version Selection Grid */}
-                  <div className="flex flex-col gap-2">
-                    <h4 className="flex items-center justify-between font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
-                      <span>Chọn phiên bản:</span>
-                    </h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {versions.map((ver) => {
-                        const isSelected = activeVersion === ver.id;
-                        return (
-                          <button
-                            key={ver.id}
-                            onClick={() => setActiveVersion(ver.id)}
-                            className={`relative p-3 rounded-xl border text-left flex flex-col justify-center min-h-[52px] cursor-pointer transition-all ${
-                              isSelected 
-                                ? "border-primary bg-secondary ring-1 ring-primary/30 shadow-sm" 
-                                : "border-border bg-card hover:border-primary/40"
-                            }`}
-                          >
-                            {isSelected && (
-                              <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
-                                <span className="material-symbols-outlined text-[10px] font-black">check</span>
-                              </div>
-                            )}
-                            <span className={`font-sans text-[13px] font-bold ${isSelected ? "font-black text-foreground" : "text-foreground"}`}>
-                              {ver.title}
-                            </span>
-                            <span className="text-[11px] font-medium text-muted-foreground block mt-0.5 truncate">
-                              {ver.desc}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+              </div>
 
-                  {/* Color Selection Grid */}
-                  <div className="flex flex-col gap-2">
-                    <h4 className="font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Màu sắc: <span className="font-extrabold text-foreground">{colors.find(c => c.id === activeColor)?.title}</span>
-                    </h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {colors.map((color) => {
-                        const isSelected = activeColor === color.id;
-                        const colorPriceInt = basePriceInt + getVersionModifier(activeVersion) + getColorModifier(color.id);
-                        const formattedColorPrice = colorPriceInt.toLocaleString("vi-VN") + "đ";
-                        return (
-                          <button
-                            key={color.id}
-                            onClick={() => setActiveColor(color.id)}
-                            className={`relative p-2 rounded-xl border text-left flex items-center gap-2 cursor-pointer transition-all ${
-                              isSelected 
-                                ? "border-primary bg-secondary ring-1 ring-primary/30 shadow-sm" 
-                                : "border-border bg-card hover:border-primary/40"
-                            }`}
-                          >
-                            {isSelected && (
-                              <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
-                                <span className="material-symbols-outlined text-[10px] font-black">check</span>
-                              </div>
-                            )}
-                            <div className="flex size-7 shrink-0 items-center justify-center">
-                              <span
-                                className={`size-5 rounded-full ${color.swatchClass}`}
-                                aria-hidden="true"
-                              />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="font-sans font-bold text-[13px] text-foreground leading-tight truncate">
-                                {color.title}
-                              </span>
-                              <span className="text-[10.5px] font-medium text-muted-foreground mt-0.5 leading-none">
-                                {formattedColorPrice}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
+              {/* Color Selection Grid */}
+              <div className="flex flex-col gap-2">
+                <h4 className="font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
+                Màu sắc: <span className="font-extrabold text-foreground">{colors.find(c => c.id === activeColor)?.title}</span>
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {colors.map((color) => {
+                    const isSelected = activeColor === color.id;
+                    const colorAttribute = product.attributeOptions?.find((attribute) => attribute.id === color.id);
+                    const colorPriceDetails = getApiAttributePriceDetails(colorAttribute);
+                    const colorPriceInt = colorPriceDetails
+                      ? parseInt(colorPriceDetails.present.replace(/\./g, "").replace("đ", ""), 10)
+                      : basePriceInt + getVersionModifier(activeVersion) + getColorModifier(color.id);
+                    const formattedColorPrice = colorPriceDetails?.present || colorPriceInt.toLocaleString("vi-VN") + "đ";
+                    return (
+                      <button
+                        key={color.id}
+                        onClick={() => {
+                          setActiveColor(color.id);
+                          if (colorAttribute) {
+                            setActiveVersion(colorAttribute.id);
+                          }
+                        }}
+                        className={`relative p-2 rounded-xl border text-left flex items-center gap-2 cursor-pointer transition-all ${
+                          isSelected
+                            ? "border-primary bg-secondary ring-1 ring-primary/30 shadow-sm"
+                            : "border-border bg-card hover:border-primary/40"
+                        }`}
+                      >
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
+                            <span className="material-symbols-outlined text-[10px] font-black">check</span>
+                          </div>
+                        )}
+                        <div className="flex size-7 shrink-0 items-center justify-center">
+                          <span
+                            className={`size-5 rounded-full ${color.swatchClass}`}
+                            aria-hidden="true"
+                          />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-sans font-bold text-[13px] text-foreground leading-tight truncate">
+                            {color.title}
+                          </span>
+                          <span className="text-[10.5px] font-medium text-muted-foreground mt-0.5 leading-none">
+                            {formattedColorPrice}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Promotion & Coupon Card - Seamless borderless design */}
               <div className="overflow-hidden rounded-xl border bg-card p-1 shadow-sm">
@@ -2822,8 +2610,6 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 </div>
 
                 <div className="p-2.5 flex flex-col gap-2.5">
-                  
-                  {/* Coupon Ticket - Seamless borderless card with soft shadow */}
                   <div className="relative flex h-[52px] items-stretch overflow-hidden rounded-lg border bg-card">
                     <div className="w-[40px] bg-primary flex flex-col justify-center items-center shrink-0 px-0.5 select-none">
                       <span className="text-white text-[8px] font-black leading-none uppercase">GIẢM</span>
@@ -2877,8 +2663,6 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 </div>
               </div>
 
-              {/* Frequently Bought Together (Phụ kiện mua cùng / Đề xuất mua kèm) Section */}
-              {viewMode !== "erp" && (
               <div className="flex select-none flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sticky top-6 z-20">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h4 className="font-sans font-bold text-[11.5px] uppercase text-foreground tracking-wider flex items-center gap-1.5">
@@ -2955,7 +2739,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                             </div>
                             {/* 3D Fold Corner for Left Ribbon */}
                             <div className="absolute top-[16px] left-[-4px] w-[4px] h-[4px] bg-[#B43C00] z-10" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
-                            
+
                             {/* Left side: Product Image in a matching aspect ratio container */}
                             <div className="relative -my-2 -ml-2 flex h-[calc(100%+1rem)] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-l-xl bg-transparent p-0 sm:-my-2.5 sm:-ml-2.5 sm:h-[calc(100%+1.25rem)] sm:w-[120px]">
                               <img
@@ -3022,7 +2806,6 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                   </AnimatePresence>
               </div>
               </div>
-              )}
 
             </div>
 
@@ -3032,12 +2815,12 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
           <div className="mt-6 sm:mt-8 rounded-xl border bg-card p-5 shadow-sm sm:p-6">
             <h2 className="font-sans font-bold text-sm sm:text-base text-foreground mb-5 flex items-center gap-2 select-none">
               <span className="material-symbols-outlined text-primary font-black text-[20px]">reviews</span>
-              <span>Đánh giá & nhận xét {viewMode === "erp" ? product.name : `${product.name} Cloud Server`}</span>
+              <span>Đánh giá & nhận xét {product.name} Cloud Server</span>
             </h2>
 
             {/* Overall Summary Row */}
             <div className="mb-6 grid grid-cols-1 items-center gap-6 rounded-xl border bg-background p-5 text-card-foreground shadow-sm md:grid-cols-3">
-              
+
               {/* Left Side: Score & Button */}
               <div className="flex flex-col items-center justify-center text-center md:border-r border-border md:pr-6 py-2">
                 <span className="font-sans font-black text-4xl text-foreground leading-none">5.0</span>
@@ -3059,8 +2842,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                     <span className="w-3 text-right">{stars}</span>
                     <span className="material-symbols-outlined text-[11px] text-primary fill-current">star</span>
                     <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full bg-primary" 
+                      <div
+                        className="h-full rounded-full bg-primary"
                         style={{ width: stars === 5 ? "100%" : "0%" }}
                       />
                     </div>
@@ -3072,7 +2855,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
               {/* Right Side: Experience Ratings */}
               <div className="flex flex-col justify-center gap-3 md:pl-6 md:border-l border-border py-2">
                 <h4 className="text-[11px] font-extrabold text-foreground uppercase tracking-wider select-none mb-1">Trải nghiệm dịch vụ</h4>
-                
+
                 <div className="flex flex-col gap-2">
                   {[
                     { label: "Thời lượng hoạt động (SLA)", val: "5/5" },
@@ -3107,8 +2890,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 <button
                   key={cIdx}
                   className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
-                    chip.active 
-                      ? "border-primary/30 bg-secondary text-primary" 
+                    chip.active
+                      ? "border-primary/30 bg-secondary text-primary"
                       : "border-border bg-card text-muted-foreground hover:border-primary/40"
                   }`}
                 >
@@ -3119,10 +2902,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
 
             {/* Reviews List */}
             <div className="flex flex-col gap-4">
-              
+
               {/* Review Card 1 */}
               <div className="flex gap-4 rounded-xl border bg-background p-4 shadow-sm sm:p-5">
-                
+
                 {/* User Avatar Circle */}
                 <div className="flex size-9 shrink-0 select-none items-center justify-center rounded-full border bg-muted text-xs font-extrabold uppercase text-muted-foreground">
                   C
@@ -3149,39 +2932,21 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                   </div>
 
                   {/* Experience tags */}
-                  {viewMode === "erp" ? (
-                    <div className="flex items-center gap-2 flex-wrap mb-3.5 select-none">
-                      <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                        Chất lượng sản phẩm: <span className="text-emerald-600 font-bold">Tuyệt vời (10/10)</span>
-                      </span>
-                      <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                        Đóng gói & Giao nhận: <span className="text-emerald-600 font-bold">Cực nhanh & Cẩn thận</span>
-                      </span>
-                      <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                        Hỗ trợ kỹ thuật: <span className="text-emerald-600 font-bold">Tận tình 24/7</span>
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 flex-wrap mb-3.5 select-none">
-                      <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                        SLA hoạt động: <span className="text-emerald-600 font-bold">Cực ổn định (100%)</span>
-                      </span>
-                      <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                        Hiệu năng xử lý: <span className="text-emerald-600 font-bold">Siêu tốc và mượt mà</span>
-                      </span>
-                      <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                        Cấu hình: <span className="text-emerald-600 font-bold">Linh hoạt</span>
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap mb-3.5 select-none">
+                    <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      SLA hoạt động: <span className="text-emerald-600 font-bold">Cực ổn định (100%)</span>
+                    </span>
+                    <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      Hiệu năng xử lý: <span className="text-emerald-600 font-bold">Siêu tốc và mượt mà</span>
+                    </span>
+                    <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      Cấu hình: <span className="text-emerald-600 font-bold">Linh hoạt</span>
+                    </span>
+                  </div>
 
                   {/* Content comment */}
                   <p className="text-[12px] font-medium text-muted-foreground leading-relaxed">
-                    {viewMode === "erp" ? (
-                      "Chưa có dữ liệu đánh giá từ API."
-                    ) : (
-                      `Đã mua sắm và deploy dự án của công ty lên hệ thống ${product.name} Cloud Server. Phải nói là tốc độ cực kỳ kinh khủng khiếp, mượt mà và không hề gián đoạn một giây phút nào cả. Giao diện trực quan đẹp mắt, đúng chuẩn hệ sinh thái đẳng cấp. Đặc biệt hỗ trợ kỹ thuật của các bạn tư vấn viên rất tận tình 24/7. Có thêm tính năng mua trả góp 0% quá tiện lợi cho startup quy mô nhỏ như bên mình. Đánh giá 5 sao không cần bàn cãi!`
-                    )}
+                    {`Đã mua sắm và deploy dự án của công ty lên hệ thống ${product.name} Cloud Server. Phải nói là tốc độ cực kỳ kinh khủng khiếp, mượt mà và không hề gián đoạn một giây phút nào cả. Giao diện trực quan đẹp mắt, đúng chuẩn hệ sinh thái đẳng cấp. Đặc biệt hỗ trợ kỹ thuật của các bạn tư vấn viên rất tận tình 24/7. Có thêm tính năng mua trả góp 0% quá tiện lợi cho startup quy mô nhỏ như bên mình. Đánh giá 5 sao không cần bàn cãi!`}
                   </p>
 
                 </div>
@@ -3196,9 +2961,9 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
 
           <AnimatePresence>
             {showBottomFade && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 h-12 bg-gradient-to-t from-background/60 to-transparent" 
+                className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 h-12 bg-gradient-to-t from-background/60 to-transparent"
               />
             )}
           </AnimatePresence>
@@ -3217,20 +2982,20 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
               <div className="absolute top-[19px] left-[-4px] w-[4px] h-[4px] bg-[#B43C00] z-35" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
             </>
           )}
-          
+
           {/* Left segment: Image, Name, Price */}
           <div className="relative -my-3 -ml-3 flex min-w-0 items-center gap-3 self-stretch">
             <div className="hidden h-full w-20 shrink-0 items-center justify-center overflow-hidden rounded-l-xl bg-transparent p-0 sm:flex">
-              <img 
-                src={images[0]} 
-                alt={product.name} 
+              <img
+                src={images[0]}
+                alt={product.name}
                 className="size-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div className="flex flex-col min-w-0">
               <h4 className="font-sans font-bold text-[12px] text-foreground truncate max-w-[140px] md:max-w-[280px] hidden md:block">
-                {viewMode === "erp" ? product.name : `${product.name} Cloud Server`}
+                {product.name} Cloud Server
               </h4>
               {selectedOptionLabel && (
                 <span className="hidden max-w-[140px] truncate text-[10px] font-bold leading-none text-muted-foreground md:block md:max-w-[280px]">
@@ -3252,14 +3017,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
           <div className="relative flex items-center gap-2 shrink-0">
 
 
-            <button 
+            <button
               onClick={(e) => {
                 if (onAddToCart) {
-                  const isErp = viewMode === "erp" && activeVar;
-                  const variantSku = activeVar?.sku?.sku || productSku;
-                  const variantLabel = isErp
-                    ? `${activeVar.name} [SKU: ${variantSku}]`
-                    : `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
+                  const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
                   onAddToCart(variantLabel, "Trả góp 0%", e);
                 }
                 onClose();
@@ -3268,15 +3029,11 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
             >
               Trả góp 0%
             </button>
-            
+
             <button
               onClick={(e) => {
                 if (onAddToCart) {
-                  const isErp = viewMode === "erp" && activeVar;
-                  const variantSku = activeVar?.sku?.sku || productSku;
-                  const variantLabel = isErp
-                    ? `${activeVar.name} [SKU: ${variantSku}]`
-                    : `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
+                  const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
                   onAddToCart(variantLabel, formattedCurrentPrice, e);
                 }
                 onClose();
@@ -3289,11 +3046,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
             <button
               onClick={(e) => {
                 if (onAddToCart) {
-                  const isErp = viewMode === "erp" && activeVar;
-                  const variantSku = activeVar?.sku?.sku || productSku;
-                  const variantLabel = isErp
-                    ? `${activeVar.name} [SKU: ${variantSku}]`
-                    : `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
+                  const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
                   onAddToCart(variantLabel, formattedCurrentPrice, e);
                 }
                 onClose();
@@ -3377,7 +3130,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 {/* Content wrapper with scroll indicators */}
                 <div className="flex-1 relative overflow-hidden flex flex-col">
                   {/* Top blur fade overlay */}
-                  <div 
+                  <div
                     className={`absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white to-transparent pointer-events-none z-20 transition-opacity duration-350 ${
                       showTopFade ? "opacity-100" : "opacity-0"
                     }`}
@@ -3401,10 +3154,12 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                               key={idx}
                               className="grid grid-cols-1 sm:grid-cols-12 text-[12px] sm:text-[12.5px] py-3 px-4 transition-colors hover:bg-muted/50/40"
                             >
-                              <div className="sm:col-span-4 text-muted0 font-bold sm:pr-4 flex items-center">
-                                {item.label}
-                              </div>
-                              <div className="sm:col-span-8 text-foreground font-semibold mt-1 sm:mt-0 leading-relaxed">
+                              {item.label && (
+                                <div className="sm:col-span-4 text-muted0 font-bold sm:pr-4 flex items-center">
+                                  {item.label}
+                                </div>
+                              )}
+                              <div className={`${item.label ? "sm:col-span-8" : "sm:col-span-12"} text-foreground font-semibold mt-1 sm:mt-0 leading-relaxed`}>
                                 {item.value}
                               </div>
                             </div>
@@ -3419,7 +3174,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                   </div>
 
                   {/* Bottom blur fade overlay */}
-                  <div 
+                  <div
                     className={`absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white to-transparent pointer-events-none z-20 transition-opacity duration-350 ${
                       showBottomFade ? "opacity-100" : "opacity-0"
                     }`}

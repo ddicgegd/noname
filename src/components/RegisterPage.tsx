@@ -1,15 +1,26 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Mail, Lock, User, ArrowRight, Eye, EyeOff, ShieldCheck, CheckCircle, AlertCircle, Shield, Cpu, RefreshCw, Check, Loader2, Settings, Key, Terminal, Server, ChevronDown, ChevronUp } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Eye, EyeOff, ShieldCheck, CheckCircle, CheckCircle2, XCircle, AlertCircle, Shield, Cpu, RefreshCw, Check, Loader2, Settings, Key, Terminal, Server, ChevronDown, ChevronUp } from "lucide-react";
 import { apiRequest, isProxyEnabled } from "../lib/api";
+import { extractBackendMessage, sanitizeErrorMessage } from "../lib/responseExtractor";
+import { ApiResponse } from "../types/api";
+import {
+  loginUser,
+  registerUser,
+  recoverAccount as apiRecoverAccount,
+  changePassword as apiChangePassword,
+  changeUsername as apiChangeUsername,
+  validateResetToken as apiValidateResetToken
+} from "../services/authService";
+import { UserLoginRequest, UserRegisterRequest } from "../types/auth";
 
 interface RegisterPageProps {
-  onNavigate: (page: "landing" | "product" | "register") => void;
+  onNavigate: (page: "landing" | "product" | "auth" | "terms") => void;
 }
 
 export default function RegisterPage({ onNavigate }: RegisterPageProps) {
-  const [isSignUp, setIsSignUp] = useState(false);
-  
+  const [isSignUp, setIsSignUp] = useState(() => window.location.hash.toLowerCase() === "#register");
+
   // Form states
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
@@ -17,21 +28,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [agreeToTerms, setAgreeToTerms] = useState(false);
-  
+
   // UI helper states
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  
-  // Holographic Login scanning animation states
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [authStage, setAuthStage] = useState(0); // Stages: 1 = scan, 2 = decrypt / connect, 3 = granted
-  const [authProgress, setAuthProgress] = useState(0);
-  const [authLogs, setAuthLogs] = useState<string[]>([]);
-  const [authResult, setAuthResult] = useState<"SUCCESS" | "FAILED" | null>(null);
-  const [authFailureReason, setAuthFailureReason] = useState<string>("");
-  
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   // Mouse position for spotlight effect on the card
   const cardRef = useRef<HTMLDivElement>(null);
   const [spotlightPos, setSpotlightPos] = useState({ x: 0, y: 0 });
@@ -46,93 +50,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     });
   };
 
-  useEffect(() => {
-    if (!isAuthenticating) return;
-    
-    // Reset values
-    setAuthProgress(0);
-    setAuthLogs(["[INFO] Khởi chạy bộ kiểm tra bảo mật...", "[INFO] Đang quét cấu hình thiết bị (deviceInfo)..."]);
-    
-    const interval = setInterval(() => {
-      setAuthProgress(p => {
-        const next = p + 2;
-        if (next >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return next;
-      });
-    }, 30);
-
-    return () => clearInterval(interval);
-  }, [isAuthenticating]);
-
-  useEffect(() => {
-    if (!isAuthenticating) return;
-
-    if (authProgress >= 25 && authProgress < 50 && authLogs.length === 2) {
-      if (isSignUp) {
-        setAuthLogs(prev => [...prev, "[INFO] Đang kiểm tra định dạng Email & Kiểm tra trùng lặp mật khẩu...", "[OK] Định dạng Email hợp lệ. Không có lỗi validation cơ bản."]);
-      } else {
-        setAuthLogs(prev => [...prev, "[OK] Định danh thiết bị: Chrome / Linux x86_64", "[INFO] Đang kết nối PostgreSQL qua JPA findByNameOrEmail()..."]);
-      }
-    } else if (authProgress >= 50 && authProgress < 75 && authLogs.length === 4) {
-      if (authResult === "FAILED") {
-        if (authFailureReason.includes("Email đã tồn tại")) {
-          setAuthLogs(prev => [...prev, "[ERROR] Lỗi ràng buộc duy nhất: Email đã tồn tại và đang hoạt động (ACTIVE).", "[ERROR] ĐĂNG KÝ BỊ TỪ CHỐI!"]);
-        } else if (authFailureReason.includes("Tên đăng nhập đã tồn tại")) {
-          setAuthLogs(prev => [...prev, "[ERROR] Lỗi ràng buộc duy nhất: Tên đăng nhập đã tồn tại với email khác (ACTIVE).", "[ERROR] ĐĂNG KÝ BỊ TỪ CHỐI!"]);
-        } else {
-          setAuthLogs(prev => [...prev, `[ERROR] Lỗi: ${authFailureReason}`, "[ERROR] TRUY CẬP BỊ TỪ CHỐI!"]);
-        }
-      } else {
-        if (isSignUp) {
-          const customMsg = localStorage.getItem("horizon_last_registration_message") || "";
-          if (customMsg.includes("đã tồn tại nhưng chưa xác thực")) {
-            setAuthLogs(prev => [...prev, "[WARN] Phát hiện Email/Username đã tồn tại ở trạng thái chưa kích hoạt (INACTIVE)", "[INFO] Tiến hành tái sử dụng bản ghi người dùng, cập nhật TTL và làm mới mã kích hoạt..."]);
-          } else {
-            setAuthLogs(prev => [...prev, "[OK] Đã xác minh Email & Username không trùng lặp với tài khoản đang hoạt động", "[INFO] Khởi tạo thực thể User mới với Trạng thái: INACTIVE..."]);
-          }
-        } else {
-          setAuthLogs(prev => [...prev, "[OK] Tìm thấy thực thể tài khoản tương khớp", "[INFO] Đang giải mã & so khớp thuật toán bcrypt_check()..."]);
-        }
-      }
-    } else if (authProgress >= 75 && authProgress < 100 && authLogs.length === 6) {
-      if (authResult === "FAILED") {
-        setAuthLogs(prev => [...prev, "[ERROR] Hủy bỏ giao dịch ghi nhận DB.", "[ERROR] ĐĂNG KÝ THẤT BẠI!"]);
-      } else {
-        if (isSignUp) {
-          setAuthLogs(prev => [...prev, "[OK] Đã băm mật khẩu thành công bằng BCryptPasswordEncoder", "[INFO] Đang sinh mã UUID làm AuthCode với thời hạn 5 phút (EMAIL_VERIFICATION)..."]);
-        } else {
-          setAuthLogs(prev => [...prev, "[OK] Xác thực mật khẩu thành công!", "[INFO] Khởi tạo Token Rotation & Ghi đè Redis Cache..."]);
-        }
-      }
-    } else if (authProgress >= 100 && (authLogs.length === 6 || authLogs.length === 8)) {
-      if (authResult === "FAILED") {
-        if (!authLogs.includes("[ERROR] QUÁ TRÌNH XÁC THỰC THẤT BẠI")) {
-          setAuthLogs(prev => [...prev, "[ERROR] QUÁ TRÌNH XÁC THỰC THẤT BẠI", "[INFO] Hệ thống phản hồi lỗi 400 Bad Request / BusinessException"]);
-        }
-      } else {
-        if (isSignUp) {
-          if (!authLogs.includes("[OK] [@Async] Đã render email và gửi đường link kích hoạt UUID tới hòm thư người dùng!")) {
-            const customMsg = localStorage.getItem("horizon_last_registration_message") || "";
-            if (customMsg.includes("đã tồn tại nhưng chưa xác thực")) {
-              setAuthLogs(prev => [...prev, "[OK] Đã cập nhật mã kích hoạt AuthCode mới vào PostgreSQL!", "[OK] [@Async] Đã phát VerificationEmailEvent thành công!"]);
-            } else {
-              setAuthLogs(prev => [...prev, "[OK] Commit CSDL thành công! Phát VerificationEmailEvent qua Transactional Event Listener", "[OK] [@Async] Đã render email và gửi đường link kích hoạt UUID tới hòm thư người dùng!"]);
-            }
-          }
-        } else {
-          if (!authLogs.includes("[OK] ĐH ĐÃ CẤP QUYỀN TRUY CẬP HỆ THỐNG! Đang chuyển hướng...")) {
-            setAuthLogs(prev => [...prev, "[OK] Cập nhật phiên Hash Profile (user:profile) hoàn tất", "[OK] ĐH ĐÃ CẤP QUYỀN TRUY CẬP HỆ THỐNG! Đang chuyển hướng..."]);
-          }
-        }
-      }
-    }
-  }, [authProgress, isAuthenticating, authLogs.length, authResult, authFailureReason, isSignUp]);
-
   const [lastRegToken, setLastRegToken] = useState<string | null>(null);
   const [lastRegEmail, setLastRegEmail] = useState<string | null>(null);
+
+  // Verification Overlay states
+  const [showVerifyOverlay, setShowVerifyOverlay] = useState(false);
+  const [verifyOverlayStatus, setVerifyOverlayStatus] = useState<"loading" | "success" | "error">("loading");
+  const [verifyOverlayMsg, setVerifyOverlayMsg] = useState("");
+  const [verifyOverlayTimeLeft, setVerifyOverlayTimeLeft] = useState(2);
 
   // --- ACCOUNT RECOVERY STATE VARIABLES ---
   const [recoveryMode, setRecoveryMode] = useState<"NONE" | "SEND_LINK" | "MANUAL_TOKEN" | "RESET_PASSWORD">("NONE");
@@ -163,25 +88,66 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     if (!msg) return "";
     let clean = msg;
     clean = clean.replace(/API Error:\s*\d+\s*(Unauthorized|Bad Request|Internal Server Error|Forbidden)?/i, "").trim();
-    clean = clean.replace(/^(API Error:\s*\d+|Error\s*\d+|Mã lỗi:\s*\d+)\s*-?\s*/i, "").trim();
-    if (!clean || clean === "401" || clean === "400" || clean === "500" || clean === "403") {
-      return "Tên đăng nhập hoặc mật khẩu không chính xác.";
+    clean = clean.replace(/^(API Error:\s*\d+|Error\s*\d+|Mã lỗi:\s*\d+)\s*-?\\s*/i, "").trim();
+    if (clean.includes("Failed to fetch") || clean.includes("NetworkError") || clean.includes("Network Error")) {
+      return "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại máy chủ backend (http://localhost:8080).";
+    }
+    if (!clean) {
+      return "Đã có lỗi xảy ra từ máy chủ. Vui lòng thử lại sau.";
     }
     return clean;
   };
 
-  // Email Verification States
-  const [isVerifyingMode, setIsVerifyingMode] = useState(false);
+  const [isVerifyingMode, setIsVerifyingMode] = useState(() => {
+    const hash = window.location.hash.toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    const hasToken = ["token", "code", "verify-email", "verify"].some((p) => params.has(p));
+    if (hash === "#verify") {
+      return hasToken;
+    }
+    return false;
+  });
+
+  // Sync states when URL hash changes (e.g. Back/Forward navigation)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === "#register") {
+        setIsSignUp(true);
+        setIsVerifyingMode(false);
+      } else if (hash === "#verify") {
+        const params = new URLSearchParams(window.location.search);
+        const hasToken = ["token", "code", "verify-email", "verify"].some((p) => params.has(p));
+        if (!lastRegEmail && !hasToken) {
+          window.location.hash = "login";
+          setIsSignUp(false);
+          setIsVerifyingMode(false);
+        } else {
+          setIsSignUp(false);
+          setIsVerifyingMode(true);
+        }
+      } else {
+        setIsSignUp(false);
+        setIsVerifyingMode(false);
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    // Align state on mount
+    handleHashChange();
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, [lastRegEmail]);
   const [verificationTokenInput, setVerificationTokenInput] = useState("");
   const [apiBaseUrl, setApiBaseUrl] = useState(() => {
     const stored = localStorage.getItem("horizon_api_base_url");
-    if (stored === "http://localhost:3999" || stored === "http://localhost:8080") {
-      localStorage.setItem("horizon_api_base_url", "https://mummified-escapable-proven.ngrok-free.dev");
-      return "https://mummified-escapable-proven.ngrok-free.dev";
+    if (!stored) {
+      localStorage.setItem("horizon_api_base_url", "http://localhost:8080");
+      return "http://localhost:8080";
     }
-    return stored || "https://mummified-escapable-proven.ngrok-free.dev";
+    return stored;
   });
-  const [verifyApiPath, setVerifyApiPath] = useState(() => localStorage.getItem("horizon_verify_api_path") || "/api/auth/verify-email");
+  const [verifyApiPath, setVerifyApiPath] = useState(() => localStorage.getItem("horizon_verify_api_path") ?? "/api/auth/verify-email");
   const [verifyMethod, setVerifyMethod] = useState<"GET" | "POST">("GET");
   const [isVerifyingRequest, setIsVerifyingRequest] = useState(false);
   const [verificationLogs, setVerificationLogs] = useState<string[]>([]);
@@ -219,59 +185,19 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       localStorage.setItem("horizon_device_id", deviceId);
     }
 
-    const ua = navigator.userAgent;
-    let browserName = "Unknown Browser";
-    let browserVersion = "Unknown";
-    if (ua.indexOf("Chrome") > -1) {
-      browserName = "Chrome";
-      const match = ua.match(/Chrome\/([0-9\.]+)/);
-      if (match) browserVersion = match[1];
-    } else if (ua.indexOf("Safari") > -1) {
-      browserName = "Safari";
-      const match = ua.match(/Version\/([0-9\.]+)/);
-      if (match) browserVersion = match[1];
-    } else if (ua.indexOf("Firefox") > -1) {
-      browserName = "Firefox";
-      const match = ua.match(/Firefox\/([0-9\.]+)/);
-      if (match) browserVersion = match[1];
-    } else if (ua.indexOf("Edge") > -1) {
-      browserName = "Edge";
-      const match = ua.match(/Edg\/([0-9\.]+)/);
-      if (match) browserVersion = match[1];
-    }
-
-    let osName = "Unknown OS";
-    let osVersion = "Unknown";
-    if (ua.indexOf("Windows") > -1) {
-      osName = "Windows";
-      const match = ua.match(/Windows NT ([0-9\._]+)/);
-      if (match) osVersion = match[1];
-    } else if (ua.indexOf("Macintosh") > -1) {
-      osName = "macOS";
-      const match = ua.match(/Mac OS X ([0-9\._]+)/);
-      if (match) osVersion = match[1].replace(/_/g, ".");
-    } else if (ua.indexOf("Linux") > -1) {
-      osName = "Linux";
-    } else if (ua.indexOf("Android") > -1) {
-      osName = "Android";
-    } else if (ua.indexOf("iPhone") > -1) {
-      osName = "iOS";
-    }
-
-    const deviceType = /Mobi|Android|iPhone|iPad/i.test(ua) ? "MOBILE" : "DESKTOP";
+    let timeZone;
+    try {
+      timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch(e) {}
 
     return {
-      deviceType,
-      osName,
-      osVersion,
-      browserName,
-      browserVersion,
       screenWidth: window.screen.width,
       screenHeight: window.screen.height,
-      userAgent: ua,
-      ipAddress: "127.0.0.1",
-      language: navigator.language || "vi-VN",
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Ho_Chi_Minh",
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      platform: navigator.platform,
+      vendor: navigator.vendor,
+      timeZone: timeZone,
       deviceId
     };
   };
@@ -287,7 +213,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     try {
       const stored = localStorage.getItem("horizon_auth_audit_logs");
       let logs = stored ? JSON.parse(stored) : [];
-      
+
       const newLog = {
         id: "log-" + Math.random().toString(36).substring(2, 11) + "-" + Date.now(),
         timestamp: new Date().toISOString(),
@@ -298,7 +224,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         serverUrl,
         deviceInfo: devInfo
       };
-      
+
       logs.unshift(newLog);
       if (logs.length > 50) logs = logs.slice(0, 50);
       localStorage.setItem("horizon_auth_audit_logs", JSON.stringify(logs));
@@ -324,50 +250,127 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setSuccessMsg("");
     setRecoveryUser(null);
     try {
-      const response = await apiRequest(`/api/auth/validate-reset-token?token=${encodeURIComponent(token)}`, {
-        method: "GET"
-      });
-      const isSuccess = response && (
-        response.status === "success" ||
-        (response.status && typeof response.status === "object" && (
-          response.status.message === "Success" ||
-          response.status.message === "success" ||
-          response.status.code === 200 ||
-          response.status.code === "200"
-        ))
-      );
-      if (isSuccess && response.data) {
+      const response = await apiValidateResetToken(token);
+      const extracted = extractBackendMessage(response);
+
+      if (response.data !== undefined && response.data !== null) {
         setRecoveryUser(response.data);
-        if (response.data.roles) {
+        if (response.data.roles !== undefined) {
           localStorage.setItem("horizon_recovery_user_roles", JSON.stringify(response.data.roles));
         }
       } else {
-        setTokenValidationError("Đường dẫn khôi phục không hợp lệ hoặc cấu trúc dữ liệu không chính xác.");
+        setTokenValidationError(extracted.message);
       }
     } catch (err: any) {
       console.error("Token validation failed:", err);
-      // Fallback: If validate-reset-token endpoint is not supported on the backend, 
-      // we don't block the user from entering and submitting their new password.
-      // The token will be validated natively during the POST reset-password submit.
-      console.warn("Backend validate-reset-token endpoint failed or not found. Falling back to direct password reset for real Spring Boot integration.");
-      setRecoveryUser({
-        email: "Tài khoản liên kết",
-        fullName: "Thành viên hệ thống",
-        numberPhone: "Bảo mật hệ thống",
-        avatarUrl: ""
-      });
-      setTokenValidationError("");
+      const cleanReason = sanitizeErrorMessage(err.message);
+      setTokenValidationError(cleanReason);
     } finally {
       setIsValidatingToken(false);
+    }
+  };
+
+  const executeOverlayVerification = async (tokenClean: string) => {
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+
+      const response = await fetch(`http://localhost:8080/api/auth/verify-email?token=${encodeURIComponent(tokenClean)}`, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+
+      const text = await response.text();
+      let resData: any = {};
+      try {
+        resData = JSON.parse(text);
+      } catch {
+        resData = {};
+      }
+
+      const backendMsg = extractBackendMessage(resData);
+
+      if (response.ok) {
+        setVerifyOverlayStatus("success");
+        setVerifyOverlayMsg(backendMsg.message ?? "Tài khoản của bạn đã được xác thực thành công.");
+        setVerifyOverlayTimeLeft(2);
+
+        let returnedEmail = "";
+        if (resData.data !== undefined && resData.data !== null && typeof resData.data.email === "string") {
+          returnedEmail = resData.data.email;
+        }
+        if (returnedEmail.length > 0) {
+          setEmail(returnedEmail);
+        }
+
+        setSuccessMsg(backendMsg.message ?? "Kích hoạt tài khoản thành công! Vui lòng đăng nhập.");
+
+        const interval = setInterval(() => {
+          setVerifyOverlayTimeLeft((prev) => {
+            if (prev <= 1) {
+              clearInterval(interval);
+              setShowVerifyOverlay(false);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        setVerifyOverlayStatus("error");
+        setVerifyOverlayMsg(backendMsg.message ?? "Mã xác thực không hợp lệ hoặc đã hết hạn.");
+        setVerifyOverlayTimeLeft(4);
+
+        const interval = setInterval(() => {
+          setVerifyOverlayTimeLeft((prev) => {
+            if (prev <= 1) {
+              clearInterval(interval);
+              setShowVerifyOverlay(false);
+              setIsSignUp(true);
+              window.location.hash = "register";
+              setErrorMsg(backendMsg.message ?? "Mã xác thực không hợp lệ hoặc đã hết hạn.");
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
+    } catch (err) {
+      setVerifyOverlayStatus("error");
+      setVerifyOverlayMsg("Không thể kết nối tới máy chủ backend. Vui lòng kiểm tra lại trạng thái server.");
+      setVerifyOverlayTimeLeft(4);
+
+      const interval = setInterval(() => {
+        setVerifyOverlayTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setShowVerifyOverlay(false);
+            setIsSignUp(true);
+            window.location.hash = "register";
+            setErrorMsg("Kích hoạt email thất bại do lỗi kết nối tới server.");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
   };
 
   // On mount, parse token from URL if present
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tokenParam = params.get("token") || params.get("code") || params.get("verify-email") || params.get("verify");
+    let tokenParam = params.get("token");
+    if (!tokenParam) tokenParam = params.get("code");
+    if (!tokenParam) tokenParam = params.get("verify-email");
+    if (!tokenParam) tokenParam = params.get("verify");
+
     if (tokenParam) {
-      const isRecovery = params.has("token") || params.has("code") || tokenParam.startsWith("recovery-");
+      let isRecovery = false;
+      if (params.has("token")) isRecovery = true;
+      if (params.has("code")) isRecovery = true;
+      if (tokenParam.startsWith("recovery-")) isRecovery = true;
+
       if (isRecovery) {
         // Account recovery flow
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -376,13 +379,13 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         setIsPasswordResetExpanded(true);
         validateRecoveryToken(tokenParam);
       } else {
-        // Email verification flow
+        // Email verification flow - trigger overlay directly on top of login form
+        window.history.replaceState({}, document.title, "/auth#login");
         setVerificationTokenInput(tokenParam);
-        setIsVerifyingMode(true);
-        setVerificationLogs([
-          `[INFO] Đã phát hiện token xác thực từ URL: ${tokenParam}`,
-          `[INFO] Hãy nhấp "XÁC NHẬN KÍCH HOẠT" để gửi yêu cầu đến backend của bạn.`
-        ]);
+        setShowVerifyOverlay(true);
+        setVerifyOverlayStatus("loading");
+        setVerifyOverlayMsg("Đang tiến hành xác minh tài khoản với server...");
+        executeOverlayVerification(tokenParam);
       }
     }
   }, []);
@@ -400,17 +403,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setSuccessMsg("");
 
     try {
-      const emailParam = encodeURIComponent(recoveryEmail.trim());
-      const response = await apiRequest(`/api/auth/recover-account/${emailParam}`, {
-        method: "GET"
-      });
-
-      setSuccessMsg(response.data || "Đường dẫn khôi phục tài khoản đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.");
-      setCooldownTime(60); // Set cooldown
+      const response = await apiRecoverAccount(recoveryEmail.trim());
+      const extracted = extractBackendMessage(response);
+      setSuccessMsg(extracted.message);
+      setCooldownTime(60);
     } catch (err: any) {
       console.error("Account recovery request failed:", err);
       const cleanReason = sanitizeErrorMessage(err.message);
-      setErrorMsg(cleanReason || "Gửi yêu cầu khôi phục thất bại. Vui lòng kiểm tra lại địa chỉ email hoặc liên hệ quản trị viên.");
+      setErrorMsg(cleanReason);
     } finally {
       setLoading(false);
     }
@@ -436,41 +436,23 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setSuccessMsg("");
 
     try {
-      // Flow 4: Token-Authenticated Password Modification (PUT)
-      let response;
-      try {
-        response = await apiRequest(`/api/auth/change-password`, {
-          method: "PUT",
-          body: JSON.stringify({
-            token: recoveryToken,
-            newPassword: recoveryNewPassword,
-            confirmPassword: recoveryConfirmPassword,
-          }),
-        });
-      } catch (putErr) {
-        console.warn("PUT /api/auth/change-password failed, attempting legacy POST /api/auth/reset-password fallback...", putErr);
-        response = await apiRequest(`/api/auth/reset-password?code=${encodeURIComponent(recoveryToken)}`, {
-          method: "POST",
-          body: JSON.stringify({
-            newPassword: recoveryNewPassword,
-            confirmPassword: recoveryConfirmPassword,
-          }),
-        });
-      }
+      const response = await apiChangePassword({
+        token: recoveryToken,
+        newPassword: recoveryNewPassword,
+        confirmPassword: recoveryConfirmPassword,
+      });
 
-      const successDetail = response?.data || "Mật khẩu của bạn đã được thay đổi thành công!";
-      setSuccessMsg(successDetail);
-      addAuditLog("VERIFY", { token: recoveryToken }, "SUCCESS", "Đổi mật khẩu thành công qua Real API Backend!", apiBaseUrl, getClientDeviceInfo());
-      
-      // Clear password inputs but do not redirect, reset mode, or clear token/user
+      const extracted = extractBackendMessage(response);
+      setSuccessMsg(extracted.message);
+      addAuditLog("VERIFY", { token: recoveryToken }, "SUCCESS", extracted.message, apiBaseUrl, getClientDeviceInfo());
+
       setRecoveryNewPassword("");
       setRecoveryConfirmPassword("");
-
     } catch (err: any) {
       console.error("Password reset failed:", err);
       const cleanReason = sanitizeErrorMessage(err.message);
-      setErrorMsg(cleanReason || "Thay đổi mật khẩu không thành công. Vui lòng thử lại.");
-      addAuditLog("VERIFY", { token: recoveryToken }, "FAILED", `Đổi mật khẩu thất bại: ${cleanReason || err.message}`, apiBaseUrl, getClientDeviceInfo());
+      setErrorMsg(cleanReason);
+      addAuditLog("VERIFY", { token: recoveryToken }, "FAILED", `Đổi mật khẩu thất bại: ${cleanReason}`, apiBaseUrl, getClientDeviceInfo());
     } finally {
       setLoading(false);
     }
@@ -488,19 +470,15 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setSuccessMsg("");
 
     try {
-      // Flow 3: Token-Authenticated Username Modification (PUT)
-      const response = await apiRequest(`/api/auth/change-username`, {
-        method: "PUT",
-        body: JSON.stringify({
-          token: recoveryToken,
-          newUsername: recoveryNewUsername.trim(),
-        }),
+      const response = await apiChangeUsername({
+        token: recoveryToken,
+        newUsername: recoveryNewUsername.trim(),
       });
 
-      const successDetail = response?.data || "Tên đăng nhập đã được thay đổi thành công!";
-      setSuccessMsg(successDetail);
-      addAuditLog("VERIFY", { token: recoveryToken, newUsername: recoveryNewUsername.trim() }, "SUCCESS", "Đổi tên đăng nhập thành công qua Real API Backend!", apiBaseUrl, getClientDeviceInfo());
-      
+      const extracted = extractBackendMessage(response);
+      setSuccessMsg(extracted.message);
+      addAuditLog("VERIFY", { token: recoveryToken, newUsername: recoveryNewUsername.trim() }, "SUCCESS", extracted.message, apiBaseUrl, getClientDeviceInfo());
+
       if (recoveryUser) {
         setRecoveryUser({
           ...recoveryUser,
@@ -511,12 +489,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       setRecoveryNewUsername("");
       setIsUsernameChangeExpanded(false);
-
     } catch (err: any) {
       console.error("Username change failed:", err);
       const cleanReason = sanitizeErrorMessage(err.message);
-      setErrorMsg(cleanReason || "Đổi tên đăng nhập thất bại. Vui lòng thử lại.");
-      addAuditLog("VERIFY", { token: recoveryToken, newUsername: recoveryNewUsername.trim() }, "FAILED", `Đổi tên đăng nhập thất bại: ${cleanReason || err.message}`, apiBaseUrl, getClientDeviceInfo());
+      setErrorMsg(cleanReason);
+      addAuditLog("VERIFY", { token: recoveryToken, newUsername: recoveryNewUsername.trim() }, "FAILED", `Đổi tên đăng nhập thất bại: ${cleanReason}`, apiBaseUrl, getClientDeviceInfo());
     } finally {
       setLoading(false);
     }
@@ -524,7 +501,9 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
   const handleVerifyEmail = (token: string) => {
     setVerificationTokenInput(token);
+    window.location.hash = "verify";
     setIsVerifyingMode(true);
+
     setVerificationLogs([`[INFO] Đã lấy mã kích hoạt từ SMTP Relay: ${token}`, `[INFO] Khởi chạy kích hoạt tự động...`]);
     setTimeout(() => {
       handleExecuteRealVerification(token);
@@ -532,88 +511,101 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   };
 
   const handleVerificationSuccess = (emailVal: string) => {
-    const savedEmail = emailVal || lastRegEmail || localStorage.getItem("horizon_last_registration_email") || "";
-    const savedUsername = localStorage.getItem("horizon_last_registration_username") || "";
-    const savedPassword = localStorage.getItem("horizon_last_registration_password") || "";
-
-    if (savedEmail) {
-      setEmail(savedEmail);
+    let savedEmail = emailVal;
+    if (savedEmail.length === 0) {
+      if (lastRegEmail !== null && lastRegEmail.length > 0) savedEmail = lastRegEmail;
+      else {
+        const storedEmail = localStorage.getItem("horizon_last_registration_email");
+        if (storedEmail !== null) savedEmail = storedEmail;
+      }
     }
 
-    // Set a short delay so the user can see the "Xác thực thành công" log.
+    const savedUsername = localStorage.getItem("horizon_last_registration_username");
+    const savedPassword = localStorage.getItem("horizon_last_registration_password");
+
     setTimeout(async () => {
-      if (savedPassword && (savedEmail || savedUsername)) {
+      let canAutoLogin = false;
+      if (savedPassword !== null && savedPassword.length > 0) {
+        if (savedEmail.length > 0) canAutoLogin = true;
+        else if (savedUsername !== null && savedUsername.length > 0) canAutoLogin = true;
+      }
+
+      if (canAutoLogin && savedPassword) {
         setVerificationLogs(prev => [
           ...prev,
           `[INFO] Đã tìm thấy thông tin mật khẩu đăng ký. Tiến hành tự động đăng nhập...`
         ]);
 
-        const loginTerm = savedEmail || savedUsername;
+        let loginTerm = savedEmail;
+        if (loginTerm.length === 0 && savedUsername !== null) loginTerm = savedUsername;
         setEmail(loginTerm);
         setPassword(savedPassword);
+        window.location.hash = "login";
         setIsSignUp(false);
         setIsVerifyingMode(false);
+
         setLoading(true);
 
         setTimeout(async () => {
           try {
             const devInfo = getClientDeviceInfo();
-            const payload = { usernameOrEmail: loginTerm, password: savedPassword, deviceInfo: devInfo };
+            const payload: UserLoginRequest = { usernameOrEmail: loginTerm, password: savedPassword, deviceInfo: devInfo };
 
-            // Try real API login
-            const res = await apiRequest("/api/auth/login", {
-              method: "POST",
-              body: JSON.stringify(payload),
-            });
+            const res = await loginUser(payload);
+            const extractedMsg = extractBackendMessage(res);
 
-            const userData = res?.data || res || {};
-            const accessJWT = userData.accessToken || userData.token || "mock_access_token";
-            const refreshJWT = userData.refreshToken || "mock_refresh_token";
-            const userRoles = userData.roles || ["USER"];
-            const finalEmail = userData.email || savedEmail;
-            const finalUsername = userData.username || userData.name || savedUsername || savedEmail.split("@")[0];
+            if (res.data !== undefined && res.data !== null) {
+              const userData = res.data;
+              const accessJWT = userData.accessToken ?? "";
+              const refreshJWT = userData.refreshToken ?? "";
+              const userRoles = userData.roles ?? ["USER"];
+              const finalEmail = userData.email ?? savedEmail;
+              let finalUsername = userData.username;
+              if (!finalUsername) finalUsername = savedUsername ?? savedEmail.split("@")[0];
 
-            const realUserObj = {
-              id: userData.id || 999,
-              fullName: userData.fullName || userData.name || finalUsername,
-              username: finalUsername,
-              email: finalEmail,
-              roles: userRoles,
-              status: "ACTIVE"
-            };
+              const realUserObj = {
+                id: userData.id ?? 1,
+                fullName: userData.fullName ?? finalUsername,
+                username: finalUsername,
+                email: finalEmail,
+                roles: userRoles,
+                status: "ACTIVE"
+              };
 
-            const redisProfile = {
-              userId: realUserObj.id,
-              email: realUserObj.email,
-              roles: realUserObj.roles,
-              accessToken: accessJWT
-            };
+              const redisProfile = {
+                userId: realUserObj.id,
+                email: realUserObj.email,
+                roles: realUserObj.roles,
+                accessToken: accessJWT
+              };
 
-            const redisRefreshTokens = {
-              [devInfo.deviceId]: {
-                token: refreshJWT,
-                deviceInfo: devInfo
-              }
-            };
+              const redisRefreshTokens = {
+                [devInfo.deviceId]: {
+                  token: refreshJWT,
+                  deviceInfo: devInfo
+                }
+              };
 
-            localStorage.setItem("horizon_redis_profile", JSON.stringify(redisProfile));
-            localStorage.setItem("horizon_redis_refresh_tokens", JSON.stringify(redisRefreshTokens));
-            localStorage.setItem("horizon_current_user", JSON.stringify(realUserObj));
+              localStorage.setItem("horizon_redis_profile", JSON.stringify(redisProfile));
+              localStorage.setItem("horizon_redis_refresh_tokens", JSON.stringify(redisRefreshTokens));
+              localStorage.setItem("horizon_current_user", JSON.stringify(realUserObj));
+            }
 
-            setAuthResult("SUCCESS");
-            setIsAuthenticating(true);
             setLoading(false);
-            addAuditLog("LOGIN", payload, "SUCCESS", "Tự động đăng nhập thành công sau kích hoạt (Real Backend)!", apiBaseUrl, devInfo);
+            addAuditLog("LOGIN", payload, "SUCCESS", extractedMsg.message, apiBaseUrl, devInfo);
           } catch (err: any) {
             console.warn("Auto-login API failed:", err);
             setLoading(false);
+            window.location.hash = "login";
             setIsVerifyingMode(false);
-            setErrorMsg("Không thể tự động đăng nhập: " + (err.message || "Lỗi kết nối"));
+
+            setErrorMsg(sanitizeErrorMessage(err.message));
           }
         }, 150);
       } else {
-        // Just go to login page normally and fill in the email
+        window.location.hash = "login";
         setIsVerifyingMode(false);
+
         setIsSignUp(false);
         setVerificationLogs([]);
         setSuccessMsg("Kích hoạt tài khoản thành công! Vui lòng đăng nhập với thông tin tài khoản của bạn.");
@@ -622,8 +614,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   };
 
   const handleExecuteRealVerification = async (overrideToken?: string) => {
-    const tokenToUse = (overrideToken || verificationTokenInput).trim();
-    if (!tokenToUse) {
+    let tokenToUse = verificationTokenInput.trim();
+    if (overrideToken !== undefined && overrideToken.length > 0) tokenToUse = overrideToken.trim();
+
+    if (tokenToUse.length === 0) {
       setVerificationLogs(["[ERROR] Vui lòng nhập Mã xác thực (Token) hoặc dán link kích hoạt để tiếp tục."]);
       setVerificationResultState("FAILED");
       return;
@@ -636,18 +630,16 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       `[INFO] Phương thức: GỌI TRỰC TIẾP API BACKEND`
     ]);
 
-    // Stage 1: Connecting
     await new Promise(resolve => setTimeout(resolve, 500));
     setVerificationLogs(prev => [
       ...prev,
       `[INFO] Đang kết nối tới ${apiBaseUrl}...`
     ]);
 
-    // Real API Call!
     await new Promise(resolve => setTimeout(resolve, 500));
-    const cleanPath = verifyApiPath.startsWith("/") ? verifyApiPath : `/${verifyApiPath}`;
-    
-    // Support parsing full link paste
+    let cleanPath = verifyApiPath;
+    if (!cleanPath.startsWith("/")) cleanPath = "/" + cleanPath;
+
     let tokenClean = tokenToUse;
     if (tokenToUse.includes("token=")) {
       const parts = tokenToUse.split("token=");
@@ -655,26 +647,20 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     }
 
     const fullUrl = `${apiBaseUrl.replace(/\/$/, "")}${cleanPath}?token=${tokenClean}`;
-    const useProxy = isProxyEnabled();
-    const fetchUrl = useProxy ? "/api/proxy" : fullUrl;
 
     setVerificationLogs(prev => [
       ...prev,
-      `[INFO] Gửi yêu cầu HTTP ${verifyMethod}: ${fullUrl} ${useProxy ? "(Bypass CORS Proxy: BẬT)" : ""}`,
+      `[INFO] Gửi yêu cầu HTTP ${verifyMethod}: ${fullUrl}`,
       `[INFO] Đang chờ phản hồi từ Spring Boot Server...`
     ]);
 
     try {
       const headers: Record<string, string> = {
         "Accept": "application/json",
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true"
+        "Content-Type": "application/json"
       };
-      if (useProxy) {
-        headers["X-Target-URL"] = fullUrl;
-      }
 
-      const response = await fetch(fetchUrl, {
+      const response = await fetch(fullUrl, {
         method: verifyMethod,
         headers
       });
@@ -686,49 +672,53 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       if (response.ok) {
         const responseText = await response.text();
-        const isHtml = responseText.trim().startsWith("<") || responseText.toLowerCase().includes("<html") || responseText.toLowerCase().includes("ngrok");
-        
+        const isHtml = responseText.trim().startsWith("<") || responseText.toLowerCase().includes("<html");
+
         if (isHtml) {
           setVerificationLogs(prev => [
             ...prev,
-            `[ERROR] Nhận phản hồi HTML thay vì JSON từ Server.`,
-            `[ERROR] Đây là trang cảnh báo bảo mật ngrok (Bypass Ngrok Warning).`,
-            `[ERROR] Đã phát hiện và ngăn chặn hiển thị sai trạng thái. Vui lòng kiểm tra lại cấu hình kết nối hoặc bật Proxy để hoàn tất.`
+            `[ERROR] Nhận phản hồi HTML thay vì JSON từ Server.`
           ]);
           throw new Error("Phản hồi không hợp lệ: Server trả về trang HTML thay vì dữ liệu JSON.");
         }
 
-        let resData: any = {};
+        let resData: ApiResponse = {};
         try {
           resData = JSON.parse(responseText);
         } catch {
           resData = {};
         }
-        console.log("Verify API Response:", resData);
+
+        const extractedMsg = extractBackendMessage(resData);
 
         setVerificationLogs(prev => [
           ...prev,
           `[OK] Spring Boot phản hồi: SUCCESS`,
-          `[OK] Đã kích hoạt tài khoản trên CSDL PostgreSQL thực tế!`,
-          `[OK] TÀI KHOẢN ĐÃ ĐƯỢC KÍCH HOẠT THÀNH CÔNG TRÊN SERVER CỦA BẠN!`
+          `[OK] Đã kích hoạt tài khoản trên CSDL thực tế!`,
+          `[OK] ${extractedMsg.message}`
         ]);
         setVerificationResultState("SUCCESS");
-        
-        const returnedEmail = resData?.data?.email || resData?.email || "";
-        if (returnedEmail) {
+
+        let returnedEmail = "";
+        if (resData.data !== undefined && resData.data !== null && typeof resData.data.email === "string") {
+          returnedEmail = resData.data.email;
+        }
+
+        if (returnedEmail.length > 0) {
           setEmail(returnedEmail);
         }
-        setSuccessMsg(`Xác thực thành công từ API Backend! Tài khoản của bạn đã được kích hoạt trên hệ thống thực tế. Đang chuyển hướng đăng nhập...`);
+        setSuccessMsg(extractedMsg.message);
         setIsSignUp(false);
 
-        addAuditLog("VERIFY", { token: tokenClean }, "SUCCESS", "Kích hoạt email thành công từ Real API Backend!", apiBaseUrl, getClientDeviceInfo());
+        addAuditLog("VERIFY", { token: tokenClean }, "SUCCESS", extractedMsg.message, apiBaseUrl, getClientDeviceInfo());
         handleVerificationSuccess(returnedEmail);
       } else {
         const errBody = await response.text().catch(() => "");
         let parsedErr = "";
         try {
           const jsonErr = JSON.parse(errBody);
-          parsedErr = jsonErr?.detail || jsonErr?.title || jsonErr?.message || jsonErr?.status?.message || errBody;
+          const extractedErr = extractBackendMessage(jsonErr);
+          parsedErr = extractedErr.message;
         } catch {
           parsedErr = errBody;
         }
@@ -736,7 +726,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         setVerificationLogs(prev => [
           ...prev,
           `[ERROR] Server trả về lỗi: Code ${response.status}`,
-          parsedErr ? `[ERROR] Chi tiết: ${parsedErr}` : `[ERROR] Token không hợp lệ hoặc đã hết hạn.`
+          parsedErr.length > 0 ? `[ERROR] Chi tiết: ${parsedErr}` : `[ERROR] Token không hợp lệ hoặc đã hết hạn.`
         ]);
         setVerificationResultState("FAILED");
 
@@ -744,15 +734,16 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       }
     } catch (err: any) {
       console.error("Real API Verification Failed:", err);
+      const errDetail = typeof err.message === "string" ? err.message : "Network error";
       setVerificationLogs(prev => [
         ...prev,
         `[ERROR] Không thể kết nối tới Server Spring Boot tại địa chỉ: ${apiBaseUrl}`,
-        `[ERROR] Chi tiết lỗi: ${err.message || err}`,
+        `[ERROR] Chi tiết lỗi: ${errDetail}`,
         `[INFO] Mẹo: Hãy chắc chắn rằng Server Spring Boot của bạn đang chạy tại ${apiBaseUrl} và đã cấu hình cho phép CORS cho origin của trang web này.`
       ]);
       setVerificationResultState("FAILED");
 
-      addAuditLog("VERIFY", { token: tokenClean }, "FAILED", "Kích hoạt email thất bại do lỗi kết nối: " + (err.message || err), apiBaseUrl, getClientDeviceInfo());
+      addAuditLog("VERIFY", { token: tokenClean }, "FAILED", "Kích hoạt email thất bại do lỗi kết nối: " + errDetail, apiBaseUrl, getClientDeviceInfo());
     } finally {
       setIsVerifyingRequest(false);
     }
@@ -761,21 +752,32 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const handleResendToken = async () => {
     setErrorMsg("");
     setSuccessMsg("");
-    
-    const targetEmail = email || lastRegEmail || localStorage.getItem("horizon_last_registration_email") || "";
-    if (!targetEmail || !targetEmail.trim()) {
+
+    let targetEmail = email;
+    if (targetEmail.length === 0 && lastRegEmail !== null) targetEmail = lastRegEmail;
+    if (targetEmail.length === 0) {
+      const stored = localStorage.getItem("horizon_last_registration_email");
+      if (stored !== null) targetEmail = stored;
+    }
+
+    if (targetEmail.length === 0 || targetEmail.trim().length === 0) {
       setErrorMsg("Không tìm thấy email đăng ký ban đầu để gửi lại mã.");
       return;
     }
 
     setLoading(true);
     const devInfo = getClientDeviceInfo();
-    const payload = {
-      name: username.trim() || targetEmail.split("@")[0],
-      fullName: fullName.trim() || "Người dùng",
+    let regName = username.trim();
+    if (regName.length === 0) regName = targetEmail.split("@")[0];
+    let regFullName = fullName.trim();
+    if (regFullName.length === 0) regFullName = regName;
+
+    const payload: UserRegisterRequest = {
+      name: regName,
+      fullName: regFullName,
       email: targetEmail.trim().toLowerCase(),
-      password: password || "password123",
-      confirmPassword: password || "password123"
+      password,
+      confirmPassword: password
     };
 
     setVerificationLogs(prev => [
@@ -784,297 +786,245 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     ]);
 
     try {
-      const res = await apiRequest("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const res = await registerUser(payload);
+      const extractedMsg = extractBackendMessage(res);
+      setSuccessMsg(extractedMsg.message);
 
-      const customMsg = res?.message || res?.data?.message || "Đã gửi lại mã xác thực thành công!";
-      setSuccessMsg(customMsg);
-      
-      const token = res?.data?.token || res?.token || "verify-" + Math.floor(100000 + Math.random() * 900000);
-      localStorage.setItem("horizon_last_registration_token", token);
+      let token = "";
+      if (res.data !== undefined && res.data !== null) {
+        if (typeof res.data.token === "string") token = res.data.token;
+        else if (typeof res.data.accessToken === "string") token = res.data.accessToken;
+      }
+
+      if (token.length > 0) {
+        localStorage.setItem("horizon_last_registration_token", token);
+        setLastRegToken(token);
+      }
       localStorage.setItem("horizon_last_registration_email", payload.email);
-      localStorage.setItem("horizon_last_registration_message", customMsg);
-      
-      setLastRegToken(token);
+      localStorage.setItem("horizon_last_registration_message", extractedMsg.message);
+
       setLastRegEmail(payload.email);
-      setTimeLeft(300); // Reset countdown timer to 5 minutes
-      
+      setTimeLeft(300);
+
       setVerificationLogs(prev => [
         ...prev,
-        `[OK] Đã cập nhật token mới thành công: ${token}`,
-        `[OK] Email xác thực mới đã được phát hành!`
+        `[OK] Đã phát hành yêu cầu xác thực mới!`,
+        `[OK] ${extractedMsg.message}`
       ]);
-      addAuditLog("REGISTER", payload, "SUCCESS", `[GỬI LẠI MÃ] ${customMsg}`, apiBaseUrl, devInfo);
+      addAuditLog("REGISTER", payload, "SUCCESS", `[GỬI LẠI MÃ] ${extractedMsg.message}`, apiBaseUrl, devInfo);
     } catch (err: any) {
       console.warn("Real Backend Resend Failed:", err);
-      setErrorMsg(err.message || "Gửi lại mã không thành công.");
+      const cleanReason = sanitizeErrorMessage(err.message);
+      setErrorMsg(cleanReason);
       setVerificationLogs(prev => [
         ...prev,
-        `[ERROR] Gửi lại mã thất bại: ${err.message}`
+        `[ERROR] Gửi lại mã thất bại: ${cleanReason}`
       ]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (authProgress >= 100 && isAuthenticating) {
-      if (authResult === "SUCCESS") {
-        const redirectTimeout = setTimeout(() => {
-          setIsAuthenticating(false);
-          if (isSignUp) {
-            const token = localStorage.getItem("horizon_last_registration_token");
-            const emailAddr = localStorage.getItem("horizon_last_registration_email");
-            const customMsg = localStorage.getItem("horizon_last_registration_message") || "Một email xác thực đã được gửi đến địa chỉ hòm thư của bạn. Vui lòng kiểm tra.";
-            setLastRegToken(token);
-            setLastRegEmail(emailAddr);
 
-            setSuccessMsg(customMsg);
-            setIsSignUp(false);
-            setIsVerifyingMode(true);
-            setVerificationTokenInput("");
-            setPassword("");
-            setConfirmPassword("");
-          } else {
-            onNavigate("landing");
-          }
-        }, 1000);
-        return () => clearTimeout(redirectTimeout);
-      } else if (authResult === "FAILED") {
-        const redirectTimeout = setTimeout(() => {
-          setIsAuthenticating(false);
-          setErrorMsg(sanitizeErrorMessage(authFailureReason) || "Xác thực không thành công. Vui lòng kiểm tra lại thông tin.");
-          setLoading(false);
-        }, 1200);
-        return () => clearTimeout(redirectTimeout);
-      }
-    }
-  }, [authProgress, isAuthenticating, authResult, onNavigate, isSignUp, authFailureReason]);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
+    setFieldErrors({});
 
-    // Input validations
+    // Client-side validation
     if (isSignUp) {
-      if (!fullName || !fullName.trim()) {
-        setErrorMsg("Họ tên không được để trống");
-        return;
-      }
-      if (!username || !username.trim()) {
-        setErrorMsg("Tên đăng nhập không được để trống");
-        return;
-      }
-      if (username.trim().length < 3 || username.trim().length > 50) {
-        setErrorMsg("Tên đăng nhập phải từ 3 đến 50 ký tự");
-        return;
-      }
-      if (!email || !email.trim()) {
-        setErrorMsg("Email không được để trống");
-        return;
-      }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email.trim())) {
-        setErrorMsg("Email không đúng định dạng");
-        return;
-      }
-      if (!password) {
-        setErrorMsg("Mật khẩu không được để trống");
-        return;
-      }
-      if (password.length < 6) {
-        setErrorMsg("Mật khẩu phải có ít nhất 6 ký tự");
-        return;
-      }
-      if (!confirmPassword) {
-        setErrorMsg("Xác nhận mật khẩu không được để trống");
-        return;
-      }
-      if (password !== confirmPassword) {
-        setErrorMsg("Xác nhận mật khẩu không khớp.");
-        return;
-      }
-      if (!agreeToTerms) {
-        setErrorMsg("Bạn phải đồng ý với Điều khoản và Chính sách dịch vụ.");
+      const errs: Record<string, string> = {};
+      if (!username || !username.trim())
+        errs["name"] = "Tên đăng nhập không được để trống.";
+      else if (username.trim().length < 3 || username.trim().length > 50)
+        errs["name"] = "Tên đăng nhập phải từ 3 đến 50 ký tự.";
+      if (!fullName || !fullName.trim())
+        errs["fullName"] = "Họ và tên không được để trống.";
+      if (!email || !email.trim())
+        errs["email"] = "Email không được để trống.";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+        errs["email"] = "Email không đúng định dạng.";
+      if (!password)
+        errs["password"] = "Mật khẩu không được để trống.";
+      else if (password.length < 6)
+        errs["password"] = "Mật khẩu phải có ít nhất 6 ký tự.";
+      if (!confirmPassword)
+        errs["confirmPassword"] = "Vui lòng xác nhận mật khẩu.";
+      else if (password && password !== confirmPassword)
+        errs["confirmPassword"] = "Xác nhận mật khẩu không khớp.";
+      const termsError = !agreeToTerms ? "Bạn phải đồng ý với Điều khoản và Chính sách dịch vụ." : "";
+      if (Object.keys(errs).length > 0 || termsError) {
+        setFieldErrors(errs);
+        if (termsError) setErrorMsg(termsError);
         return;
       }
     } else {
-      if (!email) {
-        setErrorMsg("Vui lòng nhập tên đăng nhập hoặc email.");
-        return;
-      }
-      if (!password) {
-        setErrorMsg("Vui lòng nhập mật khẩu.");
+      const errs: Record<string, string> = {};
+      if (!email)
+        errs["usernameOrEmail"] = "Vui lòng nhập tên đăng nhập hoặc email.";
+      else if (email.trim().length < 3 || email.trim().length > 50)
+        errs["usernameOrEmail"] = "Tên đăng nhập hoặc email phải từ 3 đến 50 ký tự.";
+      if (!password)
+        errs["password"] = "Mật khẩu không được để trống.";
+      if (Object.keys(errs).length > 0) {
+        setFieldErrors(errs);
         return;
       }
     }
 
     setLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1200));
 
     try {
-      // Load stored users from localStorage or initialize with ADMIN default
-      let storedUsers: any[] = [];
-      try {
-        const stored = localStorage.getItem("horizon_cloud_users");
-        if (stored) {
-          storedUsers = JSON.parse(stored);
-        } else {
-          storedUsers = [
-            {
-              id: 1,
-              fullName: "System Administrator",
-              username: "ADMIN",
-              email: "ADMIN@gmail.com",
-              password: "admin",
-              roles: ["ADMIN", "USER", "SUPER_ADMIN"],
-              status: "ACTIVE"
-            }
-          ];
-          localStorage.setItem("horizon_cloud_users", JSON.stringify(storedUsers));
-        }
-      } catch (err) {
-        console.error("Lỗi đọc dữ liệu người dùng:", err);
-        storedUsers = [
-          {
-            id: 1,
-            fullName: "System Administrator",
-            username: "ADMIN",
-            email: "ADMIN@gmail.com",
-            password: "admin",
-            roles: ["ADMIN", "USER", "SUPER_ADMIN"],
-            status: "ACTIVE"
-          }
-        ];
-      }
-
-      const endpoint = isSignUp ? "/api/auth/register" : "/api/auth/login";
       const devInfo = getClientDeviceInfo();
-      const payload = isSignUp 
-        ? { name: username.trim(), fullName: fullName.trim(), email: email.trim().toLowerCase(), password, confirmPassword } 
-        : { usernameOrEmail: email, password, deviceInfo: devInfo };
 
-      // Try actual network request
       try {
-        const res = await apiRequest(endpoint, {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-
-        console.log("Real backend response:", res);
-
         if (isSignUp) {
-          // For Sign Up
-          const customMsg = res?.message || res?.data?.message || "Đăng ký thành công từ Real API Backend! Vui lòng kiểm tra email để kích hoạt.";
-          setSuccessMsg(customMsg);
-          
-          const token = res?.data?.token || res?.token || "";
-          localStorage.setItem("horizon_last_registration_token", token);
-          localStorage.setItem("horizon_last_registration_email", email.trim().toLowerCase());
-          localStorage.setItem("horizon_last_registration_message", customMsg);
+          const payload: UserRegisterRequest = {
+            name: username.trim(),
+            fullName: fullName.trim(),
+            email: email.trim().toLowerCase(),
+            password,
+            confirmPassword
+          };
+          const res = await registerUser(payload);
+          const extractedMsg = extractBackendMessage(res);
+          setSuccessMsg(extractedMsg.message);
+
+          let token = "";
+          if (res.data !== undefined && res.data !== null) {
+            if (typeof res.data.token === "string") token = res.data.token;
+            else if (typeof res.data.accessToken === "string") token = res.data.accessToken;
+          }
+          if (token.length > 0) {
+            localStorage.setItem("horizon_last_registration_token", token);
+            setLastRegToken(token);
+          }
+          localStorage.setItem("horizon_last_registration_email", payload.email);
+          localStorage.setItem("horizon_last_registration_message", extractedMsg.message);
           localStorage.setItem("horizon_last_registration_username", username.trim());
           localStorage.setItem("horizon_last_registration_password", password);
-          
-          setLastRegToken(token);
-          setLastRegEmail(email.trim().toLowerCase());
 
-          setAuthResult("SUCCESS");
-          setIsAuthenticating(true);
+          setLastRegEmail(payload.email);
           setLoading(false);
+          window.location.hash = "verify";
+          setIsSignUp(false);
+          setIsVerifyingMode(true);
 
-          addAuditLog("REGISTER", payload, "SUCCESS", customMsg, apiBaseUrl, devInfo);
+          setVerificationTokenInput("");
+          setPassword("");
+          setConfirmPassword("");
+
+          addAuditLog("REGISTER", payload, "SUCCESS", extractedMsg.message, apiBaseUrl, devInfo);
         } else {
-          // For Login
-          const userData = res?.data || res || {};
-          const accessJWT = userData.accessToken || userData.token || "mock_access_token";
-          const refreshJWT = userData.refreshToken || "mock_refresh_token";
-          const userRoles = userData.roles || ["USER"];
-          const finalEmail = userData.email || email;
-          const finalUsername = userData.username || userData.name || email.split("@")[0];
-
-          const realUserObj = {
-            id: userData.id || 999,
-            fullName: userData.fullName || userData.name || finalUsername,
-            username: finalUsername,
-            email: finalEmail,
-            roles: userRoles,
-            status: "ACTIVE"
+          const payload: UserLoginRequest = {
+            usernameOrEmail: email.trim(),
+            password,
+            deviceInfo: devInfo
           };
+          const res = await loginUser(payload);
+          const extractedMsg = extractBackendMessage(res);
 
-          const redisProfile = {
-            userId: realUserObj.id,
-            email: realUserObj.email,
-            roles: realUserObj.roles,
-            accessToken: accessJWT
-          };
+          if (res.data !== undefined && res.data !== null) {
+            const userData = res.data;
+            const accessJWT = userData.accessToken ?? "";
+            const refreshJWT = userData.refreshToken ?? "";
+            const userRoles = userData.roles ?? ["USER"];
+            const finalEmail = userData.email ?? email;
+            let finalUsername = userData.username;
+            if (!finalUsername) finalUsername = email.split("@")[0];
 
-          const redisRefreshTokens = {
-            [devInfo.deviceId]: {
-              token: refreshJWT,
-              deviceInfo: devInfo
-            }
-          };
+            const realUserObj = {
+              id: userData.id ?? 1,
+              fullName: userData.fullName ?? finalUsername,
+              username: finalUsername,
+              email: finalEmail,
+              roles: userRoles,
+              status: "ACTIVE"
+            };
+            const redisProfile = {
+              userId: realUserObj.id,
+              email: realUserObj.email,
+              roles: realUserObj.roles,
+              accessToken: accessJWT
+            };
+            const redisRefreshTokens = {
+              [devInfo.deviceId]: { token: refreshJWT, deviceInfo: devInfo }
+            };
 
-          localStorage.setItem("horizon_redis_profile", JSON.stringify(redisProfile));
-          localStorage.setItem("horizon_redis_refresh_tokens", JSON.stringify(redisRefreshTokens));
-          localStorage.setItem("horizon_current_user", JSON.stringify(realUserObj));
+            localStorage.setItem("horizon_redis_profile", JSON.stringify(redisProfile));
+            localStorage.setItem("horizon_redis_refresh_tokens", JSON.stringify(redisRefreshTokens));
+            localStorage.setItem("horizon_current_user", JSON.stringify(realUserObj));
+          }
 
-          setAuthResult("SUCCESS");
-          setIsAuthenticating(true);
           setLoading(false);
-
-          addAuditLog("LOGIN", payload, "SUCCESS", "Đăng nhập thành công từ Real API Backend. Đã đồng bộ Redis Session Cache.", apiBaseUrl, devInfo);
+          addAuditLog("LOGIN", payload, "SUCCESS", extractedMsg.message, apiBaseUrl, devInfo);
+          onNavigate("landing");
         }
-        return; // Success, exit
+        return;
       } catch (err: any) {
         console.warn("Real Backend API Request Failed:", err);
-        
-        // Check if it is Báo cáo 1 Case 2: Unverified email
+
         const errorResponse = err.data;
-        const isUnverified = err.status === 401 && (
-          (errorResponse?.status?.code === 401 && errorResponse?.data?.email) || 
-          (errorResponse?.data?.message?.includes("chưa được xác thực") || errorResponse?.message?.includes("chưa được xác thực") || (errorResponse?.data?.message && errorResponse?.data?.message.includes("chưa được xác thực")))
-        );
+        let extracted = err.extracted;
+        if (!extracted && errorResponse) extracted = extractBackendMessage(errorResponse);
+
+        // Map backend fieldErrors to UI keys
+        // Register: name, fullName, email, password, confirmPassword
+        // Login: usernameOrEmail, password
+        const rawFieldErrors: Record<string, string> =
+          err.fieldErrors ?? extracted?.fieldErrors ?? {};
+
+        if (Object.keys(rawFieldErrors).length > 0) {
+          setFieldErrors(rawFieldErrors);
+        }
+
+        // Case 2.2: 401 Unverified email
+        const isUnverified = err.status === 401 && errorResponse?.data?.email !== undefined;
 
         if (isUnverified) {
-          const unverifiedEmail = errorResponse?.data?.email || email;
-          const resendMessage = errorResponse?.data?.message || errorResponse?.message || "Tài khoản của bạn chưa được xác thực. Vui lòng kích hoạt.";
-          const resendToken = errorResponse?.data?.token;
-
+          const unverifiedEmail = errorResponse?.data?.email ?? email;
+          const resendMessage = extracted?.message || "Tài khoản chưa được xác thực. Vui lòng kích hoạt.";
           setSuccessMsg(resendMessage);
-          if (resendToken) {
-            localStorage.setItem("horizon_last_registration_token", resendToken);
-            setLastRegToken(resendToken);
+          if (typeof errorResponse?.data?.token === "string") {
+            localStorage.setItem("horizon_last_registration_token", errorResponse.data.token);
+            setLastRegToken(errorResponse.data.token);
           }
           localStorage.setItem("horizon_last_registration_email", unverifiedEmail);
           setLastRegEmail(unverifiedEmail);
-          
-          // Navigate to verification screen
+          window.location.hash = "verify";
           setIsSignUp(false);
           setIsVerifyingMode(true);
+
           setVerificationTokenInput("");
-          setAuthResult("SUCCESS");
-          setIsAuthenticating(false);
           setLoading(false);
-          
-          addAuditLog("LOGIN", payload, "FAILED", `[CHƯA XÁC THỰC] Chuyển hướng sang Kích hoạt email: ${unverifiedEmail}`, apiBaseUrl, devInfo);
+          const payloadInfo = { usernameOrEmail: email, password, deviceInfo: devInfo };
+          addAuditLog("LOGIN", payloadInfo, "FAILED", `[CHƯA XÁC THỰC] Chuyển hướng sang Kích hoạt email: ${unverifiedEmail}`, apiBaseUrl, devInfo);
           return;
         }
 
-        setAuthResult("FAILED");
-        const cleanReason = sanitizeErrorMessage(err.message);
-        setAuthFailureReason(cleanReason || "Xác thực không thành công. Hãy kiểm tra lại thông tin đăng nhập.");
-        setIsAuthenticating(true);
+        // General business/system error — only show if no field errors
+        const cleanReason =
+          extracted?.message ||
+          (typeof err.message === "string" && err.message.length > 0
+            ? sanitizeErrorMessage(err.message)
+            : "Xác thực không thành công. Hãy kiểm tra lại thông tin đăng nhập.");
+
+        if (Object.keys(rawFieldErrors).length === 0) {
+          setErrorMsg(cleanReason);
+        }
         setLoading(false);
 
-        addAuditLog(isSignUp ? "REGISTER" : "LOGIN", payload, "FAILED", cleanReason || "Xác thực bị từ chối từ Server Spring Boot.", apiBaseUrl, devInfo);
+        const payloadInfo = isSignUp
+          ? { name: username.trim(), fullName: fullName.trim(), email: email.trim().toLowerCase(), password, confirmPassword }
+          : { usernameOrEmail: email, password, deviceInfo: devInfo };
+        addAuditLog(isSignUp ? "REGISTER" : "LOGIN", payloadInfo, "FAILED", cleanReason, apiBaseUrl, devInfo);
       }
-
     } catch (err: any) {
       setLoading(false);
-      setErrorMsg(err.message || "Đã xảy ra lỗi hệ thống bảo mật. Vui lòng thử lại sau.");
+      setErrorMsg(err.message || "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.");
     }
   };
 
@@ -1084,9 +1034,9 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
   return (
     <div className="w-full min-h-screen bg-[#E4E4E4] text-[#111111] flex flex-col items-center justify-center relative py-20 px-4 md:px-10 overflow-hidden select-none">
-      
+
       {/* Top Left Branding Header */}
-      <div 
+      <div
         onClick={() => onNavigate("landing")}
         className="absolute top-6 left-6 md:top-8 md:left-10 flex items-center gap-2.5 cursor-pointer z-20 group"
       >
@@ -1137,8 +1087,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         }}
         className="absolute top-1/2 left-1/2 w-[400px] h-[400px] rounded-full bg-gradient-to-tr from-purple-500 to-amber-500 blur-[110px] pointer-events-none -translate-x-1/2 -translate-y-1/2"
       />
-      
-      <div className="max-w-[540px] w-full z-10">
+
+      <div className="max-w-[540px] w-full z-10" style={{ zoom: 1.2 }}>
 
         {/* Auth Glassmorphism Card */}
         <div
@@ -1158,119 +1108,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
           />
 
           <AnimatePresence mode="wait">
-            {isAuthenticating ? (
-              <motion.div
-                key="auth-scanning-hud"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.3 }}
-                className="flex flex-col items-center justify-center py-6 min-h-[460px]"
-              >
-                {/* Rotating HUD circle scanning graphic */}
-                <div className="relative w-40 h-40 mx-auto flex items-center justify-center mb-8">
-                  {/* Rotating Outer HUD rings */}
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 rounded-full border border-dashed border-[#FF4D24]/30"
-                  />
-                  <motion.div
-                    animate={{ rotate: -360 }}
-                    transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-2 rounded-full border border-double border-indigo-500/40"
-                  />
-                  
-                  {/* Neon scan lines moving up and down */}
-                  <motion.div
-                    animate={{ y: [-50, 50, -50] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-[#FF4D24] to-transparent shadow-[0_0_12px_#FF4D24]"
-                  />
-
-                  {/* Icon status based on progress */}
-                  <div className="relative z-10 w-24 h-24 rounded-full bg-slate-950 flex flex-col items-center justify-center border-2 border-slate-800/80 shadow-inner overflow-hidden">
-                    {authProgress < 100 ? (
-                      <>
-                        <Cpu className="w-8 h-8 text-[#FF4D24] animate-pulse mb-1" />
-                        <span className="font-mono text-[10.5px] text-slate-300 font-bold">{authProgress}%</span>
-                      </>
-                    ) : authResult === "SUCCESS" ? (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                        className="flex flex-col items-center justify-center"
-                      >
-                        <Shield className="w-10 h-10 text-emerald-500 mb-1" />
-                        <span className="font-mono text-[10px] text-emerald-500 font-extrabold tracking-wider">GRANTED</span>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                        className="flex flex-col items-center justify-center"
-                      >
-                        <AlertCircle className="w-10 h-10 text-red-500 mb-1" />
-                        <span className="font-mono text-[10px] text-red-500 font-extrabold tracking-wider">DENIED</span>
-                      </motion.div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Subtitle & Logs */}
-                <div className="w-full space-y-5">
-                  <div className="text-center">
-                    <h3 className="text-sm font-black text-slate-900 tracking-wider uppercase flex items-center justify-center gap-2">
-                      {authProgress < 100 ? (
-                        <>
-                          <Loader2 className="w-4 h-4 text-[#FF4D24] animate-spin" />
-                          <span>ĐANG XÁC THỰC BẢO MẬT...</span>
-                        </>
-                      ) : authResult === "SUCCESS" ? (
-                        <span className="text-emerald-600 font-black flex items-center gap-1.5">
-                          <Check className="w-4.5 h-4.5 bg-emerald-100 text-emerald-600 rounded-full p-0.5" /> 
-                          {isSignUp ? "ĐĂNG KÝ THÀNH CÔNG!" : "ĐĂNG NHẬP THÀNH CÔNG!"}
-                        </span>
-                      ) : (
-                        <span className="text-red-600 font-black flex items-center gap-1.5 animate-bounce">
-                          <AlertCircle className="w-4.5 h-4.5 bg-red-100 text-red-600 rounded-full p-0.5" /> 
-                          XÁC THỰC THẤT BẠI!
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-[10px] text-slate-400 font-mono mt-1">Spring Security 6.x + Stateless Redis Session</p>
-                  </div>
-
-                  {/* Micro terminal logs typing */}
-                  <div className="w-full bg-slate-950 text-left p-4 rounded-xl border border-slate-800/80 font-mono text-[10.5px] leading-relaxed text-slate-300 min-h-[160px] space-y-1 overflow-hidden shadow-inner">
-                    {authLogs.map((log, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: -5 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.12 }}
-                        className={log.startsWith("[OK]") ? "text-emerald-400 font-bold" : log.startsWith("[ERROR]") ? "text-red-400 font-bold" : "text-slate-400"}
-                      >
-                        {log}
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {authProgress >= 100 && authResult === "FAILED" && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-center py-2 text-red-500 font-bold text-xs flex items-center justify-center gap-2 animate-pulse"
-                    >
-                      <Loader2 className="w-4 h-4 animate-spin text-red-500" />
-                      <span>Đang quay lại sửa thông tin...</span>
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-            ) : recoveryMode === "SEND_LINK" ? (
+            {recoveryMode === "SEND_LINK" ? (
               <motion.div
                 key="account-recovery-send-form"
                 initial={{ opacity: 0, scale: 0.98 }}
@@ -1300,7 +1138,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
                 {/* Success / Error Messages */}
                 <AnimatePresence mode="wait">
-                  {errorMsg && (
+                  {errorMsg && Object.keys(fieldErrors).length === 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -1422,7 +1260,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
                 {/* Success / Error Messages */}
                 <AnimatePresence mode="wait">
-                  {errorMsg && (
+                  {errorMsg && Object.keys(fieldErrors).length === 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -1639,7 +1477,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
                     {/* Success / Error Messages inside Form */}
                     <AnimatePresence mode="wait">
-                      {errorMsg && (
+                      {errorMsg && Object.keys(fieldErrors).length === 0 && (
                         <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -1702,8 +1540,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               transition={{ duration: 0.25, ease: "easeInOut" }}
                               className="overflow-hidden"
                             >
-                              <form 
-                                onSubmit={handleChangeUsername} 
+                              <form
+                                onSubmit={handleChangeUsername}
                                 className="px-4 pb-5 pt-1 flex flex-col gap-4 border-t border-slate-100"
                               >
                                 <div className="flex flex-col gap-1.5">
@@ -1780,8 +1618,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               transition={{ duration: 0.25, ease: "easeInOut" }}
                               className="overflow-hidden"
                             >
-                              <form 
-                                onSubmit={handleResetPassword} 
+                              <form
+                                onSubmit={handleResetPassword}
                                 className="px-4 pb-5 pt-1 flex flex-col gap-4 border-t border-slate-100"
                               >
                                 <div className="flex flex-col gap-1.5">
@@ -1885,183 +1723,103 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-6"
+                className="space-y-6 text-left"
               >
-                <div>
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#FF4D24]/20 to-indigo-500/20 flex items-center justify-center border border-[#FF4D24]/10 shadow-inner">
-                      <Mail className="w-4.5 h-4.5 text-[#FF4D24]" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-black text-[#111111] tracking-tight font-sans">
-                        Xác thực kích hoạt tài khoản
-                      </h2>
-                      <p className="text-[10px] text-slate-500 font-bold font-mono uppercase tracking-wider">
-                        EMAIL VERIFICATION INTERFACE
-                      </p>
-                    </div>
+                {/* Header */}
+                <div className="flex flex-col items-center text-center pb-2">
+                  <div className="relative mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#FF4D24]/10 to-[#FF4D24]/20 border border-[#FF4D24]/20 shadow-[0_8px_20px_-6px_rgba(255,77,36,0.3)] animate-pulse">
+                    <Mail className="w-6 h-6 text-[#FF4D24]" />
+                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border border-white flex items-center justify-center" />
                   </div>
-                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                    Vui lòng nhập Mã xác thực (Token UUID) hoặc dán toàn bộ đường link kích hoạt nhận được trong hòm thư của bạn để tiến hành kích hoạt tài khoản trên hệ thống.
-                  </p>
+                  <h2 className="text-xl font-black text-[#111111] tracking-tight font-sans">Xác thực tài khoản</h2>
+                  <p className="text-xs text-slate-400 font-medium mt-1">Một mã xác thực bảo mật đã được gửi đến email:</p>
+
+                  {lastRegEmail && (
+                    <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-[#FF4D24]/5 border border-[#FF4D24]/10 rounded-full text-xs font-bold text-[#FF4D24] shadow-sm select-all">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D24] animate-ping" />
+                      <span>{lastRegEmail}</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Visual Countdown Timer Widget */}
-                <div className="flex items-center justify-between bg-slate-50 border border-slate-200/60 p-3.5 rounded-2xl">
-                  <div className="flex items-center gap-2.5">
-                    <div className="relative flex h-3.5 w-3.5 items-center justify-center">
-                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${timeLeft > 0 ? "bg-[#FF4D24]" : "bg-red-500"}`}></span>
-                      <span className={`relative inline-flex rounded-full h-2 w-2 ${timeLeft > 0 ? "bg-[#FF4D24]" : "bg-red-500"}`}></span>
+                {/* Countdown Timer */}
+                <div className="relative overflow-hidden bg-slate-50/80 border border-slate-200/50 p-4 rounded-2xl shadow-sm transition-all hover:bg-slate-50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm shrink-0">
+                      <span className={`animate-ping absolute inline-flex h-3 w-3 rounded-full opacity-75 ${timeLeft > 0 ? "bg-[#FF4D24]" : "bg-slate-300"}`}></span>
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${timeLeft > 0 ? "bg-[#FF4D24]" : "bg-slate-300"}`}></span>
                     </div>
-                    <div className="text-left">
-                      <p className="text-[11px] font-black text-slate-800 tracking-tight leading-none">Mã có hiệu lực trong</p>
-                      <p className="text-[9.5px] text-slate-400 font-mono mt-1 font-bold">SPRING BOOT TTL COUNTDOWN</p>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wide font-mono">Thời gian hiệu lực</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Mã sẽ tự động hủy sau khi hết giờ</p>
                     </div>
                   </div>
-                  <div className="font-mono text-xs font-black tracking-wider text-slate-900 bg-white border border-slate-200 shadow-sm px-3 py-1.5 rounded-xl flex items-center gap-1.5 min-w-[70px] justify-center">
-                    <span className={timeLeft <= 30 && timeLeft > 0 ? "text-red-500 animate-pulse font-bold" : timeLeft === 0 ? "text-slate-400" : "text-indigo-600"}>
+                  <div className="font-mono text-sm font-black tracking-widest bg-white border border-slate-200 shadow-sm px-3.5 py-2 rounded-xl text-center">
+                    <span className={timeLeft <= 30 && timeLeft > 0 ? "text-red-500 animate-pulse" : timeLeft === 0 ? "text-slate-400" : "text-[#FF4D24]"}>
                       {Math.floor(timeLeft / 60).toString().padStart(2, "0")}:{(timeLeft % 60).toString().padStart(2, "0")}
                     </span>
                   </div>
                 </div>
 
                 {timeLeft === 0 && (
-                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-[11px] text-red-600 flex items-start gap-2 leading-relaxed font-sans animate-pulse">
+                  <div className="p-3.5 bg-red-50 border border-red-100 rounded-xl text-[11px] text-red-600 flex items-start gap-2.5 leading-relaxed">
                     <AlertCircle className="w-4.5 h-4.5 text-red-500 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="font-black block mb-0.5">Mã xác thực đã hết hạn!</strong>
-                      Mã xác thực của bạn đã quá hạn 5 phút. Vui lòng bấm nút <span className="font-bold text-[#FF4D24]">"Gửi lại mã xác thực mới"</span> ở phía dưới để nhận mã mới.
-                    </div>
+                    <span>Mã xác thực đã hết hạn. Vui lòng nhấn gửi lại mã mới bên dưới.</span>
                   </div>
                 )}
 
-                {/* Token Input Box */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono flex items-center justify-between" htmlFor="verify-token">
-                    <span>Mã xác thực tài khoản (Token / Verification URL)</span>
-                    <span className="text-[#FF4D24] text-[9px] font-bold lowercase font-sans">Hạn dùng 5 phút</span>
-                  </label>
-                  <div className="relative">
-                    <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                {/* Token Input */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="verify-token">
+                      Mã xác thực bảo mật
+                    </label>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text) {
+                            setVerificationTokenInput(text.trim());
+                          }
+                        } catch (e) {
+                          setErrorMsg("Không thể đọc tự động từ clipboard. Hãy dán trực tiếp.");
+                        }
+                      }}
+                      className="text-[10px] font-bold text-[#FF4D24] hover:text-[#E03D16] transition-colors cursor-pointer flex items-center gap-1 font-mono uppercase"
+                    >
+                      <Terminal className="w-3 h-3" />
+                      <span>Dán nhanh</span>
+                    </button>
+                  </div>
+
+                  <div className="relative group">
+                    <Key className="w-4.5 h-4.5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#FF4D24]" />
                     <input
                       id="verify-token"
                       type="text"
-                      placeholder="Ví dụ: 2441de48-1db6-4795-b6ee-9921d01769a6"
+                      placeholder="Dán mã kích hoạt của bạn vào đây"
                       value={verificationTokenInput}
                       onChange={(e) => setVerificationTokenInput(e.target.value)}
-                      className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-4 py-3.5 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111] font-mono"
+                      className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-11 pr-4 py-4 rounded-2xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111] font-mono tracking-tight shadow-inner"
                     />
                   </div>
                 </div>
 
-                {/* Collapsible Backend Connection Settings */}
-                <div className="border border-slate-200/60 rounded-2xl bg-slate-50/50 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setShowApiSettings(!showApiSettings)}
-                    className="w-full flex items-center justify-between p-3.5 text-xs font-bold text-slate-700 hover:bg-slate-100/50 transition-all cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Settings className="w-4 h-4 text-slate-400 animate-spin" style={{ animationDuration: "8s" }} />
-                      <span>Cấu hình Kết nối CSDL & API Backend</span>
-                    </div>
-                    <span className="text-[10px] text-indigo-600 font-bold font-mono">
-                      {showApiSettings ? "ĐÓNG" : "MỞ RỘNG"}
-                    </span>
-                  </button>
-
-                  <AnimatePresence>
-                    {showApiSettings && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.25, ease: "easeInOut" }}
-                        className="border-t border-slate-200/50 p-4 space-y-4 bg-slate-50/20"
-                      >
-                        {/* API Base URL */}
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                            Backend Server URL (apiBaseUrl)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="http://localhost:8080"
-                            value={apiBaseUrl}
-                            onChange={(e) => setApiBaseUrl(e.target.value)}
-                            className="w-full bg-white border border-slate-200 focus:border-indigo-500 text-xs font-mono p-2.5 rounded-lg outline-none text-[#111111]"
-                          />
-                        </div>
-
-                        {/* API Path & Method row */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                              Endpoint Verify Path
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="/api/auth/verify-email"
-                              value={verifyApiPath}
-                              onChange={(e) => setVerifyApiPath(e.target.value)}
-                              className="w-full bg-white border border-slate-200 focus:border-indigo-500 text-xs font-mono p-2.5 rounded-lg outline-none text-[#111111]"
-                            />
-                          </div>
-
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                              HTTP Method
-                            </label>
-                            <input
-                              type="text"
-                              disabled
-                              value="GET"
-                              className="w-full bg-slate-100 border border-slate-200 text-slate-400 text-xs font-mono p-2.5 rounded-lg cursor-not-allowed outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        {/* CORS Bypass Proxy Settings */}
-                        <div className="flex items-center justify-between p-3 bg-indigo-50/50 border border-indigo-100/80 rounded-xl mt-1">
-                          <div className="text-left">
-                            <p className="text-[10px] font-bold text-slate-800 tracking-tight leading-none">Bypass CORS via Proxy</p>
-                            <p className="text-[9px] text-slate-400 font-mono mt-1 font-bold">NODE.JS SERVER PASS-THROUGH</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = isProxyEnabled();
-                              localStorage.setItem("horizon_use_api_proxy", (!current).toString());
-                              setVerificationLogs(prev => [...prev, `[INFO] Đã ${!current ? "KÍCH HOẠT" : "VÔ HIỆU HÓA"} Proxy vượt rào CORS.`]);
-                            }}
-                            className={`px-3 py-1.5 text-[9px] font-black font-mono rounded-lg transition-all cursor-pointer ${
-                              isProxyEnabled() 
-                                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" 
-                                : "bg-slate-200 text-slate-600 hover:bg-slate-300"
-                            }`}
-                          >
-                            {isProxyEnabled() ? "ACTIVE (PROXY ON)" : "OFF (DIRECT)"}
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* Verification Action Buttons */}
+                {/* Action Buttons */}
                 <div className="flex flex-col gap-3">
                   <button
                     type="button"
                     onClick={() => handleExecuteRealVerification()}
-                    disabled={isVerifyingRequest || timeLeft === 0}
-                    className="w-full bg-slate-900 hover:bg-slate-950 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white py-3.5 px-4 rounded-xl font-sans text-xs font-bold shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    disabled={isVerifyingRequest || timeLeft === 0 || !verificationTokenInput.trim()}
+                    className="w-full bg-slate-950 hover:bg-slate-900 active:scale-[0.99] disabled:opacity-60 disabled:scale-100 disabled:cursor-not-allowed text-white py-4 px-4 rounded-2xl font-sans text-xs font-black tracking-wide shadow-lg shadow-black/10 transition-all flex items-center justify-center gap-2.5 cursor-pointer overflow-hidden border border-slate-800"
                   >
                     {isVerifyingRequest && verificationResultState === null ? (
-                      <div className="w-4.5 h-4.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                      <Loader2 className="w-4.5 h-4.5 text-[#FF4D24] animate-spin" />
                     ) : (
                       <>
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        <span>Xác nhận kích hoạt (Real API Call)</span>
+                        <ShieldCheck className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+                        <span>XÁC NHẬN KÍCH HOẠT NGAY</span>
                       </>
                     )}
                   </button>
@@ -2070,45 +1828,59 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     type="button"
                     onClick={handleResendToken}
                     disabled={loading || isVerifyingRequest}
-                    className="w-full bg-gradient-to-r from-[#FF4D24]/10 to-[#FF4D24]/5 hover:from-[#FF4D24]/20 hover:to-[#FF4D24]/10 border border-[#FF4D24]/30 text-[#FF4D24] disabled:opacity-50 py-3.5 px-4 rounded-xl font-sans text-xs font-black hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                    className="w-full border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.99] disabled:opacity-50 text-slate-700 py-3.5 px-4 rounded-2xl font-sans text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-[#FF4D24]" />
+                      <Loader2 className="w-4.5 h-4.5 animate-spin text-[#FF4D24]" />
                     ) : (
-                      <RefreshCw className="w-4 h-4 text-[#FF4D24] animate-spin" style={{ animationDuration: "3s" }} />
+                      <RefreshCw className="w-4 h-4 text-slate-500" />
                     )}
-                    <span>GỬI LẠI MÃ XÁC THỰC MỚI</span>
+                    <span>Gửi lại mã xác thực mới</span>
                   </button>
                 </div>
 
-                {/* Real-time Verification Terminal Logs */}
+                {/* Logs */}
                 {verificationLogs.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                      <Terminal className="w-3.5 h-3.5" />
-                      <span>Nhật ký truy vấn xác thực (Logs)</span>
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between px-1">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                        <Terminal className="w-3.5 h-3.5" />
+                        <span>Trạng thái kết nối máy chủ</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500/80" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-yellow-500/80" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500/80" />
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-950 text-left p-4 rounded-2xl border border-slate-800/80 font-mono text-[10.5px] leading-relaxed text-slate-300 min-h-[140px] space-y-1.5 overflow-hidden shadow-inner">
-                      {verificationLogs.map((log, index) => (
-                        <motion.div
-                          key={index}
-                          initial={{ opacity: 0, x: -5 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.12 }}
-                          className={log.startsWith("[OK]") ? "text-emerald-400 font-bold" : log.startsWith("[ERROR]") ? "text-red-400 font-bold" : "text-slate-400"}
-                        >
-                          {log}
-                        </motion.div>
-                      ))}
+                    <div className="w-full bg-[#111317] border border-slate-800/85 rounded-2xl p-4.5 font-mono text-[10px] leading-relaxed text-slate-300 min-h-[110px] max-h-[160px] overflow-y-auto shadow-inner space-y-2 scrollbar-thin scrollbar-thumb-slate-800">
+                      {verificationLogs.map((log, index) => {
+                        let colorClass = "text-slate-400";
+                        if (log.startsWith("[OK]")) colorClass = "text-emerald-400 font-semibold";
+                        else if (log.startsWith("[ERROR]")) colorClass = "text-red-400 font-semibold";
+                        else if (log.startsWith("[INFO]")) colorClass = "text-sky-400";
+                        return (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, x: -6 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className={`break-all ${colorClass}`}
+                          >
+                            {log}
+                          </motion.div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
-                {/* Back Link */}
+                {/* Back */}
                 <div className="text-center pt-2 border-t border-slate-200/50">
                   <button
                     type="button"
                     onClick={() => {
+                      window.location.hash = "login";
                       setIsVerifyingMode(false);
                       setVerificationLogs([]);
                       setVerificationResultState(null);
@@ -2118,61 +1890,69 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     className="text-xs font-bold text-slate-500 hover:text-[#FF4D24] transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto"
                   >
                     <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                    <span>Quay lại trang Đăng nhập / Đăng ký</span>
+                    <span>Quay lại Đăng nhập / Đăng ký</span>
                   </button>
                 </div>
               </motion.div>
+
             ) : (
               <motion.div
                 key="auth-credentials-form"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
                 className="space-y-6"
               >
                 {/* Tab Switcher: Sign In vs Sign Up */}
                 <div className="flex items-center p-1 bg-slate-200/60 rounded-xl mb-6 relative">
+                  <div
+                    className="absolute rounded-lg bg-white shadow-sm pointer-events-none"
+                    style={{
+                      top: 4, bottom: 4,
+                      left: isSignUp ? "50%" : 4,
+                      right: isSignUp ? 4 : "50%",
+                      transition: "left 0.25s ease, right 0.25s ease",
+                    }}
+                  />
                   <button
                     onClick={() => {
+                      window.location.hash = "login";
                       setIsSignUp(false);
+
                       setErrorMsg("");
                       setSuccessMsg("");
                     }}
                     type="button"
-                    className="flex-1 py-2 text-xs font-black rounded-lg relative z-10 transition-colors duration-300 cursor-pointer"
-                    style={{ color: !isSignUp ? "#111111" : "#666666" }}
+                    className={`flex-1 py-2 text-xs font-black rounded-lg relative z-10 cursor-pointer transition-colors duration-250 ${
+                      !isSignUp ? "text-slate-950" : "text-slate-500"
+                    }`}
                   >
                     Đăng nhập
                   </button>
                   <button
                     onClick={() => {
+                      window.location.hash = "register";
                       setIsSignUp(true);
+
                       setErrorMsg("");
                       setSuccessMsg("");
                     }}
                     type="button"
-                    className="flex-1 py-2 text-xs font-black rounded-lg relative z-10 transition-colors duration-300 cursor-pointer"
-                    style={{ color: isSignUp ? "#111111" : "#666666" }}
+                    className={`flex-1 py-2 text-xs font-black rounded-lg relative z-10 cursor-pointer transition-colors duration-250 ${
+                      isSignUp ? "text-slate-950" : "text-slate-500"
+                    }`}
                   >
-                    Đăng ký thành viên
+                    Đăng ký
                   </button>
-
-                  {/* Sliding high-contrast background bar */}
-                  <motion.div
-                    className="absolute top-1 bottom-1 left-1 bg-white rounded-lg shadow-sm"
-                    style={{ width: "calc(50% - 4px)" }}
-                    animate={{ x: isSignUp ? "100%" : "0%" }}
-                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                  />
                 </div>
 
-                <div>
-                  <h2 className="text-xl font-black text-[#111111] tracking-tight font-sans">
+                <div className="min-h-[60px]">
+                  <h2 className="text-xl font-black text-[#111111] tracking-tight font-sans transition-opacity duration-300">
                     {isSignUp ? "Tạo tài khoản mới" : "Chào mừng quay trở lại"}
                   </h2>
-                  <p className="text-xs text-slate-500 font-medium mt-1 mb-3">
-                    {isSignUp 
+                  <p className="text-xs text-slate-500 font-medium mt-1 mb-3 transition-opacity duration-300">
+                    {isSignUp
                       ? "Khởi tạo tài khoản Horizon Mobile để nhận ngay ngàn ưu đãi mua sắm điện thoại chính hãng."
                       : "Đăng nhập tài khoản Horizon Mobile để quản lý giỏ hàng, đơn hàng và lịch sử mua sắm."
                     }
@@ -2180,213 +1960,254 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 </div>
 
                 {/* Success / Error Messages */}
-                <AnimatePresence mode="wait">
-                  {errorMsg && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-semibold flex items-start gap-2"
-                    >
-                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{errorMsg}</span>
-                    </motion.div>
-                  )}
-
-                  {successMsg && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-start gap-2"
-                    >
-                      <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{successMsg}</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {errorMsg && Object.keys(fieldErrors).length === 0 && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-semibold flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+                {successMsg && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{successMsg}</span>
+                  </div>
+                )}
 
                 {/* Primary Form */}
-                <form onSubmit={handleFormSubmit} className="flex flex-col gap-4">
-                  
-                   {/* Inputs for Username & Full Name (Only for Sign Up) */}
-                  <AnimatePresence mode="popLayout">
-                    {isSignUp && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0, marginBottom: -16 }}
-                        animate={{ opacity: 1, height: "auto", marginBottom: 0 }}
-                        exit={{ opacity: 0, height: 0, marginBottom: -16 }}
-                        transition={{ duration: 0.25, ease: "easeInOut" }}
-                        className="overflow-hidden flex flex-col gap-4"
-                      >
-                        {/* Tên Đăng Nhập */}
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="reg-username">
-                            Tên đăng nhập (Username)
-                          </label>
-                          <div className="relative">
-                            <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                            <input
-                              id="reg-username"
-                              type="text"
-                              placeholder="john_doe"
-                              value={username}
-                              onChange={(e) => setUsername(e.target.value)}
-                              className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
-                            />
-                          </div>
-                        </div>
+                <form onSubmit={handleFormSubmit} noValidate className="flex flex-col gap-4">
 
-                        {/* Họ và Tên */}
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="reg-fullname">
-                            Họ và Tên đầy đủ
-                          </label>
-                          <div className="relative">
-                            <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                            <input
-                              id="reg-fullname"
-                              type="text"
-                              placeholder="John Doe"
-                              value={fullName}
-                              onChange={(e) => setFullName(e.target.value)}
-                              className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
-                            />
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Input Email Address / UsernameOrEmail */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="reg-email">
-                      {isSignUp ? "Địa chỉ Email" : "Tên đăng nhập hoặc Email"}
-                    </label>
-                    <div className="relative">
-                      {isSignUp ? (
-                        <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      ) : (
-                        <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      )}
-                      <input
-                        id="reg-email"
-                        type={isSignUp ? "email" : "text"}
-                        placeholder={isSignUp ? "name@company.com" : "ADMIN hoặc name@company.com"}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Input Password */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="reg-password">
-                        Mật khẩu
+                  {/* === ĐĂNG KÝ === */}
+                  <div style={{ display: isSignUp ? "flex" : "none" }} className="flex-col gap-4">
+                    {/* Tên đăng nhập */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-username">
+                        Tên đăng nhập
                       </label>
-                      {!isSignUp && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRecoveryMode("SEND_LINK");
-                            setErrorMsg("");
-                            setSuccessMsg("");
-                            if (email && email.includes("@")) {
-                              setRecoveryEmail(email);
+                      <div className="relative">
+                        <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          id="su-username"
+                          type="text"
+                          placeholder="Nhập tên đăng nhập"
+                          value={username}
+                          onChange={(e) => {
+                            setUsername(e.target.value);
+                            if (fieldErrors["username"] || fieldErrors["name"]) {
+                              setFieldErrors(prev => ({ ...prev, username: "", name: "" }));
                             }
                           }}
-                          className="text-[10px] font-bold text-[#FF4D24] hover:underline"
-                        >
-                          Quên thông tin tài khoản?
-                        </button>
+                          className={`w-full bg-white border ${fieldErrors["username"] || fieldErrors["name"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                        />
+                      </div>
+                      {(fieldErrors["username"] || fieldErrors["name"]) && (
+                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["username"] || fieldErrors["name"]}</span>
+                        </p>
                       )}
                     </div>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        id="reg-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+
+                    {/* Ho va ten */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-fullname">
+                        Họ và Tên đầy đủ
+                      </label>
+                      <div className="relative">
+                        <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          id="su-fullname"
+                          type="text"
+                          placeholder="Họ và tên đầy đủ"
+                          value={fullName}
+                          onChange={(e) => {
+                            setFullName(e.target.value);
+                            if (fieldErrors["fullName"]) setFieldErrors(prev => ({ ...prev, fullName: "" }));
+                          }}
+                          className={`w-full bg-white border ${fieldErrors["fullName"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                        />
+                      </div>
+                      {fieldErrors["fullName"] && (
+                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["fullName"]}</span>
+                        </p>
+                      )}
                     </div>
-                  </div>
 
-                  {/* Input Confirm Password (Only for Sign Up) */}
-                  <AnimatePresence mode="popLayout">
-                    {isSignUp && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0, marginBottom: -16 }}
-                        animate={{ opacity: 1, height: "auto", marginBottom: 0 }}
-                        exit={{ opacity: 0, height: 0, marginBottom: -16 }}
-                        transition={{ duration: 0.25, ease: "easeInOut" }}
-                        className="overflow-hidden flex flex-col gap-1.5"
-                      >
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="reg-confirm">
-                          Xác nhận mật khẩu
-                        </label>
-                        <div className="relative">
-                          <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                          <input
-                            id="reg-confirm"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="••••••••"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                    {/* Email */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-email">
+                        Địa chỉ Email
+                      </label>
+                      <div className="relative">
+                        <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          id="su-email"
+                          type="email"
+                          placeholder="Địa chỉ email"
+                          value={email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (fieldErrors["email"]) setFieldErrors(prev => ({ ...prev, email: "" }));
+                          }}
+                          className={`w-full bg-white border ${fieldErrors["email"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                        />
+                      </div>
+                      {fieldErrors["email"] && (
+                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["email"]}</span>
+                        </p>
+                      )}
+                    </div>
 
-                  {/* Terms checkbox for Sign Up */}
-                  {isSignUp && (
-                    <div className="flex items-start gap-2.5 mt-1">
-                      <input
-                        id="reg-terms"
-                        type="checkbox"
-                        checked={agreeToTerms}
-                        onChange={(e) => setAgreeToTerms(e.target.checked)}
-                        className="w-4 h-4 text-[#FF4D24] focus:ring-[#FF4D24] border-slate-300 rounded cursor-pointer mt-0.5"
-                      />
-                      <label htmlFor="reg-terms" className="text-[10.5px] text-slate-500 leading-normal font-sans">
+                    {/* Mat khau */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-password">
+                        Mật khẩu
+                      </label>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          id="su-password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
+                          }}
+                          className={`w-full bg-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                        />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {fieldErrors["password"] && (
+                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["password"]}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Xác nhận mật khẩu */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-confirm">
+                        Xác nhận mật khẩu
+                      </label>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          id="su-confirm"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                          value={confirmPassword}
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            if (fieldErrors["confirmPassword"]) setFieldErrors(prev => ({ ...prev, confirmPassword: "" }));
+                          }}
+                          className={`w-full bg-white border ${fieldErrors["confirmPassword"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                        />
+                      </div>
+                      {fieldErrors["confirmPassword"] && (
+                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["confirmPassword"]}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Terms */}
+                    <div className="flex items-center gap-2.5 mt-1 text-left">
+                      <input id="su-terms" type="checkbox" checked={agreeToTerms} onChange={(e) => setAgreeToTerms(e.target.checked)} className="w-4 h-4 accent-[#FF4D24] border-slate-300 rounded cursor-pointer shrink-0" />
+                      <label htmlFor="su-terms" className="text-[10.5px] text-slate-500 leading-normal font-sans">
                         Tôi đồng ý với{" "}
-                        <a href="#terms" className="text-[#FF4D24] font-bold hover:underline">Điều khoản Dịch vụ</a>
+                        <a href="#terms" onClick={(e) => { e.preventDefault(); onNavigate("terms"); }} className="text-[#FF4D24] font-bold hover:underline">Điều khoản Dịch vụ</a>
                         {" "}và{" "}
-                        <a href="#privacy" className="text-[#FF4D24] font-bold hover:underline">Chính sách Bảo mật</a>
+                        <a href="#privacy" onClick={(e) => { e.preventDefault(); onNavigate("terms"); }} className="text-[#FF4D24] font-bold hover:underline">Chính sách Bảo mật</a>
                         {" "}của Horizon Mobile.
                       </label>
                     </div>
-                  )}
+                  </div>
 
-                  {/* Submit Button */}
+                  {/* === DANG NHAP === */}
+                  <div style={{ display: isSignUp ? "none" : "flex" }} className="flex-col gap-4">
+                    {/* Email hoac Username */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="li-email">
+                        Tên đăng nhập hoặc Email
+                      </label>
+                      <div className="relative">
+                        <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          id="li-email"
+                          type="text"
+                          placeholder="Email hoặc tên đăng nhập"
+                          value={email}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (fieldErrors["email"] || fieldErrors["usernameOrEmail"]) {
+                              setFieldErrors(prev => ({ ...prev, email: "", usernameOrEmail: "" }));
+                            }
+                          }}
+                          className={`w-full bg-white border ${fieldErrors["email"] || fieldErrors["usernameOrEmail"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                        />
+                      </div>
+                      {(fieldErrors["email"] || fieldErrors["usernameOrEmail"]) && (
+                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["email"] || fieldErrors["usernameOrEmail"]}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Mat khau */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="li-password">
+                          Mật khẩu
+                        </label>
+                        <button type="button" onClick={() => { setRecoveryMode("SEND_LINK"); setErrorMsg(""); setSuccessMsg(""); if (email && email.includes("@")) setRecoveryEmail(email); }} className="text-[10px] font-bold text-[#FF4D24] hover:underline cursor-pointer">
+                          Quên thông tin tài khoản?
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          id="li-password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
+                          }}
+                          className={`w-full bg-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                        />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {fieldErrors["password"] && (
+                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["password"]}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Submit */}
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-slate-900 hover:bg-slate-950 disabled:bg-slate-400 text-white py-3 px-4 rounded-xl font-sans text-xs font-bold shadow-md shadow-black/5 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+                    className={`relative w-full border ${loading ? "bg-[#FF4D24]/10 border-[#FF4D24]/30 text-[#FF4D24]" : "bg-slate-900 hover:bg-slate-800 border-transparent text-white"} py-3.5 px-4 rounded-xl font-sans text-xs font-bold shadow-md shadow-black/10 transition-all duration-200 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
                   >
-                    {loading ? (
-                      <div className="w-4.5 h-4.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    ) : (
-                      <>
-                        <span>{isSignUp ? "Tạo tài khoản" : "Đăng nhập hệ thống"}</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
+                    <span className="flex items-center justify-center gap-2 transition-opacity duration-200" style={{ opacity: loading ? 0 : 1 }}>
+                      <span>{isSignUp ? "Tạo tài khoản" : "Đăng nhập"}</span>
+                      <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
+                    </span>
+                    <span className="absolute inset-0 flex items-center justify-center gap-2.5 text-[#FF4D24] transition-opacity duration-200" style={{ opacity: loading ? 1 : 0 }}>
+                      <Loader2 className="w-4 h-4 text-[#FF4D24] animate-spin" />
+                      <span>{isSignUp ? "Đang khởi tạo tài khoản..." : "Đang đăng nhập..."}</span>
+                    </span>
                   </button>
                 </form>
+
 
                 {/* Social login divider */}
                 <div className="relative my-6 select-none">
@@ -2423,29 +2244,99 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   </button>
                 </div>
 
-                {/* Quick Info text / SLA disclaimer */}
-                <div className="flex items-center gap-1.5 justify-center mt-6 text-[10px] text-slate-400 font-medium select-none">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#FF4D24]" />
-                  <span>Mã hóa bảo mật 256-bit SSL hoàn toàn an toàn</span>
-                </div>
+
 
 
               </motion.div>
             )}
           </AnimatePresence>
 
+          {/* Email Verification Overlay Modal */}
+          <AnimatePresence>
+            {showVerifyOverlay && (
+              <motion.div
+                key="verify-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="absolute inset-0 bg-slate-950/10 backdrop-blur-[16px] z-50 rounded-[32px] flex items-center justify-center p-6 select-none"
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.25, delay: 0.1 }}
+                  className="bg-white border border-white shadow-[0_20px_50px_rgba(0,0,0,0.08)] rounded-2xl p-8 max-w-[360px] w-full text-center space-y-5"
+                >
+                  {verifyOverlayStatus === "loading" && (
+                    <>
+                      <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FF4D24]/5 border border-[#FF4D24]/10 shadow-inner mx-auto text-[#FF4D24]">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <h3 className="text-sm font-black text-[#111111] font-sans">Đang xác thực tài khoản</h3>
+                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed px-1">Đang tiến hành xác minh token bảo mật với server...</p>
+                      </div>
+                    </>
+                  )}
+
+                  {verifyOverlayStatus === "success" && (
+                    <>
+                      <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-100 shadow-sm mx-auto text-emerald-500">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <h3 className="text-sm font-black text-[#111111] font-sans">Xác thực thành công!</h3>
+                        <p className="text-[11px] text-slate-600 leading-relaxed font-medium px-1">{verifyOverlayMsg}</p>
+                      </div>
+                      <div className="py-1 px-2.5 bg-emerald-50/50 border border-emerald-100/60 rounded-lg text-[9px] text-emerald-700 font-bold font-mono inline-block">
+                        Chuyển hướng về đăng nhập sau {verifyOverlayTimeLeft} giây...
+                      </div>
+                      <button
+                        onClick={() => setShowVerifyOverlay(false)}
+                        className="w-full bg-[#FF4D24] hover:bg-[#E03D16] text-white py-2.5 px-4 rounded-xl font-sans text-xs font-black shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span>ĐĂNG NHẬP NGAY</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+
+                  {verifyOverlayStatus === "error" && (
+                    <>
+                      <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 border border-red-100 shadow-sm mx-auto text-red-500">
+                        <XCircle className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <h3 className="text-sm font-black text-[#111111] font-sans">Xác thực thất bại</h3>
+                        <p className="text-[11px] text-red-600 leading-relaxed font-medium px-1">{verifyOverlayMsg}</p>
+                      </div>
+                      <div className="py-1 px-2.5 bg-red-50/50 border border-[#FF4D24]/10 rounded-lg text-[9px] text-[#FF4D24] font-bold font-mono inline-block">
+                        Quay lại đăng ký sau {verifyOverlayTimeLeft} giây...
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowVerifyOverlay(false);
+                          setIsSignUp(true);
+                          window.location.hash = "register";
+                          setErrorMsg(verifyOverlayMsg);
+                        }}
+                        className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-4 rounded-xl font-sans text-xs font-black shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span>QUAY LẠI ĐĂNG KÝ</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
         </div>
 
-        {/* Floating back home action */}
-        <div className="text-center mt-6">
-          <button
-            onClick={() => onNavigate("landing")}
-            className="text-xs font-bold text-slate-500 hover:text-[#FF4D24] transition-all cursor-pointer flex items-center gap-1 mx-auto"
-          >
-            <span className="material-symbols-outlined text-sm">arrow_back</span>
-            <span>Quay về Trang chủ</span>
-          </button>
-        </div>
+
 
       </div>
 

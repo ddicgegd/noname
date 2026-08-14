@@ -8,7 +8,7 @@ import {
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell, PieChart, Pie } from "recharts";
 
 interface AuthReportDashboardProps {
-  onNavigate: (page: "landing" | "product" | "register" | "auth-report") => void;
+  onNavigate: (page: "landing" | "product" | "auth" | "auth-report" | "terms") => void;
 }
 
 interface AuditLog {
@@ -360,7 +360,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
   const [jwtStatus, setJwtStatus] = useState<{ active: boolean; expiryDate: string; timeLeft: string } | null>(null);
 
   // Connection diagnostics states
-  const [gatewayUrl, setGatewayUrl] = useState(() => localStorage.getItem("horizon_api_base_url") || "https://mummified-escapable-proven.ngrok-free.dev");
+  const [gatewayUrl, setGatewayUrl] = useState(() => localStorage.getItem("horizon_api_base_url") || "http://localhost:8080");
   const [pingStatus, setPingStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [pingLatency, setPingLatency] = useState<number | null>(null);
   const [pingError, setPingError] = useState<string | null>(null);
@@ -418,7 +418,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
           payload: { usernameOrEmail: "ADMIN", password: "••••••••" },
           status: "SUCCESS",
           message: "Đăng nhập thành công. Cấp chứng chỉ JWT & Lưu thông tin Redis.",
-          serverUrl: "https://mummified-escapable-proven.ngrok-free.dev",
+          serverUrl: "http://localhost:8080",
           deviceInfo: {
             deviceType: "DESKTOP",
             osName: "Linux",
@@ -437,7 +437,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
           payload: { usernameOrEmail: "ADMIN@gmail.com", password: "••••••••" },
           status: "FAILED",
           message: "API Error: 401 Unauthorized - Mật khẩu không chính xác hoặc Hash BCrypt không khớp.",
-          serverUrl: "https://mummified-escapable-proven.ngrok-free.dev",
+          serverUrl: "http://localhost:8080",
           deviceInfo: {
             deviceType: "DESKTOP",
             osName: "Linux",
@@ -456,7 +456,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
           payload: { name: "an_nguyen", fullName: "Nguyễn Văn An", email: "an.nguyen@gmail.com" },
           status: "SUCCESS",
           message: "Đăng ký thành công. Trạng thái người dùng: INACTIVE. Đã tạo AuthCode kích hoạt.",
-          serverUrl: "https://mummified-escapable-proven.ngrok-free.dev",
+          serverUrl: "http://localhost:8080",
           deviceInfo: {
             deviceType: "MOBILE",
             osName: "Android",
@@ -475,7 +475,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
           payload: { token: "verify-789421" },
           status: "FAILED",
           message: "API Error: 400 Bad Request - Mã kích hoạt không hợp lệ hoặc đã hết hạn (quá 5 phút).",
-          serverUrl: "https://mummified-escapable-proven.ngrok-free.dev",
+          serverUrl: "http://localhost:8080",
           deviceInfo: {
             deviceType: "DESKTOP",
             osName: "Windows",
@@ -504,7 +504,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
     setMeError(null);
     setMeProfileData(null);
 
-    const apiBaseUrl = localStorage.getItem("horizon_api_base_url") || "https://mummified-escapable-proven.ngrok-free.dev";
+    const apiBaseUrl = localStorage.getItem("horizon_api_base_url") || "http://localhost:8080";
     const storedProfile = localStorage.getItem("horizon_redis_profile");
     let token = "";
     if (storedProfile) {
@@ -638,7 +638,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
     setPingError(null);
     setCorsReport(null);
     
-    const apiBaseUrl = localStorage.getItem("horizon_api_base_url") || "https://mummified-escapable-proven.ngrok-free.dev";
+    const apiBaseUrl = localStorage.getItem("horizon_api_base_url") || "http://localhost:8080";
     const start = Date.now();
 
     try {
@@ -680,7 +680,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
       setPingStatus("error");
       
       if (err.name === "AbortError") {
-        setPingError("Yêu cầu kết nối bị quá hạn (Timeout > 6000ms). Có thể Server đang ngủ sâu hoặc Tunnel ngrok đã bị đóng.");
+        setPingError("Yêu cầu kết nối bị quá hạn (Timeout > 6000ms). Có thể Server chưa phản hồi.");
       } else {
         setPingError(err.message || "Không thể kết nối. Máy chủ từ chối kết nối hoặc gặp lỗi CORS (Cross-Origin Resource Sharing).");
       }
@@ -689,7 +689,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
         statusCode: "ERR_CONNECTION_FAILED",
         corsPassed: false,
         recomendedFix: [
-          "Hãy chắc chắn Server Spring Boot / Java của bạn đang chạy và có file Tunnel hoạt động (ngrok / localtunnel).",
+          "Hãy chắc chắn Server Spring Boot / Java của bạn đang chạy tại http://localhost:8080.",
           "Cấu hình CORS trong Spring Boot của bạn phải cho phép origin hiện tại: " + window.location.origin,
           "Trong lớp WebMvcConfigurer của Spring Boot, thêm .allowedOrigins(\"*\") hoặc cho phép cụ thể URL trên."
         ]
@@ -763,7 +763,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
             </div>
 
             <button 
-              onClick={() => onNavigate("register")}
+              onClick={() => { window.location.hash = "login"; onNavigate("auth"); }}
               className="px-4 py-2 bg-[#FF4D24] hover:bg-[#FF4D24]/90 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-[#FF4D24]/20 flex items-center gap-1.5 cursor-pointer"
             >
               <User className="w-4 h-4" />
@@ -867,7 +867,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
                 {/* API Input config */}
                 <div className="mt-4 p-3.5 bg-slate-900/60 border border-slate-800/80 rounded-xl space-y-2.5">
                   <div>
-                    <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">API Server Base URL (Ngrok)</label>
+                    <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">API Server Base URL</label>
                     <input
                       type="text"
                       value={gatewayUrl}
@@ -876,7 +876,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
                         setGatewayUrl(cleanVal);
                         localStorage.setItem("horizon_api_base_url", cleanVal);
                       }}
-                      placeholder="https://mummified-escapable-proven.ngrok-free.dev"
+                      placeholder="http://localhost:8080"
                       className="w-full mt-1.5 h-9 px-3 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-[#FF4D24]/50 focus:ring-1 focus:ring-[#FF4D24]/20"
                     />
                     <p className="text-[9px] text-slate-500 mt-1">Cấu hình này tự động đồng bộ trên toàn bộ danh mục sản phẩm và cổng chẩn đoán.</p>
@@ -1666,7 +1666,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">Endpoint URL</span>
                       <p className="text-slate-200 break-all leading-normal bg-black/20 p-2 rounded border border-slate-800/40">
                         {meQueryType === "rest"
-                          ? `${(localStorage.getItem("horizon_api_base_url") || "https://mummified-escapable-proven.ngrok-free.dev").replace(/\/$/, "")}/api/auth/me`
+                          ? `${(localStorage.getItem("horizon_api_base_url") || "http://localhost:8080").replace(/\/$/, "")}/api/auth/me`
                           : `${window.location.origin}/graphql`
                         }
                       </p>

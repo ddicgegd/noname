@@ -1,7 +1,7 @@
 import React from "react";
 import { Mail, Phone, MapPin, Globe, ShieldCheck, Facebook, Github, Linkedin, Youtube } from "lucide-react";
 
-export default function Footer({ onNavigate }: { onNavigate?: (page: "landing" | "product" | "register" | "auth-report") => void }) {
+export default function Footer({ onNavigate }: { onNavigate?: (page: "landing" | "product" | "auth" | "auth-report" | "terms") => void }) {
   const currentYear = new Date().getFullYear();
 
   return (

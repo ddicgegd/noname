@@ -9,7 +9,7 @@ import {
 import { apiRequest } from "../lib/api";
 
 interface ProfilePageProps {
-  onNavigate: (page: "landing" | "product" | "register" | "auth-report" | "profile") => void;
+  onNavigate: (page: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms") => void;
 }
 
 interface OrderItem {
@@ -627,7 +627,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     if (window.confirm("Bạn có chắc chắn muốn đăng xuất tài khoản?")) {
       localStorage.removeItem("horizon_redis_profile");
       localStorage.removeItem("horizon_current_user");
-      onNavigate("register");
+      window.location.hash = "login";
+      onNavigate("auth");
     }
   };
 
@@ -642,58 +643,58 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       <div className="absolute top-[30%] right-[-10%] w-[500px] h-[500px] rounded-full bg-gradient-to-br from-indigo-400/30 to-purple-400/30 blur-[120px] pointer-events-none select-none z-0" />
       <div className="absolute bottom-[5%] left-[-10%] w-[550px] h-[550px] rounded-full bg-gradient-to-tr from-[#FF4D24]/15 via-indigo-400/30 to-blue-400/25 blur-[130px] pointer-events-none select-none z-0" />
       
-      <div className="relative z-10 max-w-6xl w-full mx-auto px-4 sm:px-8 space-y-8">
+      <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-10 xl:px-12 space-y-8">
         
         {/* Minimal Navigation Breadcrumb and top control actions (Optimized & Unified) */}
-        <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 select-none">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+        <div className="flex flex-col gap-5 border-b border-slate-100 pb-7 select-none">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-400">
             <span className="hover:text-black cursor-pointer transition-colors" onClick={() => onNavigate("landing")}>Horizon Global</span>
             <span>/</span>
             <span className="text-[#FF4D24] font-semibold">Cổng tài khoản</span>
           </div>
 
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             {!isLoading && token && user ? (
               /* Unified User Info & Title when logged in */
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-lg shadow-sm shrink-0 select-none border-2 border-white ring-4 ring-indigo-50">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-2xl shadow-sm shrink-0 select-none border-2 border-white ring-4 ring-indigo-50">
                   {user.fullName ? user.fullName.charAt(0).toUpperCase() : "H"}
                 </div>
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none">{user.fullName || "Hội viên Horizon"}</h1>
-                    <span className="text-[10px] font-bold font-mono text-[#FF4D24] bg-red-50 px-1.5 py-0.5 rounded-md uppercase border border-red-100">Live Portal</span>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none">{user.fullName || "Hội viên Horizon"}</h1>
+                    <span className="text-xs font-bold font-mono text-[#FF4D24] bg-red-50 px-2 py-1 rounded-lg uppercase border border-red-100">Live Portal</span>
                   </div>
-                  <p className="text-xs text-slate-500 font-medium">
+                  <p className="text-sm text-slate-500 font-medium">
                     Tên đăng nhập: <span className="font-mono font-bold text-indigo-600">@{user.username || "username"}</span> • Email: <span className="font-semibold text-slate-600">{user.email || "N/A"}</span>
                   </p>
                 </div>
               </div>
             ) : (
               /* Simple Page Title when loading or not logged in */
-              <div className="space-y-1">
-                <h1 className="text-xl font-extrabold text-[#111111] tracking-tight">Cổng thông tin & Đơn hàng</h1>
-                <p className="text-xs text-slate-400 font-medium">Quản lý thiết lập cá nhân & bảo mật tài khoản thành viên</p>
+              <div className="space-y-1.5">
+                <h1 className="text-3xl font-extrabold text-[#111111] tracking-tight">Cổng thông tin & Đơn hàng</h1>
+                <p className="text-sm text-slate-400 font-medium">Quản lý thiết lập cá nhân & bảo mật tài khoản thành viên</p>
               </div>
             )}
 
             {/* Top Toolbar actions (Only shown when authenticated) */}
             {!isLoading && token && user && (
-              <div className="flex items-center gap-2.5 self-start md:self-auto">
+              <div className="flex items-center gap-3 self-start md:self-auto">
                 <button 
                   onClick={() => {
                     setErrorMsg("");
                     setSuccessMsg("");
                     setIsAccountsCenterOpen(true);
                   }}
-                  className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-indigo-100/40 active:scale-95"
+                  className="px-5 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-bold rounded-2xl transition-all flex items-center gap-2 cursor-pointer shadow-sm shadow-indigo-100/40 active:scale-95"
                 >
-                  <Sliders className="w-3.5 h-3.5" />
+                  <Sliders className="w-4 h-4" />
                   <span>Quản lý bảo mật</span>
                 </button>
                 <button 
                   onClick={handleLogout}
-                  className="px-4 py-2 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  className="px-5 py-3 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-sm font-bold rounded-2xl transition-all flex items-center gap-2 cursor-pointer active:scale-95"
                 >
                   <span>Đăng xuất</span>
                 </button>
@@ -723,7 +724,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               </p>
             </div>
             <button
-              onClick={() => onNavigate("register")}
+              onClick={() => { window.location.hash = "login"; onNavigate("auth"); }}
               className="w-full bg-[#FF4D24] hover:bg-black text-white text-xs font-bold py-3.5 rounded-2xl transition-all cursor-pointer border border-[#FF4D24] hover:border-black shadow-sm"
             >
               Đăng ký / Đăng nhập ngay ↗
@@ -734,7 +735,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           <div className="space-y-8 text-left">
             
             {/* Core Section: Split View for Orders and Delivery Tracker */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-10 items-start">
               
               {/* Left Side: Order list history (Sản phẩm đã mua) */}
               <div className="lg:col-span-5 space-y-5">
@@ -750,7 +751,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   {/* Scrollable Container with Smooth Translucent Masking */}
                   <div 
                     onScroll={handleScroll}
-                    className="space-y-4 max-h-[380px] overflow-y-auto pr-1 py-1 transition-all duration-300"
+                    className="hide-scrollbar space-y-4 max-h-[560px] overflow-y-auto py-1 transition-all duration-300"
                     style={{
                       maskImage: `linear-gradient(to bottom, 
                         transparent 0%, 
@@ -852,7 +853,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <div
                         ref={stepsContainerRef}
                         onScroll={handleStepsScroll}
-                        className="relative max-h-[300px] overflow-y-auto pr-2 py-2 pl-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent transition-all duration-300"
+                        className="hide-scrollbar relative max-h-[480px] overflow-y-auto py-2 pl-6 space-y-6 transition-all duration-300"
                         style={{
                           maskImage: `linear-gradient(to bottom, 
                             transparent 0%, 

@@ -15,8 +15,8 @@ interface CartItem {
 }
 
 interface NavbarProps {
-  currentPage: "landing" | "product" | "register" | "auth-report" | "profile";
-  onNavigate: (page: "landing" | "product" | "register" | "auth-report" | "profile") => void;
+  currentPage: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms";
+  onNavigate: (page: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms") => void;
   cartItems: CartItem[];
   onRemoveCartItem?: (id: string | string[]) => void;
   onAddToCart?: (itemName: string, itemPrice: string) => void;
@@ -975,19 +975,37 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
         <div className="relative" ref={menuRef}>
           <button
             id="navbar-account-button"
-            onClick={() => setShowAccountMenu(!showAccountMenu)}
+            onClick={() => {
+              if (!loggedInUser) {
+                onNavigate("auth");
+                return;
+              }
+              setShowAccountMenu(!showAccountMenu);
+            }}
             className="flex items-center gap-2.5 bg-white/40 text-[#111111] border border-white/60 shadow-sm backdrop-blur-md font-sans text-base font-semibold pl-3 pr-5 py-2 rounded-full hover:bg-white/60 transition-all duration-300 active:scale-95 cursor-pointer select-none"
           >
-            {/* Elegant glassmorphism circle with a user icon */}
-            <div className="w-8 h-8 rounded-full bg-slate-950/5 flex items-center justify-center text-[#111111]/80">
-              <User size={16} className="stroke-[2.5]" />
+            {/* Elegant glassmorphism circle with user avatar or icon */}
+            <div className="w-8 h-8 rounded-full bg-slate-950/5 flex items-center justify-center text-[#111111]/80 overflow-hidden">
+              {loggedInUser ? (
+                loggedInUser.avatarUrl ? (
+                  <img src={loggedInUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="font-extrabold text-xs text-[#FF4D24]">
+                    {(loggedInUser.fullName ?? loggedInUser.username ?? "U")[0].toUpperCase()}
+                  </span>
+                )
+              ) : (
+                <User size={16} className="stroke-[2.5]" />
+              )}
             </div>
-            <span className="font-semibold text-base text-[#111111] tracking-tight">Tài khoản</span>
+            <span className="font-semibold text-base text-[#111111] tracking-tight">
+              {loggedInUser ? (loggedInUser.fullName.length > 0 ? loggedInUser.fullName : `@${loggedInUser.username}`) : "Đăng nhập"}
+            </span>
           </button>
 
           {/* Account Dropdown Menu */}
           <AnimatePresence>
-            {showAccountMenu && (
+            {showAccountMenu && loggedInUser && (
               <motion.div 
                 initial={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
@@ -1045,7 +1063,8 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                   <button 
                     onClick={() => {
                       setShowAccountMenu(false);
-                      onNavigate("register");
+                      window.location.hash = "register";
+                      onNavigate("auth");
                     }}
                     className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
                   >
@@ -1057,7 +1076,12 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                 <button 
                   onClick={() => {
                     setShowAccountMenu(false);
-                    onNavigate(loggedInUser ? "profile" : "register");
+                    if (loggedInUser) {
+                      onNavigate("profile");
+                    } else {
+                      window.location.hash = "register";
+                      onNavigate("auth");
+                    }
                   }}
                   className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
                 >
@@ -1071,7 +1095,8 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                     if (loggedInUser) {
                       onNavigate("profile");
                     } else {
-                      onNavigate("register");
+                      window.location.hash = "register";
+                      onNavigate("auth");
                     }
                   }}
                   className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
@@ -1089,7 +1114,8 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       localStorage.removeItem("horizon_redis_profile");
                       localStorage.removeItem("horizon_current_user");
                       setLoggedInUser(null);
-                      onNavigate("register");
+                      window.location.hash = "register";
+                      onNavigate("auth");
                     }}
                     className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-rose-100"
                   >
@@ -1100,7 +1126,8 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                   <button 
                     onClick={() => {
                       setShowAccountMenu(false);
-                      onNavigate("register");
+                      window.location.hash = "register";
+                      onNavigate("auth");
                     }}
                     className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-[#FF4D24] hover:bg-red-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-red-100"
                   >
