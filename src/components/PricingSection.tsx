@@ -4,7 +4,7 @@
  */
 
 import { motion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
 import ClawMachine from "./ClawMachine";
 
@@ -71,7 +71,7 @@ const PRICING_PLANS: PricingPlan[] = [
   },
 ];
 
-function HoloCard({ plan }: { plan: PricingPlan }) {
+function HoloCard({ plan, isVerified }: { plan: PricingPlan; isVerified: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null);   // perspective wrapper
   const cardRef = useRef<HTMLDivElement>(null);   // tilting card
   const foilRef = useRef<HTMLDivElement>(null);   // foil overlay
@@ -273,7 +273,7 @@ function HoloCard({ plan }: { plan: PricingPlan }) {
             {plan.price}
             <span className="font-sans text-sm font-medium text-[#555555] ml-1">{plan.period}</span>
           </div>
-          <ul className="space-y-4 mb-8 flex-1 font-sans text-sm text-[#555555]">
+          <ul className="space-y-4 mb-2 flex-1 font-sans text-sm text-[#555555]">
             {plan.features.map((feature, idx) => (
               <li key={idx} className="flex items-center gap-3">
                 <span className={`material-symbols-outlined ${plan.checkIconColor} text-lg font-bold`}>check</span>
@@ -281,7 +281,6 @@ function HoloCard({ plan }: { plan: PricingPlan }) {
               </li>
             ))}
           </ul>
-
         </div>
       </div>
     </div>
@@ -289,23 +288,31 @@ function HoloCard({ plan }: { plan: PricingPlan }) {
 }
 
 export default function PricingSection() {
+  const [isVerified, setIsVerified] = useState(false);
+
   return (
     <section id="pricing" className="py-24 px-6 sm:px-16 relative">
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <motion.div
-            className="bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.02)] overflow-hidden h-full min-h-[550px]"
+            className="p-6 sm:p-8 bg-white/50 backdrop-blur-xl rounded-2xl flex flex-col relative overflow-hidden h-full min-h-[550px] border border-white/60 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08),0_8px_32px_rgba(0,0,0,0.04)]"
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <ClawMachine />
+            {/* Deep glowing background gradients from context (Features Section) */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#FF4D24]/20 via-transparent to-[#326578]/10 -z-10 pointer-events-none" />
+            <div className="absolute inset-0 overflow-hidden opacity-40 -z-10 pointer-events-none">
+              <div className="absolute top-1/2 left-1/2 w-[80%] h-[120%] bg-white/40 rounded-full blur-[150px] -translate-x-1/2 -translate-y-1/2" />
+            </div>
+
+            <ClawMachine onVerify={setIsVerified} />
           </motion.div>
 
           {PRICING_PLANS.map((plan) => (
             <div key={plan.id} className="contents">
-              <HoloCard plan={plan} />
+              <HoloCard plan={plan} isVerified={isVerified} />
             </div>
           ))}
         </div>

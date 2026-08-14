@@ -78,8 +78,8 @@ export default function FeatureOne() {
             {/* Deep glowing background gradients */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#FF4D24]/10 via-white/50 to-[#326578]/10" />
             <div className="absolute inset-0 overflow-hidden opacity-30">
-              <div className="absolute top-0 left-0 w-[60%] h-[80%] bg-[#FF4D24]/20 rounded-full blur-[120px] -translate-x-1/4 -translate-y-1/4" />
-              <div className="absolute bottom-0 right-0 w-[60%] h-[80%] bg-[#326578]/20 rounded-full blur-[120px] translate-x-1/4 translate-y-1/4" />
+              <div className="absolute top-0 right-0 w-[60%] h-[80%] bg-[#FF4D24]/20 rounded-full blur-[120px] translate-x-1/4 -translate-y-1/4" />
+              <div className="absolute bottom-0 left-0 w-[60%] h-[80%] bg-[#326578]/20 rounded-full blur-[120px] -translate-x-1/4 translate-y-1/4" />
             </div>
 
             {/* Glowing Glass Card */}
