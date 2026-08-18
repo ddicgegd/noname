@@ -172,6 +172,30 @@ async function startServer() {
       };
     }
 
+    if (apiPath.startsWith("/api/orders") || apiPath.startsWith("/api/order")) {
+      const items = body?.items || [{ attributesSku: "SKU-IPHONE15-128GB-BLK", quantity: 1 }];
+      const subtotal = items.reduce((sum: number, it: any) => sum + ((it.salePrice || it.unitPrice || 21990000) * (it.quantity || 1)), 0);
+      const totalAmount = subtotal + (subtotal > 0 ? 249900 : 0);
+      return {
+        status: { code: 201, message: "Order created successfully" },
+        data: {
+          orderNumber: `018d9ef2-${Math.random().toString(16).substring(2, 6)}-7123-88bb-${Math.random().toString(16).substring(2, 14)}`,
+          currentStatus: "PENDING",
+          shippingAddress: "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
+          subtotal: subtotal || 21990000.0,
+          totalAmount: totalAmount || 22239900.0,
+          orderItems: items.map((it: any) => ({
+            attributesSku: it.attributesSku || "SKU-IPHONE15-128GB-BLK",
+            quantity: it.quantity || 1,
+            unitPrice: it.unitPrice || 22990000.0,
+            salePrice: it.salePrice || 21990000.0,
+            subtotal: (it.salePrice || it.unitPrice || 21990000.0) * (it.quantity || 1),
+            variantOptions: it.variantOptions || [{ name: "Màu sắc", value: "Đen" }]
+          }))
+        }
+      };
+    }
+
     throw new Error(`Route mock not found: ${method} ${apiPath}`);
   }
 
@@ -404,6 +428,78 @@ async function startServer() {
       size: { type: GraphQLInt }
     }
   });
+
+  // --- ORDER GRAPHQL TYPES (No id/orderId in DTOs) ---
+  const CreateOrderItemInputType = new GraphQLInputObjectType({
+    name: "CreateOrderItemInput",
+    fields: {
+      attributesSku: { type: new GraphQLNonNull(GraphQLString) },
+      quantity: { type: new GraphQLNonNull(GraphQLInt) }
+    }
+  });
+
+  const CreateOrderInputType = new GraphQLInputObjectType({
+    name: "CreateOrderInput",
+    fields: {
+      items: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(CreateOrderItemInputType))) },
+      addressSku: { type: new GraphQLNonNull(GraphQLString) },
+      paymentMethod: { type: GraphQLString }
+    }
+  });
+
+  const OrderVariantOptionType = new GraphQLObjectType({
+    name: "OrderVariantOption",
+    fields: {
+      name: { type: GraphQLString },
+      value: { type: GraphQLString }
+    }
+  });
+
+  const OrderItemType = new GraphQLObjectType({
+    name: "OrderItemDto",
+    fields: {
+      attributesSku: { type: GraphQLString },
+      quantity: { type: GraphQLInt },
+      unitPrice: { type: GraphQLFloat },
+      salePrice: { type: GraphQLFloat },
+      subtotal: { type: GraphQLFloat },
+      variantOptions: { type: new GraphQLList(OrderVariantOptionType) }
+    }
+  });
+
+  const OrderType = new GraphQLObjectType({
+    name: "OrderDto",
+    fields: {
+      orderNumber: { type: GraphQLString },
+      currentStatus: { type: GraphQLString },
+      shippingAddress: { type: GraphQLString },
+      subtotal: { type: GraphQLFloat },
+      totalAmount: { type: GraphQLFloat },
+      orderItems: { type: new GraphQLList(OrderItemType) }
+    }
+  });
+
+  const CreateOrderResponseType = new GraphQLObjectType({
+    name: "CreateOrderResponse",
+    fields: {
+      status: { type: StatusType },
+      data: { type: OrderType }
+    }
+  });
+
+  const mapOrderData = (data: any) => {
+    if (!data) return null;
+    const { id: _orderId, ...orderWithoutId } = data;
+    const rawItems = orderWithoutId.orderItems || orderWithoutId.items || [];
+    const orderItems = rawItems.map((item: any) => {
+      const { id: _iId, orderId: _oId, ...itemWithoutIds } = item;
+      return itemWithoutIds;
+    });
+    return {
+      ...orderWithoutId,
+      orderItems
+    };
+  };
 
   const normalizeGatewayListResponse = (response: any) => {
     if (response?.status?.code && response.status.code !== 200) {
@@ -694,6 +790,35 @@ async function startServer() {
               status: { code: 500, message: error.message },
               message: error.message
             };
+          }
+        }
+      },
+      createOrder: {
+        type: CreateOrderResponseType,
+        args: {
+          input: { type: new GraphQLNonNull(CreateOrderInputType) }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const response = await callApiGateway("/api/orders", {
+              method: "POST",
+              body: args.input,
+              token: context?.token
+            }, context);
+
+            const status = response?.status || { code: 201, message: "Order created successfully" };
+            const rawData = response?.data || response;
+            const cleanData = mapOrderData(rawData);
+
+            return {
+              status: {
+                code: status.code || 201,
+                message: status.message || "Order created successfully"
+              },
+              data: cleanData
+            };
+          } catch (error: any) {
+            throw new Error(error?.message || "Unable to create order");
           }
         }
       }

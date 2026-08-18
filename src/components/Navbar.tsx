@@ -15,8 +15,8 @@ interface CartItem {
 }
 
 interface NavbarProps {
-  currentPage: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms";
-  onNavigate: (page: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms") => void;
+  currentPage: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms";
+  onNavigate: (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms") => void;
   cartItems: CartItem[];
   onRemoveCartItem?: (id: string | string[]) => void;
   onAddToCart?: (itemName: string, itemPrice: string) => void;
@@ -954,8 +954,8 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                         alert("Vui lòng tích chọn sản phẩm bạn muốn thanh toán!");
                         return;
                       }
-                      alert(`Đơn hàng trị giá ${formatPrice(calculateTotalValue() * 1.05)} đang được xử lý.`);
                       setShowCartMenu(false);
+                      onNavigate("order");
                     }}
                     disabled={cartItems.length === 0}
                     className="flex-[1.2] bg-[#111111] text-white disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed font-sans text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer hover:bg-black"

@@ -2,15 +2,27 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   User, Lock, Mail, ChevronDown, ChevronUp, CheckCircle, 
-  Eye, EyeOff, AlertCircle, RefreshCw, ArrowRight, Phone,
+  Eye, EyeOff, AlertCircle, RefreshCw, ArrowRight, ArrowLeft, Phone,
   Shield, Check, X, Sliders, ShoppingBag, ClipboardList, Truck, Package, 
-  MapPin, Clock, CreditCard, ChevronRight, HelpCircle
+  MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
+  Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
+  ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2
 } from "lucide-react";
 import { apiRequest } from "../lib/api";
-
-interface ProfilePageProps {
-  onNavigate: (page: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms") => void;
-}
+import { 
+  AddressDto, 
+  getMyAddresses, 
+  getDefaultAddress,
+  createAddress, 
+  updateAddress,
+  setDefaultAddress, 
+  deleteAddress, 
+  resolveAddress, 
+  ResolvedAddressDto,
+  AddressApiResponseLog,
+  subscribeAddressApiLogs,
+  clearAddressApiLogs
+} from "../services/addressService";
 
 interface OrderItem {
   id: string;
@@ -31,6 +43,19 @@ interface OrderItem {
   trackingNumber: string;
 }
 
+interface ProfilePageProps {
+  onNavigate: (page: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms") => void;
+}
+
+export interface PaymentMethodItem {
+  id: string;
+  type: "visa" | "mastercard" | "jcb" | "momo";
+  cardNumber: string;
+  holderName: string;
+  expiryDate: string;
+  isDefault: boolean;
+}
+
 export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   // Authentication status
   const [token, setToken] = useState<string>("");
@@ -44,15 +69,21 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   });
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
-  // Accounts Center Modal Trigger State
+  // Accounts Center Modal Trigger State & Active Tab
   const [isAccountsCenterOpen, setIsAccountsCenterOpen] = useState<boolean>(false);
+  const [activeModalTab, setActiveModalTab] = useState<"profile" | "security" | "addresses" | "payments" | "sessions">("profile");
 
   // Error / Success Messages
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [successMsg, setSuccessMsg] = useState<string>("");
 
-  // Accordion Expansions in Accounts Center Modal
-  const [isUsernameChangeExpanded, setIsUsernameChangeExpanded] = useState<boolean>(false);
+  // Profile Edit fields
+  const [editFullName, setEditFullName] = useState<string>("");
+  const [editPhone, setEditPhone] = useState<string>("");
+  const [editGender, setEditGender] = useState<string>("male");
+
+  // Accordion Expansions in Security tab
+  const [isUsernameChangeExpanded, setIsUsernameChangeExpanded] = useState<boolean>(true);
   const [isPasswordResetExpanded, setIsPasswordResetExpanded] = useState<boolean>(false);
 
   // Input states
@@ -60,6 +91,81 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [newPassword, setNewPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
+
+  // Saved Addresses State
+  const [addresses, setAddresses] = useState<AddressDto[]>([]);
+  const [isAddingAddress, setIsAddingAddress] = useState<boolean>(false);
+  const [editingAddressSku, setEditingAddressSku] = useState<string | null>(null);
+  const [newAddressForm, setNewAddressForm] = useState({
+    recipientName: "",
+    phone: "",
+    address: "",
+    type: "office" as "home" | "office",
+    isDefault: false
+  });
+  const [resolvedPreview, setResolvedPreview] = useState<ResolvedAddressDto | null>(null);
+  const [isResolvingAddress, setIsResolvingAddress] = useState<boolean>(false);
+
+  // Real-time Address API response inspector logs state
+  const [apiResponseLogs, setApiResponseLogs] = useState<AddressApiResponseLog[]>([]);
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
+  const [isInspectorExpanded, setIsInspectorExpanded] = useState<boolean>(true);
+  const [inspectorTab, setInspectorTab] = useState<"response" | "request">("response");
+
+  // Subscribe to live Address API responses
+  useEffect(() => {
+    const unsubscribe = subscribeAddressApiLogs((logs) => {
+      setApiResponseLogs(logs);
+      if (logs.length > 0) {
+        setSelectedLogId(prev => {
+          if (!prev || !logs.some(l => l.id === prev)) {
+            return logs[0].id;
+          }
+          return prev;
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Auto-dismiss success & error notification banners after a short duration with motion
+  useEffect(() => {
+    if (successMsg) {
+      const timer = setTimeout(() => {
+        setSuccessMsg("");
+      }, 3200);
+      return () => clearTimeout(timer);
+    }
+  }, [successMsg]);
+
+  useEffect(() => {
+    if (errorMsg) {
+      const timer = setTimeout(() => {
+        setErrorMsg("");
+      }, 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMsg]);
+
+  const handleCopyLogJson = (log: AddressApiResponseLog) => {
+    const content = inspectorTab === "response" ? log.responseBody : (log.requestBody || {});
+    navigator.clipboard.writeText(JSON.stringify(content, null, 2));
+    setCopiedLogId(log.id);
+    setTimeout(() => setCopiedLogId(null), 2000);
+  };
+
+  // Saved Payment Methods State
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
+  const [isAddingCard, setIsAddingCard] = useState<boolean>(false);
+  const [newCardForm, setNewCardForm] = useState({
+    type: "visa" as "visa" | "mastercard" | "jcb" | "momo",
+    cardNumber: "",
+    holderName: "",
+    expiryDate: "",
+    cvv: "",
+    isDefault: false
+  });
 
   // Orders list and active selected order for detail tracking view
   const [orders, setOrders] = useState<OrderItem[]>([]);
@@ -383,11 +489,350 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           console.warn("Legacy background REST validation also failed:", restErr);
         });
       });
+      // Initialize saved addresses via addressService
+      try {
+        const loadedAddresses = await getMyAddresses();
+        setAddresses(loadedAddresses);
+      } catch (addrErr) {
+        console.warn("Could not load addresses:", addrErr);
+      }
+
+      // Initialize saved payment methods
+      const storedPayments = localStorage.getItem("horizon_user_payment_methods");
+      if (storedPayments) {
+        setPaymentMethods(JSON.parse(storedPayments));
+      } else {
+        const initialPayments: PaymentMethodItem[] = [
+          {
+            id: "PAY-1",
+            type: "visa",
+            cardNumber: "•••• •••• •••• 8892",
+            holderName: "NGO NGOC DINH",
+            expiryDate: "09/29",
+            isDefault: true
+          },
+          {
+            id: "PAY-2",
+            type: "mastercard",
+            cardNumber: "•••• •••• •••• 4519",
+            holderName: "NGO NGOC DINH",
+            expiryDate: "11/28",
+            isDefault: false
+          },
+          {
+            id: "PAY-3",
+            type: "momo",
+            cardNumber: "0901 234 567",
+            holderName: "Ví MoMo E-Wallet",
+            expiryDate: "Đã liên kết",
+            isDefault: false
+          }
+        ];
+        localStorage.setItem("horizon_user_payment_methods", JSON.stringify(initialPayments));
+        setPaymentMethods(initialPayments);
+      }
     } catch (e) {
       console.error("Error loading profile:", e);
       setErrorMsg("Lỗi hệ thống khi tải thông tin tài khoản.");
       setIsLoading(false);
     }
+  };
+
+  // Sync edit profile form whenever user object updates
+  useEffect(() => {
+    if (user) {
+      setEditFullName(user.fullName || "");
+      setEditPhone(user.phoneNumber || "0901234567");
+      setEditGender(user.gender || "male");
+      if (addresses.length > 0 && !newAddressForm.recipientName) {
+        setNewAddressForm(prev => ({ ...prev, recipientName: user.fullName || "", phone: user.phoneNumber || "0901234567" }));
+      }
+      if (paymentMethods.length > 0 && !newCardForm.holderName) {
+        setNewCardForm(prev => ({ ...prev, holderName: (user.fullName || "NGO NGOC DINH").toUpperCase() }));
+      }
+    }
+  }, [user]);
+
+  // Handler for Profile Information Update
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editFullName.trim()) {
+      setErrorMsg("Họ và tên không được để trống.");
+      return;
+    }
+    setActionLoading(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      const updatedUser = {
+        ...user,
+        fullName: editFullName.trim(),
+        phoneNumber: editPhone.trim(),
+        gender: editGender
+      };
+      setUser(updatedUser);
+      localStorage.setItem("horizon_current_user", JSON.stringify(updatedUser));
+
+      const storedProfile = localStorage.getItem("horizon_redis_profile");
+      if (storedProfile) {
+        const prof = JSON.parse(storedProfile);
+        localStorage.setItem("horizon_redis_profile", JSON.stringify({
+          ...prof,
+          fullName: editFullName.trim(),
+          phoneNumber: editPhone.trim()
+        }));
+      }
+
+      setSuccessMsg("Cập nhật thông tin hồ sơ thành công!");
+      logAuditAction("UPDATE_PROFILE", "SUCCESS", "Cập nhật thông tin định danh người dùng");
+    } catch (err: any) {
+      setErrorMsg("Không thể cập nhật thông tin: " + (err.message || "Lỗi không xác định"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handler for Address Book: Save (Create or Update) Address
+  const handleSaveAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAddressForm.recipientName.trim() || !newAddressForm.phone.trim() || !newAddressForm.address.trim()) {
+      setErrorMsg("Vui lòng điền đầy đủ họ tên, số điện thoại và địa chỉ giao hàng.");
+      return;
+    }
+
+    if (!resolvedPreview || !resolvedPreview.success || !resolvedPreview.latitude || !resolvedPreview.longitude) {
+      setErrorMsg("Địa chỉ chưa được xác thực tọa độ hợp lệ từ hệ thống Geocoding. Vui lòng nhập địa chỉ đầy đủ 3 cấp hành chính.");
+      return;
+    }
+
+    setActionLoading(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      if (editingAddressSku) {
+        // UPDATE (PUT /api/addresses/{sku})
+        const updated = await updateAddress(editingAddressSku, {
+          address: newAddressForm.address.trim(),
+          phoneNumber: newAddressForm.phone.trim(),
+          recipientName: newAddressForm.recipientName.trim(),
+          isDefault: newAddressForm.isDefault,
+          type: newAddressForm.type
+        });
+
+        const newAddresses = addresses.map(a => a.sku === editingAddressSku ? updated : a);
+        setAddresses(newAddresses);
+        localStorage.setItem("horizon_user_addresses", JSON.stringify(newAddresses));
+        setIsAddingAddress(false);
+        setEditingAddressSku(null);
+        setResolvedPreview(null);
+        setSuccessMsg("Cập nhật địa chỉ giao nhận thành công!");
+        logAuditAction("UPDATE_ADDRESS", "SUCCESS", `Cập nhật địa chỉ SKU: ${editingAddressSku}`);
+      } else {
+        // CREATE (POST /api/addresses)
+        const created = await createAddress({
+          address: newAddressForm.address.trim(),
+          phoneNumber: newAddressForm.phone.trim(),
+          recipientName: newAddressForm.recipientName.trim(),
+          isDefault: newAddressForm.isDefault || addresses.length === 0,
+          type: newAddressForm.type
+        });
+
+        let updated = [...addresses];
+        if (created.isDefault) {
+          updated = updated.map(a => ({ ...a, isDefault: false }));
+        }
+        updated.unshift(created);
+
+        setAddresses(updated);
+        localStorage.setItem("horizon_user_addresses", JSON.stringify(updated));
+        setIsAddingAddress(false);
+        setEditingAddressSku(null);
+        setResolvedPreview(null);
+        setSuccessMsg("Đã lưu địa chỉ giao nhận mới thành công!");
+        logAuditAction("CREATE_ADDRESS", "SUCCESS", `Thêm địa chỉ SKU: ${created.sku}`);
+      }
+
+      setNewAddressForm({
+        recipientName: user?.fullName || "",
+        phone: user?.phoneNumber || "",
+        address: "",
+        type: "office",
+        isDefault: false
+      });
+    } catch (err: any) {
+      setErrorMsg(err.message || "Không thể lưu địa chỉ.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handler for opening Edit Address Form
+  const handleOpenEditAddress = (addr: AddressDto) => {
+    setNewAddressForm({
+      recipientName: addr.recipientName,
+      phone: addr.phoneNumber,
+      address: addr.address,
+      type: addr.type || "office",
+      isDefault: addr.isDefault
+    });
+    if (addr.latitude && addr.longitude) {
+      setResolvedPreview({
+        success: true,
+        latitude: addr.latitude,
+        longitude: addr.longitude,
+        formattedAddress: addr.address,
+        rawAddress: addr.address
+      });
+    } else {
+      setResolvedPreview(null);
+    }
+    setEditingAddressSku(addr.sku);
+    setIsAddingAddress(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+  };
+
+  // Handler for Address Book: Set Default
+  const handleSetDefaultAddress = async (sku: string) => {
+    try {
+      await setDefaultAddress(sku);
+      const updated = addresses.map(a => ({
+        ...a,
+        isDefault: a.sku === sku
+      }));
+      setAddresses(updated);
+      localStorage.setItem("horizon_user_addresses", JSON.stringify(updated));
+      setSuccessMsg("Đã đặt địa chỉ làm mặc định!");
+      setErrorMsg("");
+      logAuditAction("SET_DEFAULT_ADDRESS", "SUCCESS", `Đặt mặc định địa chỉ SKU: ${sku}`);
+    } catch (err: any) {
+      setErrorMsg("Không thể đặt làm mặc định: " + (err.message || "Lỗi mạng"));
+    }
+  };
+
+  // Handler for Address Book: Delete
+  const handleDeleteAddress = async (sku: string) => {
+    if (addresses.length <= 1) {
+      setErrorMsg("Bạn cần duy trì ít nhất 1 địa chỉ nhận hàng.");
+      return;
+    }
+    try {
+      await deleteAddress(sku);
+      const updated = addresses.filter(a => a.sku !== sku);
+      if (!updated.some(a => a.isDefault) && updated.length > 0) {
+        updated[0].isDefault = true;
+      }
+      setAddresses(updated);
+      localStorage.setItem("horizon_user_addresses", JSON.stringify(updated));
+      setSuccessMsg("Đã xóa địa chỉ khỏi sổ danh bạ.");
+      setErrorMsg("");
+      logAuditAction("DELETE_ADDRESS", "SUCCESS", `Xóa địa chỉ SKU: ${sku}`);
+    } catch (err: any) {
+      setErrorMsg("Không thể xóa địa chỉ: " + (err.message || "Lỗi mạng"));
+    }
+  };
+
+  // Real-time Geocoding address resolve debounce effect (1.25s debounce to prevent spam)
+  useEffect(() => {
+    const trimmed = newAddressForm.address?.trim() || "";
+    if (!isAddingAddress || trimmed.length < 4) {
+      setResolvedPreview(null);
+      setIsResolvingAddress(false);
+      return;
+    }
+
+    // Do not call API again if the address already matches the resolved address
+    if (resolvedPreview && (resolvedPreview.rawAddress === trimmed || resolvedPreview.formattedAddress === trimmed)) {
+      setIsResolvingAddress(false);
+      return;
+    }
+
+    setIsResolvingAddress(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await resolveAddress(trimmed);
+        setResolvedPreview(res);
+      } catch (_) {
+        setResolvedPreview(null);
+      } finally {
+        setIsResolvingAddress(false);
+      }
+    }, 1250); // Exact 1.25s debounce
+
+    return () => clearTimeout(timer);
+  }, [newAddressForm.address, isAddingAddress]);
+
+  // Handler for Payment Methods: Add Payment Method / Card
+  const handleAddPaymentMethod = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCardForm.cardNumber.trim() || !newCardForm.holderName.trim() || !newCardForm.expiryDate.trim()) {
+      setErrorMsg("Vui lòng nhập đầy đủ số thẻ, tên chủ thẻ và hạn sử dụng.");
+      return;
+    }
+
+    const cleanNumber = newCardForm.cardNumber.replace(/\s+/g, "");
+    const masked = cleanNumber.length >= 4 
+      ? `•••• •••• •••• ${cleanNumber.slice(-4)}`
+      : `•••• ${cleanNumber}`;
+
+    const newPayment: PaymentMethodItem = {
+      id: `PAY-${Date.now().toString().slice(-4)}`,
+      type: newCardForm.type,
+      cardNumber: masked,
+      holderName: newCardForm.holderName.trim().toUpperCase(),
+      expiryDate: newCardForm.expiryDate.trim(),
+      isDefault: newCardForm.isDefault || paymentMethods.length === 0
+    };
+
+    let updated = [...paymentMethods];
+    if (newPayment.isDefault) {
+      updated = updated.map(p => ({ ...p, isDefault: false }));
+    }
+    updated.unshift(newPayment);
+
+    setPaymentMethods(updated);
+    localStorage.setItem("horizon_user_payment_methods", JSON.stringify(updated));
+    setIsAddingCard(false);
+    setSuccessMsg("Đã liên kết phương thức thanh toán an toàn!");
+    setErrorMsg("");
+    setNewCardForm({
+      type: "visa",
+      cardNumber: "",
+      holderName: (user?.fullName || "NGO NGOC DINH").toUpperCase(),
+      expiryDate: "",
+      cvv: "",
+      isDefault: false
+    });
+  };
+
+  // Handler for Payment Methods: Set Default
+  const handleSetDefaultPayment = (id: string) => {
+    const updated = paymentMethods.map(p => ({
+      ...p,
+      isDefault: p.id === id
+    }));
+    setPaymentMethods(updated);
+    localStorage.setItem("horizon_user_payment_methods", JSON.stringify(updated));
+    setSuccessMsg("Đã đặt phương thức thanh toán làm mặc định!");
+    setErrorMsg("");
+  };
+
+  // Handler for Payment Methods: Delete
+  const handleDeletePayment = (id: string) => {
+    if (paymentMethods.length <= 1) {
+      setErrorMsg("Bạn cần duy trì ít nhất 1 phương thức thanh toán khả dụng.");
+      return;
+    }
+    const updated = paymentMethods.filter(p => p.id !== id);
+    if (!updated.some(p => p.isDefault) && updated.length > 0) {
+      updated[0].isDefault = true;
+    }
+    setPaymentMethods(updated);
+    localStorage.setItem("horizon_user_payment_methods", JSON.stringify(updated));
+    setSuccessMsg("Đã gỡ bỏ phương thức thanh toán.");
+    setErrorMsg("");
   };
 
   // Handler for username modification
@@ -938,10 +1383,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
       </div>
 
-      {/* POPUP ACCOUNTS CENTER MODAL (Meta-style Portal Overlay) */}
+      {/* POPUP ACCOUNTS CENTER MODAL (Meta / Apple ID Style 2-Column Portal - 30% Expanded) */}
       <AnimatePresence>
         {isAccountsCenterOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 lg:p-8 select-none">
             
             {/* Dark blur backdrop */}
             <motion.div 
@@ -949,212 +1394,1247 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsAccountsCenterOpen(false)}
-              className="absolute inset-0 bg-slate-900/50 backdrop-blur-md"
+              className="absolute inset-0 bg-slate-900/65 backdrop-blur-md"
             />
 
-            {/* Modal Card content box */}
+            {/* Modal Dialog Box (Standard Accounts Center Frame max-w-6xl ~1152px, height 780px) */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              initial={{ opacity: 0, scale: 0.96, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ type: "spring", duration: 0.4 }}
-              className="relative w-full max-w-md bg-white border border-slate-100 rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] p-6 sm:p-8 overflow-y-auto max-h-[85vh] space-y-6 z-10"
+              exit={{ opacity: 0, scale: 0.96, y: 15 }}
+              transition={{ type: "spring", duration: 0.35 }}
+              className="relative w-full max-w-6xl bg-white/95 backdrop-blur-xl border border-slate-200/80 rounded-[28px] shadow-[0_32px_100px_-20px_rgba(15,23,42,0.3)] flex flex-col md:flex-row overflow-hidden max-h-[92vh] md:h-[750px] lg:h-[780px] z-10"
             >
               
-              {/* Close Button top-right */}
-              <button 
-                onClick={() => setIsAccountsCenterOpen(false)}
-                className="absolute right-5 top-5 w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-black transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {/* LEFT COLUMN: Sidebar Navigation / Context Data View */}
+              <div className="w-full md:w-80 lg:w-[330px] bg-slate-50/90 border-b md:border-b-0 md:border-r border-slate-200/70 p-6 flex flex-col justify-between shrink-0 text-left relative overflow-hidden">
+                {/* Ambient glow matching page deep indigo/violet theme in top-left */}
+                <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full bg-gradient-to-br from-indigo-600/15 via-violet-600/10 to-purple-700/8 blur-3xl pointer-events-none z-0" />
+                {((activeModalTab === "addresses" && isAddingAddress) || (activeModalTab === "payments" && isAddingCard)) ? (
+                  /* WHEN FORM IS OPEN: Show existing data list on the left side */
+                  <div className="flex flex-col h-full space-y-4">
+                    {/* Header with back button */}
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingAddress(false);
+                          setIsAddingCard(false);
+                          setErrorMsg("");
+                          setSuccessMsg("");
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Quay lại danh mục</span>
+                      </button>
+                    </div>
 
-              {/* Modal Header */}
-              <div className="text-left">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-inner shrink-0">
-                    <Sliders className="w-4 h-4" />
+                    {/* Scrollable list of existing items */}
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 max-h-[480px]">
+                      {activeModalTab === "addresses" && addresses.map(addr => {
+                        const isOffice = addr.type === "office";
+                        const isCurrentlyEditing = editingAddressSku === addr.sku;
+                        return (
+                          <div 
+                            key={addr.sku}
+                            onClick={() => handleOpenEditAddress(addr)}
+                            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                              isCurrentlyEditing
+                                ? "bg-indigo-50/50 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs"
+                                : addr.isDefault 
+                                  ? "bg-white border-indigo-200 hover:border-indigo-300 shadow-2xs" 
+                                  : "bg-white hover:bg-slate-50/70 border-slate-200/80 hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                  isOffice ? "bg-indigo-100/70 text-indigo-700" : "bg-violet-100/70 text-violet-700"
+                                }`}>
+                                  {isOffice ? <Building2 className="w-3.5 h-3.5" /> : <Home className="w-3.5 h-3.5" />}
+                                </div>
+                                <span className="text-xs font-bold text-slate-900 truncate">{addr.recipientName}</span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {addr.isDefault && (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] px-2 py-0.5 font-bold uppercase bg-indigo-600 text-white rounded-full">
+                                    <Check className="w-2.5 h-2.5 stroke-[2.5]" /> Mặc định
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-[11px] font-mono font-medium text-slate-600 mb-1 flex items-center gap-1.5">
+                              <Phone className="w-3 h-3 text-indigo-600" />
+                              <span>{addr.phoneNumber}</span>
+                            </p>
+                            <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
+                              {addr.address}
+                            </p>
+                            {addr.latitude && addr.longitude && (
+                              <div className="flex items-center gap-1 text-[9.5px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 mt-1.5 w-fit">
+                                <Compass className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>{addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {activeModalTab === "payments" && paymentMethods.map(card => (
+                        <div 
+                          key={card.id}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            card.isDefault 
+                              ? "bg-slate-900 text-white border-slate-800 shadow-xs" 
+                              : "bg-white border-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black ${
+                              card.type === "visa" 
+                                ? "bg-blue-600 text-white" 
+                                : card.type === "mastercard" 
+                                  ? "bg-red-600 text-white" 
+                                  : card.type === "momo"
+                                    ? "bg-pink-600 text-white"
+                                    : "bg-emerald-600 text-white"
+                            }`}>
+                              {card.type.toUpperCase()}
+                            </span>
+                            {card.isDefault && (
+                              <span className="text-[9px] px-1.5 py-0.2 font-bold uppercase bg-white/20 text-white rounded">
+                                Mặc định
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-xs font-mono font-bold tracking-wider ${card.isDefault ? "text-white" : "text-slate-800"}`}>
+                            {card.cardNumber}
+                          </p>
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1 font-mono">
+                            <span>{card.holderName}</span>
+                            <span>{card.expiryDate}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Bottom action when form is open */}
+                    <div className="pt-3 mt-auto border-t border-slate-200/70">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingAddress(false);
+                          setIsAddingCard(false);
+                          setErrorMsg("");
+                          setSuccessMsg("");
+                        }}
+                        className="w-full bg-rose-50/80 hover:bg-rose-100/90 text-rose-600 border border-rose-200/70 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Hủy bỏ biểu mẫu</span>
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-black text-[#111111] font-sans leading-tight">Trung tâm tài khoản</h3>
-                    <p className="text-[9px] text-indigo-600 font-bold font-mono uppercase tracking-wider">Horizon Accounts Center</p>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Thiết lập bảo mật và cấu hình tài khoản ủy quyền Bearer Access Token an toàn.
-                </p>
+                ) : (
+                  /* WHEN NO FORM IS OPEN: Standard Navigation Sidebar */
+                  <>
+                    <div className="space-y-5 relative z-10">
+                      
+                      {/* Top Branding */}
+                      <div className="flex items-center gap-3 pb-4 border-b border-slate-200/70">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-purple-700 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
+                          <Sliders className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Trung tâm tài khoản</h3>
+                          <p className="text-[10px] text-indigo-600 font-bold font-mono uppercase tracking-wider">Horizon Accounts Center</p>
+                        </div>
+                      </div>
+
+                      {/* Profile Mini Card */}
+                      {user && (
+                        <div className="p-3.5 bg-white border border-slate-200/90 rounded-2xl flex items-center gap-3.5 shadow-xs">
+                          <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-indigo-600 via-violet-700 to-[#FF4D24] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-sm">
+                            {user.fullName ? user.fullName.charAt(0).toUpperCase() : "H"}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-black text-slate-900 truncate leading-tight">{user.fullName || "Hội viên Horizon"}</p>
+                              <span className="text-[9px] px-1.5 py-0.2 font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 rounded">LIVE</span>
+                            </div>
+                            <p className="text-[10.5px] font-mono text-slate-400 truncate mt-0.5">{user.email || "N/A"}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Navigation Tabs */}
+                      <div className="space-y-1.5">
+                        {[
+                          { id: "profile", label: "Hồ sơ cá nhân", icon: User, desc: "Tên, email, số điện thoại" },
+                          { id: "security", label: "Mật khẩu & Bảo mật", icon: ShieldCheck, desc: "Đổi mật khẩu, username" },
+                          { id: "addresses", label: "Sổ địa chỉ nhận hàng", icon: MapPin, count: addresses.length, desc: "Địa chỉ giao nhận" },
+                          { id: "payments", label: "Thẻ & Phương thức", icon: CreditCard, count: paymentMethods.length, desc: "Visa, Mastercard, Ví" },
+                          { id: "sessions", label: "Thiết bị & Phiên", icon: Laptop, desc: "Quản lý đăng nhập" }
+                        ].map(tab => {
+                          const Icon = tab.icon;
+                          const isActive = activeModalTab === tab.id;
+                          return (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              onClick={() => {
+                                setActiveModalTab(tab.id as any);
+                                setErrorMsg("");
+                                setSuccessMsg("");
+                                setIsAddingAddress(false);
+                                setIsAddingCard(false);
+                              }}
+                              className={`w-full px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                                isActive
+                                  ? "bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 text-white shadow-md shadow-indigo-600/20"
+                                  : "text-slate-700 hover:bg-indigo-50/70 hover:text-indigo-950"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Icon className={`w-4.5 h-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
+                                <div className="text-left">
+                                  <span className="block leading-tight">{tab.label}</span>
+                                  <span className={`text-[10px] font-normal leading-none block mt-0.5 ${isActive ? "text-indigo-100" : "text-slate-400"}`}>{tab.desc}</span>
+                                </div>
+                              </div>
+                              {tab.count !== undefined && (
+                                <span className={`text-[10.5px] px-2.5 py-0.5 rounded-full font-mono font-bold ${
+                                  isActive ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                                }`}>
+                                  {tab.count}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Bottom Close Button in Sidebar */}
+                    <div className="pt-4 mt-auto border-t border-slate-200/60 hidden md:block relative z-10">
+                      <button
+                        type="button"
+                        onClick={() => setIsAccountsCenterOpen(false)}
+                        className="w-full bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-xs font-bold py-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <span>Đóng trung tâm tài khoản</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Status Alert in Modal */}
-              <AnimatePresence mode="wait">
-                {errorMsg && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-semibold flex items-start gap-2 text-left"
-                  >
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
-                    <span>{errorMsg}</span>
-                  </motion.div>
-                )}
-
-                {successMsg && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-start gap-2 text-left"
-                  >
-                    <CheckCircle className="w-4.5 h-4.5 shrink-0 mt-0.5 text-emerald-500" />
-                    <span>{successMsg}</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Profile Brief Info inside Modal */}
-              {user && (
-                <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-1.5 text-left">
-                  <span className="text-[9px] text-slate-400 font-bold font-mono uppercase">Hồ sơ đồng bộ</span>
-                  <p className="text-xs font-extrabold text-slate-800 leading-none">{user.fullName || "Hội viên Horizon"}</p>
-                  <p className="text-[10.5px] font-mono text-slate-400 select-all">{user.email || "N/A"}</p>
-                </div>
-              )}
-
-              {/* Action 1: Username accordion */}
-              <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsUsernameChangeExpanded(!isUsernameChangeExpanded);
-                    setIsPasswordResetExpanded(false);
-                    setErrorMsg("");
-                    setSuccessMsg("");
-                  }}
-                  className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50/50 cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <User className="w-4 h-4 text-indigo-600" />
-                    <span className="text-xs font-extrabold text-slate-800">Đổi tên đăng nhập (Username)</span>
+              {/* RIGHT COLUMN: Active Tab Content Panel (Optimized padding) */}
+              <div className="flex-1 bg-white p-5 sm:p-6 lg:p-7 overflow-y-auto flex flex-col text-left relative min-h-0">
+                
+                {/* Panel Header */}
+                <div className="flex items-start justify-between gap-4 pb-3.5 mb-4 border-b border-slate-100 shrink-0">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                      {isAddingAddress && (editingAddressSku ? "Chỉnh sửa địa chỉ nhận hàng" : "Thêm địa chỉ giao nhận mới")}
+                      {isAddingCard && "Thêm phương thức thanh toán mới"}
+                      {!isAddingAddress && !isAddingCard && (
+                        <>
+                          {activeModalTab === "profile" && "Thông tin hồ sơ cá nhân"}
+                          {activeModalTab === "security" && "Mật khẩu & Thiết lập bảo mật"}
+                          {activeModalTab === "addresses" && "Quản lý sổ địa chỉ giao hàng"}
+                          {activeModalTab === "payments" && "Phương thức thanh toán & Quản lý thẻ"}
+                          {activeModalTab === "sessions" && "Thiết bị & Phiên hoạt động"}
+                        </>
+                      )}
+                    </h2>
+                    <p className="text-xs text-slate-500 font-normal mt-0.5">
+                      {isAddingAddress && "Cập nhật thông tin chi tiết người nhận và vị trí chính xác để đồng bộ giao hàng."}
+                      {isAddingCard && "Liên kết thẻ tín dụng, ghi nợ hoặc ví điện tử (danh sách hiện có hiển thị ở cột trái)"}
+                      {!isAddingAddress && !isAddingCard && (
+                        <>
+                          {activeModalTab === "profile" && "Quản lý thông tin định danh, số điện thoại và thông tin liên lạc của tài khoản Horizon"}
+                          {activeModalTab === "security" && "Cập nhật mật khẩu tài khoản và quản lý thông tin bảo vệ an toàn dịch vụ"}
+                          {activeModalTab === "addresses" && "Lưu trữ các địa chỉ nhận hàng cá nhân hoặc doanh nghiệp để đặt đơn tiện lợi hơn"}
+                          {activeModalTab === "payments" && "Quản lý thẻ tín dụng, ghi nợ quốc tế và các ví điện tử thanh toán bảo mật"}
+                          {activeModalTab === "sessions" && "Kiểm tra các phiên đăng nhập đang hoạt động và quản lý bảo mật thiết bị kết nối"}
+                        </>
+                      )}
+                    </p>
                   </div>
-                  {isUsernameChangeExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
+                  
+                  <button 
+                    onClick={() => {
+                      if (isAddingAddress) setIsAddingAddress(false);
+                      else if (isAddingCard) setIsAddingCard(false);
+                      else setIsAccountsCenterOpen(false);
+                    }}
+                    className="w-9 h-9 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-black transition-colors cursor-pointer shrink-0"
+                    title={isAddingAddress || isAddingCard ? "Đóng form" : "Đóng"}
+                  >
+                    <X className="w-4.5 h-4.5" />
+                  </button>
+                </div>
 
-                <AnimatePresence initial={false}>
-                  {isUsernameChangeExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden border-t border-slate-100"
-                    >
-                      <form onSubmit={handleChangeUsername} className="p-4 flex flex-col gap-3">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono text-left">Tên đăng nhập mới</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Nhập username mới..."
-                            value={newUsername}
-                            onChange={(e) => setNewUsername(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 focus:border-[#FF4D24] text-xs px-3.5 py-2.5 rounded-xl outline-none focus:bg-white transition-all text-[#111111] font-medium"
-                          />
+                {/* Floating Toast Notification (Zero Layout Shift - Zero Jank) */}
+                <div className="absolute top-4 right-4 z-50 pointer-events-none flex flex-col items-end gap-2 max-w-sm w-full">
+                  <AnimatePresence>
+                    {errorMsg && (
+                      <motion.div
+                        key="modal-error-toast"
+                        initial={{ opacity: 0, y: -12, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -12, scale: 0.95 }}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                        className="pointer-events-auto w-full p-3 bg-white/95 backdrop-blur-md border border-red-200/90 text-red-700 rounded-xl text-xs font-semibold flex items-center justify-between gap-3 text-left shadow-xl shadow-red-500/10 ring-1 ring-red-500/10"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-6 h-6 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="truncate">{errorMsg}</span>
                         </div>
                         <button
-                          type="submit"
-                          disabled={actionLoading}
-                          className="w-full bg-[#FF4D24] hover:bg-black text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-colors"
+                          type="button"
+                          onClick={() => setErrorMsg("")}
+                          className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer shrink-0"
                         >
-                          {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Cập nhật tên đăng nhập"}
+                          <X className="w-3.5 h-3.5" />
                         </button>
-                      </form>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                      </motion.div>
+                    )}
 
-              {/* Action 2: Password accordion */}
-              <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPasswordResetExpanded(!isPasswordResetExpanded);
-                    setIsUsernameChangeExpanded(false);
-                    setErrorMsg("");
-                    setSuccessMsg("");
-                  }}
-                  className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50/50 cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <Lock className="w-4 h-4 text-[#FF4D24]" />
-                    <span className="text-xs font-extrabold text-slate-800">Mật khẩu và bảo mật</span>
+                    {successMsg && (
+                      <motion.div
+                        key="modal-success-toast"
+                        initial={{ opacity: 0, y: -12, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -12, scale: 0.95 }}
+                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                        className="pointer-events-auto w-full p-3 bg-white/95 backdrop-blur-md border border-emerald-200/90 text-emerald-800 rounded-xl text-xs font-semibold flex items-center justify-between gap-3 text-left shadow-xl shadow-emerald-500/10 ring-1 ring-emerald-500/10"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="truncate">{successMsg}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSuccessMsg("")}
+                          className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer shrink-0"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* TAB 1: Profile Information */}
+                {activeModalTab === "profile" && (
+                  <form onSubmit={handleSaveProfile} className="space-y-5 flex-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      
+                      <div className="space-y-1.5 text-left">
+                        <label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Họ và tên người dùng</label>
+                        <input
+                          type="text"
+                          required
+                          value={editFullName}
+                          onChange={(e) => setEditFullName(e.target.value)}
+                          placeholder="Nhập họ và tên..."
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-semibold"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 text-left">
+                        <label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Số điện thoại liên hệ</label>
+                        <input
+                          type="tel"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          placeholder="0901234567"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-semibold"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 text-left">
+                        <label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Email tài khoản đăng nhập</label>
+                        <input
+                          type="email"
+                          disabled
+                          value={user?.email || "N/A"}
+                          className="w-full bg-slate-100/70 border border-slate-200 text-xs px-4 py-3 rounded-2xl outline-none text-slate-500 font-mono cursor-not-allowed"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 text-left">
+                        <label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Giới tính</label>
+                        <select
+                          value={editGender}
+                          onChange={(e) => setEditGender(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-semibold cursor-pointer"
+                        >
+                          <option value="male">Nam</option>
+                          <option value="female">Nữ</option>
+                          <option value="other">Khác</option>
+                        </select>
+                      </div>
+
+                    </div>
+
+                    <div className="p-4 bg-indigo-50/40 border border-indigo-100/70 rounded-2xl flex items-center justify-between gap-4 text-left mt-3">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-100/80 text-indigo-700 flex items-center justify-center shrink-0">
+                          <Sparkles className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Đồng bộ đám mây tức thời</p>
+                          <p className="text-[11px] text-slate-500">Mọi thay đổi hồ sơ sẽ được cập nhật đồng nhất trên các nền tảng Web & Mobile.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={actionLoading}
+                        className="px-7 py-3 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 hover:opacity-95 text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-2 shadow-md shadow-indigo-600/20"
+                      >
+                        {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Lưu thay đổi hồ sơ"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* TAB 2: Security & Passwords */}
+                {activeModalTab === "security" && (
+                  <div className="space-y-5 flex-1">
+                    
+                    {/* Username Update Section */}
+                    <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden shadow-xs">
+                      <button
+                        type="button"
+                        onClick={() => setIsUsernameChangeExpanded(!isUsernameChangeExpanded)}
+                        className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-indigo-50/30 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3.5">
+                          <User className="w-5 h-5 text-indigo-600" />
+                          <div>
+                            <span className="text-xs font-black text-slate-800 block">Đổi tên đăng nhập (Username)</span>
+                            <span className="text-[11px] text-slate-400">Tên hiện tại: @{user?.username || "username"}</span>
+                          </div>
+                        </div>
+                        {isUsernameChangeExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                      </button>
+
+                      <AnimatePresence initial={false}>
+                        {isUsernameChangeExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden border-t border-slate-100"
+                          >
+                            <form onSubmit={handleChangeUsername} className="p-5 flex flex-col gap-3.5">
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono text-left">Tên đăng nhập mới</label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="Nhập username mới..."
+                                  value={newUsername}
+                                  onChange={(e) => setNewUsername(e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-medium"
+                                />
+                              </div>
+                              <button
+                                type="submit"
+                                disabled={actionLoading}
+                                className="w-full bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 hover:opacity-95 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-sm shadow-indigo-600/20"
+                              >
+                                {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Cập nhật tên đăng nhập"}
+                              </button>
+                            </form>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Password Reset Section */}
+                    <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden shadow-xs">
+                      <button
+                        type="button"
+                        onClick={() => setIsPasswordResetExpanded(!isPasswordResetExpanded)}
+                        className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-indigo-50/30 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3.5">
+                          <Lock className="w-5 h-5 text-indigo-600" />
+                          <div>
+                            <span className="text-xs font-black text-slate-800 block">Đổi mật khẩu tài khoản</span>
+                            <span className="text-[11px] text-slate-400">Khuyến nghị kết hợp chữ hoa, chữ số & ký tự đặc biệt</span>
+                          </div>
+                        </div>
+                        {isPasswordResetExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                      </button>
+
+                      <AnimatePresence initial={false}>
+                        {isPasswordResetExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden border-t border-slate-100"
+                          >
+                            <form onSubmit={handleResetPassword} className="p-5 flex flex-col gap-3.5">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                <div className="flex flex-col gap-1.5 text-left">
+                                  <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Mật khẩu mới</label>
+                                  <div className="relative">
+                                    <input
+                                      type={showPassword ? "text" : "password"}
+                                      required
+                                      placeholder="Nhập tối thiểu 6 ký tự..."
+                                      value={newPassword}
+                                      onChange={(e) => setNewPassword(e.target.value)}
+                                      className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs pl-4 pr-10 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-medium"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowPassword(!showPassword)}
+                                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                    >
+                                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col gap-1.5 text-left">
+                                  <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Xác nhận mật khẩu</label>
+                                  <input
+                                    type={showPassword ? "text" : "password"}
+                                    required
+                                    placeholder="Nhập lại mật khẩu..."
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-medium"
+                                  />
+                                </div>
+                              </div>
+
+                              <button
+                                type="submit"
+                                disabled={actionLoading}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-sm shadow-indigo-600/20 mt-1"
+                              >
+                                {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Xác nhận đổi mật khẩu"}
+                              </button>
+                            </form>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Security 2FA Information */}
+                    <div className="p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-left">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                          <Shield className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Bảo mật Token Bearer JWT</p>
+                          <p className="text-[11px] text-slate-500">Mã hóa đối xứng qua Gateway BFF an toàn 100%.</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 font-mono">
+                        HOẠT ĐỘNG
+                      </span>
+                    </div>
+
                   </div>
-                  {isPasswordResetExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
+                )}
 
-                <AnimatePresence initial={false}>
-                  {isPasswordResetExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden border-t border-slate-100"
-                    >
-                      <form onSubmit={handleResetPassword} className="p-4 flex flex-col gap-3">
-                        <div className="flex flex-col gap-1 text-left">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">Mật khẩu mới</label>
-                          <div className="relative">
-                            <input
-                              type={showPassword ? "text" : "password"}
-                              required
-                              placeholder="Nhập tối thiểu 6 ký tự..."
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 focus:border-[#FF4D24] text-xs pl-3.5 pr-10 py-2.5 rounded-xl outline-none focus:bg-white transition-all text-[#111111] font-medium"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                            >
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
+                {/* TAB 3: Address Book */}
+                {activeModalTab === "addresses" && (
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {isAddingAddress ? (
+                      /* FULL FORM VIEW WHEN ADDING / EDITING ADDRESS */
+                      <motion.form
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        onSubmit={handleSaveAddress}
+                        className="flex flex-col gap-4 text-left"
+                      >
+                        {/* Error Banner inside Form */}
+                        {errorMsg && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-start gap-2.5 text-left text-xs"
+                          >
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-rose-900">Không thể lưu địa chỉ:</p>
+                              <p className="text-rose-700 text-xs leading-snug">{errorMsg}</p>
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {/* Row 1: Recipient Name & Phone */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-700 block">
+                              Người nhận <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                required
+                                placeholder="Họ và tên người nhận..."
+                                value={newAddressForm.recipientName}
+                                onChange={(e) => {
+                                  setNewAddressForm({ ...newAddressForm, recipientName: e.target.value });
+                                  if (errorMsg) setErrorMsg("");
+                                }}
+                                className="w-full h-10 px-3.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-700 block">
+                              Số điện thoại <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="tel"
+                                required
+                                placeholder="090xxxxxxx"
+                                value={newAddressForm.phone}
+                                onChange={(e) => {
+                                  setNewAddressForm({ ...newAddressForm, phone: e.target.value });
+                                  if (errorMsg) setErrorMsg("");
+                                }}
+                                className="w-full h-10 px-3.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
+                              />
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-1 text-left">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">Xác nhận mật khẩu</label>
+                        {/* Row 2: Detailed Address + Realtime Geocoding Feedback */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-slate-700">
+                              Địa chỉ chi tiết (Tự động Geocoding) <span className="text-rose-500">*</span>
+                            </label>
+                            {isResolvingAddress && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600">
+                                <RefreshCw className="w-3 h-3 animate-spin" /> Đang phân tích tọa độ...
+                              </span>
+                            )}
+                          </div>
+                          
                           <input
-                            type={showPassword ? "text" : "password"}
+                            type="text"
                             required
-                            placeholder="Nhập lại mật khẩu..."
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 focus:border-[#FF4D24] text-xs px-3.5 py-2.5 rounded-xl outline-none focus:bg-white transition-all text-[#111111] font-medium"
+                            placeholder="Ví dụ: Số 15 Lê Duẩn, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh..."
+                            value={newAddressForm.address}
+                            onChange={(e) => {
+                              setNewAddressForm({ ...newAddressForm, address: e.target.value });
+                              if (errorMsg) setErrorMsg("");
+                            }}
+                            className="w-full h-10 px-3.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
                           />
+
+                          {/* Geocoding resolved preview */}
+                          {resolvedPreview && resolvedPreview.success && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -2 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="p-3 bg-emerald-50/80 border border-emerald-200/90 rounded-xl flex items-center justify-between gap-3 text-left shadow-2xs"
+                            >
+                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                                  <Compass className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0 space-y-0.5 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                                      {resolvedPreview.latitude.toFixed(4)}, {resolvedPreview.longitude.toFixed(4)}
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+                                      <Check className="w-3 h-3 stroke-[2.5]" /> Đã định vị tọa độ
+                                    </span>
+                                  </div>
+                                  <p className="text-[11.5px] text-emerald-950 font-medium leading-snug truncate">
+                                    {resolvedPreview.formattedAddress}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {newAddressForm.address.trim() !== resolvedPreview.formattedAddress.trim() && (
+                                <button
+                                  type="button"
+                                  onClick={() => setNewAddressForm(prev => ({ ...prev, address: resolvedPreview.formattedAddress }))}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer shrink-0 shadow-2xs flex items-center gap-1"
+                                >
+                                  <Check className="w-3 h-3 stroke-[2.5]" />
+                                  <span>Dùng địa chỉ này</span>
+                                </button>
+                              )}
+                            </motion.div>
+                          )}
+
+                          {resolvedPreview && !resolvedPreview.success && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -2 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="flex items-start gap-1.5 p-2 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-800 font-medium leading-snug text-left"
+                            >
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                              <span>{resolvedPreview.error || "Vui lòng nhập rõ số nhà, tên đường, phường/xã, quận/huyện và tỉnh/thành phố."}</span>
+                            </motion.div>
+                          )}
                         </div>
 
-                        <button
-                          type="submit"
-                          disabled={actionLoading}
-                          className="w-full bg-[#FF4D24] hover:bg-black text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-colors"
-                        >
-                          {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Xác nhận đổi mật khẩu"}
-                        </button>
-                      </form>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                        {/* Row 3: Address Type & Default Flag side-by-side */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-end">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-700 block">Loại địa chỉ</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setNewAddressForm({ ...newAddressForm, type: "office" })}
+                                className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                  newAddressForm.type === "office"
+                                    ? "bg-indigo-50/90 border-indigo-600 text-indigo-700 ring-1 ring-indigo-600/30 shadow-2xs font-bold"
+                                    : "bg-slate-50/50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-white"
+                                }`}
+                              >
+                                <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Văn phòng</span>
+                              </button>
+                              
+                              <button
+                                type="button"
+                                onClick={() => setNewAddressForm({ ...newAddressForm, type: "home" })}
+                                className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                  newAddressForm.type === "home"
+                                    ? "bg-violet-50/90 border-violet-600 text-violet-700 ring-1 ring-violet-600/30 shadow-2xs font-bold"
+                                    : "bg-slate-50/50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-white"
+                                }`}
+                              >
+                                <Home className="w-3.5 h-3.5 text-violet-600" />
+                                <span>Nhà riêng</span>
+                              </button>
+                            </div>
+                          </div>
 
-              {/* Close portal button */}
-              <button
-                type="button"
-                onClick={() => setIsAccountsCenterOpen(false)}
-                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-3 rounded-2xl transition-all cursor-pointer"
-              >
-                Đóng Trung tâm tài khoản
-              </button>
+                          <div className="p-2.5 bg-slate-50/80 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                            <label className="flex items-center gap-2.5 cursor-pointer select-none group w-full">
+                              <input
+                                type="checkbox"
+                                checked={newAddressForm.isDefault}
+                                onChange={(e) => setNewAddressForm({ ...newAddressForm, isDefault: e.target.checked })}
+                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer accent-indigo-600 shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 transition-colors block leading-none">
+                                  Địa chỉ mặc định
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-normal leading-none block mt-0.5">
+                                  Tự động chọn khi thanh toán
+                                </span>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Bottom Action Buttons (Directly beneath form fields) */}
+                        <div className="flex items-center justify-end gap-2.5 pt-3.5 mt-1 border-t border-slate-100 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAddingAddress(false);
+                              setEditingAddressSku(null);
+                              setResolvedPreview(null);
+                              setErrorMsg("");
+                              setSuccessMsg("");
+                            }}
+                            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                          >
+                            Hủy bỏ
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={
+                              actionLoading ||
+                              isResolvingAddress ||
+                              !resolvedPreview?.success ||
+                              !resolvedPreview?.latitude ||
+                              !resolvedPreview?.longitude ||
+                              !newAddressForm.recipientName.trim() ||
+                              !newAddressForm.phone.trim() ||
+                              !newAddressForm.address.trim()
+                            }
+                            className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-violet-700 hover:opacity-95 active:scale-[0.98] text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                          >
+                            {actionLoading ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <>
+                                <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>{editingAddressSku ? "Cập nhật địa chỉ" : "Lưu địa chỉ"}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </motion.form>
+                    ) : (
+                      /* DEFAULT VIEW: Header + 2-Column Grid of Addresses */
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700">{addresses.length} địa chỉ nhận hàng đã lưu</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAddingAddress(true);
+                              setEditingAddressSku(null);
+                              setNewAddressForm({
+                                recipientName: user?.fullName || "",
+                                phone: user?.phoneNumber || "",
+                                address: "",
+                                type: "office",
+                                isDefault: false
+                              });
+                              setErrorMsg("");
+                              setSuccessMsg("");
+                            }}
+                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Thêm địa chỉ mới</span>
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {addresses.map((addr) => {
+                            const isOffice = addr.type === "office";
+                            return (
+                              <div
+                                key={addr.sku}
+                                className={`relative p-5 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between overflow-hidden group ${
+                                  addr.isDefault 
+                                    ? "bg-indigo-50/40 border-indigo-200/90 shadow-sm ring-1 ring-indigo-500/10" 
+                                    : "bg-white hover:bg-slate-50/50 border-slate-200/90 hover:border-slate-300 shadow-2xs"
+                                }`}
+                              >
+                                {addr.isDefault && (
+                                  <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-600/70 to-transparent" />
+                                )}
+
+                                <div className="space-y-3.5">
+                                  {/* Header: Name + Type Badge + Default Badge */}
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
+                                        isOffice 
+                                          ? "bg-indigo-100/80 text-indigo-700 border border-indigo-200/50" 
+                                          : "bg-violet-100/80 text-violet-700 border border-violet-200/50"
+                                      }`}>
+                                        {isOffice ? <Building2 className="w-4 h-4" /> : <Home className="w-4 h-4" />}
+                                      </div>
+                                      <div>
+                                        <h4 className="text-sm font-bold text-slate-900 tracking-tight leading-tight">
+                                          {addr.recipientName}
+                                        </h4>
+                                        <span className="inline-flex items-center gap-1 text-[10.5px] font-medium text-slate-500 mt-0.5">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${isOffice ? "bg-indigo-500" : "bg-violet-500"}`} />
+                                          {isOffice ? "Văn phòng" : "Nhà riêng"}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {addr.isDefault && (
+                                      <span className="inline-flex items-center gap-1 text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-indigo-600 text-white shadow-2xs shrink-0 tracking-wider">
+                                        <Check className="w-3 h-3 stroke-[2.5]" /> Mặc định
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Info: Phone & Coordinates & Detailed Address */}
+                                  <div className="space-y-2 pt-2.5 border-t border-slate-100">
+                                    <div className="flex items-center flex-wrap gap-2 text-xs">
+                                      <div className="inline-flex items-center gap-1.5 font-mono font-semibold text-slate-700 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60">
+                                        <Phone className="w-3 h-3 text-indigo-600" />
+                                        <span>{addr.phoneNumber}</span>
+                                      </div>
+
+                                      {addr.latitude && addr.longitude && (
+                                        <div className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200/60">
+                                          <Compass className="w-3 h-3 text-emerald-600" />
+                                          <span>{addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-start gap-2 pt-1 text-xs font-normal text-slate-600 leading-relaxed">
+                                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                      <span className="text-slate-700 font-medium leading-snug">
+                                        {addr.address}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Footer Action Bar */}
+                                <div className="flex items-center justify-between pt-3 mt-3.5 border-t border-slate-100">
+                                  {!addr.isDefault ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetDefaultAddress(addr.sku)}
+                                      className="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer flex items-center gap-1"
+                                    >
+                                      <span>Đặt làm mặc định</span>
+                                      <ArrowRight className="w-3 h-3" />
+                                    </button>
+                                  ) : (
+                                    <span className="text-[11px] font-semibold text-indigo-700 flex items-center gap-1.5">
+                                      <Check className="w-3.5 h-3.5 text-indigo-600" />
+                                      <span>Địa chỉ giao hàng chính</span>
+                                    </span>
+                                  )}
+                                  
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditAddress(addr)}
+                                      className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                                      title="Chỉnh sửa địa chỉ"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteAddress(addr.sku)}
+                                      className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                      title="Xóa địa chỉ"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 4: Payment Methods & Cards */}
+                {activeModalTab === "payments" && (
+                  <div className="space-y-5 flex-1">
+                    {isAddingCard ? (
+                      /* FULL FORM VIEW WHEN ADDING PAYMENT CARD */
+                      <motion.form
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        onSubmit={handleAddPaymentMethod}
+                        className="p-6 bg-slate-50/70 border border-indigo-200/80 rounded-2xl space-y-4 text-left shadow-xs"
+                      >
+                        <div className="p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-xl flex items-center gap-3 text-left">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-600/10 text-indigo-600 flex items-center justify-center shrink-0">
+                            <CreditCard className="w-4 h-4 text-indigo-600" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-indigo-950">Liên kết phương thức thanh toán mới</p>
+                            <p className="text-[11px] text-slate-500">Các phương thức đã lưu được hiển thị ở cột bên trái để bạn tiện theo dõi.</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Loại phương thức</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                            {[
+                              { type: "visa", label: "Visa" },
+                              { type: "mastercard", label: "Mastercard" },
+                              { type: "jcb", label: "JCB" },
+                              { type: "momo", label: "Ví MoMo" }
+                            ].map(item => (
+                              <button
+                                key={item.type}
+                                type="button"
+                                onClick={() => setNewCardForm({ ...newCardForm, type: item.type as any })}
+                                className={`py-2.5 px-3 text-xs font-bold rounded-xl border text-center cursor-pointer transition-all ${
+                                  newCardForm.type === item.type
+                                    ? "bg-gradient-to-r from-indigo-600 to-violet-700 text-white border-transparent shadow-xs"
+                                    : "bg-white text-slate-700 border-slate-200 hover:bg-indigo-50/50"
+                                }`}
+                              >
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">
+                              {newCardForm.type === "momo" ? "Số điện thoại MoMo *" : "Số thẻ thanh toán *"}
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder={newCardForm.type === "momo" ? "090xxxxxxx" : "4111 2222 3333 4444"}
+                              value={newCardForm.cardNumber}
+                              onChange={(e) => setNewCardForm({ ...newCardForm, cardNumber: e.target.value })}
+                              className="w-full bg-white border border-slate-200 focus:border-indigo-600 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-slate-900"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Tên chủ thẻ (In hoa) *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="NGO NGOC DINH"
+                              value={newCardForm.holderName}
+                              onChange={(e) => setNewCardForm({ ...newCardForm, holderName: e.target.value.toUpperCase() })}
+                              className="w-full bg-white border border-slate-200 focus:border-indigo-600 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold uppercase text-slate-900"
+                            />
+                          </div>
+                        </div>
+
+                        {newCardForm.type !== "momo" && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Hạn sử dụng (MM/YY) *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="08/29"
+                                value={newCardForm.expiryDate}
+                                onChange={(e) => setNewCardForm({ ...newCardForm, expiryDate: e.target.value })}
+                                className="w-full bg-white border border-slate-200 focus:border-indigo-600 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-center text-slate-900"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Mã bảo mật CVC/CVV *</label>
+                              <input
+                                type="password"
+                                maxLength={4}
+                                placeholder="•••"
+                                value={newCardForm.cvv}
+                                onChange={(e) => setNewCardForm({ ...newCardForm, cvv: e.target.value })}
+                                className="w-full bg-white border border-slate-200 focus:border-indigo-600 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-center text-slate-900"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-200/70">
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={newCardForm.isDefault}
+                              onChange={(e) => setNewCardForm({ ...newCardForm, isDefault: e.target.checked })}
+                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer"
+                            />
+                            <span className="text-xs text-slate-700 font-semibold">Đặt làm phương thức thanh toán chính</span>
+                          </label>
+                          
+                          <div className="flex items-center gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAddingCard(false);
+                                setErrorMsg("");
+                                setSuccessMsg("");
+                              }}
+                              className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200/70 rounded-xl transition-all cursor-pointer"
+                            >
+                              Hủy bỏ
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 hover:opacity-95 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5"
+                            >
+                              <Check className="w-4 h-4" />
+                              <span>Lưu phương thức</span>
+                            </button>
+                          </div>
+                        </div>
+                      </motion.form>
+                    ) : (
+                      /* DEFAULT VIEW: Header + 2-Column Grid of Payment Cards */
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700">{paymentMethods.length} phương thức thanh toán</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAddingCard(true);
+                              setErrorMsg("");
+                              setSuccessMsg("");
+                            }}
+                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Thêm thẻ / Ví mới</span>
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {paymentMethods.map((card) => (
+                            <div
+                              key={card.id}
+                              className={`p-4 sm:p-5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                                card.isDefault 
+                                  ? "bg-slate-900 text-white border-slate-800 shadow-lg shadow-slate-900/15" 
+                                  : "bg-white border-slate-200 hover:border-slate-300"
+                              }`}
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className={`px-2.5 py-1 rounded-lg font-black text-xs font-mono tracking-wider ${
+                                    card.type === "visa" 
+                                      ? "bg-blue-600 text-white" 
+                                      : card.type === "mastercard" 
+                                        ? "bg-red-600 text-white" 
+                                        : card.type === "momo"
+                                          ? "bg-pink-600 text-white"
+                                          : "bg-emerald-600 text-white"
+                                  }`}>
+                                    {card.type.toUpperCase()}
+                                  </div>
+                                  {card.isDefault && (
+                                    <span className="text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-white/20 text-white border border-white/30">
+                                      Mặc định
+                                    </span>
+                                  )}
+                                </div>
+
+                                <p className={`text-sm font-mono font-bold tracking-wider ${card.isDefault ? "text-white" : "text-slate-900"}`}>
+                                  {card.cardNumber}
+                                </p>
+
+                                <div className="flex items-center justify-between text-[11px] pt-1">
+                                  <span className={card.isDefault ? "text-slate-300 font-mono font-medium" : "text-slate-500 font-mono"}>
+                                    {card.holderName}
+                                  </span>
+                                  <span className={card.isDefault ? "text-slate-400 font-mono" : "text-slate-400 font-mono"}>
+                                    Hạn: {card.expiryDate}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className={`flex items-center justify-between pt-3 mt-3 border-t ${card.isDefault ? "border-slate-800" : "border-slate-100"}`}>
+                                {!card.isDefault ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetDefaultPayment(card.id)}
+                                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+                                  >
+                                    Đặt làm mặc định
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                                    <Check className="w-3.5 h-3.5" /> Thẻ thanh toán chính
+                                  </span>
+                                )}
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePayment(card.id)}
+                                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                                    card.isDefault 
+                                      ? "text-slate-400 hover:text-red-400 hover:bg-white/10" 
+                                      : "text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                  }`}
+                                  title="Xóa thẻ"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 5: Active Sessions & Devices (2-Column Grid Layout) */}
+                {activeModalTab === "sessions" && (
+                  <div className="space-y-5 flex-1">
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Current device card */}
+                      <div className="p-4 sm:p-5 bg-emerald-50/40 border border-emerald-200/80 rounded-2xl flex items-start gap-3.5 text-left">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                          <Laptop className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs font-black text-slate-900">Trình duyệt Web (Phiên hiện tại)</p>
+                            <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              HOẠT ĐỘNG
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-mono">
+                            IP: 118.69.182.10 • TP. Hồ Chí Minh, Việt Nam
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            Truy cập lần cuối: Vừa xong
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Secondary Mobile App device session */}
+                      <div className="p-4 sm:p-5 bg-white border border-slate-200 rounded-2xl flex items-start gap-3.5 text-left">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                          <Smartphone className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs font-black text-slate-900">Horizon Mobile App v2.4 (iOS)</p>
+                            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                              iPhone 15 Pro
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-mono">
+                            IP: 14.241.221.84 • TP. Hồ Chí Minh
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            Truy cập lần cuối: 2 giờ trước
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Terminate other sessions action */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSuccessMsg("Đã đăng xuất tài khoản khỏi tất cả các thiết bị khác thành công!");
+                          logAuditAction("TERMINATE_SESSIONS", "SUCCESS", "Đăng xuất các phiên thiết bị khác từ Portal");
+                        }}
+                        className="w-full py-3 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer border border-slate-200 hover:border-red-200 shadow-xs"
+                      >
+                        Đăng xuất khỏi tất cả các thiết bị khác
+                      </button>
+                    </div>
+
+                  </div>
+                )}
+
+              </div>
 
             </motion.div>
           </div>

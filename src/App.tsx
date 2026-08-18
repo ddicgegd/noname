@@ -15,6 +15,7 @@ import RegisterPage from "./components/RegisterPage";
 import AuthReportDashboard from "./components/AuthReportDashboard";
 import ProfilePage from "./components/ProfilePage";
 import TermsPage from "./components/TermsPage";
+import OrderPage from "./components/OrderPage";
 import { AnimatePresence, motion } from "motion/react";
 
 interface CartItem {
@@ -48,9 +49,10 @@ interface RisingStar {
 }
 
 export default function App() {
-  const getPageFromPath = (path: string): "landing" | "product" | "auth" | "auth-report" | "profile" | "terms" => {
+  const getPageFromPath = (path: string): "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" => {
     const cleanPath = path.toLowerCase().replace(/\/$/, "");
     if (["/p", "/product"].includes(cleanPath)) return "product";
+    if (["/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath)) return "order";
     if (["/auth-report", "/diagnostic"].includes(cleanPath)) return "auth-report";
     if (["/profile", "/account", "/accounts"].includes(cleanPath)) return "profile";
     if (["/verify-email", "/verify"].includes(cleanPath)) {
@@ -66,6 +68,7 @@ export default function App() {
     switch (page) {
       case "landing": return "/";
       case "product": return "/p";
+      case "order": return "/order";
       case "auth-report": return "/auth-report";
       case "profile": return "/profile";
       case "auth": {
@@ -79,7 +82,7 @@ export default function App() {
     }
   };
 
-  const [currentPage, setCurrentPage] = useState<"landing" | "product" | "auth" | "auth-report" | "profile" | "terms">((() => {
+  const [currentPage, setCurrentPage] = useState<"landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms">((() => {
     const page = getPageFromPath(window.location.pathname);
     if (page === "auth") {
       const hash = window.location.hash.toLowerCase();
@@ -124,7 +127,7 @@ export default function App() {
   }, []);
 
   // Custom navigate function to sync with address bar
-  const navigate = (page: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms") => {
+  const navigate = (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms") => {
     setCurrentPage(page);
     let targetPath = getPathFromPage(page);
     if (page === "auth") {
@@ -332,6 +335,21 @@ export default function App() {
               onFlyEffect={handleFlyEffect}
               onSpawnStars={handleSpawnStars}
               onFlyToAccount={handleFlyToAccount}
+            />
+          </motion.div>
+        ) : currentPage === "order" ? (
+          <motion.div
+            key="order"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+          >
+            <OrderPage
+              onNavigate={navigate}
+              cartItems={cartItems}
+              onRemoveCartItem={handleRemoveCartItem}
+              onAddToCart={handleAddToCart}
             />
           </motion.div>
         ) : currentPage === "auth-report" ? (

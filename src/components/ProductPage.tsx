@@ -11,6 +11,7 @@ import {
 } from "../lib/productCatalog";
 import { getProductColorOptions, type ProductColorOption } from "../lib/productColorSwatches";
 import { searchAttributesForProductSku, searchProductsForCatalog } from "../services/merchandiseService";
+import { createOrder, type CreateOrderInput } from "../services/orderService";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1518,6 +1519,8 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
               window.history.replaceState(null, "", "/p");
             }}
             onAddToCart={onAddToCart}
+            onNavigate={onNavigate}
+            showToast={showToast}
             onFlyEffect={onFlyEffect}
             onSpawnStars={onSpawnStars}
             onFlyToAccount={onFlyToAccount}
@@ -1755,6 +1758,8 @@ interface ProductDetailModalProps {
     itemPrice: string,
     clickEvent?: React.MouseEvent | { clientX: number; clientY: number }
   ) => void;
+  onNavigate?: (page: "landing" | "product" | "auth-report" | "profile" | "auth" | "terms") => void;
+  showToast?: (message: string, type?: "success" | "info" | "warning") => void;
   onFlyEffect?: (
     startX: number,
     startY: number,
@@ -1772,9 +1777,11 @@ interface ProductDetailModalProps {
   ) => void;
 }
 
-function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductDetailModalProps) {
+function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, showToast, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductDetailModalProps) {
   const images = getProductImagesList(product);
   const versions = getProductVersions(product);
+
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
   const baseVndInfo = getProductVNDDetails(product);
   const basePriceInt = parseInt(baseVndInfo.present.replace(/\./g, "").replace("đ", ""), 10) || 5000000;
@@ -1868,6 +1875,111 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
   const selectedVersion = versions.find((version) => version.id === activeVersion);
   const selectedColor = colors.find((color) => color.id === activeColor);
   const selectedOptionLabel = [selectedVersion?.title, selectedColor?.title].filter(Boolean).join(" - ");
+
+  const handleBuyNow = async (e: React.MouseEvent) => {
+    if (isSubmittingOrder) return;
+    setIsSubmittingOrder(true);
+
+    try {
+      const attrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || "SKU-IPHONE15-128GB-BLK";
+      const addressSku = localStorage.getItem("horizon_user_address_sku") || "ADDR-018D9EF25B94";
+
+      const payload: CreateOrderInput = {
+        items: [
+          {
+            attributesSku: String(attrSku),
+            quantity: 1
+          }
+        ],
+        addressSku,
+        paymentMethod: "COD"
+      };
+
+      const result = await createOrder(payload);
+
+      if (result?.status?.code === 201 || result?.data?.orderNumber) {
+        const orderNumber = result.data.orderNumber;
+        const formattedTotal = result.data.totalAmount
+          ? result.data.totalAmount.toLocaleString("vi-VN") + "đ"
+          : formattedCurrentPrice;
+
+        // Synchronize to localStorage for Order Tracking view in Profile
+        try {
+          const storedOrders = localStorage.getItem("horizon_user_orders");
+          const activeOrders = storedOrders ? JSON.parse(storedOrders) : [];
+          const newOrderEntry = {
+            id: orderNumber,
+            name: `${product.name} (${selectedOptionLabel || "Mặc định"})`,
+            price: formattedTotal,
+            date: new Date().toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }),
+            status: "pending" as const,
+            statusText: "Đang chờ xác nhận",
+            deliverySteps: [
+              {
+                title: "Đơn hàng đã tạo",
+                desc: `Mã đơn ${orderNumber} - Phương thức COD`,
+                time: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+                completed: true,
+                active: true
+              },
+              {
+                title: "Xác nhận kho",
+                desc: "Kiểm tra tình trạng hàng tồn",
+                time: "--:--",
+                completed: false,
+                active: false
+              },
+              {
+                title: "Bàn giao vận chuyển",
+                desc: "Đang phân phối cho bưu tá",
+                time: "--:--",
+                completed: false,
+                active: false
+              },
+              {
+                title: "Giao hàng thành công",
+                desc: "Khách nhận hàng và thanh toán",
+                time: "--:--",
+                completed: false,
+                active: false
+              }
+            ],
+            shippingAddress: result.data.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
+            carrier: "Giao Hàng Nhanh (Express)",
+            trackingNumber: `GHN-${orderNumber.substring(0, 8).toUpperCase()}`
+          };
+
+          localStorage.setItem("horizon_user_orders", JSON.stringify([newOrderEntry, ...activeOrders]));
+        } catch (saveErr) {
+          console.warn("Could not sync order to local storage:", saveErr);
+        }
+
+        if (showToast) {
+          showToast(`Tạo đơn hàng thành công! Mã đơn: ${orderNumber}`, "success");
+        }
+
+        if (onFlyToAccount) {
+          onFlyToAccount(e.clientX, e.clientY, "shopping_bag", "#FF4D24", "rgba(255,77,36,0.3)");
+        }
+
+        setTimeout(() => {
+          onClose();
+          if (onNavigate) {
+            onNavigate("profile");
+          }
+        }, 800);
+      } else {
+        throw new Error(result?.status?.message || "Không thể khởi tạo đơn hàng");
+      }
+    } catch (error: any) {
+      console.error("Lỗi khi tạo đơn hàng:", error);
+      if (showToast) {
+        showToast(`Lỗi tạo đơn: ${error.message || "Vui lòng thử lại"}`, "warning");
+      }
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
 
   const [favoriteActive, setFavoriteActive] = useState(false);
   const [voucherCollected, setVoucherCollected] = useState(false);
@@ -3002,7 +3114,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
           <div className="relative flex items-center gap-2 shrink-0">
 
 
-            <button
+            <Button
+              variant="outline"
               onClick={(e) => {
                 if (onAddToCart) {
                   const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
@@ -3010,25 +3123,30 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 }
                 onClose();
               }}
-              className="hidden h-10 cursor-pointer select-none items-center justify-center rounded-xl border border-primary px-3.5 py-2 text-[11.5px] font-bold text-primary transition-colors hover:bg-secondary sm:flex sm:px-4 sm:text-[12px]"
+              className="hidden h-10 rounded-xl border-primary text-[11.5px] font-bold text-primary hover:bg-secondary sm:flex sm:px-4 sm:text-[12px]"
             >
               Trả góp 0%
-            </button>
+            </Button>
 
-            <button
-              onClick={(e) => {
-                if (onAddToCart) {
-                  const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
-                  onAddToCart(variantLabel, formattedCurrentPrice, e);
-                }
-                onClose();
-              }}
-              className="flex h-10 cursor-pointer select-none items-center justify-center rounded-xl bg-primary px-5 py-2 text-[11.5px] font-extrabold text-primary-foreground shadow-sm transition-colors hover:bg-primary/80 active:scale-97 sm:px-6 sm:text-[12px]"
+            <Button
+              variant="default"
+              disabled={isSubmittingOrder}
+              onClick={handleBuyNow}
+              className="flex h-10 rounded-xl bg-primary px-5 py-2 text-[11.5px] font-extrabold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-97 sm:px-6 sm:text-[12px]"
             >
-              MUA NGAY
-            </button>
+              {isSubmittingOrder ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2Icon className="size-4 animate-spin" data-icon="inline-start" />
+                  <span>Đang xử lý...</span>
+                </span>
+              ) : (
+                "MUA NGAY"
+              )}
+            </Button>
 
-            <button
+            <Button
+              variant="outline"
+              size="icon"
               onClick={(e) => {
                 if (onAddToCart) {
                   const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
@@ -3036,11 +3154,11 @@ function ProductDetailModal({ product, onClose, onAddToCart, onFlyEffect, onSpaw
                 }
                 onClose();
               }}
-              className="flex size-10 shrink-0 cursor-pointer select-none items-center justify-center rounded-xl border border-primary p-2 text-primary transition-all hover:bg-secondary active:scale-95"
+              className="size-10 rounded-xl border-primary text-primary hover:bg-secondary active:scale-95"
               title="Thêm vào giỏ hàng"
             >
-              <span className="material-symbols-outlined text-[18px] sm:text-[20px] font-bold">shopping_cart</span>
-            </button>
+              <ShoppingCartIcon className="size-5 font-bold" />
+            </Button>
           </div>
 
         </div>
