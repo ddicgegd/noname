@@ -6,7 +6,8 @@ import {
   Shield, Check, X, Sliders, ShoppingBag, ClipboardList, Truck, Package, 
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
   Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
-  ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2
+  ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
+  LocateFixed, Map, Search, CheckCircle2, Layers
 } from "lucide-react";
 import { apiRequest } from "../lib/api";
 import { 
@@ -105,6 +106,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   });
   const [resolvedPreview, setResolvedPreview] = useState<ResolvedAddressDto | null>(null);
   const [isResolvingAddress, setIsResolvingAddress] = useState<boolean>(false);
+  const [mapLayer, setMapLayer] = useState<"mapnik" | "hot" | "transport">("mapnik");
+  const [isMapActive, setIsMapActive] = useState<boolean>(false);
+  const [copiedCoord, setCopiedCoord] = useState<boolean>(false);
+  const [mapKey, setMapKey] = useState<number>(0);
 
   // Real-time Address API response inspector logs state
   const [apiResponseLogs, setApiResponseLogs] = useState<AddressApiResponseLog[]>([]);
@@ -764,6 +769,90 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     return () => clearTimeout(timer);
   }, [newAddressForm.address, isAddingAddress]);
 
+  // Handler for active/manual Geocoding refresh on the address input
+  const handleManualResolveAddress = async () => {
+    const trimmed = newAddressForm.address.trim();
+    if (trimmed.length < 3) return;
+    setIsResolvingAddress(true);
+    try {
+      const res = await resolveAddress(trimmed);
+      setResolvedPreview(res);
+      setMapKey(prev => prev + 1);
+    } catch (_) {
+      setResolvedPreview(null);
+    } finally {
+      setIsResolvingAddress(false);
+    }
+  };
+
+  // Handler for auto-filling recipient info from profile
+  const handleFillFromProfile = () => {
+    setNewAddressForm(prev => ({
+      ...prev,
+      recipientName: user?.fullName || editFullName || "Người nhận",
+      phone: user?.phoneNumber || editPhone || "0901234567"
+    }));
+    setSuccessMsg("Đã tự động điền thông tin từ hồ sơ cá nhân!");
+    if (errorMsg) setErrorMsg("");
+  };
+
+  // Handler for GPS Device Location
+  const handleGetDeviceLocation = () => {
+    if (!navigator.geolocation) {
+      setErrorMsg("Trình duyệt không hỗ trợ định vị GPS tự động.");
+      return;
+    }
+    setIsResolvingAddress(true);
+    setErrorMsg("");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          // Reverse geocoding via OpenStreetMap Nominatim
+          const resp = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=vi`
+          );
+          const data = await resp.json();
+          const displayAddress = data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+          setNewAddressForm(prev => ({
+            ...prev,
+            address: displayAddress
+          }));
+          setResolvedPreview({
+            success: true,
+            latitude,
+            longitude,
+            formattedAddress: displayAddress,
+            rawAddress: displayAddress
+          });
+          setSuccessMsg("Đã định vị thành công vị trí GPS hiện tại của bạn!");
+        } catch (e) {
+          // Fallback with coordinates
+          const coordsStr = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+          setNewAddressForm(prev => ({
+            ...prev,
+            address: coordsStr
+          }));
+          setResolvedPreview({
+            success: true,
+            latitude,
+            longitude,
+            formattedAddress: coordsStr,
+            rawAddress: coordsStr
+          });
+          setSuccessMsg("Đã nhận diện tọa độ GPS của thiết bị!");
+        } finally {
+          setIsResolvingAddress(false);
+        }
+      },
+      (err) => {
+        setIsResolvingAddress(false);
+        setErrorMsg("Không thể lấy vị trí: " + (err.message || "Vui lòng cho phép quyền truy cập vị trí trên trình duyệt"));
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   // Handler for Payment Methods: Add Payment Method / Card
   const handleAddPaymentMethod = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1407,14 +1496,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             >
               
               {/* LEFT COLUMN: Sidebar Navigation / Context Data View */}
-              <div className="w-full md:w-80 lg:w-[330px] bg-slate-50/90 border-b md:border-b-0 md:border-r border-slate-200/70 p-6 flex flex-col justify-between shrink-0 text-left relative overflow-hidden">
+              <div className="w-full md:w-80 lg:w-[320px] bg-slate-50/90 border-b md:border-b-0 md:border-r border-slate-200/70 p-4 sm:p-4.5 flex flex-col justify-between shrink-0 text-left relative overflow-hidden">
                 {/* Ambient glow matching page deep indigo/violet theme in top-left */}
                 <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full bg-gradient-to-br from-indigo-600/15 via-violet-600/10 to-purple-700/8 blur-3xl pointer-events-none z-0" />
                 {((activeModalTab === "addresses" && isAddingAddress) || (activeModalTab === "payments" && isAddingCard)) ? (
                   /* WHEN FORM IS OPEN: Show existing data list on the left side */
-                  <div className="flex flex-col h-full space-y-4">
-                    {/* Header with back button */}
-                    <div>
+                  <div className="flex flex-col h-full relative z-10">
+                    {/* Header with back button & count */}
+                    <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-200/80 shrink-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -1423,15 +1512,18 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 transition-colors cursor-pointer group"
                       >
-                        <ArrowLeft className="w-3.5 h-3.5" />
-                        <span>Quay lại danh mục</span>
+                        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                        <span>Danh sách địa chỉ</span>
                       </button>
+                      <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded-full">
+                        {addresses.length} đã lưu
+                      </span>
                     </div>
 
-                    {/* Scrollable list of existing items */}
-                    <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 max-h-[480px]">
+                    {/* Scrollable list of existing items (Space-optimized & Refined) */}
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-0">
                       {activeModalTab === "addresses" && addresses.map(addr => {
                         const isOffice = addr.type === "office";
                         const isCurrentlyEditing = editingAddressSku === addr.sku;
@@ -1439,44 +1531,39 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <div 
                             key={addr.sku}
                             onClick={() => handleOpenEditAddress(addr)}
-                            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative group ${
                               isCurrentlyEditing
-                                ? "bg-indigo-50/50 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs"
+                                ? "bg-indigo-50/60 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs"
                                 : addr.isDefault 
-                                  ? "bg-white border-indigo-200 hover:border-indigo-300 shadow-2xs" 
-                                  : "bg-white hover:bg-slate-50/70 border-slate-200/80 hover:border-slate-300"
+                                  ? "bg-white border-indigo-200/90 hover:border-indigo-300 shadow-2xs" 
+                                  : "bg-white hover:bg-slate-50 border-slate-200/80 hover:border-slate-300 shadow-2xs"
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2 mb-1.5">
                               <div className="flex items-center gap-2 min-w-0">
                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                                  isOffice ? "bg-indigo-100/70 text-indigo-700" : "bg-violet-100/70 text-violet-700"
+                                  isOffice ? "bg-indigo-100/80 text-indigo-700" : "bg-violet-100/80 text-violet-700"
                                 }`}>
                                   {isOffice ? <Building2 className="w-3.5 h-3.5" /> : <Home className="w-3.5 h-3.5" />}
                                 </div>
                                 <span className="text-xs font-bold text-slate-900 truncate">{addr.recipientName}</span>
                               </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                {addr.isDefault && (
-                                  <span className="inline-flex items-center gap-0.5 text-[9px] px-2 py-0.5 font-bold uppercase bg-indigo-600 text-white rounded-full">
-                                    <Check className="w-2.5 h-2.5 stroke-[2.5]" /> Mặc định
-                                  </span>
-                                )}
-                              </div>
+                              {addr.isDefault && (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] px-2 py-0.5 font-bold uppercase bg-indigo-600 text-white rounded-full shrink-0">
+                                  <Check className="w-2.5 h-2.5 stroke-[2.5]" /> Mặc định
+                                </span>
+                              )}
                             </div>
-                            <p className="text-[11px] font-mono font-medium text-slate-600 mb-1 flex items-center gap-1.5">
-                              <Phone className="w-3 h-3 text-indigo-600" />
-                              <span>{addr.phoneNumber}</span>
-                            </p>
-                            <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
-                              {addr.address}
-                            </p>
-                            {addr.latitude && addr.longitude && (
-                              <div className="flex items-center gap-1 text-[9.5px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 mt-1.5 w-fit">
-                                <Compass className="w-2.5 h-2.5 text-emerald-600" />
-                                <span>{addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
-                              </div>
-                            )}
+
+                            <div className="space-y-0.5 pl-8">
+                              <p className="text-[11px] font-mono font-medium text-slate-500 flex items-center gap-1">
+                                <Phone className="w-3 h-3 text-slate-400" />
+                                <span>{addr.phoneNumber}</span>
+                              </p>
+                              <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
+                                {addr.address}
+                              </p>
+                            </div>
                           </div>
                         );
                       })}
@@ -1520,7 +1607,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     </div>
 
                     {/* Bottom action when form is open */}
-                    <div className="pt-3 mt-auto border-t border-slate-200/70">
+                    <div className="pt-2.5 mt-2.5 border-t border-slate-200/70 shrink-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -1529,9 +1616,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="w-full bg-rose-50/80 hover:bg-rose-100/90 text-rose-600 border border-rose-200/70 text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                        className="w-full bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/90 text-xs font-bold py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-3.5 h-3.5 text-slate-400" />
                         <span>Hủy bỏ biểu mẫu</span>
                       </button>
                     </div>
@@ -1630,11 +1717,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 )}
               </div>
 
-              {/* RIGHT COLUMN: Active Tab Content Panel (Optimized padding) */}
-              <div className="flex-1 bg-white p-5 sm:p-6 lg:p-7 overflow-y-auto flex flex-col text-left relative min-h-0">
+              {/* RIGHT COLUMN: Active Tab Content Panel (Optimized Edge-to-Edge Spacing) */}
+              <div className="flex-1 bg-gradient-to-br from-slate-50/95 via-slate-50/60 to-indigo-50/20 p-3.5 sm:p-4 lg:p-4.5 overflow-y-auto flex flex-col text-left relative min-h-0">
                 
                 {/* Panel Header */}
-                <div className="flex items-start justify-between gap-4 pb-3.5 mb-4 border-b border-slate-100 shrink-0">
+                <div className="flex items-start justify-between gap-3 pb-2.5 mb-3 border-b border-slate-200/80 shrink-0">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900 tracking-tight">
                       {isAddingAddress && (editingAddressSku ? "Chỉnh sửa địa chỉ nhận hàng" : "Thêm địa chỉ giao nhận mới")}
@@ -1664,17 +1751,43 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     </p>
                   </div>
                   
-                  <button 
-                    onClick={() => {
-                      if (isAddingAddress) setIsAddingAddress(false);
-                      else if (isAddingCard) setIsAddingCard(false);
-                      else setIsAccountsCenterOpen(false);
-                    }}
-                    className="w-9 h-9 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-black transition-colors cursor-pointer shrink-0"
-                    title={isAddingAddress || isAddingCard ? "Đóng form" : "Đóng"}
-                  >
-                    <X className="w-4.5 h-4.5" />
-                  </button>
+                  {/* Header Actions: Only single action button during address edit */}
+                  {isAddingAddress ? (
+                    <div className="flex items-center shrink-0">
+                      <button
+                        type="submit"
+                        form="address-form"
+                        disabled={
+                          actionLoading ||
+                          isResolvingAddress ||
+                          !resolvedPreview?.success ||
+                          !resolvedPreview?.latitude ||
+                          !resolvedPreview?.longitude ||
+                          !newAddressForm.recipientName.trim() ||
+                          !newAddressForm.phone.trim() ||
+                          !newAddressForm.address.trim()
+                        }
+                        className="h-9 px-4.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-sm shadow-indigo-600/25 flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                      >
+                        {actionLoading ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <span>{editingAddressSku ? "Cập nhật địa chỉ" : "Lưu địa chỉ"}</span>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        if (isAddingCard) setIsAddingCard(false);
+                        else setIsAccountsCenterOpen(false);
+                      }}
+                      className="w-9 h-9 rounded-full bg-white hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-black transition-colors cursor-pointer shrink-0"
+                      title={isAddingCard ? "Đóng form" : "Đóng"}
+                    >
+                      <X className="w-4.5 h-4.5" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Floating Toast Notification (Zero Layout Shift - Zero Jank) */}
@@ -1960,54 +2073,59 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 {activeModalTab === "addresses" && (
                   <div className="flex-1 flex flex-col min-h-0">
                     {isAddingAddress ? (
-                      /* FULL FORM VIEW WHEN ADDING / EDITING ADDRESS */
+                      /* TOP-COMPACT-FORM & FULL-HEIGHT MAP (WITH 65/35 RATIO & MINIMAL EYE BLUR SAVER) */
                       <motion.form
+                        id="address-form"
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         onSubmit={handleSaveAddress}
-                        className="flex flex-col gap-4 text-left"
+                        className="flex flex-col gap-2.5 text-left flex-1 min-h-0"
                       >
                         {/* Error Banner inside Form */}
                         {errorMsg && (
                           <motion.div
                             initial={{ opacity: 0, y: -4 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-start gap-2.5 text-left text-xs"
+                            className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-start gap-2.5 text-left text-xs shrink-0"
                           >
                             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                            <div className="space-y-0.5">
+                            <div className="space-y-0.5 min-w-0 flex-1">
                               <p className="font-bold text-rose-900">Không thể lưu địa chỉ:</p>
                               <p className="text-rose-700 text-xs leading-snug">{errorMsg}</p>
                             </div>
                           </motion.div>
                         )}
 
-                        {/* Row 1: Recipient Name & Phone */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-slate-700 block">
-                              Người nhận <span className="text-rose-500">*</span>
-                            </label>
-                            <div className="relative">
+                        {/* TOP SECTION: Expanded Input Dashboard */}
+                        <div className="bg-white/95 border border-slate-200/90 rounded-2xl p-3 sm:p-3.5 space-y-2.5 shadow-sm shrink-0 w-full">
+                          {/* Row 1: Recipient, Phone, Address Type, Default Switch */}
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center w-full">
+                            
+                            {/* Recipient Name */}
+                            <div className="md:col-span-4">
+                              <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1 mb-1">
+                                <User className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Người nhận</span> <span className="text-rose-500">*</span>
+                              </label>
                               <input
                                 type="text"
                                 required
-                                placeholder="Họ và tên người nhận..."
+                                placeholder="Họ và tên..."
                                 value={newAddressForm.recipientName}
                                 onChange={(e) => {
                                   setNewAddressForm({ ...newAddressForm, recipientName: e.target.value });
                                   if (errorMsg) setErrorMsg("");
                                 }}
-                                className="w-full h-10 px-3.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
+                                className="w-full h-9 px-3 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
                               />
                             </div>
-                          </div>
-                          
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-slate-700 block">
-                              Số điện thoại <span className="text-rose-500">*</span>
-                            </label>
-                            <div className="relative">
+
+                            {/* Phone Number */}
+                            <div className="md:col-span-3">
+                              <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1 mb-1">
+                                <Phone className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Số điện thoại</span> <span className="text-rose-500">*</span>
+                              </label>
                               <input
                                 type="tel"
                                 required
@@ -2017,179 +2135,263 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   setNewAddressForm({ ...newAddressForm, phone: e.target.value });
                                   if (errorMsg) setErrorMsg("");
                                 }}
-                                className="w-full h-10 px-3.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
+                                className="w-full h-9 px-3 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-mono font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
                               />
                             </div>
-                          </div>
-                        </div>
 
-                        {/* Row 2: Detailed Address + Realtime Geocoding Feedback */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-semibold text-slate-700">
-                              Địa chỉ chi tiết (Tự động Geocoding) <span className="text-rose-500">*</span>
-                            </label>
-                            {isResolvingAddress && (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600">
-                                <RefreshCw className="w-3 h-3 animate-spin" /> Đang phân tích tọa độ...
-                              </span>
-                            )}
-                          </div>
-                          
-                          <input
-                            type="text"
-                            required
-                            placeholder="Ví dụ: Số 15 Lê Duẩn, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh..."
-                            value={newAddressForm.address}
-                            onChange={(e) => {
-                              setNewAddressForm({ ...newAddressForm, address: e.target.value });
-                              if (errorMsg) setErrorMsg("");
-                            }}
-                            className="w-full h-10 px-3.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
-                          />
-
-                          {/* Geocoding resolved preview */}
-                          {resolvedPreview && resolvedPreview.success && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -2 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="p-3 bg-emerald-50/80 border border-emerald-200/90 rounded-xl flex items-center justify-between gap-3 text-left shadow-2xs"
-                            >
-                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
-                                  <Compass className="w-3.5 h-3.5" />
-                                </div>
-                                <div className="min-w-0 space-y-0.5 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
-                                      {resolvedPreview.latitude.toFixed(4)}, {resolvedPreview.longitude.toFixed(4)}
-                                    </span>
-                                    <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
-                                      <Check className="w-3 h-3 stroke-[2.5]" /> Đã định vị tọa độ
-                                    </span>
-                                  </div>
-                                  <p className="text-[11.5px] text-emerald-950 font-medium leading-snug truncate">
-                                    {resolvedPreview.formattedAddress}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {newAddressForm.address.trim() !== resolvedPreview.formattedAddress.trim() && (
+                            {/* Address Type: Modern Segmented Control */}
+                            <div className="md:col-span-3">
+                              <label className="text-[11px] font-bold text-slate-700 block mb-1">Loại địa chỉ</label>
+                              <div className="h-9 p-0.5 bg-slate-100 border border-slate-200/90 rounded-xl flex items-center gap-0.5">
                                 <button
                                   type="button"
-                                  onClick={() => setNewAddressForm(prev => ({ ...prev, address: resolvedPreview.formattedAddress }))}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer shrink-0 shadow-2xs flex items-center gap-1"
+                                  onClick={() => setNewAddressForm({ ...newAddressForm, type: "office" })}
+                                  className={`flex-1 h-full rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                                    newAddressForm.type === "office"
+                                      ? "bg-white text-indigo-700 shadow-2xs border border-slate-200/60 font-extrabold"
+                                      : "text-slate-500 hover:text-slate-800"
+                                  }`}
                                 >
-                                  <Check className="w-3 h-3 stroke-[2.5]" />
-                                  <span>Dùng địa chỉ này</span>
+                                  <Building2 className="w-3 h-3" />
+                                  <span>Văn phòng</span>
                                 </button>
-                              )}
-                            </motion.div>
-                          )}
+                                <button
+                                  type="button"
+                                  onClick={() => setNewAddressForm({ ...newAddressForm, type: "home" })}
+                                  className={`flex-1 h-full rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                                    newAddressForm.type === "home"
+                                      ? "bg-white text-violet-700 shadow-2xs border border-slate-200/60 font-extrabold"
+                                      : "text-slate-500 hover:text-slate-800"
+                                  }`}
+                                >
+                                  <Home className="w-3 h-3" />
+                                  <span>Nhà riêng</span>
+                                </button>
+                              </div>
+                            </div>
 
-                          {resolvedPreview && !resolvedPreview.success && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -2 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="flex items-start gap-1.5 p-2 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-800 font-medium leading-snug text-left"
-                            >
-                              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                              <span>{resolvedPreview.error || "Vui lòng nhập rõ số nhà, tên đường, phường/xã, quận/huyện và tỉnh/thành phố."}</span>
-                            </motion.div>
-                          )}
-                        </div>
-
-                        {/* Row 3: Address Type & Default Flag side-by-side */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-end">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-slate-700 block">Loại địa chỉ</label>
-                            <div className="grid grid-cols-2 gap-2">
+                            {/* Default Address: Sleek Interactive Toggle Card */}
+                            <div className="md:col-span-2 flex flex-col justify-end">
+                              <span className="text-[11px] font-bold text-slate-700 block mb-1">Mặc định</span>
                               <button
                                 type="button"
-                                onClick={() => setNewAddressForm({ ...newAddressForm, type: "office" })}
-                                className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                  newAddressForm.type === "office"
-                                    ? "bg-indigo-50/90 border-indigo-600 text-indigo-700 ring-1 ring-indigo-600/30 shadow-2xs font-bold"
-                                    : "bg-slate-50/50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-white"
+                                role="switch"
+                                aria-checked={newAddressForm.isDefault}
+                                onClick={() => setNewAddressForm({ ...newAddressForm, isDefault: !newAddressForm.isDefault })}
+                                className={`h-9 px-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer select-none ${
+                                  newAddressForm.isDefault 
+                                    ? "bg-indigo-50/90 border-indigo-200 text-indigo-900 shadow-2xs" 
+                                    : "bg-slate-50/70 border-slate-200 text-slate-500 hover:bg-slate-100/60"
                                 }`}
+                                title="Bật/Tắt làm địa chỉ giao hàng mặc định"
                               >
-                                <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                                <span>Văn phòng</span>
-                              </button>
-                              
-                              <button
-                                type="button"
-                                onClick={() => setNewAddressForm({ ...newAddressForm, type: "home" })}
-                                className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                  newAddressForm.type === "home"
-                                    ? "bg-violet-50/90 border-violet-600 text-violet-700 ring-1 ring-violet-600/30 shadow-2xs font-bold"
-                                    : "bg-slate-50/50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-white"
-                                }`}
-                              >
-                                <Home className="w-3.5 h-3.5 text-violet-600" />
-                                <span>Nhà riêng</span>
+                                <span className="text-[11px] font-bold">
+                                  {newAddressForm.isDefault ? "Mặc định" : "Thường"}
+                                </span>
+                                <div className={`w-7 h-4 rounded-full transition-colors relative p-0.5 flex items-center ${
+                                  newAddressForm.isDefault ? "bg-indigo-600 justify-end" : "bg-slate-300 justify-start"
+                                }`}>
+                                  <div className="w-3 h-3 rounded-full bg-white shadow-xs" />
+                                </div>
                               </button>
                             </div>
+
                           </div>
 
-                          <div className="p-2.5 bg-slate-50/80 border border-slate-200/80 rounded-xl flex items-center justify-between">
-                            <label className="flex items-center gap-2.5 cursor-pointer select-none group w-full">
-                              <input
-                                type="checkbox"
-                                checked={newAddressForm.isDefault}
-                                onChange={(e) => setNewAddressForm({ ...newAddressForm, isDefault: e.target.checked })}
-                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer accent-indigo-600 shrink-0"
-                              />
-                              <div className="min-w-0">
-                                <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 transition-colors block leading-none">
-                                  Địa chỉ mặc định
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-normal leading-none block mt-0.5">
-                                  Tự động chọn khi thanh toán
-                                </span>
-                              </div>
+                          {/* Row 2: Address Search Input (65%) & Instant Geocoding Chip (35%) */}
+                          <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                            <label className="text-[11px] font-bold text-slate-700 block">
+                              Địa chỉ chi tiết (Tự động Geocoding tọa độ) <span className="text-rose-500">*</span>
                             </label>
+
+                            <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
+                              {/* 65% Fixed Width Input */}
+                              <div className="relative w-full sm:w-[65%] sm:basis-[65%] shrink-0">
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                                  <Search className="w-3.5 h-3.5" />
+                                </div>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="Nhập số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố..."
+                                  value={newAddressForm.address}
+                                  onChange={(e) => {
+                                    setNewAddressForm({ ...newAddressForm, address: e.target.value });
+                                    if (errorMsg) setErrorMsg("");
+                                  }}
+                                  className="w-full h-9.5 pl-9 pr-9 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
+                                />
+                                {newAddressForm.address.trim() && (
+                                  <button
+                                    type="button"
+                                    onClick={handleManualResolveAddress}
+                                    disabled={isResolvingAddress}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
+                                    title="Chủ động tải lại vị trí / Geocoding tọa độ"
+                                  >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${isResolvingAddress ? "animate-spin text-indigo-600" : "text-slate-400 hover:text-indigo-600"}`} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* 35% Fixed Width Geocoding Status Chip (Click to Copy & Stretched Layout) */}
+                              <div className="w-full sm:w-[35%] sm:basis-[35%] shrink-0">
+                                {isResolvingAddress ? (
+                                  <div className="w-full h-9.5 px-3 bg-indigo-50/90 border border-indigo-200/80 rounded-xl flex items-center justify-center gap-1.5 text-xs text-indigo-700 font-medium">
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
+                                    <span className="truncate">Đang tìm tọa độ...</span>
+                                  </div>
+                                ) : resolvedPreview && resolvedPreview.success ? (
+                                  <div
+                                    onClick={() => {
+                                      if (resolvedPreview?.latitude && resolvedPreview?.longitude) {
+                                        const mapShareText = `https://maps.google.com/?q=${resolvedPreview.latitude.toFixed(6)},${resolvedPreview.longitude.toFixed(6)}`;
+                                        navigator.clipboard.writeText(mapShareText);
+                                        setCopiedCoord(true);
+                                        setTimeout(() => setCopiedCoord(false), 1000);
+                                      }
+                                    }}
+                                    className="w-full h-9.5 px-3 bg-emerald-50/90 hover:bg-emerald-100/70 border border-emerald-200 rounded-xl flex items-center justify-between gap-1.5 text-xs transition-all cursor-pointer shadow-2xs group select-none"
+                                    title="Bấm vào để sao chép liên kết vị trí bản đồ"
+                                  >
+                                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                      <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5] shrink-0" />
+                                      <span className="font-mono font-bold text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200/70 px-1.5 py-0.5 rounded text-[11px] truncate flex-1 text-center">
+                                        {resolvedPreview.latitude.toFixed(4)}, {resolvedPreview.longitude.toFixed(4)}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {copiedCoord ? (
+                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-200 px-1.5 py-0.5 rounded">Đã copy!</span>
+                                      ) : (
+                                        <Copy className="w-3 h-3 text-emerald-600 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                      )}
+                                      {newAddressForm.address.trim() !== resolvedPreview.formattedAddress.trim() && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setNewAddressForm(prev => ({ ...prev, address: resolvedPreview.formattedAddress }));
+                                          }}
+                                          className="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-1.5 py-0.5 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5"
+                                          title="Áp dụng định dạng địa chỉ chuẩn hóa"
+                                        >
+                                          <Sparkles className="w-2.5 h-2.5" />
+                                          <span>Chuẩn hóa</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : resolvedPreview && !resolvedPreview.success ? (
+                                  <div className="w-full h-9.5 px-3 bg-amber-50/90 border border-amber-200 rounded-xl flex items-center justify-center gap-1.5 text-xs text-amber-800 font-medium">
+                                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span className="truncate">Chưa tìm thấy tọa độ</span>
+                                  </div>
+                                ) : (
+                                  <div className="w-full h-9.5 px-3 bg-white border border-dashed border-slate-200 rounded-xl flex items-center justify-center text-[11px] text-slate-400 font-medium">
+                                    <span>Chờ nhập địa chỉ...</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Bottom Action Buttons (Directly beneath form fields) */}
-                        <div className="flex items-center justify-end gap-2.5 pt-3.5 mt-1 border-t border-slate-100 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsAddingAddress(false);
-                              setEditingAddressSku(null);
-                              setResolvedPreview(null);
-                              setErrorMsg("");
-                              setSuccessMsg("");
-                            }}
-                            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
-                          >
-                            Hủy bỏ
-                          </button>
-                          <button
-                            type="submit"
-                            disabled={
-                              actionLoading ||
-                              isResolvingAddress ||
-                              !resolvedPreview?.success ||
-                              !resolvedPreview?.latitude ||
-                              !resolvedPreview?.longitude ||
-                              !newAddressForm.recipientName.trim() ||
-                              !newAddressForm.phone.trim() ||
-                              !newAddressForm.address.trim()
-                            }
-                            className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-violet-700 hover:opacity-95 active:scale-[0.98] text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
-                          >
-                            {actionLoading ? (
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
+                        {/* BOTTOM SECTION: Full-Height Clean Interactive Map Viewport (MINIMAL EYE BLUR SAVER) */}
+                        <div className="flex-1 min-h-[360px] rounded-2xl border border-slate-200 bg-slate-100 overflow-hidden relative shadow-sm flex">
+                          
+                          {/* Map Viewport Area */}
+                          <div className="w-full h-full relative bg-slate-100 flex items-center justify-center overflow-hidden flex-1">
+                            {resolvedPreview?.success && resolvedPreview.latitude && resolvedPreview.longitude ? (
                               <>
-                                <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>{editingAddressSku ? "Cập nhật địa chỉ" : "Lưu địa chỉ"}</span>
+                                {/* Iframe with dynamic blur effect according to performance state */}
+                                <iframe
+                                  key={mapKey}
+                                  title="OpenStreetMap Live Preview"
+                                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${resolvedPreview.longitude - 0.007}%2C${resolvedPreview.latitude - 0.004}%2C${resolvedPreview.longitude + 0.007}%2C${resolvedPreview.latitude + 0.004}&layer=${mapLayer}&marker=${resolvedPreview.latitude}%2C${resolvedPreview.longitude}`}
+                                  className={`w-full h-full border-0 absolute inset-0 transition-all duration-300 ${
+                                    isMapActive 
+                                      ? "filter-none opacity-100 scale-100 pointer-events-auto" 
+                                      : "filter blur-[4px] opacity-40 scale-105 pointer-events-none"
+                                  }`}
+                                  loading="lazy"
+                                />
+
+                                {/* Performance Saver Overlay: Single Minimal Eye Button */}
+                                {!isMapActive && (
+                                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-900/10 backdrop-blur-[2px] p-4">
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsMapActive(true)}
+                                      className="w-14 h-14 rounded-full bg-white/95 hover:bg-white text-indigo-600 shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer group"
+                                      title="Bật hiển thị bản đồ tương tác"
+                                    >
+                                      <Eye className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Floating Location Action Bar when Map is Active (No Name, Recenter Icon + Google Maps Button) */}
+                                {isMapActive && (
+                                  <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 bg-white/95 backdrop-blur-md p-1 pl-2.5 rounded-xl border border-slate-200/90 shadow-md animate-in fade-in duration-200">
+                                    <div className="flex items-center gap-1.5 pr-1">
+                                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                      <span className="text-[11px] font-mono font-bold text-slate-700">
+                                        {resolvedPreview.latitude.toFixed(4)}, {resolvedPreview.longitude.toFixed(4)}
+                                      </span>
+                                    </div>
+
+                                    <div className="h-4 w-px bg-slate-200 shrink-0" />
+
+                                    {/* Button 1: Recenter map to target address (Icon Only) */}
+                                    <button
+                                      type="button"
+                                      onClick={() => setMapKey(prev => prev + 1)}
+                                      className="w-6.5 h-6.5 bg-indigo-50 hover:bg-indigo-100/90 text-indigo-700 rounded-lg border border-indigo-200/80 transition-all flex items-center justify-center cursor-pointer shrink-0 active:scale-95 shadow-2xs"
+                                      title="Trỏ lại tâm vị trí"
+                                    >
+                                      <LocateFixed className="w-3.5 h-3.5 text-indigo-600" />
+                                    </button>
+
+                                    {/* Button 2: Open in Google Maps */}
+                                    <a
+                                      href={`https://www.google.com/maps/search/?api=1&query=${resolvedPreview.latitude},${resolvedPreview.longitude}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 text-[10.5px] font-bold rounded-lg border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                                      title="Mở vị trí này trên Google Maps"
+                                    >
+                                      <span>Google Maps</span>
+                                      <ExternalLink className="w-3 h-3 text-slate-400" />
+                                    </a>
+                                  </div>
+                                )}
                               </>
+                            ) : isResolvingAddress ? (
+                              <div className="flex flex-col items-center justify-center gap-3 p-6 text-center z-10">
+                                <div className="relative">
+                                  <div className="w-14 h-14 rounded-full border-3 border-indigo-200 border-t-indigo-600 animate-spin" />
+                                  <Compass className="w-6 h-6 text-indigo-600 absolute inset-0 m-auto animate-pulse" />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <p className="text-xs font-bold text-slate-800">Đang quét định vị bản đồ...</p>
+                                  <p className="text-[11px] text-slate-500">Hệ thống đang kết nối OpenStreetMap Geocoding API</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center gap-3 p-6 text-center z-10 max-w-sm">
+                                <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
+                                  <Map className="w-7 h-7" />
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-sm font-bold text-slate-800">Chưa có vị trí trên bản đồ</p>
+                                  <p className="text-xs text-slate-500">Nhập địa chỉ ở trên để hiển thị bản đồ toàn cảnh.</p>
+                                </div>
+                              </div>
                             )}
-                          </button>
+                          </div>
+
                         </div>
                       </motion.form>
                     ) : (
