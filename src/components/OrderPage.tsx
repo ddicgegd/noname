@@ -1318,7 +1318,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col max-h-[85vh] z-10"
             >
               {/* Modal Header */}
-              <div className="p-4 border-b border-neutral-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="px-4 py-2.5 sm:py-3 border-b border-neutral-100 flex items-center justify-between shrink-0 bg-white">
                 <div className="flex items-center gap-2">
                   <Ticket className="size-4 text-orange-600" />
                   <h3 className="text-sm font-bold text-neutral-900">
@@ -1337,9 +1337,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                 </button>
               </div>
 
-              {/* Voucher List with Scroll & Bottom Fade */}
+              {/* Voucher List with Hidden Scrollbar & Bottom Fade Indicator */}
               <div className="relative flex-1 min-h-0">
-                <div className="p-4 flex flex-col gap-2.5 overflow-y-auto max-h-[330px] pr-2 pb-6">
+                <div className="p-4 flex flex-col gap-2.5 overflow-y-auto max-h-[340px] hide-scrollbar pb-6">
                   {AVAILABLE_VOUCHERS.map((v) => {
                     const isSelected = selectedVoucherId === v.id;
                     const isEligible = subtotal >= v.minOrder;
@@ -1423,7 +1423,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                   })}
                 </div>
                 {/* Bottom Fade Gradient Indicator */}
-                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white via-white/80 to-transparent" />
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white via-white/80 to-transparent" />
               </div>
 
               {/* Modal Footer */}
@@ -1459,7 +1459,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               className="relative w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col max-h-[85vh] z-10"
             >
               {/* Modal Header */}
-              <div className="p-4 border-b border-neutral-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="px-4 py-2.5 sm:py-3 border-b border-neutral-100 flex items-center justify-between shrink-0 bg-white">
                 <div className="flex items-center gap-2">
                   <MapPin className="size-4 text-orange-600" />
                   <h3 className="text-sm font-bold text-neutral-900">Địa chỉ nhận hàng</h3>
@@ -1477,7 +1477,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               </div>
 
               {/* Address Grid */}
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto max-h-[62vh] pr-1.5 auto-rows-fr">
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto max-h-[62vh] auto-rows-fr">
                 {addressList.length > 0 ? (
                   addressList.map((addr) => {
                     const isSelected = (selectedAddressSku && selectedAddressSku === addr.sku) || userInfo.address === addr.address;
