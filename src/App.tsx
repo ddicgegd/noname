@@ -52,7 +52,7 @@ export default function App() {
   const getPageFromPath = (path: string): "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" => {
     const cleanPath = path.toLowerCase().replace(/\/$/, "");
     if (["/p", "/product"].includes(cleanPath)) return "product";
-    if (["/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath)) return "order";
+    if (["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath)) return "order";
     if (["/auth-report", "/diagnostic"].includes(cleanPath)) return "auth-report";
     if (["/profile", "/account", "/accounts"].includes(cleanPath)) return "profile";
     if (["/verify-email", "/verify"].includes(cleanPath)) {
@@ -68,7 +68,7 @@ export default function App() {
     switch (page) {
       case "landing": return "/";
       case "product": return "/p";
-      case "order": return "/order";
+      case "order": return "/o";
       case "auth-report": return "/auth-report";
       case "profile": return "/profile";
       case "auth": {
@@ -94,6 +94,7 @@ export default function App() {
   }));
 
   const [activeBrand, setActiveBrand] = useState("Samsung");
+  const [buyNowProduct, setBuyNowProduct] = useState<any>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([
     { id: "1", name: "Professional Plan", price: "$49 / tháng", icon: "📦" },
     { id: "2", name: "Premium Add-on", price: "$19 / tháng", icon: "⚡" }
@@ -335,6 +336,10 @@ export default function App() {
               onFlyEffect={handleFlyEffect}
               onSpawnStars={handleSpawnStars}
               onFlyToAccount={handleFlyToAccount}
+              onBuyNow={(product) => {
+                setBuyNowProduct(product);
+                navigate("order");
+              }}
             />
           </motion.div>
         ) : currentPage === "order" ? (
@@ -350,6 +355,7 @@ export default function App() {
               cartItems={cartItems}
               onRemoveCartItem={handleRemoveCartItem}
               onAddToCart={handleAddToCart}
+              buyNowProduct={buyNowProduct}
             />
           </motion.div>
         ) : currentPage === "auth-report" ? (

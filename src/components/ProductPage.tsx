@@ -545,7 +545,8 @@ interface ProductPageProps {
     itemPrice: string,
     clickEvent?: React.MouseEvent | { clientX: number; clientY: number }
   ) => void;
-  onNavigate?: (page: "landing" | "product" | "auth-report" | "profile" | "auth" | "terms") => void;
+  onNavigate?: (page: "landing" | "product" | "order" | "auth-report" | "profile" | "auth" | "terms") => void;
+  onBuyNow?: (product: any) => void;
   onFlyEffect?: (
     startX: number,
     startY: number,
@@ -563,7 +564,7 @@ interface ProductPageProps {
   ) => void;
 }
 
-export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductPageProps) {
+export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductPageProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -1520,6 +1521,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onFlyEffect, onSp
             }}
             onAddToCart={onAddToCart}
             onNavigate={onNavigate}
+            onBuyNow={onBuyNow}
             showToast={showToast}
             onFlyEffect={onFlyEffect}
             onSpawnStars={onSpawnStars}
@@ -1758,7 +1760,8 @@ interface ProductDetailModalProps {
     itemPrice: string,
     clickEvent?: React.MouseEvent | { clientX: number; clientY: number }
   ) => void;
-  onNavigate?: (page: "landing" | "product" | "auth-report" | "profile" | "auth" | "terms") => void;
+  onNavigate?: (page: "landing" | "product" | "order" | "auth-report" | "profile" | "auth" | "terms") => void;
+  onBuyNow?: (product: any) => void;
   showToast?: (message: string, type?: "success" | "info" | "warning") => void;
   onFlyEffect?: (
     startX: number,
@@ -1777,7 +1780,7 @@ interface ProductDetailModalProps {
   ) => void;
 }
 
-function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, showToast, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductDetailModalProps) {
+function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNow, showToast, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductDetailModalProps) {
   const images = getProductImagesList(product);
   const versions = getProductVersions(product);
 
@@ -1876,108 +1879,47 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, showToa
   const selectedColor = colors.find((color) => color.id === activeColor);
   const selectedOptionLabel = [selectedVersion?.title, selectedColor?.title].filter(Boolean).join(" - ");
 
-  const handleBuyNow = async (e: React.MouseEvent) => {
-    if (isSubmittingOrder) return;
-    setIsSubmittingOrder(true);
+  const handleBuyNow = (e: React.MouseEvent) => {
+    const attrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || `ATTR-${product.id.toUpperCase()}`;
+    const versionName = selectedVersion?.title || versions[0]?.title || "Tiêu chuẩn";
+    const colorName = selectedColor?.title || colors[0]?.title || "Mặc định";
+    const availableColorTitles = colors.map((c) => c.title);
+    const availableVersionTitles = versions.map((v) => v.title);
+    const selectedImg = images[activeImgIdx] || product.imageUrl || (product as any).image || "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&auto=format&fit=crop&q=80";
 
+    const buyNowItem = {
+      id: product.id || "prod-buy-now",
+      attributesSku: String(attrSku),
+      name: product.name,
+      color: colorName,
+      availableColors: availableColorTitles.length > 0 ? availableColorTitles : [colorName],
+      size: versionName,
+      availableSizes: availableVersionTitles.length > 0 ? availableVersionTitles : [versionName],
+      unitPrice: currentPriceInt > 0 ? currentPriceInt : 29990000,
+      oldPrice: currentOldPriceInt > 0 ? currentOldPriceInt : (currentPriceInt ? currentPriceInt * 1.1 : 32990000),
+      quantity: 1,
+      image: selectedImg,
+      selected: true,
+    };
+
+    // Cache locally for persistence
     try {
-      const attrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || "SKU-IPHONE15-128GB-BLK";
-      const addressSku = localStorage.getItem("horizon_user_address_sku") || "ADDR-018D9EF25B94";
+      localStorage.setItem("horizon_buy_now_product", JSON.stringify(buyNowItem));
+    } catch (err) {
+      console.warn("Could not cache buyNowItem:", err);
+    }
 
-      const payload: CreateOrderInput = {
-        items: [
-          {
-            attributesSku: String(attrSku),
-            quantity: 1
-          }
-        ],
-        addressSku,
-        paymentMethod: "COD"
-      };
+    if (showToast) {
+      showToast(`Đã chuyển ${product.name} sang trang thanh toán`, "info");
+    }
 
-      const result = await createOrder(payload);
+    if (onBuyNow) {
+      onBuyNow(buyNowItem);
+    }
 
-      if (result?.status?.code === 201 || result?.data?.orderNumber) {
-        const orderNumber = result.data.orderNumber;
-        const formattedTotal = result.data.totalAmount
-          ? result.data.totalAmount.toLocaleString("vi-VN") + "đ"
-          : formattedCurrentPrice;
-
-        // Synchronize to localStorage for Order Tracking view in Profile
-        try {
-          const storedOrders = localStorage.getItem("horizon_user_orders");
-          const activeOrders = storedOrders ? JSON.parse(storedOrders) : [];
-          const newOrderEntry = {
-            id: orderNumber,
-            name: `${product.name} (${selectedOptionLabel || "Mặc định"})`,
-            price: formattedTotal,
-            date: new Date().toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }),
-            status: "pending" as const,
-            statusText: "Đang chờ xác nhận",
-            deliverySteps: [
-              {
-                title: "Đơn hàng đã tạo",
-                desc: `Mã đơn ${orderNumber} - Phương thức COD`,
-                time: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-                completed: true,
-                active: true
-              },
-              {
-                title: "Xác nhận kho",
-                desc: "Kiểm tra tình trạng hàng tồn",
-                time: "--:--",
-                completed: false,
-                active: false
-              },
-              {
-                title: "Bàn giao vận chuyển",
-                desc: "Đang phân phối cho bưu tá",
-                time: "--:--",
-                completed: false,
-                active: false
-              },
-              {
-                title: "Giao hàng thành công",
-                desc: "Khách nhận hàng và thanh toán",
-                time: "--:--",
-                completed: false,
-                active: false
-              }
-            ],
-            shippingAddress: result.data.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-            carrier: "Giao Hàng Nhanh (Express)",
-            trackingNumber: `GHN-${orderNumber.substring(0, 8).toUpperCase()}`
-          };
-
-          localStorage.setItem("horizon_user_orders", JSON.stringify([newOrderEntry, ...activeOrders]));
-        } catch (saveErr) {
-          console.warn("Could not sync order to local storage:", saveErr);
-        }
-
-        if (showToast) {
-          showToast(`Tạo đơn hàng thành công! Mã đơn: ${orderNumber}`, "success");
-        }
-
-        if (onFlyToAccount) {
-          onFlyToAccount(e.clientX, e.clientY, "shopping_bag", "#FF4D24", "rgba(255,77,36,0.3)");
-        }
-
-        setTimeout(() => {
-          onClose();
-          if (onNavigate) {
-            onNavigate("profile");
-          }
-        }, 800);
-      } else {
-        throw new Error(result?.status?.message || "Không thể khởi tạo đơn hàng");
-      }
-    } catch (error: any) {
-      console.error("Lỗi khi tạo đơn hàng:", error);
-      if (showToast) {
-        showToast(`Lỗi tạo đơn: ${error.message || "Vui lòng thử lại"}`, "warning");
-      }
-    } finally {
-      setIsSubmittingOrder(false);
+    onClose();
+    if (onNavigate) {
+      onNavigate("order");
     }
   };
 
@@ -3130,18 +3072,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, showToa
 
             <Button
               variant="default"
-              disabled={isSubmittingOrder}
               onClick={handleBuyNow}
               className="flex h-10 rounded-xl bg-primary px-5 py-2 text-[11.5px] font-extrabold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-97 sm:px-6 sm:text-[12px]"
             >
-              {isSubmittingOrder ? (
-                <span className="flex items-center gap-1.5">
-                  <Loader2Icon className="size-4 animate-spin" data-icon="inline-start" />
-                  <span>Đang xử lý...</span>
-                </span>
-              ) : (
-                "MUA NGAY"
-              )}
+              MUA NGAY
             </Button>
 
             <Button

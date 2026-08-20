@@ -6,6 +6,7 @@ import {
   GraphQLObjectType, 
   GraphQLInputObjectType,
   GraphQLFloat,
+  GraphQLBoolean,
   GraphQLString, 
   GraphQLInt, 
   GraphQLEnumType, 
@@ -442,8 +443,16 @@ async function startServer() {
     name: "CreateOrderInput",
     fields: {
       items: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(CreateOrderItemInputType))) },
-      addressSku: { type: new GraphQLNonNull(GraphQLString) },
-      paymentMethod: { type: GraphQLString }
+      addressSku: { type: GraphQLString },
+      shippingAddress: { type: GraphQLString },
+      paymentMethod: { type: GraphQLString },
+      shippingMethod: { type: GraphQLString },
+      isFromCart: { type: GraphQLBoolean },
+      discountCode: { type: GraphQLString },
+      discountCodes: { type: new GraphQLList(GraphQLString) },
+      customerNotes: { type: GraphQLString },
+      language: { type: GraphQLString },
+      bankCode: { type: GraphQLString }
     }
   });
 
@@ -459,11 +468,36 @@ async function startServer() {
     name: "OrderItemDto",
     fields: {
       attributesSku: { type: GraphQLString },
+      productName: { type: GraphQLString },
       quantity: { type: GraphQLInt },
       unitPrice: { type: GraphQLFloat },
       salePrice: { type: GraphQLFloat },
+      costPrice: { type: GraphQLFloat },
+      discountAmount: { type: GraphQLFloat },
+      discountPercentage: { type: GraphQLFloat },
       subtotal: { type: GraphQLFloat },
+      taxAmount: { type: GraphQLFloat },
+      notes: { type: GraphQLString },
+      imageUrl: { type: GraphQLString },
       variantOptions: { type: new GraphQLList(OrderVariantOptionType) }
+    }
+  });
+
+  const OrderCustomerInfoType = new GraphQLObjectType({
+    name: "OrderCustomerInfo",
+    fields: {
+      customerId: { type: GraphQLString },
+      fullName: { type: GraphQLString },
+      phone: { type: GraphQLString },
+      shippingAddress: { type: GraphQLString }
+    }
+  });
+
+  const OrderStatusHistoryItemType = new GraphQLObjectType({
+    name: "OrderStatusHistoryItem",
+    fields: {
+      status: { type: GraphQLString },
+      timestamp: { type: GraphQLString }
     }
   });
 
@@ -472,15 +506,89 @@ async function startServer() {
     fields: {
       orderNumber: { type: GraphQLString },
       currentStatus: { type: GraphQLString },
+      currentStatusDescription: { type: GraphQLString },
+      shippingMethod: { type: GraphQLString },
+      paymentMethod: { type: GraphQLString },
       shippingAddress: { type: GraphQLString },
+      receiverName: { type: GraphQLString },
+      receiverPhone: { type: GraphQLString },
       subtotal: { type: GraphQLFloat },
+      shippingFee: { type: GraphQLFloat },
+      productDiscountAmount: { type: GraphQLFloat },
+      shippingDiscountAmount: { type: GraphQLFloat },
+      discountAmount: { type: GraphQLFloat },
+      discountCode: { type: GraphQLString },
       totalAmount: { type: GraphQLFloat },
-      orderItems: { type: new GraphQLList(OrderItemType) }
+      customerNotes: { type: GraphQLString },
+      customerInfo: { type: OrderCustomerInfoType },
+      orderItems: { type: new GraphQLList(OrderItemType) },
+      statusHistory: { type: new GraphQLList(OrderStatusHistoryItemType) },
+      createdAt: { type: GraphQLString }
     }
   });
 
   const CreateOrderResponseType = new GraphQLObjectType({
     name: "CreateOrderResponse",
+    fields: {
+      status: { type: StatusType },
+      data: { type: OrderType }
+    }
+  });
+
+  const OrderStatusEnum = new GraphQLEnumType({
+    name: "OrderStatus",
+    values: {
+      PENDING: { value: "PENDING" },
+      CONFIRMED: { value: "CONFIRMED" },
+      PROCESSING: { value: "PROCESSING" },
+      SHIPPED: { value: "SHIPPED" },
+      DELIVERED: { value: "DELIVERED" },
+      COMPLETED: { value: "COMPLETED" },
+      CANCELLED: { value: "CANCELLED" }
+    }
+  });
+
+  const FirstItemPreviewType = new GraphQLObjectType({
+    name: "FirstItemPreview",
+    fields: {
+      attributesSku: { type: GraphQLString },
+      productName: { type: GraphQLString },
+      thumbnailUrl: { type: GraphQLString },
+      quantity: { type: GraphQLInt },
+      price: { type: GraphQLFloat }
+    }
+  });
+
+  const OrderSummaryItemType = new GraphQLObjectType({
+    name: "OrderSummaryItem",
+    fields: {
+      orderNumber: { type: GraphQLString },
+      currentStatus: { type: GraphQLString },
+      totalAmount: { type: GraphQLFloat },
+      itemCount: { type: GraphQLInt },
+      createdAt: { type: GraphQLString },
+      firstItemPreview: { type: FirstItemPreviewType }
+    }
+  });
+
+  const MyOrderListDataDtoType = new GraphQLObjectType({
+    name: "MyOrderListDataDto",
+    fields: {
+      contents: { type: new GraphQLList(OrderSummaryItemType) },
+      paging: { type: PagingType }
+    }
+  });
+
+  const MyOrderListResponseType = new GraphQLObjectType({
+    name: "MyOrderListResponse",
+    fields: {
+      status: { type: StatusType },
+      data: { type: MyOrderListDataDtoType }
+    }
+  });
+
+  const MyOrderDetailResponseType = new GraphQLObjectType({
+    name: "MyOrderDetailResponse",
     fields: {
       status: { type: StatusType },
       data: { type: OrderType }
@@ -670,6 +778,64 @@ async function startServer() {
             return normalizeGatewayListResponse(response);
           } catch (error: any) {
             throw new Error(error?.message || "Unable to search attributes");
+          }
+        }
+      },
+      myOrdersList: {
+        type: MyOrderListResponseType,
+        args: {
+          status: { type: new GraphQLNonNull(OrderStatusEnum) },
+          page: { type: GraphQLInt },
+          size: { type: GraphQLInt },
+          sortBy: { type: GraphQLString },
+          sortDirection: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const params = new URLSearchParams();
+            if (args.status) params.append("status", args.status);
+            if (args.page) params.append("page", String(args.page));
+            if (args.size) params.append("size", String(args.size));
+            if (args.sortBy) params.append("sortBy", args.sortBy);
+            if (args.sortDirection) params.append("sortDirection", args.sortDirection);
+
+            const path = `/api/orders/my-orders/list${params.toString() ? `?${params.toString()}` : ""}`;
+            const response = await callApiGateway(path, { method: "GET", token: context?.token }, context);
+            const status = response?.status || { code: 200, message: "Lấy danh sách đơn hàng thành công" };
+            const data = response?.data || response;
+            return {
+              status: { code: status.code || 200, message: status.message || "Lấy danh sách đơn hàng thành công" },
+              data
+            };
+          } catch (error: any) {
+            return {
+              status: { code: 500, message: error.message },
+              data: null
+            };
+          }
+        }
+      },
+      myOrderDetail: {
+        type: MyOrderDetailResponseType,
+        args: {
+          orderNumber: { type: new GraphQLNonNull(GraphQLString) }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const path = `/api/orders/my-orders/${encodeURIComponent(args.orderNumber)}`;
+            const response = await callApiGateway(path, { method: "GET", token: context?.token }, context);
+            const status = response?.status || { code: 200, message: "Lấy chi tiết đơn hàng thành công" };
+            const rawData = response?.data || response;
+            const cleanData = mapOrderData(rawData);
+            return {
+              status: { code: status.code || 200, message: status.message || "Lấy chi tiết đơn hàng thành công" },
+              data: cleanData
+            };
+          } catch (error: any) {
+            return {
+              status: { code: 500, message: error.message },
+              data: null
+            };
           }
         }
       }

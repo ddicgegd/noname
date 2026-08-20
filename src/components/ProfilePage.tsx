@@ -2247,27 +2247,23 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                       if (resolvedPreview?.latitude && resolvedPreview?.longitude) {
                                         const mapShareText = `https://maps.google.com/?q=${resolvedPreview.latitude.toFixed(6)},${resolvedPreview.longitude.toFixed(6)}`;
                                         navigator.clipboard.writeText(mapShareText);
-                                        setCopiedCoord(true);
-                                        setTimeout(() => setCopiedCoord(false), 1000);
+                                        setSuccessMsg("Đã sao chép liên kết vị trí bản đồ!");
+                                        setTimeout(() => {
+                                          setSuccessMsg((prev) => (prev === "Đã sao chép liên kết vị trí bản đồ!" ? "" : prev));
+                                        }, 1000);
                                       }
                                     }}
                                     className="w-full h-9.5 px-3 bg-emerald-50/90 hover:bg-emerald-100/70 border border-emerald-200 rounded-xl flex items-center justify-between gap-1.5 text-xs transition-all cursor-pointer shadow-2xs group select-none"
                                     title="Bấm vào để sao chép liên kết vị trí bản đồ"
                                   >
-                                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                      <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5] shrink-0" />
+                                    <div className="flex items-center min-w-0 flex-1">
                                       <span className="font-mono font-bold text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200/70 px-1.5 py-0.5 rounded text-[11px] truncate flex-1 text-center">
                                         {resolvedPreview.latitude.toFixed(4)}, {resolvedPreview.longitude.toFixed(4)}
                                       </span>
                                     </div>
 
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      {copiedCoord ? (
-                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-200 px-1.5 py-0.5 rounded">Đã copy!</span>
-                                      ) : (
-                                        <Copy className="w-3 h-3 text-emerald-600 opacity-60 group-hover:opacity-100 transition-opacity" />
-                                      )}
-                                      {newAddressForm.address.trim() !== resolvedPreview.formattedAddress.trim() && (
+                                    {newAddressForm.address.trim() !== resolvedPreview.formattedAddress.trim() && (
+                                      <div className="flex items-center shrink-0">
                                         <button
                                           type="button"
                                           onClick={(e) => {
@@ -2280,8 +2276,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                           <Sparkles className="w-2.5 h-2.5" />
                                           <span>Chuẩn hóa</span>
                                         </button>
-                                      )}
-                                    </div>
+                                      </div>
+                                    )}
                                   </div>
                                 ) : resolvedPreview && !resolvedPreview.success ? (
                                   <div className="w-full h-9.5 px-3 bg-amber-50/90 border border-amber-200 rounded-xl flex items-center justify-center gap-1.5 text-xs text-amber-800 font-medium">
@@ -2429,7 +2425,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 key={addr.sku}
                                 className={`relative p-5 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between overflow-hidden group ${
                                   addr.isDefault 
-                                    ? "bg-indigo-50/40 border-indigo-200/90 shadow-sm ring-1 ring-indigo-500/10" 
+                                    ? "bg-indigo-50/30 border-indigo-200/90 shadow-sm ring-1 ring-indigo-500/10" 
                                     : "bg-white hover:bg-slate-50/50 border-slate-200/90 hover:border-slate-300 shadow-2xs"
                                 }`}
                               >
@@ -2437,25 +2433,31 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-600/70 to-transparent" />
                                 )}
 
-                                <div className="space-y-3.5">
-                                  {/* Header: Name + Type Badge + Default Badge */}
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
+                                <div className="space-y-3">
+                                  {/* Header: Name, Type Badge & Default Status */}
+                                  <div className="flex items-start justify-between gap-2.5">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
                                         isOffice 
                                           ? "bg-indigo-100/80 text-indigo-700 border border-indigo-200/50" 
                                           : "bg-violet-100/80 text-violet-700 border border-violet-200/50"
                                       }`}>
                                         {isOffice ? <Building2 className="w-4 h-4" /> : <Home className="w-4 h-4" />}
                                       </div>
-                                      <div>
-                                        <h4 className="text-sm font-bold text-slate-900 tracking-tight leading-tight">
-                                          {addr.recipientName}
-                                        </h4>
-                                        <span className="inline-flex items-center gap-1 text-[10.5px] font-medium text-slate-500 mt-0.5">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${isOffice ? "bg-indigo-500" : "bg-violet-500"}`} />
-                                          {isOffice ? "Văn phòng" : "Nhà riêng"}
-                                        </span>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <h4 className="text-sm font-bold text-slate-900 tracking-tight leading-tight truncate">
+                                            {addr.recipientName}
+                                          </h4>
+                                          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                                            isOffice 
+                                              ? "bg-indigo-50 text-indigo-700 border-indigo-200/60" 
+                                              : "bg-violet-50 text-violet-700 border-violet-200/60"
+                                          }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isOffice ? "bg-indigo-500" : "bg-violet-500"}`} />
+                                            {isOffice ? "Văn phòng" : "Nhà riêng"}
+                                          </span>
+                                        </div>
                                       </div>
                                     </div>
 
@@ -2466,44 +2468,43 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     )}
                                   </div>
 
-                                  {/* Info: Phone & Coordinates & Detailed Address */}
-                                  <div className="space-y-2 pt-2.5 border-t border-slate-100">
-                                    <div className="flex items-center flex-wrap gap-2 text-xs">
-                                      <div className="inline-flex items-center gap-1.5 font-mono font-semibold text-slate-700 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60">
-                                        <Phone className="w-3 h-3 text-indigo-600" />
-                                        <span>{addr.phoneNumber}</span>
+                                  {/* Contact & GPS Metadata */}
+                                  <div className="flex items-center flex-wrap gap-2 text-xs">
+                                    <div className="inline-flex items-center gap-1.5 font-mono text-slate-700 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60 text-[11px] font-medium">
+                                      <Phone className="w-3 h-3 text-indigo-600 shrink-0" />
+                                      <span>{addr.phoneNumber}</span>
+                                    </div>
+
+                                    {addr.latitude && addr.longitude && (
+                                      <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/60 font-medium">
+                                        <Compass className="w-3 h-3 text-emerald-600 shrink-0" />
+                                        <span>{addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
                                       </div>
+                                    )}
+                                  </div>
 
-                                      {addr.latitude && addr.longitude && (
-                                        <div className="inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200/60">
-                                          <Compass className="w-3 h-3 text-emerald-600" />
-                                          <span>{addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <div className="flex items-start gap-2 pt-1 text-xs font-normal text-slate-600 leading-relaxed">
-                                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                                      <span className="text-slate-700 font-medium leading-snug">
-                                        {addr.address}
-                                      </span>
-                                    </div>
+                                  {/* Detailed Address Box */}
+                                  <div className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed bg-slate-50/70 p-2.5 rounded-xl border border-slate-100/90">
+                                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                    <span className="text-slate-700 font-medium leading-snug break-words flex-1">
+                                      {addr.address}
+                                    </span>
                                   </div>
                                 </div>
 
                                 {/* Footer Action Bar */}
-                                <div className="flex items-center justify-between pt-3 mt-3.5 border-t border-slate-100">
+                                <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100">
                                   {!addr.isDefault ? (
                                     <button
                                       type="button"
                                       onClick={() => handleSetDefaultAddress(addr.sku)}
-                                      className="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer flex items-center gap-1"
+                                      className="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer flex items-center gap-1 py-1"
                                     >
                                       <span>Đặt làm mặc định</span>
                                       <ArrowRight className="w-3 h-3" />
                                     </button>
                                   ) : (
-                                    <span className="text-[11px] font-semibold text-indigo-700 flex items-center gap-1.5">
+                                    <span className="text-[11px] font-semibold text-indigo-700 flex items-center gap-1.5 py-1">
                                       <Check className="w-3.5 h-3.5 text-indigo-600" />
                                       <span>Địa chỉ giao hàng chính</span>
                                     </span>
