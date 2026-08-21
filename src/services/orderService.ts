@@ -280,83 +280,53 @@ export const GET_MY_ORDER_DETAIL_QUERY = `
 `;
 
 /**
- * Khởi tạo đơn hàng mới qua GraphQL Gateway v1.3.0 (với REST fallback)
+ * Khởi tạo đơn hàng mới - REST API trực tiếp vào Backend Spring Boot (Port 8080)
+ * Endpoint: POST /api/orders (Đặc tả ERP REST API Contracts v1.3.0)
  */
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResponse> {
   const token = getUnifiedAccessToken();
-  const normalizedDiscountCodes = input.discountCodes || (input.discountCode ? [input.discountCode] : []);
+  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
 
-  const payloadInput: any = {
-    shippingAddress: input.shippingAddress || "",
+  // Payload tuân thủ đặc tả REST API v1.3.0 từ NotebookLM
+  const payload: any = {
     shippingMethod: input.shippingMethod || "DELIVERY",
-    paymentMethod: input.paymentMethod || "COD",
     isFromCart: typeof input.isFromCart === "boolean" ? input.isFromCart : false,
-    customerNotes: input.customerNotes || "",
-    discountCodes: normalizedDiscountCodes,
+    addressSku: input.addressSku || undefined,
+    voucherCode: input.discountCode || (input.discountCodes && input.discountCodes[0]) || undefined,
+    shippingAddress: input.shippingAddress || "",
+    paymentMethod: input.paymentMethod || "COD",
+    customerNotes: input.customerNotes || undefined,
     items: input.items.map((item) => ({
       attributesSku: item.attributesSku,
       quantity: Number(item.quantity) || 1,
     })),
   };
 
-  if (input.addressSku) {
-    payloadInput.addressSku = input.addressSku;
-  }
-  if (input.discountCode) {
-    payloadInput.discountCode = input.discountCode;
-  }
   if (input.language) {
-    payloadInput.language = input.language;
+    payload.language = input.language;
   }
   if (input.bankCode) {
-    payloadInput.bankCode = input.bankCode;
+    payload.bankCode = input.bankCode;
   }
 
-  // 1. Thực thi qua GraphQL Gateway
-  try {
-    const response = await fetch("/graphql", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-BFF-Gateway-Url": localStorage.getItem("horizon_api_base_url") || "",
-        ...(token ? { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        query: CREATE_ORDER_MUTATION,
-        variables: { input: payloadInput },
-      }),
-    });
-
-    if (response.ok) {
-      const payload = await response.json();
-      if (!payload.errors?.length && payload.data?.createOrder?.data) {
-        return payload.data.createOrder;
-      }
-      if (payload.errors?.length) {
-        console.warn("GraphQL createOrder error message:", payload.errors[0]?.message);
-      }
-    }
-  } catch (err) {
-    console.warn("GraphQL createOrder network error, attempting REST fallback:", err);
-  }
-
-  // 2. Fallback trực tiếp sang REST API /api/orders
-  const baseUrl = getApiBaseUrl();
-  const restResponse = await fetch(`${baseUrl}/api/orders`, {
+  const response = await fetch(`${baseUrl}/api/orders`, {
     method: "POST",
     headers: {
+      "Accept": "application/json",
       "Content-Type": "application/json",
       ...(token ? { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(payloadInput),
+    body: JSON.stringify(payload),
   });
 
-  if (!restResponse.ok) {
-    let errorMsg = `Đặt hàng thất bại (${restResponse.status})`;
+  if (!response.ok) {
+    let errorMsg = `Đặt hàng thất bại (${response.status})`;
     try {
-      const errJson = await restResponse.json();
+      const errJson = await response.json();
       if (errJson?.status?.message) {
         errorMsg = errJson.status.message;
+      } else if (errJson?.detail) {
+        errorMsg = errJson.detail;
       } else if (errJson?.message) {
         errorMsg = errJson.message;
       }
@@ -364,13 +334,13 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     throw new Error(errorMsg);
   }
 
-  const restData = await restResponse.json();
+  const resData = await response.json();
   return {
     status: {
-      code: restData?.status?.code || 201,
-      message: restData?.status?.message || "Success",
+      code: resData?.status?.code || 201,
+      message: resData?.status?.message || "Created",
     },
-    data: restData?.data || restData,
+    data: resData?.data || resData,
   };
 }
 
