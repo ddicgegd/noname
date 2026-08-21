@@ -5,7 +5,6 @@
 
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, MouseEvent } from "react";
 import ClawMachine from "./ClawMachine";
 
 

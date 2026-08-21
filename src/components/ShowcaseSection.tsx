@@ -1,228 +1,146 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import React from "react";
+import { cn } from "@/lib/utils";
+import { Marquee } from "@/components/ui/marquee";
+import { Star, StarHalf } from "lucide-react";
 
-import React, { useRef, useState } from "react";
-import { motion } from "motion/react";
+interface Review {
+  name: string;
+  username: string;
+  body: string;
+  img: string;
+  rating: 5 | 4.5;
+}
 
-export default function ShowcaseSection() {
-  const cards = [
-    {
-      title: "Streaming Dashboard",
-      bgColor: "bg-[#38BDF8]/10",
-      accentGlow: "from-blue-500/10 to-transparent",
-      renderInner: () => (
-        <div className="relative z-10 h-full bg-white/60 backdrop-blur-md rounded-xl border border-white/80 shadow-[0_4px_16px_rgba(0,0,0,0.02)] p-4 flex flex-col justify-between">
-          <div className="h-6 px-3 bg-black/5 rounded-full w-fit flex items-center">
-            <span className="font-sans text-xs text-[#555555] font-semibold">Streaming Dashboard</span>
-          </div>
-          <div className="grid grid-cols-2 gap-3 my-4">
-            <div className="h-28 bg-[#38BDF8]/20 border border-white/50 rounded-lg flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#38BDF8] text-2xl">monitoring</span>
-            </div>
-            <div className="h-28 bg-[#C084FC]/20 border border-white/50 rounded-lg flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#C084FC] text-2xl">bubble_chart</span>
-            </div>
-          </div>
-          <div className="h-8 bg-white/80 rounded-lg border border-black/5 flex items-center px-3 justify-between">
-            <div className="w-16 h-2 bg-black/10 rounded-full" />
-            <div className="w-4 h-4 rounded-full bg-[#38BDF8]" />
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Finance Ledger",
-      bgColor: "bg-[#C084FC]/10",
-      accentGlow: "from-purple-500/10 to-transparent",
-      renderInner: () => (
-        <div className="relative z-10 h-full bg-white/60 backdrop-blur-md rounded-xl border border-white/80 shadow-[0_4px_16px_rgba(0,0,0,0.02)] p-4 flex flex-col justify-between">
-          <div className="h-6 px-3 bg-black/5 rounded-full w-fit flex items-center">
-            <span className="font-sans text-xs text-[#555555] font-semibold">Finance Ledger</span>
-          </div>
-          <div className="flex-1 border-t border-b border-black/5 flex flex-col gap-3 py-4 my-2">
-            <div className="h-4 bg-white/80 rounded border border-black/5 w-full flex items-center px-2 justify-between">
-              <div className="w-12 h-1.5 bg-black/10 rounded-full" />
-              <div className="w-8 h-1.5 bg-green-400 rounded-full" />
-            </div>
-            <div className="h-4 bg-white/80 rounded border border-black/5 w-5/6 flex items-center px-2 justify-between">
-              <div className="w-16 h-1.5 bg-black/10 rounded-full" />
-              <div className="w-6 h-1.5 bg-green-400 rounded-full" />
-            </div>
-            <div className="h-4 bg-white/80 rounded border border-black/5 w-full flex items-center px-2 justify-between">
-              <div className="w-10 h-1.5 bg-black/10 rounded-full" />
-              <div className="w-10 h-1.5 bg-red-400 rounded-full" />
-            </div>
-          </div>
-          <div className="h-8 w-24 bg-[#FF4D24] text-white font-sans text-xs font-semibold flex items-center justify-center rounded-full self-end shadow-sm">
-            Export CSV
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Travel Planner",
-      bgColor: "bg-[#FF9A9E]/10",
-      accentGlow: "from-pink-500/10 to-transparent",
-      renderInner: () => (
-        <div className="relative z-10 h-full bg-white/60 backdrop-blur-md rounded-xl border border-white/80 shadow-[0_4px_16px_rgba(0,0,0,0.02)] p-4 flex flex-col justify-between">
-          <div className="flex gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full bg-[#FF4D24]/20 border border-white/50 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary text-lg">map</span>
-            </div>
-            <div className="flex-1 flex flex-col justify-center">
-              <span className="font-sans text-xs text-black font-bold">Travel Planner</span>
-              <span className="text-[9px] text-[#555555] font-semibold uppercase tracking-wider">4 Days in Paris</span>
-            </div>
-          </div>
-          <div className="flex-1 bg-white/50 rounded-lg border border-white/60 p-3 flex flex-col justify-between">
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-[10px]">
-                <span className="font-bold text-black">Day 1: Eiffel Tower</span>
-                <span className="text-primary font-bold">09:00 AM</span>
-              </div>
-              <div className="w-full h-1 bg-black/5 rounded-full" />
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-[10px]">
-                <span className="font-bold text-black">Day 2: Louvre Museum</span>
-                <span className="text-primary font-bold">02:30 PM</span>
-              </div>
-              <div className="w-full h-1 bg-black/5 rounded-full" />
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Photo Hub",
-      bgColor: "bg-[#FFD166]/10",
-      accentGlow: "from-yellow-500/10 to-transparent",
-      renderInner: () => (
-        <div className="relative z-10 h-full bg-white/60 backdrop-blur-md rounded-xl border border-white/80 shadow-[0_4px_16px_rgba(0,0,0,0.02)] p-4 grid grid-cols-2 gap-3">
-          <div className="bg-white/80 rounded-lg border border-black/5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-yellow-600 text-lg">photo_camera</span>
-          </div>
-          <div className="bg-white/80 rounded-lg border border-black/5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-yellow-600 text-lg">filter_vintage</span>
-          </div>
-          <div className="bg-white/80 rounded-lg border border-black/5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-yellow-600 text-lg">wb_sunny</span>
-          </div>
-          <div className="bg-white/80 rounded-lg border border-black/5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-yellow-600 text-lg">image</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Task Kanban",
-      bgColor: "bg-[#4ADE80]/10",
-      accentGlow: "from-green-500/10 to-transparent",
-      renderInner: () => (
-        <div className="relative z-10 h-full bg-white/60 backdrop-blur-md rounded-xl border border-white/80 shadow-[0_4px_16px_rgba(0,0,0,0.02)] p-4 flex flex-col justify-between">
-          <div className="h-6 px-3 bg-black/5 rounded-full w-fit flex items-center">
-            <span className="font-sans text-xs text-[#555555] font-semibold">Task Kanban</span>
-          </div>
-          <div className="flex gap-2 my-3 flex-1 overflow-hidden">
-            <div className="flex-1 bg-white/80 rounded-lg border border-black/5 p-2.5 flex flex-col gap-2">
-              <div className="h-1.5 bg-black/10 rounded-full w-2/3" />
-              <div className="h-8 bg-green-500/10 border border-green-500/20 rounded flex items-center px-1.5">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 shrink-0" />
-                <div className="h-1 bg-green-500/25 rounded-full flex-1" />
-              </div>
-            </div>
-            <div className="flex-1 bg-white/80 rounded-lg border border-black/5 p-2.5 flex flex-col gap-2">
-              <div className="h-1.5 bg-black/10 rounded-full w-2/3" />
-              <div className="h-8 bg-blue-500/10 border border-blue-500/20 rounded flex items-center px-1.5">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1.5 shrink-0" />
-                <div className="h-1 bg-blue-500/25 rounded-full flex-1" />
-              </div>
-            </div>
-          </div>
-          <div className="h-6 w-full bg-black/5 rounded flex items-center px-2 justify-between">
-            <div className="w-12 h-1 bg-black/15 rounded-full" />
-            <div className="w-2 h-2 rounded-full bg-blue-500" />
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Music Player",
-      bgColor: "bg-[#F472B6]/10",
-      accentGlow: "from-pink-500/10 to-transparent",
-      renderInner: () => (
-        <div className="relative z-10 h-full bg-white/60 backdrop-blur-md rounded-xl border border-white/80 shadow-[0_4px_16px_rgba(0,0,0,0.02)] p-4 flex flex-col justify-between">
-          <div className="flex gap-3 items-center">
-            <div className="w-10 h-10 bg-[#F472B6]/20 rounded-lg flex items-center justify-center border border-[#F472B6]/30">
-              <span className="material-symbols-outlined text-pink-600 text-xl">music_note</span>
-            </div>
-            <div className="flex-1">
-              <div className="h-2 bg-black/20 rounded-full w-3/4 mb-1" />
-              <div className="h-1.5 bg-black/10 rounded-full w-1/2" />
-            </div>
-          </div>
-          <div className="flex items-center gap-4 justify-center my-4">
-            <span className="material-symbols-outlined text-black/30 text-base">skip_previous</span>
-            <span className="material-symbols-outlined text-black/70 text-2xl">play_circle</span>
-            <span className="material-symbols-outlined text-black/30 text-base">skip_next</span>
-          </div>
-          <div className="w-full h-1 bg-black/5 rounded-full relative">
-            <div className="absolute left-0 top-0 bottom-0 w-1/3 bg-pink-500/80 rounded-full" />
-          </div>
-        </div>
-      ),
-    },
-  ];
+const reviews: Review[] = [
+  {
+    name: "Tuấn Anh",
+    username: "@tuananh.dev",
+    body: "Máy nguyên seal, giao siêu tốc chỉ 2 tiếng tại nội thành. Nhân viên tư vấn nhiệt tình, 10/10 điểm!",
+    img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    rating: 5,
+  },
+  {
+    name: "Minh Thư",
+    username: "@thu.minh",
+    body: "Đóng gói cẩn thận 3 lớp chống sốc. Sản phẩm chính hãng kích hoạt bảo hành điện tử chuẩn chỉ.",
+    img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80",
+    rating: 5,
+  },
+  {
+    name: "Hoàng Nam",
+    username: "@nam.hoang99",
+    body: "Hàng đẹp nguyên bản, pin 100%. Giao trễ 10p do trời mưa nhưng bạn shipper hỗ trợ rất chu đáo.",
+    img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    rating: 4.5,
+  },
+  {
+    name: "Lan Hương",
+    username: "@huong.lan",
+    body: "Săn được voucher giá tốt nhất thị trường. Thanh toán quét mã duyệt tự động trong 30s cực kỳ tiện!",
+    img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80",
+    rating: 5,
+  },
+  {
+    name: "Đức Trọng",
+    username: "@trong.duc",
+    body: "Trải nghiệm mua sắm mượt mà từ lúc đặt tới lúc nhận. Hỗ trợ kỹ thuật chuyển dữ liệu rất tận tâm.",
+    img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+    rating: 5,
+  },
+  {
+    name: "Khánh Vy",
+    username: "@vy.khanh",
+    body: "Chất lượng máy tuyệt vời, camera nét căng. Shop tặng kèm đầy đủ ốp lưng và sạc nhanh chính hãng.",
+    img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+    rating: 4.5,
+  },
+  {
+    name: "Quốc Bảo",
+    username: "@bao.quoc",
+    body: "Đổi trả bảo hành 1 đổi 1 nhanh chóng không làm khó khách. Chắc chắn sẽ quay lại ủng hộ tiếp.",
+    img: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80",
+    rating: 5,
+  },
+  {
+    name: "Phương Linh",
+    username: "@phuonglinh",
+    body: "Máy màu Titan Sa Mạc bên ngoài sang hơn trong ảnh nhiều. Hài lòng tuyệt đối với dịch vụ của shop!",
+    img: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+    rating: 5,
+  },
+];
 
-  // Double the array to enable infinite seamless loop
-  const doubleCards = [...cards, ...cards];
+const firstRow = reviews.slice(0, reviews.length / 2);
+const secondRow = reviews.slice(reviews.length / 2);
 
+const ReviewCard = ({
+  img,
+  name,
+  username,
+  body,
+  rating,
+}: Review) => {
   return (
-    <section id="showcase" className="py-10 bg-transparent relative overflow-hidden select-none pointer-events-none">
-      {/* Dynamic background dot mesh */}
-      <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(#C084FC 1px, transparent 1px)", backgroundSize: "32px 32px", opacity: 0.2 }} />
-      
-      <div className="max-w-7xl mx-auto px-6 sm:px-16 flex flex-col items-center justify-center mb-6 relative z-10">
-        <div className="text-center max-w-3xl mx-auto">
-          <motion.h2
-            className="text-3xl sm:text-4xl md:text-5xl text-[#111111] font-display font-light leading-tight tracking-tight"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            Seamless integration from idea to execution
-          </motion.h2>
+    <figure
+      className={cn(
+        "group/card relative h-[180px] w-[350px] sm:w-[414px] shrink-0 cursor-pointer overflow-hidden rounded-2xl border p-6 sm:p-7 flex flex-col justify-between transition-all duration-300",
+        // Viền và khung card đầy đủ
+        "border-black/[0.08] bg-white/60 hover:bg-white shadow-sm hover:shadow-md backdrop-blur-md",
+        "dark:border-white/[0.1] dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
+      )}
+    >
+      <div className="flex flex-row items-center justify-between gap-3.5 opacity-30 blur-[0.6px] transition-all duration-300 group-hover/card:opacity-100 group-hover/card:blur-none select-none">
+        <div className="flex flex-row items-center gap-3.5 min-w-0">
+          <img className="rounded-full ring-2 ring-white/80 shadow-xs shrink-0 object-cover size-11" width="44" height="44" alt={name} src={img} />
+          <div className="flex flex-col min-w-0">
+            <figcaption className="text-base font-bold text-slate-800 dark:text-white leading-tight truncate">
+              {name}
+            </figcaption>
+            <p className="text-xs sm:text-sm font-semibold text-slate-400 dark:text-white/40 truncate">{username}</p>
+          </div>
+        </div>
+
+        {/* Rating Stars (5.0 or 4.5) */}
+        <div className="flex items-center gap-0.5 shrink-0" title={`Đánh giá ${rating}/5 sao`}>
+          {[...Array(4)].map((_, i) => (
+            <Star key={i} className="size-3.5 sm:size-4 text-amber-400 fill-amber-400" />
+          ))}
+          {rating === 5 ? (
+            <Star className="size-3.5 sm:size-4 text-amber-400 fill-amber-400" />
+          ) : (
+            <StarHalf className="size-3.5 sm:size-4 text-amber-400 fill-amber-400" />
+          )}
         </div>
       </div>
 
-      {/* Infinite loop marquee with fading gradient edges */}
-      <div className="w-full relative z-10 overflow-hidden py-2">
-        {/* Left and right feathered fading blur overlays */}
-        <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-48 bg-gradient-to-r from-[#E4E4E4] via-[#E4E4E4]/80 to-transparent z-20 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-48 bg-gradient-to-l from-[#E4E4E4] via-[#E4E4E4]/80 to-transparent z-20 pointer-events-none" />
+      <blockquote className="mt-2 text-sm sm:text-[15px] text-slate-900 dark:text-white leading-snug font-medium line-clamp-3">
+        {body}
+      </blockquote>
+    </figure>
+  );
+};
 
-        <div
-          className="animate-marquee gap-4 pb-6"
-          style={{
-            maskImage: "linear-gradient(to right, transparent, black 15%, black 85%, transparent)",
-            WebkitMaskImage: "linear-gradient(to right, transparent, black 15%, black 85%, transparent)"
-          }}
-        >
-          {doubleCards.map((card, i) => (
-            <div
-              key={`${card.title}-${i}`}
-              className="shrink-0 w-[310px] sm:w-[410px] h-[300px] bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 shadow-md flex flex-col overflow-hidden"
-            >
-              <div className={`h-full ${card.bgColor} relative overflow-hidden p-5 flex flex-col justify-between`}>
-                <div className={`absolute inset-0 bg-gradient-to-t ${card.accentGlow} opacity-50`} />
-                {card.renderInner()}
-              </div>
-            </div>
+export default function ShowcaseSection() {
+  return (
+    <section id="showcase" className="py-12 bg-transparent relative overflow-hidden">
+      <div className="relative flex w-full flex-col items-center justify-center gap-2.5 overflow-hidden">
+        {/* Row 1 */}
+        <Marquee pauseOnHover className="[--duration:28s] [--gap:0.75rem]">
+          {firstRow.map((review) => (
+            <ReviewCard key={review.username} {...review} />
           ))}
-        </div>
+        </Marquee>
+
+        {/* Row 2 (Staggered offset with reverse) */}
+        <Marquee reverse pauseOnHover className="[--duration:28s] [--gap:0.75rem] -ml-[215px]">
+          {secondRow.map((review) => (
+            <ReviewCard key={review.username} {...review} />
+          ))}
+        </Marquee>
+
+        {/* Fading side gradient edges */}
+        <div className="from-[#E4E4E4] pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r z-10"></div>
+        <div className="from-[#E4E4E4] pointer-events-none absolute inset-y-0 right-0 w-1/5 bg-gradient-to-l z-10"></div>
       </div>
     </section>
   );

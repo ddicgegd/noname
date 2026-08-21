@@ -354,8 +354,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   const [activeVariantDropdown, setActiveVariantDropdown] = useState<string | null>(null);
 
   // Payment Method State
-  const [paymentType, setPaymentType] = useState<"vietqr" | "bank" | "card" | "cod">("vietqr");
+  const [paymentType, setPaymentType] = useState<"momo" | "bank" | "paypal" | "card" | "cod">("momo");
   const [selectedBank, setSelectedBank] = useState<string>("vcb");
+  const [bankSubMethod, setBankSubMethod] = useState<"card" | "qr">("card");
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Financial calculations
@@ -452,10 +453,10 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
 
     // Map UI payment option sang enum backend chuẩn
     let mappedPaymentMethod: PaymentMethod = "COD";
-    if (paymentType === "vietqr" || paymentType === "bank") {
+    if (paymentType === "momo" || paymentType === "bank") {
       mappedPaymentMethod = "BANK_TRANSFER";
-    } else if (paymentType === "card") {
-      mappedPaymentMethod = "CREDIT_CARD";
+    } else if (paymentType === "paypal" || paymentType === "card") {
+      mappedPaymentMethod = "PAYPAL";
     } else {
       mappedPaymentMethod = "COD";
     }
@@ -881,9 +882,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
             {/* Payment Category Selector Tabs with Smooth Sliding Indicator */}
             <div className="grid grid-cols-4 gap-1 bg-neutral-100/70 p-1 rounded-xl text-xs font-medium shrink-0 relative">
               {[
-                { id: "vietqr", label: "VietQR", icon: QrCode },
+                { id: "momo", label: "Ví MoMo", icon: Smartphone },
                 { id: "bank", label: "Ngân hàng", icon: Building2 },
-                { id: "card", label: "Thẻ Visa", icon: CreditCard },
+                { id: "paypal", label: "PayPal", icon: CreditCard },
                 { id: "cod", label: "COD", icon: Truck },
               ].map((tab) => {
                 const isSelected = paymentType === tab.id;
@@ -915,27 +916,128 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
 
             {/* Dynamic Bank & Payment Detail View */}
             <div className="h-[306px] overflow-hidden">
-              {/* Option 1: VietQR */}
-              {paymentType === "vietqr" && (
-                <div className="h-full p-3 bg-neutral-50/80 rounded-xl border border-neutral-200/70 flex flex-col justify-between text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-neutral-900 text-[11px]">Quét mã VietQR 24/7 tức thì</span>
-                    <Badge variant="secondary" className="text-[9px] font-bold text-neutral-700 bg-neutral-200/80">
-                      Tự động duyệt 30s
-                    </Badge>
+              {/* Option 1: MoMo QR E-Wallet */}
+              {paymentType === "momo" && (
+                <div className="h-full p-3 bg-neutral-50/90 rounded-xl border border-neutral-200/80 flex flex-col justify-between text-xs overflow-hidden">
+                  {/* Header Bar */}
+                  <div className="flex items-center justify-between shrink-0 pb-1 border-b border-neutral-200/60">
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 px-1.5 bg-[#A50064] text-white rounded flex items-center justify-center font-black text-[10px] tracking-tight">
+                        MoMo
+                      </div>
+                      <span className="font-bold text-neutral-900 text-xs">Ví điện tử MoMo 24/7</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/60">
+                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] font-bold text-emerald-700">Tự động duyệt 30s</span>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-neutral-500 leading-snug">
-                    Hỗ trợ tất cả ứng dụng Mobile Banking (Vietcombank, MB, Techcombank, BIDV, Agribank, ACB, MoMo, ZaloPay...)
-                  </p>
-                  <div className="flex items-center gap-3 pt-0.5">
-                    <div className="size-14 rounded-lg bg-white border border-neutral-200 flex items-center justify-center p-1 shadow-2xs shrink-0">
-                      <QrCode className="size-10 text-neutral-900" />
+
+                  {/* Body: Left Info + Right Real QR Code */}
+                  <div className="grid grid-cols-12 gap-3 items-center py-1.5 flex-1 min-h-0">
+                    {/* Left: Banking Details */}
+                    <div className="col-span-7 flex flex-col justify-between gap-1.5 pr-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-neutral-500 font-medium">Kênh ví:</span>
+                        <span className="font-bold text-[#A50064] text-[11.5px] flex items-center gap-1">
+                          <Smartphone className="size-3.5 text-[#A50064]" />
+                          Ví MoMo QR
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-neutral-500 font-medium">SĐT / Ví nhận:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText("0988665544", "momo_phone")}
+                          className="flex items-center gap-1 font-mono font-bold text-neutral-900 hover:text-[#A50064] transition-colors cursor-pointer text-xs"
+                          title="Sao chép số MoMo"
+                        >
+                          <span>0988 665 544</span>
+                          {copiedField === "momo_phone" ? (
+                            <Check className="size-3 text-emerald-600 stroke-[2.5]" />
+                          ) : (
+                            <Copy className="size-3 text-neutral-400 hover:text-[#A50064]" />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-neutral-500 font-medium">Tên chủ ví:</span>
+                        <span className="font-bold text-neutral-900 text-[11px] truncate max-w-[145px]" title="CONG TY TNHH NONAME (HORIZON)">
+                          CONG TY TNHH NONAME
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-neutral-500 font-medium">Số tiền:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(total.toString(), "momo_amount")}
+                          className="flex items-center gap-1 font-bold text-neutral-900 hover:text-[#A50064] transition-colors cursor-pointer text-xs"
+                          title="Sao chép số tiền"
+                        >
+                          <span className="text-[#FF4D24] font-black">{formatVND(total)}</span>
+                          {copiedField === "momo_amount" ? (
+                            <Check className="size-3 text-emerald-600 stroke-[2.5]" />
+                          ) : (
+                            <Copy className="size-3 text-neutral-400 hover:text-[#A50064]" />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-pink-50/80 p-1.5 rounded-lg border border-pink-200/60">
+                        <div className="flex flex-col">
+                          <span className="text-[9.5px] text-[#A50064] font-semibold">Lời nhắn CK (bắt buộc):</span>
+                          <span className="font-mono font-black text-neutral-900 text-[11.5px] tracking-wide">
+                            NONAME {userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(`NONAME ${userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}`, "momo_msg")}
+                          className="p-1 rounded hover:bg-pink-100 text-[#A50064] cursor-pointer transition-colors shrink-0"
+                          title="Sao chép lời nhắn"
+                        >
+                          {copiedField === "momo_msg" ? (
+                            <Check className="size-3.5 text-emerald-600 stroke-[2.5]" />
+                          ) : (
+                            <Copy className="size-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-0.5 text-[10.5px]">
-                      <span className="text-neutral-400">Số tiền chuyển:</span>
-                      <span className="font-bold text-neutral-900 text-xs sm:text-[13px]">{formatVND(total)}</span>
-                      <span className="text-neutral-400 pt-0.5">Mã thanh toán: <strong className="text-neutral-800">NONAME-{Math.floor(Math.random() * 90000 + 10000)}</strong></span>
+
+                    {/* Right: Dynamic MoMo QR Image */}
+                    <div className="col-span-5 flex flex-col items-center justify-center p-2 bg-white rounded-xl border border-neutral-200 shadow-2xs">
+                      <div className="relative size-28 sm:size-32 rounded-lg bg-neutral-50 flex items-center justify-center overflow-hidden">
+                        <img
+                          src={`https://api.vietqr.io/image/970422-0988665544-compact2.png?amount=${total}&addInfo=NONAME%20${userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}&accountName=CONG%20TY%20TNHH%20NONAME%20VIETNAM`}
+                          alt="MoMo Payment QR"
+                          className="w-full h-full object-contain select-none"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = "flex";
+                          }}
+                        />
+                        <div className="hidden flex-col items-center justify-center gap-1 text-[#A50064]">
+                          <QrCode className="size-16 text-[#A50064]" />
+                          <span className="text-[9px] font-bold text-[#A50064]">MoMo QR Code</span>
+                        </div>
+                      </div>
+                      <span className="text-[9px] text-neutral-500 font-medium text-center mt-1">
+                        Mở App MoMo quét mã
+                      </span>
                     </div>
+                  </div>
+
+                  {/* Footer Note */}
+                  <div className="pt-1 border-t border-neutral-200/50 flex items-center justify-between text-[10px] text-neutral-400 shrink-0">
+                    <span>Xác thực tức thì qua Cổng MoMo</span>
+                    <span className="text-emerald-600 font-semibold flex items-center gap-0.5">
+                      <CheckCircle2 className="size-3" /> Bảo mật 256-bit
+                    </span>
                   </div>
                 </div>
               )}
@@ -943,7 +1045,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               {/* Option 2: Chọn Nhiều Loại Ngân Hàng (4 Ngân Hàng) */}
               {paymentType === "bank" && (
                 <div className="h-full flex flex-col justify-between gap-2">
-                  {/* 4 Bank Cards - Compact 4:3 Ratio */}
+                  {/* 4 Bank Cards - Compact 4:3 Ratio (Logos only) */}
                   <div className="grid grid-cols-4 gap-1.5 w-full shrink-0">
                     {BANK_OPTIONS.map((b) => {
                       const isSelected = selectedBank === b.id;
@@ -952,7 +1054,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                           key={b.id}
                           type="button"
                           onClick={() => setSelectedBank(b.id)}
-                          className={`h-13.5 sm:h-14.5 rounded-xl border-[1.5px] flex flex-col items-center justify-center p-1 transition-all cursor-pointer relative group ${
+                          className={`h-12 sm:h-13 rounded-xl border-[1.5px] flex items-center justify-center p-2 transition-all cursor-pointer relative group ${
                             isSelected
                               ? "border-orange-500 bg-orange-50/50 shadow-2xs"
                               : "border-neutral-200/90 hover:border-orange-300 hover:bg-orange-50/20 bg-white"
@@ -962,33 +1064,51 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                           <img
                             src={b.logoUrl}
                             alt={b.shortName}
-                            className="max-h-4.5 sm:max-h-5 max-w-[78%] object-contain select-none transition-transform duration-150 group-hover:scale-105"
+                            className="max-h-6 sm:max-h-7 max-w-[80%] object-contain select-none transition-transform duration-150 group-hover:scale-105"
                             onError={(e) => {
                               (e.currentTarget as HTMLElement).style.display = "none";
                             }}
                           />
-                          <span
-                            className={`text-[9.5px] sm:text-[10px] font-semibold pt-0.5 truncate transition-colors ${
-                              isSelected ? "text-orange-600 font-bold" : "text-neutral-600 group-hover:text-neutral-900"
-                            }`}
-                          >
-                            {b.shortName}
-                          </span>
                         </button>
                       );
                     })}
                   </div>
 
-                  {/* Bank Account Detail & QR (Borderless, Seamless Clean Layout) */}
-                  <div className="h-[232px] grid grid-cols-12 overflow-hidden text-xs pt-1">
-                    {/* Left Column: Bank Account Info (~60%) */}
-                    <div className="col-span-7 flex flex-col justify-between pr-3 py-1 border-r border-neutral-100">
-                      <div className="flex items-center justify-between pb-1 border-b border-neutral-100">
-                        <span className="font-bold text-neutral-900 text-xs sm:text-[12.5px] truncate" title={currentBank.name}>
-                          {currentBank.name}
-                        </span>
+                  {/* Bank Account / Card Detail with Sub-option switch */}
+                  <div className="h-[232px] flex flex-col justify-between text-xs pt-1">
+                    {/* Header Bar with Sub-option Tabs */}
+                    <div className="flex items-center justify-between pb-1.5 border-b border-neutral-100 gap-2 shrink-0">
+                      <span className="font-bold text-neutral-900 text-xs sm:text-[12.5px] truncate" title={currentBank.name}>
+                        {currentBank.name}
+                      </span>
+                      <div className="h-[29.7px] flex items-center bg-neutral-100/90 p-0.5 rounded-lg text-xs font-medium shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setBankSubMethod("card")}
+                          className={`h-full px-2.5 flex items-center justify-center rounded-md transition-all cursor-pointer select-none text-xs ${
+                            bankSubMethod === "card"
+                              ? "bg-white text-neutral-900 font-bold shadow-2xs"
+                              : "text-neutral-500 hover:text-neutral-900"
+                          }`}
+                        >
+                          Thẻ nội địa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBankSubMethod("qr")}
+                          className={`h-full px-2.5 flex items-center justify-center rounded-md transition-all cursor-pointer select-none text-xs ${
+                            bankSubMethod === "qr"
+                              ? "bg-white text-neutral-900 font-bold shadow-2xs"
+                              : "text-neutral-500 hover:text-neutral-900"
+                          }`}
+                        >
+                          Mã QR
+                        </button>
                       </div>
+                    </div>
 
+                    {/* Nội dung thông tin tài khoản ngân hàng giữ nguyên */}
+                    <div className="flex flex-col justify-between h-full py-1">
                       <div className="flex items-center justify-between py-1">
                         <span className="text-[11.5px] sm:text-xs text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
                         <button
@@ -1035,45 +1155,32 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                         </button>
                       </div>
                     </div>
-
-                    {/* Right Column: Quick QR Section - Borderless, Clean Minimalist */}
-                    <div className="col-span-5 flex flex-col items-center justify-center text-center gap-2 p-3 h-full">
-                      <div className="size-20 rounded-2xl bg-white border border-neutral-200/90 flex items-center justify-center p-2 shadow-2xs">
-                        <QrCode className="size-14 text-neutral-900" />
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <span className="text-[11px] font-bold text-neutral-900">Quét QR Nhanh</span>
-                        <span className="text-[9px] text-neutral-400">Tự động điền STK & số tiền</span>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Option 3: Thẻ Quốc Tế Visa / Mastercard */}
-              {paymentType === "card" && (
+              {/* Option 3: PayPal */}
+              {(paymentType === "paypal" || paymentType === "card") && (
                 <div className="h-full p-3 bg-neutral-50/80 rounded-xl border border-neutral-200/70 flex flex-col justify-between text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-neutral-900 text-[10.5px]">Thanh toán qua thẻ Quốc tế</span>
-                    <div className="flex items-center gap-1 text-[9.5px] font-bold text-neutral-600">
-                      <span>Visa</span> • <span>Mastercard</span> • <span>JCB</span>
+                    <span className="font-bold text-neutral-900 text-[10.5px]">Cổng thanh toán PayPal</span>
+                    <div className="flex items-center gap-1 text-[9.5px] font-bold text-[#003087]">
+                      <span>PayPal International</span>
                     </div>
                   </div>
-                  <Input
-                    placeholder="Số thẻ (16 chữ số)"
-                    className="h-7 text-xs bg-white rounded-lg border-neutral-200"
-                  />
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <Input
-                      placeholder="MM / YY"
-                      className="h-7 text-xs bg-white rounded-lg border-neutral-200"
-                    />
-                    <Input
-                      type="password"
-                      maxLength={4}
-                      placeholder="CVV"
-                      className="h-7 text-xs bg-white rounded-lg border-neutral-200"
-                    />
+                  <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-neutral-200/70 gap-2 my-auto">
+                    <span className="text-[11px] text-neutral-600 text-center">
+                      Bạn sẽ được chuyển hướng an toàn tới cổng PayPal để hoàn tất thanh toán.
+                    </span>
+                    <span className="text-[10px] font-semibold text-[#0070BA] bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200/60">
+                      Hỗ trợ Thẻ Quốc tế &amp; Số dư ví PayPal
+                    </span>
+                  </div>
+                  <div className="pt-1 border-t border-neutral-200/50 flex items-center justify-between text-[10px] text-neutral-400 shrink-0">
+                    <span>Bảo mật bởi PayPal Buyer Protection</span>
+                    <span className="text-emerald-600 font-semibold flex items-center gap-0.5">
+                      <CheckCircle2 className="size-3" /> Bảo vệ 256-bit SSL
+                    </span>
                   </div>
                 </div>
               )}

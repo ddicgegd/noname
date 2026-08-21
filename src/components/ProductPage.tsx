@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Meteors } from "@/components/ui/meteors";
 import {
   BadgeCheckIcon,
   BrainCircuitIcon,
@@ -927,8 +928,9 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
 
   return (
     <div className="min-h-screen bg-background px-4 pb-24 pt-16 md:pt-[72px] text-foreground sm:px-6 relative z-0">
-      {/* Ambient background glow - Fixed so it persists during infinite scroll */}
+      {/* Ambient background glow & Meteors - Fixed so it persists during infinite scroll */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+        <Meteors number={30} />
         <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vh] rounded-full bg-[#C084FC]/15 blur-[120px] mix-blend-normal opacity-75" />
         <div className="absolute top-[30%] right-[-10%] w-[40vw] h-[60vh] rounded-full bg-[#FF9A9E]/15 blur-[120px] mix-blend-normal opacity-75" />
         <div className="absolute bottom-[-10%] left-[20%] w-[60vw] h-[50vh] rounded-full bg-[#C084FC]/15 blur-[120px] mix-blend-normal opacity-75" />
@@ -2345,21 +2347,6 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                     </>
                   )}
 
-                  {/* Floating specs features badges */}
-                  <div className="absolute top-3.5 left-3.5 flex flex-col gap-1.5 z-10 select-none">
-                    <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-                      <span className="material-symbols-outlined text-[11px] font-bold text-primary">bolt</span>
-                      72 giờ
-                    </span>
-                    <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-                      <span className="material-symbols-outlined text-[11px] font-bold text-primary">ecg</span>
-                      Nhịp tim
-                    </span>
-                    <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-                      <span className="material-symbols-outlined text-[11px] font-bold text-primary">sim_card</span>
-                      eSim
-                    </span>
-                  </div>
 
                   <div className="absolute inset-0 z-0 size-full overflow-hidden rounded-xl">
                     <AnimatePresence mode="wait">

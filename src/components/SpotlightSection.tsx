@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useMotionValue, useSpring } from "motion/react";
 import CTAButton from "./CTAButton";
 import LogoMarquee from "./LogoMarquee";
+import { Particles } from "./ui/particles";
 
 interface SpotlightSectionProps {
   initialBgText?: string;
@@ -217,6 +218,16 @@ export default function SpotlightSection({
       <div 
         className="absolute top-0 left-0 w-[65vw] h-[65vw] max-w-[1000px] max-h-[1000px] rounded-full bg-gradient-to-br from-[#2563EB] via-[#3B82F6] to-[#60A5FA] opacity-40 blur-[130px] -translate-x-1/4 -translate-y-1/4 pointer-events-none select-none"
         style={{ zIndex: 1 }}
+      />
+
+      {/* Floating Magic Particles Layer */}
+      <Particles
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 5 }}
+        quantity={90}
+        ease={80}
+        color="#000000"
+        refresh
       />
 
       {/* Big text behind image - overflow-hidden removed to prevent clipping of the display text */}

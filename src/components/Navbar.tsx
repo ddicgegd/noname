@@ -5,7 +5,10 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp } from "lucide-react";
+import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package } from "lucide-react";
+import { Dock, DockIcon } from "@/components/ui/dock";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
 
 interface CartItem {
   id: string;
@@ -58,7 +61,7 @@ const CATEGORIES: MegaMenuCategory[] = [
         ]
       },
       {
-        title: "Mức giá điện thoại",
+        title: "Mức giá",
         items: [
           { name: "Dưới 2 triệu" },
           { name: "Từ 2 - 4 triệu" },
@@ -79,10 +82,7 @@ const CATEGORIES: MegaMenuCategory[] = [
           { name: "iPhone 16 Pro Max" },
           { name: "Galaxy S26 Ultra", tag: "HOT" },
           { name: "Galaxy S26" },
-          { name: "Galaxy Z Fold7" },
-          { name: "OPPO Reno16 F 5G", tag: "MỚI" },
-          { name: "OPPO Find X9 Ultra" },
-          { name: "OPPO Find N6" }
+          { name: "Galaxy Z Fold7" }
         ]
       },
       {
@@ -304,7 +304,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     }
     megaMenuTimeoutRef.current = setTimeout(() => {
       setShowProductMegaMenu(false);
-    }, 280); // Responsive close trigger, transition handles smooth fade out
+    }, 195); // 30% faster hide after mouse leave (from 280ms to 195ms)
   };
 
   // Close dropdown on click outside
@@ -528,24 +528,24 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       animate={{ opacity: 1, clipPath: "circle(150% at 20% -20px)", filter: "blur(0px)" }}
                       exit={{ opacity: 0, clipPath: "circle(0% at 20% -20px)", filter: "blur(10px)" }}
                       transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[92vw] lg:w-[1040px] xl:w-[1080px] bg-white/95 backdrop-blur-3xl rounded-[20px] border-0 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.12),0_8px_24px_rgba(0,0,0,0.04)] z-50 flex overflow-hidden mega-menu-popup"
+                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[90vw] lg:w-[930px] xl:w-[972px] bg-white/95 backdrop-blur-3xl rounded-[20px] border-0 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.12),0_8px_24px_rgba(0,0,0,0.04)] z-50 flex overflow-hidden mega-menu-popup"
                     >
                   {/* Decorative background glows */}
                   <div className="absolute top-0 right-0 w-40 h-40 bg-[#FF4D24]/15 rounded-full blur-[40px] pointer-events-none -z-10" />
 
-                  {/* Left Section: Poster (scaled down 20%) */}
-                  <div className="relative shrink-0 w-[268px] overflow-hidden" style={{ aspectRatio: '10/14' }}>
+                  {/* Left Section: Poster (-10% overall scale) */}
+                  <div className="relative shrink-0 w-[242px] overflow-hidden" style={{ aspectRatio: '10/14' }}>
                     <img src="https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?q=80&w=800&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover" alt="Galaxy Z Fold6" />
                     
                     {/* Dark gradient overlay for text readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-5 pointer-events-none">
-                      <span className="text-white font-black text-xl leading-tight drop-shadow-md">Galaxy Z Fold6</span>
-                      <span className="text-white/90 text-xs mt-1 font-medium drop-shadow">Sức mạnh mở ra tiềm năng</span>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-4.5 pointer-events-none">
+                      <span className="text-white font-black text-[19px] leading-tight drop-shadow-md">Galaxy Z Fold6</span>
+                      <span className="text-white/90 text-xs mt-0.5 font-medium drop-shadow">Sức mạnh mở ra tiềm năng</span>
                     </div>
                   </div>
 
-                  {/* Right Section: Categories with Rich Ambient Glow (scaled down 20%) */}
-                  <div className="relative flex-1 py-6 pl-5 pr-7 bg-transparent flex flex-col justify-center overflow-hidden">
+                  {/* Right Section: Categories with Rich Ambient Glow (-10% scale) */}
+                  <div className="relative flex-1 py-5.5 pl-4.5 pr-6 bg-transparent flex flex-col justify-center overflow-hidden">
                         {/* Stronger ambient color bleed matching the poster colors */}
                         <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-cyan-500/8 via-indigo-500/2 to-transparent pointer-events-none" />
                         
@@ -696,36 +696,42 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                 <div className="flex flex-col gap-3">
                   <span className="text-[14px] font-extrabold text-[#111111] uppercase tracking-wide font-display mb-2">Từ khóa phổ biến</span>
                   
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors" onClick={() => onNavigate("product")}>
-                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <TrendingUp size={14} className="text-slate-500" />
+                  <Dock orientation="vertical" iconMagnification={43} iconDistance={80} className="flex flex-col gap-1 w-full px-1">
+                    <DockIcon className="w-full">
+                      <div className="flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer w-full" onClick={() => onNavigate("product")}>
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                          <TrendingUp size={14} className="text-slate-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate">Aero Compute Server</p>
+                        </div>
+                        <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full shrink-0">🔥 HOT</span>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-slate-800">Aero Compute Server</p>
-                      </div>
-                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">🔥 HOT</span>
-                    </div>
+                    </DockIcon>
                     
-                    <div className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors" onClick={() => onNavigate("product")}>
-                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <TrendingUp size={14} className="text-slate-500" />
+                    <DockIcon className="w-full">
+                      <div className="flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer w-full" onClick={() => onNavigate("product")}>
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                          <TrendingUp size={14} className="text-slate-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate">Nexus AI Model</p>
+                        </div>
+                        <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full shrink-0">🔥 HOT</span>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-slate-800">Nexus AI Model</p>
-                      </div>
-                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">🔥 HOT</span>
-                    </div>
+                    </DockIcon>
 
-                    <div className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors" onClick={() => onNavigate("product")}>
-                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <Search size={14} className="text-slate-500" />
+                    <DockIcon className="w-full">
+                      <div className="flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer w-full" onClick={() => onNavigate("product")}>
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                          <Search size={14} className="text-slate-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-600 truncate">Glacier Storage 100TB</p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-slate-600">Glacier Storage 100TB</p>
-                      </div>
-                    </div>
-                  </div>
+                    </DockIcon>
+                  </Dock>
                 </div>
               </motion.div>
             )}
@@ -1046,93 +1052,108 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                   </div>
                 </div>
   
-                {loggedInUser ? (
-                  <button 
-                    onClick={() => {
-                      setShowAccountMenu(false);
-                      onNavigate("profile");
-                    }}
-                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
-                  >
-                    <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                    <span className="font-extrabold text-[#FF4D24]">Xem trang cá nhân</span>
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => {
-                      setShowAccountMenu(false);
-                      window.location.hash = "register";
-                      onNavigate("auth");
-                    }}
-                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
-                  >
-                    <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                    <span className="font-extrabold text-[#FF4D24]">Đăng ký / Đăng nhập</span>
-                  </button>
-                )}
-  
-                <button 
-                  onClick={() => {
-                    setShowAccountMenu(false);
-                    if (loggedInUser) {
-                      onNavigate("profile");
-                    } else {
-                      window.location.hash = "register";
-                      onNavigate("auth");
-                    }
-                  }}
-                  className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
-                >
-                  <Settings size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                  <span>Thiết lập tài khoản</span>
-                </button>
-  
-                <button 
-                  onClick={() => {
-                    setShowAccountMenu(false);
-                    if (loggedInUser) {
-                      onNavigate("profile");
-                    } else {
-                      window.location.hash = "register";
-                      onNavigate("auth");
-                    }
-                  }}
-                  className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] hover:bg-slate-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-slate-100"
-                >
-                  <CreditCard size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                  <span>Gói đăng ký</span>
-                </button>
-  
-                <div className="my-1.5 border-t border-slate-100" />
-  
-                {loggedInUser ? (
-                  <button 
-                    onClick={() => {
-                      setShowAccountMenu(false);
-                      localStorage.removeItem("horizon_redis_profile");
-                      localStorage.removeItem("horizon_current_user");
-                      setLoggedInUser(null);
-                      window.location.hash = "register";
-                      onNavigate("auth");
-                    }}
-                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-rose-100"
-                  >
-                    <LogOut size={15} className="text-rose-600" />
-                    <span>Đăng xuất tài khoản</span>
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => {
-                      setShowAccountMenu(false);
-                      window.location.hash = "register";
-                      onNavigate("auth");
-                    }}
-                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-[#FF4D24] hover:bg-red-50 rounded-xl transition-all duration-200 cursor-pointer text-left border border-transparent hover:border-red-100"
-                  >
-                    <LogOut size={15} className="text-[#FF4D24]" />
-                    <span>Đăng nhập tài khoản khác</span>
-                  </button>
-                )}
+                {/* Vertical Magic UI Dock Menu Items */}
+                <Dock orientation="vertical" iconMagnification={46} iconDistance={100} className="flex flex-col gap-1 w-full">
+                  {loggedInUser ? (
+                    <DockIcon className="w-full">
+                      <button 
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          onNavigate("profile");
+                        }}
+                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
+                      >
+                        <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
+                        <span className="font-extrabold text-[#FF4D24]">Xem trang cá nhân</span>
+                      </button>
+                    </DockIcon>
+                  ) : (
+                    <DockIcon className="w-full">
+                      <button 
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          window.location.hash = "register";
+                          onNavigate("auth");
+                        }}
+                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
+                      >
+                        <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
+                        <span className="font-extrabold text-[#FF4D24]">Đăng ký / Đăng nhập</span>
+                      </button>
+                    </DockIcon>
+                  )}
+    
+                  <DockIcon className="w-full">
+                    <button 
+                      onClick={() => {
+                        setShowAccountMenu(false);
+                        if (loggedInUser) {
+                          onNavigate("profile");
+                        } else {
+                          window.location.hash = "register";
+                          onNavigate("auth");
+                        }
+                      }}
+                      className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
+                    >
+                      <Settings size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
+                      <span>Thiết lập tài khoản</span>
+                    </button>
+                  </DockIcon>
+    
+                  <DockIcon className="w-full">
+                    <button 
+                      onClick={() => {
+                        setShowAccountMenu(false);
+                        if (loggedInUser) {
+                          onNavigate("profile");
+                        } else {
+                          window.location.hash = "register";
+                          onNavigate("auth");
+                        }
+                      }}
+                      className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
+                    >
+                      <CreditCard size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
+                      <span>Gói đăng ký</span>
+                    </button>
+                  </DockIcon>
+    
+                  <div className="my-1.5 border-t border-slate-100" />
+    
+                  {loggedInUser ? (
+                    <DockIcon className="w-full">
+                      <button 
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          localStorage.removeItem("horizon_redis_profile");
+                          localStorage.removeItem("horizon_current_user");
+                          setLoggedInUser(null);
+                          window.location.hash = "register";
+                          onNavigate("auth");
+                        }}
+                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-rose-600 hover:text-rose-700 rounded-xl transition-colors duration-200 cursor-pointer text-left"
+                      >
+                        <LogOut size={15} className="text-rose-600" />
+                        <span>Đăng xuất tài khoản</span>
+                      </button>
+                    </DockIcon>
+                  ) : (
+                    <DockIcon className="w-full">
+                      <button 
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          window.location.hash = "register";
+                          onNavigate("auth");
+                        }}
+                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-[#FF4D24] hover:text-[#FF7C4A] rounded-xl transition-colors duration-200 cursor-pointer text-left"
+                      >
+                        <LogOut size={15} className="text-[#FF4D24]" />
+                        <span>Đăng nhập tài khoản khác</span>
+                      </button>
+                    </DockIcon>
+                  )}
+                </Dock>
               </motion.div>
             )}
           </AnimatePresence>
