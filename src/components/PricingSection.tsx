@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React, { useEffect, useRef, useState, type MouseEvent, type CSSProperties } from "react";
 import { motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
 import ClawMachine from "./ClawMachine";
 
 
@@ -294,7 +294,7 @@ export default function PricingSection() {
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <motion.div
-            className="p-6 sm:p-8 bg-white/50 backdrop-blur-xl rounded-2xl flex flex-col relative overflow-hidden h-full min-h-[550px] border border-white/60 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08),0_8px_32px_rgba(0,0,0,0.04)]"
+            className="p-3.5 sm:p-4.5 bg-white/50 backdrop-blur-xl rounded-2xl flex flex-col justify-between relative overflow-hidden h-full min-h-[550px] border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)]"
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}

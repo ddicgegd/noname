@@ -17,12 +17,24 @@ import ProfilePage from "./components/ProfilePage";
 import TermsPage from "./components/TermsPage";
 import OrderPage from "./components/OrderPage";
 import { AnimatePresence, motion } from "motion/react";
+import { 
+  getFullCart, 
+  getCachedCart,
+  addToCart as apiAddToCart, 
+  removeCartItem as apiRemoveCartItem, 
+  removeCartItems as apiRemoveCartItems, 
+  subscribeToCartUpdates 
+} from "./services/cartService";
+import type { Cart as ApiCart } from "./types/cart";
 
 interface CartItem {
   id: string;
+  sku?: string;
   name: string;
   price: string;
   icon: string;
+  quantity?: number;
+  imageUrl?: string;
 }
 
 interface FlyingItem {
@@ -93,14 +105,61 @@ export default function App() {
     return page;
   }));
 
+  const mapApiCartToCartItems = (cart: ApiCart): CartItem[] => {
+    if (!cart || !Array.isArray(cart.items)) return [];
+    const res: CartItem[] = [];
+    cart.items.forEach((it, idx) => {
+      let icon = "📦";
+      const name = it.productName || it.sku;
+      if (name.toLowerCase().includes("ai") || name.toLowerCase().includes("trí tuệ")) icon = "🧠";
+      else if (name.toLowerCase().includes("samsung") || name.toLowerCase().includes("phone") || name.toLowerCase().includes("iphone")) icon = "📱";
+      else if (name.toLowerCase().includes("airpod") || name.toLowerCase().includes("tai nghe")) icon = "🎧";
+      else if (name.toLowerCase().includes("watch") || name.toLowerCase().includes("đồng hồ")) icon = "⌚";
+      else if (name.toLowerCase().includes("compute") || name.toLowerCase().includes("vinh")) icon = "⚡";
+
+      const formattedPrice = (it.salePrice || it.unitPrice || 0).toLocaleString("vi-VN") + "đ";
+
+      res.push({
+        id: `${it.sku}-${idx}`,
+        sku: it.sku,
+        name,
+        price: formattedPrice,
+        icon,
+        quantity: it.quantity || 1,
+        imageUrl: it.imageUrl,
+      });
+    });
+    return res;
+  };
+
   const [activeBrand, setActiveBrand] = useState("Samsung");
   const [buyNowProduct, setBuyNowProduct] = useState<any>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    { id: "1", name: "Professional Plan", price: "$49 / tháng", icon: "📦" },
-    { id: "2", name: "Premium Add-on", price: "$19 / tháng", icon: "⚡" }
-  ]);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    const cached = getCachedCart();
+    return cached ? mapApiCartToCartItems(cached) : [];
+  });
   const [flyingItems, setFlyingItems] = useState<FlyingItem[]>([]);
   const [risingStars, setRisingStars] = useState<RisingStar[]>([]);
+
+  // Sync initial cart & subscribe to reactive cart updates
+  useEffect(() => {
+    let isMounted = true;
+    getFullCart().then(cart => {
+      if (isMounted && cart?.items) {
+        setCartItems(mapApiCartToCartItems(cart));
+      }
+    }).catch(() => {});
+
+    const unsubscribe = subscribeToCartUpdates((updatedCart) => {
+      if (updatedCart) {
+        setCartItems(mapApiCartToCartItems(updatedCart));
+      } else {
+        getFullCart().then(c => setCartItems(mapApiCartToCartItems(c))).catch(() => {});
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Automatically scroll to the top on page transition
   useEffect(() => {
@@ -230,23 +289,30 @@ export default function App() {
   const handleAddToCart = (
     name: string,
     price: string,
-    clickEvent?: React.MouseEvent | { clientX: number; clientY: number }
+    clickEvent?: React.MouseEvent | { clientX: number; clientY: number },
+    sku?: string
   ) => {
     // Generate simple appropriate emoji based on product name
     let icon = "📦";
     if (name.toLowerCase().includes("ai") || name.toLowerCase().includes("trí tuệ")) icon = "🧠";
-    else if (name.toLowerCase().includes("compute") || name.toLowerCase().includes("vinh")) icon = "⚡";
-    else if (name.toLowerCase().includes("storage") || name.toLowerCase().includes("lưu trữ")) icon = "💾";
-    else if (name.toLowerCase().includes("network") || name.toLowerCase().includes("mạng")) icon = "🌐";
+    else if (name.toLowerCase().includes("samsung") || name.toLowerCase().includes("phone") || name.toLowerCase().includes("iphone")) icon = "📱";
+    else if (name.toLowerCase().includes("airpod") || name.toLowerCase().includes("tai nghe")) icon = "🎧";
     else if (name.toLowerCase().includes("watch") || name.toLowerCase().includes("đồng hồ")) icon = "⌚";
+    else if (name.toLowerCase().includes("compute") || name.toLowerCase().includes("vinh")) icon = "⚡";
 
-    const newItem: CartItem = {
-      id: `cart-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      name,
-      price,
-      icon
-    };
-    setCartItems(prev => [...prev, newItem]);
+    const targetSku = sku || (
+      name.toLowerCase().includes("iphone 16") ? "ATTR-IP16PM-DESERT-256G" :
+      name.toLowerCase().includes("iphone 15") ? "attr-ip15pm-256gb-titan" :
+      name.toLowerCase().includes("samsung") || name.toLowerCase().includes("s24") ? "ATTR-S24U-TITANGRAY-512G" :
+      name.toLowerCase().includes("xiaomi") ? "ATTR-MI14U-WHITE-512G" :
+      name.toLowerCase().includes("airpod") ? "attr-airpods-pro2-usbc" :
+      `attr-${name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").slice(0, 24)}`
+    );
+
+    // Call GraphQL mutation asynchronously
+    apiAddToCart([{ sku: targetSku, quantity: 1 }]).catch((err) => {
+      console.warn("apiAddToCart error:", err);
+    });
 
     // Flying animation coordinates
     let startX = window.innerWidth / 2;
@@ -280,9 +346,11 @@ export default function App() {
 
   const handleRemoveCartItem = (id: string | string[]) => {
     if (Array.isArray(id)) {
-      setCartItems(prev => prev.filter(item => !id.includes(item.id)));
+      const skus = Array.from(new Set(id.map(i => i.split("-")[0])));
+      apiRemoveCartItems(skus).catch(() => {});
     } else {
-      setCartItems(prev => prev.filter(item => item.id !== id));
+      const sku = id.split("-")[0];
+      apiRemoveCartItem(sku).catch(() => {});
     }
   };
 

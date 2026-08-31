@@ -4,18 +4,20 @@
  * Includes Real-Time Response Inspector Log Collector
  */
 
-import { getApiBaseUrl } from "../lib/api";
+import { getApiBaseUrl, getUnifiedAccessToken, unifiedFetch } from "../lib/api";
+import { STORAGE_KEYS } from "../lib/storageKeys";
 
 export interface AddressDto {
-  sku: string;
+  sku?: string;
   address: string;
   latitude?: number;
   longitude?: number;
   phoneNumber: string;
   recipientName: string;
-  isDefault: boolean;
-  type?: "home" | "office";
+  isDefault?: boolean;
+  type?: "home" | "office" | "other";
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateAddressInput {
@@ -27,27 +29,34 @@ export interface CreateAddressInput {
 }
 
 export interface ResolvedAddressDto {
-  success: boolean;
+  formattedAddress: string;
   latitude: number;
   longitude: number;
-  formattedAddress: string;
-  rawAddress: string;
+  province?: string;
+  district?: string;
+  ward?: string;
+  confidence?: number;
+  success?: boolean;
+  rawAddress?: string;
   error?: string | null;
 }
 
 export interface AddressApiResponseLog {
   id: string;
   timestamp: string;
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   endpoint: string;
-  fullUrl: string;
+  method: string;
   status: number;
-  statusText: string;
   durationMs: number;
-  requestHeaders?: Record<string, string>;
-  requestBody?: any;
-  responseBody: any;
+  requestPayload?: any;
+  responsePayload?: any;
+  headers?: Record<string, string>;
   isSuccess: boolean;
+  fullUrl?: string;
+  statusText?: string;
+  requestHeaders?: any;
+  requestBody?: any;
+  responseBody?: any;
 }
 
 // Global subscribers for live API response inspector
@@ -56,7 +65,7 @@ const listeners: Set<LogListener> = new Set();
 
 export function getAddressApiLogs(): AddressApiResponseLog[] {
   try {
-    const raw = localStorage.getItem("horizon_address_api_logs");
+    const raw = localStorage.getItem(STORAGE_KEYS.ADDRESS_API_LOGS) || localStorage.getItem("horizon_address_api_logs");
     if (raw) return JSON.parse(raw);
   } catch (_) {}
   return [];
@@ -71,6 +80,7 @@ export function subscribeAddressApiLogs(listener: LogListener): () => void {
 }
 
 export function clearAddressApiLogs(): void {
+  localStorage.removeItem(STORAGE_KEYS.ADDRESS_API_LOGS);
   localStorage.removeItem("horizon_address_api_logs");
   listeners.forEach(fn => fn([]));
 }
@@ -85,7 +95,7 @@ function recordApiLog(entry: Omit<AddressApiResponseLog, "id" | "timestamp">): A
   try {
     const current = getAddressApiLogs();
     const updated = [fullLog, ...current].slice(0, 30);
-    localStorage.setItem("horizon_address_api_logs", JSON.stringify(updated));
+    localStorage.setItem(STORAGE_KEYS.ADDRESS_API_LOGS, JSON.stringify(updated));
     listeners.forEach(fn => fn(updated));
   } catch (e) {
     console.error("Failed to record API log:", e);
@@ -95,14 +105,7 @@ function recordApiLog(entry: Omit<AddressApiResponseLog, "id" | "timestamp">): A
 }
 
 function getStoredToken(): string {
-  const storedProfile = localStorage.getItem("horizon_redis_profile");
-  if (storedProfile) {
-    try {
-      const prof = JSON.parse(storedProfile);
-      if (prof.accessToken) return prof.accessToken;
-    } catch (_) {}
-  }
-  return localStorage.getItem("horizon_access_token") || "";
+  return getUnifiedAccessToken();
 }
 
 /**
@@ -135,7 +138,7 @@ async function executeRealApiCall<T = any>(
   let isSuccess = false;
 
   try {
-    const res = await fetch(fullUrl, {
+    const res = await unifiedFetch(fullUrl, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined
@@ -231,17 +234,17 @@ export async function getMyAddresses(): Promise<AddressDto[]> {
   if (result.ok && result.data) {
     if (Array.isArray(result.data.data)) {
       const addresses = result.data.data;
-      localStorage.setItem("horizon_user_addresses", JSON.stringify(addresses));
+      localStorage.setItem(STORAGE_KEYS.USER_ADDRESSES, JSON.stringify(addresses));
       return addresses;
     }
     if (Array.isArray(result.data)) {
-      localStorage.setItem("horizon_user_addresses", JSON.stringify(result.data));
+      localStorage.setItem(STORAGE_KEYS.USER_ADDRESSES, JSON.stringify(result.data));
       return result.data;
     }
   }
 
   // Fallback cache if backend returned error or offline
-  const stored = localStorage.getItem("horizon_user_addresses");
+  const stored = localStorage.getItem(STORAGE_KEYS.USER_ADDRESSES) || localStorage.getItem("horizon_user_addresses");
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
@@ -273,7 +276,7 @@ export async function getMyAddresses(): Promise<AddressDto[]> {
       createdAt: "2026-08-17T14:20:00"
     }
   ];
-  localStorage.setItem("horizon_user_addresses", JSON.stringify(defaultInitial));
+  localStorage.setItem(STORAGE_KEYS.USER_ADDRESSES, JSON.stringify(defaultInitial));
   return defaultInitial;
 }
 

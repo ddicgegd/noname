@@ -12,6 +12,8 @@ import {
 import { getProductColorOptions, type ProductColorOption } from "../lib/productColorSwatches";
 import { searchAttributesForProductSku, searchProductsForCatalog } from "../services/merchandiseService";
 import { createOrder, type CreateOrderInput } from "../services/orderService";
+import { STORAGE_KEYS } from "../lib/storageKeys";
+import { createAuthAction, savePendingAction } from "../lib/authAction";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +21,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import { Separator } from "@/components/ui/separator";
 import { Meteors } from "@/components/ui/meteors";
 import {
@@ -544,7 +547,8 @@ interface ProductPageProps {
   onAddToCart?: (
     itemName: string,
     itemPrice: string,
-    clickEvent?: React.MouseEvent | { clientX: number; clientY: number }
+    clickEvent?: React.MouseEvent | { clientX: number; clientY: number },
+    sku?: string
   ) => void;
   onNavigate?: (page: "landing" | "product" | "order" | "auth-report" | "profile" | "auth" | "terms") => void;
   onBuyNow?: (product: any) => void;
@@ -987,8 +991,8 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
 
         <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="flex flex-col gap-4 lg:sticky lg:top-[max(1.25rem,calc(50vh-365px))] lg:self-start max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
-            <Card size="sm" className="py-0 overflow-hidden shadow-xs">
-              <CardHeader className="py-2.5 px-3 border-b border-border/40">
+            <Card size="sm" className="py-0 overflow-hidden shadow-xs border border-border/80 ring-1 ring-border/50 bg-card/95 backdrop-blur-xs transition-shadow hover:shadow-sm">
+              <CardHeader className="py-2.5 px-3 border-b border-border/60 bg-muted/20">
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <FilterIcon className="size-4 text-primary" />
                   Bộ lọc
@@ -1019,7 +1023,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                   </div>
                 </div>
 
-                <Separator />
+                <Separator className="bg-border/60" />
                 <div className="flex flex-col gap-1.5">
                   <div className="text-[11px] font-semibold text-muted-foreground">Hãng hạ tầng</div>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -1045,7 +1049,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                   </div>
                 </div>
 
-                <Separator />
+                <Separator className="bg-border/60" />
                 <div className="flex flex-col gap-2">
                   <div className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
                     <SlidersHorizontalIcon className="size-3.5" />
@@ -1115,7 +1119,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="bg-transparent border-t border-border/40 py-2.5 px-3 justify-between">
+              <CardFooter className="bg-muted/20 border-t border-border/60 py-2.5 px-3 justify-between">
                 <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={handleReset}>
                   <RefreshCcwIcon data-icon="inline-start" className="size-3" />
                   Đặt lại
@@ -1760,7 +1764,8 @@ interface ProductDetailModalProps {
   onAddToCart?: (
     itemName: string,
     itemPrice: string,
-    clickEvent?: React.MouseEvent | { clientX: number; clientY: number }
+    clickEvent?: React.MouseEvent | { clientX: number; clientY: number },
+    sku?: string
   ) => void;
   onNavigate?: (page: "landing" | "product" | "order" | "auth-report" | "profile" | "auth" | "terms") => void;
   onBuyNow?: (product: any) => void;
@@ -1881,13 +1886,40 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
   const selectedColor = colors.find((color) => color.id === activeColor);
   const selectedOptionLabel = [selectedVersion?.title, selectedColor?.title].filter(Boolean).join(" - ");
 
+  const executeBuyNow = createAuthAction({
+    onAuthenticated: () => {
+      if (showToast) {
+        showToast(`Đã chuyển ${product.name} sang trang thanh toán`, "info");
+      }
+      onClose();
+      if (onNavigate) {
+        onNavigate("order");
+      }
+    },
+    onGuest: () => {
+      if (showToast) {
+        showToast("Vui lòng đăng nhập tài khoản để tiến hành thanh toán đơn hàng", "info");
+      }
+      savePendingAction({
+        actionId: "BUY_NOW",
+        returnUrl: `/p#${product.sku || product.id}`,
+        payload: { sku: product.sku || product.id }
+      });
+      onClose();
+      window.location.hash = "login";
+      if (onNavigate) {
+        onNavigate("auth");
+      }
+    }
+  });
+
   const handleBuyNow = (e: React.MouseEvent) => {
     const attrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || `ATTR-${product.id.toUpperCase()}`;
     const versionName = selectedVersion?.title || versions[0]?.title || "Tiêu chuẩn";
     const colorName = selectedColor?.title || colors[0]?.title || "Mặc định";
     const availableColorTitles = colors.map((c) => c.title);
     const availableVersionTitles = versions.map((v) => v.title);
-    const selectedImg = images[activeImgIdx] || product.imageUrl || (product as any).image || "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&auto=format&fit=crop&q=80";
+    const selectedImg = images[activeImgIdx] || (product as any).imageUrl || (product as any).image || "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&auto=format&fit=crop&q=80";
 
     const buyNowItem = {
       id: product.id || "prod-buy-now",
@@ -1906,27 +1938,73 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
 
     // Cache locally for persistence
     try {
-      localStorage.setItem("horizon_buy_now_product", JSON.stringify(buyNowItem));
+      localStorage.setItem(STORAGE_KEYS.BUY_NOW_PRODUCT, JSON.stringify(buyNowItem));
     } catch (err) {
       console.warn("Could not cache buyNowItem:", err);
-    }
-
-    if (showToast) {
-      showToast(`Đã chuyển ${product.name} sang trang thanh toán`, "info");
     }
 
     if (onBuyNow) {
       onBuyNow(buyNowItem);
     }
 
-    onClose();
-    if (onNavigate) {
-      onNavigate("order");
-    }
+    executeBuyNow();
   };
+
+  const handleQA = createAuthAction({
+    onAuthenticated: () => {
+      if (showToast) {
+        showToast("Đang mở cổng gửi câu hỏi hỏi đáp chuyên gia kỹ thuật...", "success");
+      }
+    },
+    onGuest: () => {
+      if (showToast) {
+        showToast("Vui lòng đăng nhập để gửi câu hỏi hoặc đánh giá sản phẩm", "info");
+      }
+      savePendingAction({
+        actionId: "QA",
+        returnUrl: `/p#${product.sku || product.id}`
+      });
+      window.location.hash = "login";
+      if (onNavigate) {
+        onNavigate("auth");
+      }
+    }
+  });
 
   const [favoriteActive, setFavoriteActive] = useState(false);
   const [voucherCollected, setVoucherCollected] = useState(false);
+
+  const handleClaimVoucher = (e: React.MouseEvent) => {
+    if (voucherCollected) return;
+    const executeClaim = createAuthAction({
+      onAuthenticated: () => {
+        setVoucherCollected(true);
+        if (onSpawnStars) {
+          onSpawnStars(e.clientX, e.clientY, "#FF4D24");
+        }
+        if (onFlyToAccount) {
+          onFlyToAccount(e.clientX, e.clientY, "🎟️", "#FF4D24", "rgba(255,77,36,0.4)");
+        }
+        if (showToast) {
+          showToast("Đã lưu voucher CLOUD5% vào ví tài khoản cá nhân!", "success");
+        }
+      },
+      onGuest: () => {
+        if (showToast) {
+          showToast("Vui lòng đăng nhập tài khoản thành viên để nhận voucher", "info");
+        }
+        savePendingAction({
+          actionId: "CLAIM_VOUCHER",
+          returnUrl: `/p#${product.sku || product.id}`
+        });
+        window.location.hash = "login";
+        if (onNavigate) {
+          onNavigate("auth");
+        }
+      }
+    });
+    executeClaim();
+  };
 
   const [accTab, setAccTab] = useState<"watch" | "cloud" >("watch");
   const [addedAccs, setAddedAccs] = useState<string[]>([]);
@@ -2175,19 +2253,13 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
   const vndInfo = getProductVNDDetails(product);
 
   const handleModalScroll = () => {
-    if (!contentRef.current) return;
+    if (!showSpecsPopup || !contentRef.current) return;
     const container = contentRef.current;
-
-    // Detect if content is scrolled down or has remaining scrollable distance below
-    const hasScrollTop = container.scrollTop > 10;
-    const hasScrollBottom = container.scrollHeight - container.scrollTop - container.clientHeight > 10;
-    setShowTopFade(hasScrollTop);
-    setShowBottomFade(hasScrollBottom);
 
     let currentActive = specSections[0]?.id;
     let minDistance = Infinity;
 
-    specSections.forEach((sec) => {
+    for (const sec of specSections) {
       const el = document.getElementById(`modal-spec-${sec.id}`);
       if (el) {
         const distance = Math.abs(el.offsetTop - container.offsetTop - 20);
@@ -2196,7 +2268,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
           currentActive = sec.id;
         }
       }
-    });
+    }
 
     if (currentActive && currentActive !== activeTab) {
       setActiveTab(currentActive);
@@ -2249,14 +2321,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
 
         {/* Modal Main Scrollable Content Wrapper */}
         <div className="relative flex-1 min-h-0">
-          <AnimatePresence>
-            {showTopFade && (
-              <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="pointer-events-none absolute left-0 right-0 top-0 z-20 h-12 bg-gradient-to-b from-background/60 to-transparent"
-              />
-            )}
-          </AnimatePresence>
+          <ProgressiveBlur position="top" height={44} className="z-20" />
 
           <div
             ref={contentRef}
@@ -2298,7 +2363,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
 
                 {/* Social Share & Actions */}
                 <div className="flex shrink-0 select-none items-center gap-2 self-start text-[11px] font-bold text-muted-foreground sm:self-center">
-                  <button className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary">
+                  <button
+                    onClick={() => handleQA()}
+                    className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary"
+                  >
                     <span className="material-symbols-outlined text-[16px] text-primary">chat_bubble</span>
                     <span>Hỏi đáp</span>
                   </button>
@@ -2331,6 +2399,14 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
 
             {/* LEFT COLUMN: Image Box, Highlights, Commitments */}
             <div className="lg:col-span-8 flex flex-col gap-5">
+
+              {/* Minimalist Member Promotion Bar */}
+              <div className="flex select-none items-center gap-2 rounded-xl border bg-secondary p-3 text-secondary-foreground shadow-sm">
+                <span className="material-symbols-outlined text-primary text-[18px] font-bold">loyalty</span>
+                  <span className="text-[13px] font-bold leading-snug">
+                  Tiết kiệm thêm tới <span className="font-extrabold">230.000đ</span> cho Smember. <span onClick={() => { window.location.hash = "register"; if (onNavigate) onNavigate("auth"); }} className="cursor-pointer font-black underline transition-colors hover:text-foreground">Đăng ký ngay</span>
+                </span>
+              </div>
 
               {/* Product Visual Area + Gallery Thumbnails grouped tightly for space optimization */}
               <div className="flex flex-col gap-3">
@@ -2649,16 +2725,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                       <div className="flex items-center justify-between mt-auto">
                         <span className="text-[8.5px] text-muted-foreground font-bold uppercase font-mono tracking-wider">CLOUD5%</span>
                         <button
-                          onClick={(e) => {
-                            if (voucherCollected) return;
-                            setVoucherCollected(true);
-                            if (onSpawnStars) {
-                              onSpawnStars(e.clientX, e.clientY, "#FF4D24");
-                            }
-                            if (onFlyToAccount) {
-                              onFlyToAccount(e.clientX, e.clientY, "🎟️", "#FF4D24", "rgba(255,77,36,0.4)");
-                            }
-                          }}
+                          onClick={handleClaimVoucher}
                           disabled={voucherCollected}
                           className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all leading-none ${
                             voucherCollected
@@ -2985,14 +3052,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
 
         </div>
 
-          <AnimatePresence>
-            {showBottomFade && (
-              <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 h-12 bg-gradient-to-t from-background/60 to-transparent"
-              />
-            )}
-          </AnimatePresence>
+          <ProgressiveBlur position="bottom" height={72} className="z-20" />
         </div>
 
         {/* Floating bottom actions bar with 3D discount ribbon */}
@@ -3046,11 +3106,27 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
             <Button
               variant="outline"
               onClick={(e) => {
-                if (onAddToCart) {
-                  const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
-                  onAddToCart(variantLabel, "Trả góp 0%", e);
-                }
-                onClose();
+                const executeInstallment = createAuthAction({
+                  onAuthenticated: () => {
+                    if (onAddToCart) {
+                      const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
+                      onAddToCart(variantLabel, "Trả góp 0%", e);
+                    }
+                    onClose();
+                  },
+                  onGuest: () => {
+                    if (showToast) {
+                      showToast("Vui lòng đăng nhập tài khoản để duyệt hồ sơ trả góp 0%", "info");
+                    }
+                    sessionStorage.setItem("auth_redirect_target", "/o");
+                    onClose();
+                    window.location.hash = "login";
+                    if (onNavigate) {
+                      onNavigate("auth");
+                    }
+                  }
+                });
+                executeInstallment();
               }}
               className="hidden h-10 rounded-xl border-primary text-[11.5px] font-bold text-primary hover:bg-secondary sm:flex sm:px-4 sm:text-[12px]"
             >
@@ -3071,7 +3147,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
               onClick={(e) => {
                 if (onAddToCart) {
                   const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
-                  onAddToCart(variantLabel, formattedCurrentPrice, e);
+                  const attrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || `ATTR-${product.id.toUpperCase()}`;
+                  onAddToCart(variantLabel, formattedCurrentPrice, e, String(attrSku));
                 }
                 onClose();
               }}
@@ -3153,12 +3230,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
 
                 {/* Content wrapper with scroll indicators */}
                 <div className="flex-1 relative overflow-hidden flex flex-col">
-                  {/* Top blur fade overlay */}
-                  <div
-                    className={`absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white to-transparent pointer-events-none z-20 transition-opacity duration-350 ${
-                      showTopFade ? "opacity-100" : "opacity-0"
-                    }`}
-                  />
+                  {/* Top progressive blur overlay */}
+                  <ProgressiveBlur position="top" height={32} className="z-20" />
 
                   {/* Content */}
                   <div
@@ -3197,12 +3270,8 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                     )}
                   </div>
 
-                  {/* Bottom blur fade overlay */}
-                  <div
-                    className={`absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white to-transparent pointer-events-none z-20 transition-opacity duration-350 ${
-                      showBottomFade ? "opacity-100" : "opacity-0"
-                    }`}
-                  />
+                  {/* Bottom progressive blur overlay */}
+                  <ProgressiveBlur position="bottom" height={40} className="z-20" />
                 </div>
               </motion.div>
             </div>

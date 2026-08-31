@@ -1,0 +1,67 @@
+{
+  "user:ADMIN@gmail.com": {
+    "username": "ADMIN@gmail.com",
+    "items": [
+      {
+        "sku": "ATTR-SGS25U-GRAY-256",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-S24U-TITANGRAY-512G",
+        "quantity": 2
+      },
+      {
+        "sku": "ATTR-MBP16M4-BLACK-48-1TB",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-IPADPROM4-SILVER-WF-256",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-XIAOMI14-512GB",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-TABS10UG-256GB",
+        "quantity": 1
+      }
+    ]
+  },
+  "guest:test-persistent-cart": {
+    "items": [
+      {
+        "sku": "ATTR-GP9PXL-OBSIDIAN-128",
+        "quantity": 2
+      }
+    ]
+  },
+  "guest:test-browser-guest": {
+    "items": [
+      {
+        "sku": "ATTR-IP16PM-DESERT-256G",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-S24U-TITANGRAY-512G",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-MI14U-WHITE-512G",
+        "quantity": 1
+      },
+      {
+        "sku": "attr-ip15pm-256gb-titan",
+        "quantity": 1
+      },
+      {
+        "sku": "attr-airpods-pro2-usbc",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-GP9PXL-OBSIDIAN-128",
+        "quantity": 1
+      }
+    ]
+  }
+}

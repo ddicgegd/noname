@@ -1086,8 +1086,6 @@ export function ClawCaptcha({
           }}
         />
       </div>
-
-      <p className="clawcap-hint">Drag joystick to move · Tap button to grab &amp; drop</p>
     </motion.div>
     </MotionConfig>
   )

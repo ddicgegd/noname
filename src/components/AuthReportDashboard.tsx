@@ -6,6 +6,8 @@ import {
   HelpCircle, ChevronRight, User, Settings, ArrowLeft, ArrowUpRight, Clock, Eye, EyeOff
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell, PieChart, Pie } from "recharts";
+import { getApiBaseUrl } from "../lib/api";
+import { STORAGE_KEYS } from "../lib/storageKeys";
 
 interface AuthReportDashboardProps {
   onNavigate: (page: "landing" | "product" | "auth" | "auth-report" | "terms") => void;
@@ -360,7 +362,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
   const [jwtStatus, setJwtStatus] = useState<{ active: boolean; expiryDate: string; timeLeft: string } | null>(null);
 
   // Connection diagnostics states
-  const [gatewayUrl, setGatewayUrl] = useState(() => localStorage.getItem("horizon_api_base_url") || "http://localhost:8080");
+  const [gatewayUrl, setGatewayUrl] = useState(() => getApiBaseUrl());
   const [pingStatus, setPingStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [pingLatency, setPingLatency] = useState<number | null>(null);
   const [pingError, setPingError] = useState<string | null>(null);
@@ -379,23 +381,27 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
 
   const loadLocalData = () => {
     try {
-      const storedLogs = localStorage.getItem("horizon_auth_audit_logs");
+      const storedLogs = localStorage.getItem(STORAGE_KEYS.AUTH_AUDIT_LOGS) || localStorage.getItem("horizon_auth_audit_logs");
       if (storedLogs) {
         setAuditLogs(JSON.parse(storedLogs));
       }
       
-      const storedProfile = localStorage.getItem("horizon_redis_profile");
+      const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
       if (storedProfile) {
         setRedisProfile(JSON.parse(storedProfile));
       }
 
-      const storedTokens = localStorage.getItem("horizon_redis_refresh_tokens");
+      const storedTokens = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKENS_MAP) || localStorage.getItem("horizon_redis_refresh_tokens");
       if (storedTokens) {
         setRedisTokens(JSON.parse(storedTokens));
       }
 
       // Try loading last access token to auto-populate decoder
-      if (storedProfile) {
+      const directToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN) || localStorage.getItem("horizon_access_token");
+      if (directToken) {
+        setJwtInput(directToken);
+        decodeToken(directToken);
+      } else if (storedProfile) {
         const prof = JSON.parse(storedProfile);
         if (prof.accessToken) {
           setJwtInput(prof.accessToken);
@@ -408,7 +414,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
   };
 
   const initMockLogs = () => {
-    const storedLogs = localStorage.getItem("horizon_auth_audit_logs");
+    const storedLogs = localStorage.getItem(STORAGE_KEYS.AUTH_AUDIT_LOGS) || localStorage.getItem("horizon_auth_audit_logs");
     if (!storedLogs || JSON.parse(storedLogs).length === 0) {
       const dummyLogs: AuditLog[] = [
         {
@@ -488,7 +494,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
           }
         }
       ];
-      localStorage.setItem("horizon_auth_audit_logs", JSON.stringify(dummyLogs));
+      localStorage.setItem(STORAGE_KEYS.AUTH_AUDIT_LOGS, JSON.stringify(dummyLogs));
       setAuditLogs(dummyLogs);
     }
   };
@@ -504,10 +510,10 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
     setMeError(null);
     setMeProfileData(null);
 
-    const apiBaseUrl = localStorage.getItem("horizon_api_base_url") || "http://localhost:8080";
-    const storedProfile = localStorage.getItem("horizon_redis_profile");
-    let token = "";
-    if (storedProfile) {
+    const apiBaseUrl = getApiBaseUrl();
+    const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
+    let token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN) || localStorage.getItem("horizon_access_token") || "";
+    if (!token && storedProfile) {
       try {
         const prof = JSON.parse(storedProfile);
         token = prof.accessToken || "";
@@ -544,8 +550,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
           method: "POST",
           headers: {
             "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "X-BFF-Gateway-Url": localStorage.getItem("horizon_api_base_url") || ""
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({ query: graphqlQueryStr })
         });
@@ -567,7 +572,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
 
   const clearAuditLogs = () => {
     if (window.confirm("Bạn có chắc chắn muốn xóa tất cả lịch sử log chẩn đoán?")) {
-      localStorage.setItem("horizon_auth_audit_logs", JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.AUTH_AUDIT_LOGS, JSON.stringify([]));
       setAuditLogs([]);
       setSelectedLog(null);
     }
@@ -638,7 +643,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
     setPingError(null);
     setCorsReport(null);
     
-    const apiBaseUrl = localStorage.getItem("horizon_api_base_url") || "http://localhost:8080";
+    const apiBaseUrl = gatewayUrl.trim() || getApiBaseUrl();
     const start = Date.now();
 
     try {
@@ -872,14 +877,12 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
                       type="text"
                       value={gatewayUrl}
                       onChange={(e) => {
-                        const cleanVal = e.target.value.trim();
-                        setGatewayUrl(cleanVal);
-                        localStorage.setItem("horizon_api_base_url", cleanVal);
+                        setGatewayUrl(e.target.value.trim());
                       }}
                       placeholder="http://localhost:8080"
                       className="w-full mt-1.5 h-9 px-3 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-[#FF4D24]/50 focus:ring-1 focus:ring-[#FF4D24]/20"
                     />
-                    <p className="text-[9px] text-slate-500 mt-1">Cấu hình này tự động đồng bộ trên toàn bộ danh mục sản phẩm và cổng chẩn đoán.</p>
+                    <p className="text-[9px] text-slate-500 mt-1">Kiểm tra kết nối và kiểm tra tính hợp lệ của endpoint máy chủ.</p>
                   </div>
                 </div>
 
@@ -1136,16 +1139,22 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
 
                   <button 
                     onClick={() => {
-                      const storedProfile = localStorage.getItem("horizon_redis_profile");
+                      const directToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN) || localStorage.getItem("horizon_access_token");
+                      if (directToken) {
+                        setJwtInput(directToken);
+                        decodeToken(directToken);
+                        return;
+                      }
+                      const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
                       if (storedProfile) {
                         const prof = JSON.parse(storedProfile);
                         if (prof.accessToken) {
                           setJwtInput(prof.accessToken);
                           decodeToken(prof.accessToken);
+                          return;
                         }
-                      } else {
-                        alert("Không tìm thấy Access Token nào từ phiên hoạt động trước đó.");
                       }
+                      alert("Không tìm thấy Access Token nào từ phiên hoạt động trước đó.");
                     }}
                     className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold rounded-xl text-slate-300 transition-all cursor-pointer text-center"
                   >
@@ -1666,7 +1675,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">Endpoint URL</span>
                       <p className="text-slate-200 break-all leading-normal bg-black/20 p-2 rounded border border-slate-800/40">
                         {meQueryType === "rest"
-                          ? `${(localStorage.getItem("horizon_api_base_url") || "http://localhost:8080").replace(/\/$/, "")}/api/auth/me`
+                          ? `${getApiBaseUrl().replace(/\/$/, "")}/api/auth/me`
                           : `${window.location.origin}/graphql`
                         }
                       </p>

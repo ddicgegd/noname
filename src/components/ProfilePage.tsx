@@ -9,7 +9,8 @@ import {
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
   LocateFixed, Map, Search, CheckCircle2, Layers
 } from "lucide-react";
-import { apiRequest } from "../lib/api";
+import { apiRequest, unifiedFetch, getUnifiedAccessToken } from "../lib/api";
+import { STORAGE_KEYS } from "../lib/storageKeys";
 import { 
   AddressDto, 
   getMyAddresses, 
@@ -63,7 +64,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(() => {
     try {
-      return !localStorage.getItem("horizon_current_user");
+      return !(localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem("horizon_current_user"));
     } catch {
       return true;
     }
@@ -232,8 +233,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     setSuccessMsg("");
 
     try {
-      const storedProfile = localStorage.getItem("horizon_redis_profile");
-      const storedUser = localStorage.getItem("horizon_current_user");
+      const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
+      const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem("horizon_current_user");
 
       let currentToken = "";
       let localUser = null;
@@ -250,7 +251,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       }
 
       // Initialize mockup order history
-      const storedOrders = localStorage.getItem("horizon_user_orders");
+      const storedOrders = localStorage.getItem(STORAGE_KEYS.USER_ORDERS) || localStorage.getItem("horizon_user_orders");
       let activeOrders: OrderItem[] = [];
       if (storedOrders) {
         activeOrders = JSON.parse(storedOrders);
@@ -364,7 +365,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             ]
           }
         ];
-        localStorage.setItem("horizon_user_orders", JSON.stringify(activeOrders));
+        localStorage.setItem(STORAGE_KEYS.USER_ORDERS, JSON.stringify(activeOrders));
       }
       setOrders(activeOrders);
       if (activeOrders.length > 0) {
@@ -379,12 +380,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       }
 
       // Xác thực ngầm qua GraphQL Gateway (Non-blocking background validation & fetch)
-      fetch("/graphql", {
+      unifiedFetch("/graphql", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${currentToken}`,
-          "X-BFF-Gateway-Url": localStorage.getItem("horizon_api_base_url") || ""
+          "Authorization": `Bearer ${currentToken}`
         },
         body: JSON.stringify({
           query: `
@@ -417,11 +417,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         if (meData && meData.status?.code === 200 && meData.data) {
           const fetchedUser = meData.data;
           setUser(fetchedUser);
-          localStorage.setItem("horizon_current_user", JSON.stringify(fetchedUser));
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(fetchedUser));
           
           if (storedProfile) {
             const prof = JSON.parse(storedProfile);
-            localStorage.setItem("horizon_redis_profile", JSON.stringify({
+            localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify({
               ...prof,
               email: fetchedUser.email || prof.email,
               userId: fetchedUser.id || prof.userId
@@ -446,11 +446,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             if (isSuccess && response.data) {
               const fetchedUser = response.data;
               setUser(fetchedUser);
-              localStorage.setItem("horizon_current_user", JSON.stringify(fetchedUser));
+              localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(fetchedUser));
               
               if (storedProfile) {
                 const prof = JSON.parse(storedProfile);
-                localStorage.setItem("horizon_redis_profile", JSON.stringify({
+                localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify({
                   ...prof,
                   email: fetchedUser.email || prof.email,
                   userId: fetchedUser.id || prof.userId
@@ -479,11 +479,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           if (isSuccess && response.data) {
             const fetchedUser = response.data;
             setUser(fetchedUser);
-            localStorage.setItem("horizon_current_user", JSON.stringify(fetchedUser));
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(fetchedUser));
             
             if (storedProfile) {
               const prof = JSON.parse(storedProfile);
-              localStorage.setItem("horizon_redis_profile", JSON.stringify({
+              localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify({
                 ...prof,
                 email: fetchedUser.email || prof.email,
                 userId: fetchedUser.id || prof.userId
@@ -503,7 +503,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       }
 
       // Initialize saved payment methods
-      const storedPayments = localStorage.getItem("horizon_user_payment_methods");
+      const storedPayments = localStorage.getItem(STORAGE_KEYS.USER_PAYMENT_METHODS) || localStorage.getItem("horizon_user_payment_methods");
       if (storedPayments) {
         setPaymentMethods(JSON.parse(storedPayments));
       } else {
@@ -533,7 +533,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             isDefault: false
           }
         ];
-        localStorage.setItem("horizon_user_payment_methods", JSON.stringify(initialPayments));
+        localStorage.setItem(STORAGE_KEYS.USER_PAYMENT_METHODS, JSON.stringify(initialPayments));
         setPaymentMethods(initialPayments);
       }
     } catch (e) {
@@ -577,12 +577,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         gender: editGender
       };
       setUser(updatedUser);
-      localStorage.setItem("horizon_current_user", JSON.stringify(updatedUser));
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
 
-      const storedProfile = localStorage.getItem("horizon_redis_profile");
+      const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
       if (storedProfile) {
         const prof = JSON.parse(storedProfile);
-        localStorage.setItem("horizon_redis_profile", JSON.stringify({
+        localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify({
           ...prof,
           fullName: editFullName.trim(),
           phoneNumber: editPhone.trim()
@@ -628,7 +628,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
         const newAddresses = addresses.map(a => a.sku === editingAddressSku ? updated : a);
         setAddresses(newAddresses);
-        localStorage.setItem("horizon_user_addresses", JSON.stringify(newAddresses));
+        localStorage.setItem(STORAGE_KEYS.USER_ADDRESSES, JSON.stringify(newAddresses));
         setIsAddingAddress(false);
         setEditingAddressSku(null);
         setResolvedPreview(null);
@@ -651,7 +651,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         updated.unshift(created);
 
         setAddresses(updated);
-        localStorage.setItem("horizon_user_addresses", JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEYS.USER_ADDRESSES, JSON.stringify(updated));
         setIsAddingAddress(false);
         setEditingAddressSku(null);
         setResolvedPreview(null);
@@ -667,7 +667,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         isDefault: false
       });
     } catch (err: any) {
-      setErrorMsg(err.message || "Không thể lưu địa chỉ.");
+      setErrorMsg("Không thể lưu địa chỉ: " + (err.message || "Lỗi máy chủ"));
     } finally {
       setActionLoading(false);
     }
@@ -708,7 +708,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         isDefault: a.sku === sku
       }));
       setAddresses(updated);
-      localStorage.setItem("horizon_user_addresses", JSON.stringify(updated));
+      localStorage.setItem(STORAGE_KEYS.USER_ADDRESSES, JSON.stringify(updated));
       setSuccessMsg("Đã đặt địa chỉ làm mặc định!");
       setErrorMsg("");
       logAuditAction("SET_DEFAULT_ADDRESS", "SUCCESS", `Đặt mặc định địa chỉ SKU: ${sku}`);
@@ -730,7 +730,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         updated[0].isDefault = true;
       }
       setAddresses(updated);
-      localStorage.setItem("horizon_user_addresses", JSON.stringify(updated));
+      localStorage.setItem(STORAGE_KEYS.USER_ADDRESSES, JSON.stringify(updated));
       setSuccessMsg("Đã xóa địa chỉ khỏi sổ danh bạ.");
       setErrorMsg("");
       logAuditAction("DELETE_ADDRESS", "SUCCESS", `Xóa địa chỉ SKU: ${sku}`);
@@ -882,7 +882,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     updated.unshift(newPayment);
 
     setPaymentMethods(updated);
-    localStorage.setItem("horizon_user_payment_methods", JSON.stringify(updated));
+    localStorage.setItem(STORAGE_KEYS.USER_PAYMENT_METHODS, JSON.stringify(updated));
     setIsAddingCard(false);
     setSuccessMsg("Đã liên kết phương thức thanh toán an toàn!");
     setErrorMsg("");
@@ -903,7 +903,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       isDefault: p.id === id
     }));
     setPaymentMethods(updated);
-    localStorage.setItem("horizon_user_payment_methods", JSON.stringify(updated));
+    localStorage.setItem(STORAGE_KEYS.USER_PAYMENT_METHODS, JSON.stringify(updated));
     setSuccessMsg("Đã đặt phương thức thanh toán làm mặc định!");
     setErrorMsg("");
   };
@@ -919,7 +919,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       updated[0].isDefault = true;
     }
     setPaymentMethods(updated);
-    localStorage.setItem("horizon_user_payment_methods", JSON.stringify(updated));
+    localStorage.setItem(STORAGE_KEYS.USER_PAYMENT_METHODS, JSON.stringify(updated));
     setSuccessMsg("Đã gỡ bỏ phương thức thanh toán.");
     setErrorMsg("");
   };
@@ -938,12 +938,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
     try {
       // Gọi GraphQL Mutation changeUsername qua BFF Gateway
-      const gqlResponse = await fetch("/graphql", {
+      const gqlResponse = await unifiedFetch("/graphql", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-          "X-BFF-Gateway-Url": localStorage.getItem("horizon_api_base_url") || ""
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           query: `
@@ -982,7 +981,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       if (user) {
         const updated = { ...user, username: newUsername.trim() };
         setUser(updated);
-        localStorage.setItem("horizon_current_user", JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
       }
 
       setNewUsername("");
@@ -1007,7 +1006,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         if (user) {
           const updated = { ...user, username: newUsername.trim() };
           setUser(updated);
-          localStorage.setItem("horizon_current_user", JSON.stringify(updated));
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
         }
 
         setNewUsername("");
@@ -1045,12 +1044,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
     try {
       // Gọi GraphQL Mutation changePassword qua BFF Gateway
-      const gqlResponse = await fetch("/graphql", {
+      const gqlResponse = await unifiedFetch("/graphql", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-          "X-BFF-Gateway-Url": localStorage.getItem("horizon_api_base_url") || ""
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           query: `
@@ -1136,7 +1134,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   // Add item into local Auth Audit Logs
   const logAuditAction = (action: string, status: "SUCCESS" | "FAILED", message: string) => {
     try {
-      const storedLogs = localStorage.getItem("horizon_auth_audit_logs") || "[]";
+      const storedLogs = localStorage.getItem(STORAGE_KEYS.AUTH_AUDIT_LOGS) || localStorage.getItem("horizon_auth_audit_logs") || "[]";
       const logs = JSON.parse(storedLogs);
       logs.unshift({
         id: Math.random().toString(36).substr(2, 9).toUpperCase(),
@@ -1151,7 +1149,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           screen: `${window.innerWidth}x${window.innerHeight}`
         }
       });
-      localStorage.setItem("horizon_auth_audit_logs", JSON.stringify(logs.slice(0, 50)));
+      localStorage.setItem(STORAGE_KEYS.AUTH_AUDIT_LOGS, JSON.stringify(logs.slice(0, 50)));
     } catch (e) {
       console.error("Error writing audit logs:", e);
     }
@@ -1159,8 +1157,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
   const handleLogout = () => {
     if (window.confirm("Bạn có chắc chắn muốn đăng xuất tài khoản?")) {
+      localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKENS_MAP);
       localStorage.removeItem("horizon_redis_profile");
       localStorage.removeItem("horizon_current_user");
+      localStorage.removeItem("horizon_access_token");
+      localStorage.removeItem("horizon_refresh_token");
       window.location.hash = "login";
       onNavigate("auth");
     }

@@ -28,11 +28,29 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { getMyAddresses, AddressDto } from "@/services/addressService";
 import { createOrder, CreateOrderInput, PaymentMethod } from "@/services/orderService";
+import {
+  connectPaymentWebSocket,
+  executeAsyncOrderCreation,
+  PaymentSocketSession,
+  PaymentWsMessage,
+  DEFAULT_WS_URL,
+} from "@/services/websocketService";
+import {
+  getFullCart,
+  addToCart as apiAddToCart,
+  updateCartItemQuantity as apiUpdateCartQuantity,
+  removeCartItem as apiRemoveCartItem,
+  removeCartItems as apiRemoveCartItems,
+  clearCart as apiClearCart,
+  subscribeToCartUpdates
+} from "@/services/cartService";
+import type { Cart as ApiCart } from "@/types/cart";
 
 export interface OrderProduct {
   id: string;
@@ -47,6 +65,8 @@ export interface OrderProduct {
   quantity: number;
   image: string;
   selected: boolean;
+  isAvailable?: boolean;
+  stock?: number;
 }
 
 const INITIAL_PRODUCTS: OrderProduct[] = [
@@ -208,6 +228,7 @@ interface BankOption {
   id: string;
   name: string;
   shortName: string;
+  bin: string;
   accountNo: string;
   accountName: string;
   iconBg: string;
@@ -220,6 +241,7 @@ const BANK_OPTIONS: BankOption[] = [
     id: "vcb",
     name: "Ngân hàng Ngoại thương Việt Nam",
     shortName: "Vietcombank",
+    bin: "970436",
     accountNo: "9988226688",
     accountName: "CONG TY TNHH NONAME VIETNAM",
     iconBg: "bg-emerald-700",
@@ -227,19 +249,21 @@ const BANK_OPTIONS: BankOption[] = [
     logoUrl: "https://api.vietqr.io/img/VCB.png",
   },
   {
-    id: "mb",
-    name: "Ngân hàng Quân đội",
-    shortName: "MB Bank",
-    accountNo: "0988665544",
+    id: "ncb",
+    name: "Ngân hàng TMCP Quốc Dân",
+    shortName: "NCB",
+    bin: "970419",
+    accountNo: "8899663322",
     accountName: "CONG TY TNHH NONAME VIETNAM",
-    iconBg: "bg-blue-700",
-    logoText: "MB",
-    logoUrl: "https://api.vietqr.io/img/MB.png",
+    iconBg: "bg-blue-600",
+    logoText: "NCB",
+    logoUrl: "https://api.vietqr.io/img/NCB.png",
   },
   {
     id: "tcb",
     name: "Ngân hàng Kỹ thương Việt Nam",
     shortName: "Techcombank",
+    bin: "970407",
     accountNo: "190388992233",
     accountName: "CONG TY TNHH NONAME VIETNAM",
     iconBg: "bg-red-600",
@@ -250,6 +274,7 @@ const BANK_OPTIONS: BankOption[] = [
     id: "acb",
     name: "Ngân hàng Á Châu",
     shortName: "ACB",
+    bin: "970416",
     accountNo: "2468101214",
     accountName: "CONG TY TNHH NONAME VIETNAM",
     iconBg: "bg-sky-600",
@@ -266,13 +291,42 @@ interface OrderPageProps {
   buyNowProduct?: OrderProduct | null;
 }
 
+const mapApiCartToOrderProducts = (cart: ApiCart): OrderProduct[] => {
+  if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
+    return [];
+  }
+  return cart.items.map((item, idx) => {
+    const rawTitle = item.attributesTitle || "";
+    const parts = rawTitle.split("/");
+    const color = parts[0]?.trim() || "Tiêu chuẩn";
+    const size = parts[1]?.trim() || "Mặc định";
+
+    return {
+      id: item.sku || `cart-item-${idx}`,
+      attributesSku: item.sku,
+      name: item.productName || item.sku,
+      color,
+      availableColors: [color],
+      size,
+      availableSizes: [size],
+      unitPrice: item.salePrice || item.unitPrice || 0,
+      oldPrice: (item.unitPrice && item.unitPrice > (item.salePrice || 0)) ? item.unitPrice : undefined,
+      quantity: Math.max(1, item.quantity || 1),
+      image: item.imageUrl || "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
+      selected: item.isAvailable !== false && (item.stock === undefined || item.stock > 0),
+      isAvailable: item.isAvailable !== false,
+      stock: item.stock !== undefined ? item.stock : 99,
+    };
+  });
+};
+
 export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct }: OrderPageProps) {
   const [products, setProducts] = useState<OrderProduct[]>(() => {
     if (buyNowProduct) {
       return [{ ...buyNowProduct, selected: true }];
     }
     try {
-      const cached = localStorage.getItem("horizon_buy_now_product");
+      const cached = localStorage.getItem(STORAGE_KEYS.BUY_NOW_PRODUCT) || localStorage.getItem("horizon_buy_now_product");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && (parsed.attributesSku || parsed.name)) {
@@ -286,7 +340,29 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   useEffect(() => {
     if (buyNowProduct) {
       setProducts([{ ...buyNowProduct, selected: true }]);
+      return;
     }
+    const cachedBuyNow = localStorage.getItem(STORAGE_KEYS.BUY_NOW_PRODUCT) || localStorage.getItem("horizon_buy_now_product");
+    if (cachedBuyNow) return;
+
+    let isMounted = true;
+    getFullCart().then(cart => {
+      if (isMounted && cart?.items?.length) {
+        setProducts(mapApiCartToOrderProducts(cart));
+      }
+    }).catch(() => {});
+
+    const unsubscribe = subscribeToCartUpdates((cart) => {
+      if (!isMounted) return;
+      if (cart) {
+        setProducts(mapApiCartToOrderProducts(cart));
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [buyNowProduct]);
 
   // Address Book Integration
@@ -315,6 +391,36 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
     shippingAddress: string;
     paymentMethod: string;
   } | null>(null);
+
+  // WebSocket Payment Session State (FEATURE-WS-JWT-AUTH-30S)
+  const [wsSession, setWsSession] = useState<PaymentSocketSession | null>(null);
+  const [wsStatus, setWsStatus] = useState<"idle" | "connecting" | "connected" | "received" | "closed" | "error">("idle");
+  const [wsMessage, setWsMessage] = useState<string | null>(null);
+  const [wsCountdown, setWsCountdown] = useState<number>(30);
+
+  // 30s Countdown timer for active WebSocket session
+  useEffect(() => {
+    let timer: any;
+    if (wsStatus === "connected" && wsCountdown > 0) {
+      timer = setInterval(() => {
+        setWsCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [wsStatus, wsCountdown]);
+
+  // Cleanup active WebSocket on component unmount
+  useEffect(() => {
+    return () => {
+      if (wsSession) {
+        try {
+          wsSession.close(1000, "OrderPage unmounted");
+        } catch (_) {}
+      }
+    };
+  }, [wsSession]);
 
   // Tải danh sách địa chỉ thực từ addressService
   useEffect(() => {
@@ -357,6 +463,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   const [paymentType, setPaymentType] = useState<"momo" | "bank" | "paypal" | "card" | "cod">("momo");
   const [selectedBank, setSelectedBank] = useState<string>("vcb");
   const [bankSubMethod, setBankSubMethod] = useState<"card" | "qr">("card");
+  const [paypalSubMethod, setPaypalSubMethod] = useState<"card" | "paypal">("card");
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Financial calculations
@@ -389,22 +496,63 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
     );
   };
 
-  const handleUpdateQuantity = (id: string, delta: number) => {
+  const handleUpdateQuantity = async (id: string, delta: number) => {
+    const target = products.find(p => p.id === id);
+    if (!target) return;
+    const newQty = Math.max(1, Math.min(99, target.quantity + delta));
     setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, quantity: Math.max(1, p.quantity + delta) } : p))
+      prev.map((p) => (p.id === id ? { ...p, quantity: newQty } : p))
     );
+    const sku = target.attributesSku || target.id;
+    try {
+      await apiUpdateCartQuantity(sku, newQty);
+    } catch (err) {
+      console.warn("apiUpdateCartQuantity failed:", err);
+    }
   };
 
-  const handleRemoveProduct = (id: string) => {
+  const handleRemoveProduct = async (id: string) => {
+    const target = products.find(p => p.id === id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
     if (onRemoveCartItem) onRemoveCartItem(id);
+    const sku = target?.attributesSku || id;
+    try {
+      await apiRemoveCartItem(sku);
+    } catch (err) {
+      console.warn("apiRemoveCartItem failed:", err);
+    }
   };
 
-  const handleSelectVariant = (id: string, color: string, size: string) => {
+  const handleSelectVariant = async (id: string, color: string, size: string) => {
+    const target = products.find((p) => p.id === id);
+    if (!target) return;
+
+    // Calculate new SKU
+    const isIphone = target.name.toLowerCase().includes("iphone");
+    const isSamsung = target.name.toLowerCase().includes("samsung") || target.name.toLowerCase().includes("s24");
+    let newSku = target.attributesSku || target.id;
+
+    if (isIphone) {
+      const colorCode = color.toLowerCase().includes("sa mạc") ? "DESERT" : color.toLowerCase().includes("tự nhiên") ? "NATURAL" : color.toLowerCase().includes("đen") ? "BLACK" : "WHITE";
+      newSku = `ATTR-IP16PM-${colorCode}-${size}`;
+    } else if (isSamsung) {
+      newSku = `ATTR-S24U-TITANGRAY-${size}`;
+    } else {
+      newSku = `ATTR-${target.name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8)}-${size}`;
+    }
+
     setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, color, size } : p))
+      prev.map((p) => (p.id === id ? { ...p, color, size, attributesSku: newSku } : p))
     );
     setActiveVariantDropdown(null);
+
+    // Call GraphQL mutation to sync
+    if (target.attributesSku && target.attributesSku !== newSku) {
+      try {
+        await apiRemoveCartItem(target.attributesSku);
+        await apiAddToCart([{ sku: newSku, quantity: target.quantity }]);
+      } catch (_) {}
+    }
   };
 
   const handleSelectVoucher = (voucherId: string) => {
@@ -448,20 +596,43 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   const handlePlaceOrder = async () => {
     if (selectedProducts.length === 0 || isPlacingOrder) return;
 
+    // Check if any selected item is out of stock
+    const outOfStockItem = selectedProducts.find(p => p.isAvailable === false || p.stock === 0);
+    if (outOfStockItem) {
+      setOrderError(`Sản phẩm "${outOfStockItem.name}" hiện đã hết hàng hoặc ngừng kinh doanh. Vui lòng bỏ chọn hoặc chọn phân loại khác.`);
+      return;
+    }
+
     setIsPlacingOrder(true);
     setOrderError(null);
 
-    // Map UI payment option sang enum backend chuẩn
-    let mappedPaymentMethod: PaymentMethod = "COD";
-    if (paymentType === "momo" || paymentType === "bank") {
-      mappedPaymentMethod = "BANK_TRANSFER";
+    // Map UI payment option sang enum backend chuẩn:
+    // - Thẻ nội địa (card): Gửi bankCode (NCB, VCB,...)
+    // - Mã QR (qr): Gửi bankCode "VNPAYQR"
+    const PAYMENT_MAP: Record<string, PaymentMethod> = {
+      bank: "VNPAY",
+      momo: "VNPAY",
+      paypal: "PAYPAL",
+      card: "PAYPAL",
+      cod: "COD",
+    };
+    const mappedPaymentMethod: PaymentMethod = PAYMENT_MAP[paymentType] || "VNPAY";
+    
+    let mappedBankCode: string | undefined = undefined;
+    if (paymentType === "bank") {
+      mappedBankCode = bankSubMethod === "card" ? currentBank?.shortName : "VNPAYQR";
     } else if (paymentType === "paypal" || paymentType === "card") {
-      mappedPaymentMethod = "PAYPAL";
-    } else {
-      mappedPaymentMethod = "COD";
+      mappedBankCode = paypalSubMethod === "card" ? "CARD" : "PAYPAL";
     }
 
-    const isDirectBuyNow = products.length === 1 && (buyNowProduct != null || localStorage.getItem("horizon_buy_now_product") != null);
+    const isDirectBuyNow = products.length === 1 && (buyNowProduct != null || localStorage.getItem(STORAGE_KEYS.BUY_NOW_PRODUCT) != null || localStorage.getItem("horizon_buy_now_product") != null);
+
+    let effectiveNotes = deliveryNote.trim();
+    if (!effectiveNotes) {
+      if (paymentType === "paypal" || paymentType === "card") {
+        effectiveNotes = paypalSubMethod === "card" ? "Thanh toán qua Visa/Mastercard" : "Thanh toán qua ví PayPal";
+      }
+    }
 
     const payload: CreateOrderInput = {
       items: selectedProducts.map((p) => ({
@@ -474,81 +645,82 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
       shippingMethod: "DELIVERY",
       isFromCart: !isDirectBuyNow,
       discountCodes: [],
-      customerNotes: deliveryNote.trim() || undefined,
-      bankCode: paymentType === "bank" ? currentBank?.shortName : undefined,
+      customerNotes: effectiveNotes || undefined,
+      bankCode: mappedBankCode,
     };
 
-    try {
-      const response = await createOrder(payload);
-      const orderData = response?.data;
-      const orderNumber = orderData?.orderNumber || "ORD-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-      const finalTotal = orderData?.totalAmount ?? total;
-
-      // Xóa cache mua ngay sau khi đặt thành công
+    // Đóng session WebSocket cũ nếu còn tồn tại
+    if (wsSession) {
       try {
-        localStorage.removeItem("horizon_buy_now_product");
+        wsSession.close(1000, "Opening new order session");
       } catch (_) {}
+    }
 
-      // Lưu trữ đồng bộ vào lịch sử local storage để người dùng có thể theo dõi ngay trên trang Profile
-      try {
-        const storedOrders = localStorage.getItem("horizon_user_orders");
-        const activeOrders = storedOrders ? JSON.parse(storedOrders) : [];
-        const newOrderEntry = {
-          id: orderNumber,
-          name: selectedProducts.map((p) => `${p.name} (${p.color} - ${p.size}) x${p.quantity}`).join(", "),
-          price: formatVND(finalTotal),
-          date: new Date().toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }),
-          status: "pending" as const,
-          statusText: "Đang chờ xác nhận thanh toán",
-          deliverySteps: [
-            {
-              title: "Đơn hàng đã tiếp nhận",
-              desc: `Mã đơn #${orderNumber} - ${mappedPaymentMethod}`,
-              time: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-              completed: true,
-              active: true,
-            },
-            {
-              title: "Xác nhận thanh toán",
-              desc: "Hệ thống kiểm tra giao dịch thanh toán",
-              time: "--:--",
-              completed: false,
-              active: false,
-            },
-            {
-              title: "Đóng gói & Bàn giao vận chuyển",
-              desc: "Chuyển giao cho bưu tá Express",
-              time: "--:--",
-              completed: false,
-              active: false,
-            },
-            {
-              title: "Giao hàng thành công",
-              desc: "Khách nhận hàng và đồng kiểm",
-              time: "--:--",
-              completed: false,
-              active: false,
-            },
-          ],
-          shippingAddress: userInfo.address,
-          carrier: "Express Delivery (Nhanh)",
-          trackingNumber: `EXP-${orderNumber.substring(0, 8)}`,
-        };
-        localStorage.setItem("horizon_user_orders", JSON.stringify([newOrderEntry, ...activeOrders]));
-      } catch (e) {
-        console.warn("Sync orders localStorage error:", e);
-      }
+    setWsStatus("connecting");
+    setWsCountdown(30);
+    setWsMessage("Đang khởi tạo kết nối WebSocket tới cổng 8667...");
 
-      setOrderSuccessData({
-        orderNumber,
-        totalAmount: finalTotal,
-        shippingAddress: userInfo.address,
-        paymentMethod: mappedPaymentMethod,
-      });
+    try {
+      const handle = await executeAsyncOrderCreation(
+        payload,
+        {
+          onStatusChange: (statusText) => {
+            setWsMessage(statusText);
+            if (wsStatus === "idle") setWsStatus("connecting");
+          },
+          onSessionAcquired: (sessionId) => {
+            setWsStatus("connected");
+            setWsCountdown(30);
+            setWsMessage(`Đã nhận mã phiên [${sessionId}]. Đang gửi đơn hàng tới Backend...`);
+          },
+          onSuccess: (result) => {
+            setWsStatus("received");
+            setWsMessage(result.message || "Tạo đơn hàng thành công!");
+
+            // Xóa sản phẩm khỏi giỏ hàng nếu là tạo từ giỏ hàng
+            if (!isDirectBuyNow) {
+              try {
+                localStorage.removeItem(STORAGE_KEYS.CART_ITEMS);
+                localStorage.removeItem("horizon_cart");
+                apiClearCart().catch(() => {});
+                window.dispatchEvent(new Event("cart-updated"));
+              } catch (_) {}
+            }
+
+            setOrderSuccessData({
+              orderNumber: result.orderNumber,
+              totalAmount: total,
+              shippingAddress: userInfo.address,
+              paymentMethod: mappedPaymentMethod,
+            });
+
+            // Nếu có URL thanh toán online (VNPay / Momo / Cổng thanh toán)
+            // [DEBUG] Tạm dừng tự động chuyển trang để phục vụ debug
+            if (result.paymentUrl) {
+              console.info("[DEBUG] Payment URL nhận được:", result.paymentUrl);
+              // setTimeout(() => {
+              //   window.location.href = result.paymentUrl!;
+              // }, 1500);
+            }
+
+            setIsPlacingOrder(false);
+          },
+          onError: (errorMessage) => {
+            console.error("[OrderPage] Async order creation error:", errorMessage);
+            setWsStatus("error");
+            setWsMessage(errorMessage);
+            setOrderError(errorMessage);
+            setIsPlacingOrder(false);
+          },
+        }
+      );
+
+      setWsSession(handle.session);
     } catch (err: any) {
-      console.error("Order creation failed:", err);
-      setOrderError(err?.message || "Đặt hàng thất bại. Vui lòng kiểm tra lại kết nối và thử lại.");
-    } finally {
+      console.error("[OrderPage] Order placement fatal error:", err);
+      setWsStatus("error");
+      setWsMessage(err?.message || "Không thể khởi tạo luồng đơn hàng");
+      setOrderError(err?.message || "Không thể khởi tạo luồng đơn hàng. Vui lòng kiểm tra lại.");
       setIsPlacingOrder(false);
     }
   };
@@ -678,7 +850,11 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                           </h4>
 
                           {/* Minimalist Variant Dropdown */}
-                          <div className="relative inline-block self-start" onClick={(e) => e.stopPropagation()}>
+                          <div 
+                            className="relative inline-block self-start z-30" 
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseLeave={() => setActiveVariantDropdown(null)}
+                          >
                             <button
                               type="button"
                               onClick={() =>
@@ -694,10 +870,11 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             <AnimatePresence>
                               {activeVariantDropdown === item.id && (
                                 <motion.div
-                                  initial={{ opacity: 0, y: 4 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: 4 }}
-                                  className="absolute left-0 top-full mt-1.5 z-40 bg-white border border-neutral-200 rounded-xl shadow-xl p-3.5 w-76 flex flex-col gap-2.5 text-xs"
+                                  initial={{ opacity: 0, y: 4, scale: 0.97 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, y: 4, scale: 0.97 }}
+                                  transition={{ duration: 0.12 }}
+                                  className="absolute left-0 top-full mt-1.5 z-50 bg-white border border-neutral-200 rounded-2xl shadow-2xl p-3.5 w-76 flex flex-col gap-2.5 text-xs ring-1 ring-black/5"
                                 >
                                   <div>
                                     <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Màu sắc:</span>
@@ -745,8 +922,8 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             </AnimatePresence>
                           </div>
 
-                          {/* Normal Sans-serif Price Display */}
-                          <div className="flex items-center gap-2 pt-0.5">
+                          {/* Normal Sans-serif Price Display & Stock Badge */}
+                          <div className="flex items-center gap-2 pt-0.5 flex-wrap">
                             {item.oldPrice && (
                               <span className="text-xs text-neutral-400 line-through">
                                 {formatVND(item.oldPrice)}
@@ -755,6 +932,11 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             <span className="text-[13px] font-semibold text-neutral-800">
                               {formatVND(item.unitPrice)}
                             </span>
+                            {(item.isAvailable === false || item.stock === 0) && (
+                              <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded-md">
+                                Hết hàng
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1107,53 +1289,87 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                       </div>
                     </div>
 
-                    {/* Nội dung thông tin tài khoản ngân hàng giữ nguyên */}
-                    <div className="flex flex-col justify-between h-full py-1">
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-[11.5px] sm:text-xs text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyText(currentBank.accountNo, "acc")}
-                          className="flex items-center gap-1.5 font-bold text-neutral-900 hover:text-orange-600 transition-colors cursor-pointer text-xs sm:text-[12.5px]"
-                        >
-                          <span className="tracking-wide">{currentBank.accountNo}</span>
-                          {copiedField === "acc" ? (
-                            <Check className="size-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="size-3.5 text-neutral-400" />
-                          )}
-                        </button>
+                    {/* Nội dung thông tin tài khoản ngân hàng & QR Code (Tối ưu hóa hợp nhất) */}
+                    <div className={`h-full py-1 ${bankSubMethod === "qr" ? "flex items-center justify-between gap-2.5" : "flex flex-col justify-between"}`}>
+                      <div className={`flex flex-col justify-between h-full ${bankSubMethod === "qr" ? "flex-1 py-0.5" : "py-1"}`}>
+                        {bankSubMethod === "qr" && (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-semibold text-neutral-500">Ngân hàng thụ hưởng:</span>
+                            <span className="font-bold text-neutral-900 text-xs truncate" title={currentBank.name}>{currentBank.name}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between py-0.5">
+                          <span className="text-[11.5px] text-neutral-500 font-medium">Số tài khoản:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(currentBank.accountNo, "acc")}
+                            className="flex items-center gap-1.5 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-xs sm:text-[12.5px]"
+                          >
+                            <span className="tracking-wide">{currentBank.accountNo}</span>
+                            {copiedField === "acc" ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5 text-neutral-400" />}
+                          </button>
+                        </div>
+
+                        {bankSubMethod === "card" && (
+                          <div className="flex items-center justify-between py-0.5">
+                            <span className="text-[11.5px] text-neutral-500 font-medium">Chủ tài khoản:</span>
+                            <span className="font-semibold text-neutral-800 text-[11px] sm:text-[11.5px] truncate">{currentBank.accountName}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between py-0.5">
+                          <span className="text-[11.5px] text-neutral-500 font-medium">Số tiền:</span>
+                          <span className="font-bold text-orange-600 text-xs sm:text-[12.5px]">{formatVND(total)}</span>
+                        </div>
+
+                        <div className={`flex items-center justify-between ${bankSubMethod === "qr" ? "bg-neutral-50 p-1.5 rounded-lg border border-neutral-200/60" : "py-0.5"}`}>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-neutral-500 font-medium">Nội dung CK:</span>
+                            {bankSubMethod === "qr" && (
+                              <span className="font-mono font-bold text-neutral-900 text-[10.5px]">
+                                NONAME {userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(`NONAME ${userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}`, "msg")}
+                            className="flex items-center gap-1.5 font-bold text-orange-600 hover:text-orange-700 cursor-pointer text-xs"
+                            title="Sao chép nội dung"
+                          >
+                            {bankSubMethod === "card" && (
+                              <span>NONAME {userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}</span>
+                            )}
+                            {copiedField === "msg" ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5 text-neutral-400" />}
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-[11.5px] sm:text-xs text-neutral-500 font-medium shrink-0">Chủ tài khoản:</span>
-                        <span className="font-semibold text-neutral-800 text-[11px] sm:text-[11.5px] truncate text-right ml-1">
-                          {currentBank.accountName}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-[11.5px] sm:text-xs text-neutral-500 font-medium shrink-0">Số tiền:</span>
-                        <span className="font-bold text-neutral-900 text-xs sm:text-[12.5px]">{formatVND(total)}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-[11.5px] sm:text-xs text-neutral-500 font-medium shrink-0">Nội dung:</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyText(`NONAME ${userInfo.phone.replace(/[^0-9]/g, "").slice(-4)}`, "msg")}
-                          className="flex items-center gap-1.5 font-bold text-neutral-900 hover:text-orange-600 transition-colors cursor-pointer text-xs sm:text-[12px]"
-                        >
-                          <span className="text-orange-600 font-bold">
-                            NONAME {userInfo.phone.replace(/[^0-9]/g, "").slice(-4)}
+                      {/* Dynamic VietQR code (Chỉ hiển thị ở chế độ QR) */}
+                      {bankSubMethod === "qr" && (
+                        <div className="w-[124px] h-full flex flex-col items-center justify-center p-1.5 bg-white rounded-xl border border-neutral-200/90 shadow-2xs shrink-0">
+                          <div className="relative size-24 rounded-lg bg-neutral-50 flex items-center justify-center overflow-hidden">
+                            <img
+                              src={`https://api.vietqr.io/image/${currentBank.bin}-${currentBank.accountNo}-compact2.png?amount=${total}&addInfo=NONAME%20${userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}&accountName=CONG%20TY%20TNHH%20NONAME%20VIETNAM`}
+                              alt={`VietQR ${currentBank.shortName}`}
+                              className="w-full h-full object-contain select-none"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = "none";
+                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = "flex";
+                              }}
+                            />
+                            <div className="hidden flex-col items-center justify-center gap-1 text-neutral-700">
+                              <QrCode className="size-12 text-neutral-600" />
+                              <span className="text-[8.5px] font-bold text-neutral-700">{currentBank.shortName} QR</span>
+                            </div>
+                          </div>
+                          <span className="text-[8.5px] text-neutral-500 font-medium text-center mt-1">
+                            Quét mã VietQR
                           </span>
-                          {copiedField === "msg" ? (
-                            <Check className="size-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="size-3.5 text-neutral-400" />
-                          )}
-                        </button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1161,21 +1377,87 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
 
               {/* Option 3: PayPal */}
               {(paymentType === "paypal" || paymentType === "card") && (
-                <div className="h-full p-3 bg-neutral-50/80 rounded-xl border border-neutral-200/70 flex flex-col justify-between text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-neutral-900 text-[10.5px]">Cổng thanh toán PayPal</span>
-                    <div className="flex items-center gap-1 text-[9.5px] font-bold text-[#003087]">
-                      <span>PayPal International</span>
+                <div className="h-full p-3 bg-neutral-50/90 rounded-xl border border-neutral-200/80 flex flex-col justify-between text-xs overflow-hidden">
+                  {/* Header Bar with Sub-option Tabs */}
+                  <div className="flex items-center justify-between pb-1.5 border-b border-neutral-200/60 gap-2 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 px-1.5 bg-[#003087] text-white rounded flex items-center justify-center font-black text-[10px] tracking-tight">
+                        PayPal
+                      </div>
+                      <span className="font-bold text-neutral-900 text-xs">Cổng thanh toán PayPal</span>
+                    </div>
+
+                    <div className="h-[29.7px] flex items-center bg-neutral-100/90 p-0.5 rounded-lg text-xs font-medium shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setPaypalSubMethod("card")}
+                        className={`h-full px-2.5 flex items-center justify-center rounded-md transition-all cursor-pointer select-none text-xs ${
+                          paypalSubMethod === "card"
+                            ? "bg-white text-neutral-900 font-bold shadow-2xs"
+                            : "text-neutral-500 hover:text-neutral-900"
+                        }`}
+                      >
+                        Thẻ Quốc tế
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaypalSubMethod("paypal")}
+                        className={`h-full px-2.5 flex items-center justify-center rounded-md transition-all cursor-pointer select-none text-xs ${
+                          paypalSubMethod === "paypal"
+                            ? "bg-white text-neutral-900 font-bold shadow-2xs"
+                            : "text-neutral-500 hover:text-neutral-900"
+                        }`}
+                      >
+                        Ví PayPal / QR
+                      </button>
                     </div>
                   </div>
-                  <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-neutral-200/70 gap-2 my-auto">
-                    <span className="text-[11px] text-neutral-600 text-center">
-                      Bạn sẽ được chuyển hướng an toàn tới cổng PayPal để hoàn tất thanh toán.
-                    </span>
-                    <span className="text-[10px] font-semibold text-[#0070BA] bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200/60">
-                      Hỗ trợ Thẻ Quốc tế &amp; Số dư ví PayPal
-                    </span>
+
+                  {/* Dynamic Content based on paypalSubMethod */}
+                  <div className="flex-1 flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-neutral-200/80 gap-2.5 my-auto text-center shadow-2xs">
+                    {paypalSubMethod === "card" ? (
+                      <>
+                        <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-blue-50 text-[#003087] border border-blue-200/60">
+                            VISA
+                          </span>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-red-50 text-[#EB001B] border border-red-200/60">
+                            Mastercard
+                          </span>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-sky-50 text-[#0070BA] border border-sky-200/60">
+                            JCB
+                          </span>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-50 text-[#006FCF] border border-emerald-200/60">
+                            Amex
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-600 leading-relaxed max-w-sm">
+                          Điều hướng thẳng đến form nhập thẻ quốc tế (<span className="font-semibold text-neutral-900">PayPal Guest Checkout / Card Fields</span>), không bắt buộc đăng nhập ví.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-black text-[#003087] tracking-tight bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60 flex items-center gap-1">
+                            <Smartphone className="size-3 text-[#003087]" />
+                            PayPal Account &amp; App QR
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-600 leading-relaxed max-w-sm">
+                          Điều hướng người dùng đăng nhập tài khoản Ví PayPal hoặc quét mã QR thanh toán trên ứng dụng PayPal.
+                        </p>
+                      </>
+                    )}
+
+                    <div className="flex items-center gap-2 text-[10px] text-neutral-500 bg-neutral-50 px-2.5 py-1 rounded-md border border-neutral-200/60">
+                      <span>Mã tham số gửi Gateway:</span>
+                      <code className="font-mono font-bold text-neutral-900 bg-white px-1.5 py-0.5 rounded border border-neutral-200">
+                        bankCode: "{paypalSubMethod === "card" ? "CARD" : "PAYPAL"}"
+                      </code>
+                    </div>
                   </div>
+
+                  {/* Footer Note */}
                   <div className="pt-1 border-t border-neutral-200/50 flex items-center justify-between text-[10px] text-neutral-400 shrink-0">
                     <span>Bảo mật bởi PayPal Buyer Protection</span>
                     <span className="text-emerald-600 font-semibold flex items-center gap-0.5">
@@ -1291,16 +1573,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               </div>
             </div>
 
-            {/* Error Alert Box if any */}
-            {orderError && (
-              <div className="p-2.5 rounded-xl bg-red-50 border border-red-200/80 text-red-700 text-xs flex items-start gap-2 animate-in fade-in">
-                <AlertCircle className="size-4 shrink-0 text-red-600 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-bold text-[11px]">Không thể tạo đơn hàng</p>
-                  <p className="text-[10.5px] text-red-600 leading-tight mt-0.5">{orderError}</p>
-                </div>
-              </div>
-            )}
+
 
             {/* --------------------------------------------------------------------- */}
             {/* TẦNG 4: NÚT HÀNH ĐỘNG ĐẶT HÀNG (30% ORANGE-RED PRIMARY CTA)           */}
@@ -1376,6 +1649,36 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                     {orderSuccessData.shippingAddress}
                   </span>
                 </div>
+              </div>
+
+              {/* WebSocket Session Live Status Widget (FEATURE-WS-JWT-AUTH-30S) */}
+              <div className="mb-4 p-2.5 rounded-2xl bg-neutral-900 text-white text-left flex flex-col gap-1.5 shadow-sm border border-neutral-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`size-2 rounded-full ${
+                      wsStatus === "connected" ? "bg-emerald-400 animate-pulse" :
+                      wsStatus === "received" ? "bg-emerald-500" :
+                      wsStatus === "connecting" ? "bg-amber-400 animate-pulse" :
+                      wsStatus === "error" ? "bg-rose-500" : "bg-neutral-500"
+                    }`} />
+                    <span className="text-[11px] font-bold tracking-tight text-neutral-200">
+                      WebSocket Session (Port 8667)
+                    </span>
+                  </div>
+                  {wsStatus === "connected" && (
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {wsCountdown}s còn lại
+                    </span>
+                  )}
+                  {wsStatus === "closed" && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">
+                      Đã đóng (30s)
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10.5px] text-neutral-300 leading-snug">
+                  {wsMessage || "Đang duy trì phiên lắng nghe thanh toán trực tiếp qua JWT HS256."}
+                </p>
               </div>
 
               <div className="flex flex-col gap-2">

@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { 
   GraphQLSchema, 
@@ -9,6 +10,7 @@ import {
   GraphQLBoolean,
   GraphQLString, 
   GraphQLInt, 
+  GraphQLID,
   GraphQLEnumType, 
   GraphQLList,
   GraphQLNonNull
@@ -176,23 +178,62 @@ async function startServer() {
     if (apiPath.startsWith("/api/orders") || apiPath.startsWith("/api/order")) {
       const items = body?.items || [{ attributesSku: "SKU-IPHONE15-128GB-BLK", quantity: 1 }];
       const subtotal = items.reduce((sum: number, it: any) => sum + ((it.salePrice || it.unitPrice || 21990000) * (it.quantity || 1)), 0);
-      const totalAmount = subtotal + (subtotal > 0 ? 249900 : 0);
+      const discountAmount = body?.discountCodes?.length || body?.voucherCode ? 500000 : 0;
+      const totalAmount = Math.max(0, subtotal + (subtotal > 0 ? 30000 : 0) - discountAmount);
+      const resolvedOrderNum = body?.orderNumber || body?.orderSessionId || `018d9ef2-${Math.random().toString(16).substring(2, 6)}-7123-88bb-${Math.random().toString(16).substring(2, 14)}`;
+
       return {
-        status: { code: 201, message: "Order created successfully" },
+        status: { code: 201, message: "Thành công" },
         data: {
-          orderNumber: `018d9ef2-${Math.random().toString(16).substring(2, 6)}-7123-88bb-${Math.random().toString(16).substring(2, 14)}`,
-          currentStatus: "PENDING",
-          shippingAddress: "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
+          orderNumber: resolvedOrderNum,
+          orderSessionId: resolvedOrderNum,
+          status: ["PENDING", "WAITING_PAYMENT"],
+          currentStatus: "WAITING_PAYMENT",
+          currentStatusDescription: "Chờ thanh toán",
+          shippingMethod: body?.shippingMethod || "DELIVERY",
+          paymentMethod: body?.paymentMethod || "VNPAY",
+          addressSku: body?.addressSku || "ADDR-DEFAULT-001",
+          shippingAddress: body?.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
           subtotal: subtotal || 21990000.0,
+          shippingFee: 30000.0,
+          discountAmount: discountAmount,
+          productDiscountAmount: discountAmount,
+          shippingDiscountAmount: 0.0,
+          discountCodes: body?.discountCodes || (body?.voucherCode ? [body.voucherCode] : []),
+          bankCode: body?.bankCode || undefined,
+          language: body?.language || "vn",
           totalAmount: totalAmount || 22239900.0,
+          customerNotes: body?.customerNotes || undefined,
+          createdAt: new Date().toISOString(),
+          customerInfo: {
+            fullName: "Khách hàng Horizon",
+            phone: "0901234567",
+            shippingAddress: body?.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh"
+          },
           orderItems: items.map((it: any) => ({
             attributesSku: it.attributesSku || "SKU-IPHONE15-128GB-BLK",
+            productName: it.productName || "iPhone 15 Pro 128GB",
             quantity: it.quantity || 1,
             unitPrice: it.unitPrice || 22990000.0,
             salePrice: it.salePrice || 21990000.0,
+            costPrice: it.costPrice || 20000000.0,
+            discountAmount: it.discountAmount || 0.0,
+            discountPercentage: it.discountPercentage || 0.0,
             subtotal: (it.salePrice || it.unitPrice || 21990000.0) * (it.quantity || 1),
-            variantOptions: it.variantOptions || [{ name: "Màu sắc", value: "Đen" }]
+            taxAmount: 0.0,
+            imageUrl: it.imageUrl || "/images/products/iphone15.jpg",
+            variantOptions: it.variantOptions || [{ name: "Màu sắc", value: "Titan Tự Nhiên" }]
           }))
+        }
+      };
+    }
+
+    if (apiPath.startsWith("/api/merchandise") || apiPath.includes("search-Product") || apiPath.includes("merchandise")) {
+      return {
+        status: { code: 200, message: "Success" },
+        data: {
+          contents: [],
+          paging: { pageNumber: 1, pageSize: 20, totalElements: 0, totalPages: 0 }
         }
       };
     }
@@ -200,30 +241,29 @@ async function startServer() {
     throw new Error(`Route mock not found: ${method} ${apiPath}`);
   }
 
-  // API gateway client connector inside the GraphQL server
+  // API gateway client connector inside the GraphQL server with automatic Failover
   async function callApiGateway(apiPath: string, options: { method?: string; body?: any; token?: string }, context: any) {
-    const backendUrl = context?.bffGatewayUrl || getBackendUrl();
+    const defaultBackendUrl = getBackendUrl().replace(/\/$/, "");
     const method = options.method || "GET";
     const body = options.body;
-    
-    try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json"
-      };
-      if (options.token) {
-        headers["Authorization"] = options.token;
-      }
-      
-      const config: any = {
-        method,
-        headers
-      };
-      if (body && method !== "GET") {
-        config.body = typeof body === "string" ? body : JSON.stringify(body);
-      }
 
-      const res = await fetch(`${backendUrl.replace(/\/$/, "")}${apiPath}`, config);
-      
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    if (options.token) {
+      headers["Authorization"] = options.token;
+    }
+
+    const config: any = {
+      method,
+      headers
+    };
+    if (body && method !== "GET") {
+      config.body = typeof body === "string" ? body : JSON.stringify(body);
+    }
+
+    const tryFetch = async (baseUrl: string) => {
+      const res = await fetch(`${baseUrl}${apiPath}`, config);
       const statusCode = res.status;
       if (statusCode === 401) {
         if (context?.res) {
@@ -232,24 +272,23 @@ async function startServer() {
         }
         throw new Error("Unauthorized");
       }
-
       const text = await res.text();
       try {
-        const parsed = JSON.parse(text);
-        return parsed;
+        return JSON.parse(text);
       } catch (e) {
-        if (statusCode === 401) {
-          throw new Error("Unauthorized");
-        }
-        throw new Error("Failed to parse response");
+        if (statusCode === 401) throw new Error("Unauthorized");
+        throw new Error(`Failed to parse response (status ${statusCode})`);
       }
+    };
+
+    // Thử gọi Default Backend (http://localhost:8080)
+    try {
+      return await tryFetch(defaultBackendUrl);
     } catch (err: any) {
-      if (err.message === "Unauthorized") {
-        throw err;
-      }
-      
-      console.warn(`[API GATEWAY WARNING] Failed to connect to ERP Backend (${backendUrl}): ${err.message}. Falling back to high-fidelity mock implementation.`);
-      
+      if (err.message === "Unauthorized") throw err;
+      console.warn(`[API GATEWAY WARNING] Failed to connect to ERP Backend (${defaultBackendUrl}): ${err.message}. Falling back to high-fidelity mock.`);
+
+      // Tier 3: Fallback sang Mock an toàn để không bao giờ làm sập ứng dụng
       try {
         const parsedUrl = new URL(apiPath, "http://localhost");
         const queryParams = parsedUrl.searchParams;
@@ -443,11 +482,14 @@ async function startServer() {
     name: "CreateOrderInput",
     fields: {
       items: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(CreateOrderItemInputType))) },
+      orderNumber: { type: GraphQLString },
+      orderSessionId: { type: GraphQLString },
       addressSku: { type: GraphQLString },
       shippingAddress: { type: GraphQLString },
       paymentMethod: { type: GraphQLString },
       shippingMethod: { type: GraphQLString },
       isFromCart: { type: GraphQLBoolean },
+      voucherCode: { type: GraphQLString },
       discountCode: { type: GraphQLString },
       discountCodes: { type: new GraphQLList(GraphQLString) },
       customerNotes: { type: GraphQLString },
@@ -505,10 +547,13 @@ async function startServer() {
     name: "OrderDto",
     fields: {
       orderNumber: { type: GraphQLString },
+      orderSessionId: { type: GraphQLString },
+      status: { type: new GraphQLList(GraphQLString) },
       currentStatus: { type: GraphQLString },
       currentStatusDescription: { type: GraphQLString },
       shippingMethod: { type: GraphQLString },
       paymentMethod: { type: GraphQLString },
+      addressSku: { type: GraphQLString },
       shippingAddress: { type: GraphQLString },
       receiverName: { type: GraphQLString },
       receiverPhone: { type: GraphQLString },
@@ -518,6 +563,9 @@ async function startServer() {
       shippingDiscountAmount: { type: GraphQLFloat },
       discountAmount: { type: GraphQLFloat },
       discountCode: { type: GraphQLString },
+      discountCodes: { type: new GraphQLList(GraphQLString) },
+      bankCode: { type: GraphQLString },
+      language: { type: GraphQLString },
       totalAmount: { type: GraphQLFloat },
       customerNotes: { type: GraphQLString },
       customerInfo: { type: OrderCustomerInfoType },
@@ -595,18 +643,81 @@ async function startServer() {
     }
   });
 
-  const mapOrderData = (data: any) => {
-    if (!data) return null;
-    const { id: _orderId, ...orderWithoutId } = data;
-    const rawItems = orderWithoutId.orderItems || orderWithoutId.items || [];
-    const orderItems = rawItems.map((item: any) => {
-      const { id: _iId, orderId: _oId, ...itemWithoutIds } = item;
-      return itemWithoutIds;
-    });
+  const enrichItemFromSku = (item: any) => {
+    const sku = String(item.attributesSku || item.sku || "");
+    let fallbackName = item.productName;
+    let fallbackImg = item.imageUrl;
+    let fallbackPrice = typeof item.unitPrice === "number" ? item.unitPrice : (typeof item.salePrice === "number" ? item.salePrice : 0);
+
+    if (!fallbackName || fallbackName.trim() === "" || fallbackName === "null") {
+      if (sku.toUpperCase().includes("SGS25U")) {
+        fallbackName = "PROD-SGS25U Cloud Server (5G) Viền Titan Dây Cao Su Size S/M";
+        fallbackImg = fallbackImg || "https://images.unsplash.com/photo-1601524909162-be87252be298?q=80&w=400&auto=format&fit=crop";
+        fallbackPrice = fallbackPrice || 25200000;
+      } else if (sku.toUpperCase().includes("IPHONE")) {
+        fallbackName = "iPhone 15 Pro Max Cloud Compute";
+        fallbackImg = fallbackImg || "https://images.unsplash.com/photo-1695048133142-1a20484d2569?q=80&w=400";
+        fallbackPrice = fallbackPrice || 29990000;
+      } else {
+        fallbackName = `Sản phẩm (${sku || "Tiêu chuẩn"})`;
+      }
+    }
+
+    const quantity = Number(item.quantity) || 1;
+    const unitPrice = fallbackPrice || 25200000;
+    const subtotal = Number(item.subtotal) || (unitPrice * quantity);
+
     return {
-      ...orderWithoutId,
+      attributesSku: sku,
+      productName: fallbackName,
+      quantity,
+      unitPrice,
+      salePrice: unitPrice,
+      subtotal,
+      imageUrl: fallbackImg || "https://images.unsplash.com/photo-1601524909162-be87252be298?q=80&w=400",
+      ...(item.variantOptions && item.variantOptions.length > 0 ? { variantOptions: item.variantOptions } : {})
+    };
+  };
+
+  const mapOrderData = (data: any) => {
+    if (!data || typeof data !== "object") return null;
+    const { id: _orderId, orderSessionId: _sId, ...orderWithoutId } = data;
+    const rawItems = orderWithoutId.orderItems || orderWithoutId.items || [];
+    const orderItems = Array.isArray(rawItems) ? rawItems.map((item: any) => {
+      const { id: _iId, orderId: _oId, ...itemWithoutIds } = item;
+      return enrichItemFromSku(itemWithoutIds);
+    }) : [];
+
+    const currentStatus = String(orderWithoutId.currentStatus || (Array.isArray(orderWithoutId.status) ? orderWithoutId.status[0] : orderWithoutId.status) || "WAITING_PAYMENT");
+    const currentStatusDescription = String(orderWithoutId.currentStatusDescription || (currentStatus === "WAITING_PAYMENT" ? "Chờ thanh toán" : currentStatus === "COMPLETED" ? "Hoàn tất" : "Đang xử lý"));
+
+    const subtotal = Number(orderWithoutId.subtotal) || (orderItems.reduce((acc: number, it: any) => acc + (it.subtotal || 0), 0)) || 0;
+    const shippingFee = Number(orderWithoutId.shippingFee) || 0;
+    const discountAmount = Number(orderWithoutId.discountAmount) || 0;
+    const totalAmount = Number(orderWithoutId.totalAmount) || Math.max(0, subtotal + shippingFee - discountAmount);
+
+    const cleanResult = {
+      orderNumber: String(orderWithoutId.orderNumber || orderWithoutId.orderSessionId || ""),
+      status: [currentStatus],
+      currentStatus,
+      currentStatusDescription,
+      shippingMethod: orderWithoutId.shippingMethod || "DELIVERY",
+      paymentMethod: orderWithoutId.paymentMethod || "VNPAY",
+      shippingAddress: orderWithoutId.shippingAddress || "",
+      receiverName: orderWithoutId.receiverName || orderWithoutId.customerInfo?.fullName || undefined,
+      receiverPhone: orderWithoutId.receiverPhone || orderWithoutId.customerInfo?.phone || undefined,
+      subtotal,
+      shippingFee,
+      discountAmount,
+      productDiscountAmount: Number(orderWithoutId.productDiscountAmount) || 0,
+      shippingDiscountAmount: Number(orderWithoutId.shippingDiscountAmount) || 0,
+      discountCodes: Array.isArray(orderWithoutId.discountCodes) ? orderWithoutId.discountCodes : [],
+      totalAmount,
+      createdAt: orderWithoutId.createdAt || new Date().toISOString(),
       orderItems
     };
+
+    return cleanResult;
   };
 
   const normalizeGatewayListResponse = (response: any) => {
@@ -664,6 +775,236 @@ async function startServer() {
     }, context);
     const normalized = normalizeGatewayListResponse(response);
     return Array.from(new Set((normalized.contents || []).map(extractProductSku).filter(Boolean)));
+  };
+
+  // --- CART GRAPHQL TYPES & IN-MEMORY REDIS-COMPLIANT GATEWAY STORE ---
+  const CartItemType = new GraphQLObjectType({
+    name: "CartItem",
+    fields: {
+      sku: { type: new GraphQLNonNull(GraphQLString) },
+      quantity: { type: new GraphQLNonNull(GraphQLInt) },
+      productName: { type: GraphQLString },
+      imageUrl: { type: GraphQLString },
+      attributesTitle: { type: GraphQLString },
+      unitPrice: { type: GraphQLFloat },
+      salePrice: { type: GraphQLFloat },
+      subTotal: { type: GraphQLFloat },
+      isAvailable: { type: GraphQLBoolean },
+      stock: { type: GraphQLInt },
+      specifications: { type: new GraphQLList(SpecificationGroupType) },
+    }
+  });
+
+  const CartType = new GraphQLObjectType({
+    name: "Cart",
+    fields: {
+      username: { type: GraphQLString },
+      totalItems: { type: new GraphQLNonNull(GraphQLInt) },
+      totalPrice: { type: new GraphQLNonNull(GraphQLFloat) },
+      totalSalePrice: { type: new GraphQLNonNull(GraphQLFloat) },
+      totalDiscount: { type: new GraphQLNonNull(GraphQLFloat) },
+      finalAmount: { type: new GraphQLNonNull(GraphQLFloat) },
+      items: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(CartItemType))) },
+    }
+  });
+
+  const CartSummaryBadgeType = new GraphQLObjectType({
+    name: "CartSummaryBadge",
+    fields: {
+      totalItems: { type: new GraphQLNonNull(GraphQLInt) },
+    }
+  });
+
+  const CartItemInputType = new GraphQLInputObjectType({
+    name: "CartItemInput",
+    fields: {
+      sku: { type: new GraphQLNonNull(GraphQLString) },
+      quantity: { type: new GraphQLNonNull(GraphQLInt) },
+    }
+  });
+
+  const serverCartStore = new Map<string, {
+    username?: string;
+    items: Array<{
+      sku: string;
+      quantity: number;
+      productName?: string;
+      imageUrl?: string;
+      attributesTitle?: string;
+      unitPrice?: number;
+      salePrice?: number;
+      isAvailable?: boolean;
+      stock?: number;
+      specifications?: Array<{
+        groupName: string;
+        specifications: Array<{ key: string; data: string }>;
+      }>;
+    }>;
+  }>();
+
+  const CART_FILE_PATH = path.resolve(process.cwd(), ".cart-store.json");
+
+  const loadPersistedCartStore = () => {
+    try {
+      if (fs.existsSync(CART_FILE_PATH)) {
+        const raw = fs.readFileSync(CART_FILE_PATH, "utf-8");
+        const data = JSON.parse(raw);
+        if (typeof data === "object" && data !== null) {
+          Object.entries(data).forEach(([key, val]) => {
+            serverCartStore.set(key, val as any);
+          });
+        }
+      }
+    } catch (_) {}
+  };
+
+  const persistCartStore = () => {
+    try {
+      const obj: Record<string, any> = {};
+      serverCartStore.forEach((val, key) => {
+        obj[key] = val;
+      });
+      fs.writeFileSync(CART_FILE_PATH, JSON.stringify(obj, null, 2), "utf-8");
+    } catch (_) {}
+  };
+
+  loadPersistedCartStore();
+
+  const KNOWN_SKU_METADATA: Record<string, any> = {
+    "attr-ip15pm-256gb-titan": {
+      productName: "iPhone 15 Pro Max 256GB",
+      imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
+      attributesTitle: "Titan Tự Nhiên / 256GB",
+      unitPrice: 34990000,
+      salePrice: 29490000,
+      isAvailable: true,
+      stock: 15,
+      specifications: [
+        { groupName: "Màn hình", specifications: [{ key: "Kích thước", data: "6.7 inch" }] },
+        { groupName: "Hiệu năng", specifications: [{ key: "Chipset", data: "Apple A17 Pro" }] }
+      ]
+    },
+    "attr-airpods-pro2-usbc": {
+      productName: "AirPods Pro Gen 2 (MagSafe USB-C)",
+      imageUrl: "https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500&auto=format&fit=crop&q=80",
+      attributesTitle: "Trắng / USB-C",
+      unitPrice: 6190000,
+      salePrice: 5490000,
+      isAvailable: true,
+      stock: 30,
+      specifications: [
+        { groupName: "Âm thanh", specifications: [{ key: "Chống ồn", data: "Active Noise Cancellation" }] }
+      ]
+    },
+    "ATTR-IP16PM-DESERT-256G": {
+      productName: "iPhone 16 Pro Max 256GB - Titanium Sa Mạc",
+      imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
+      attributesTitle: "Titan Sa Mạc / 256GB",
+      unitPrice: 37990000,
+      salePrice: 34990000,
+      isAvailable: true,
+      stock: 20
+    },
+    "ATTR-S24U-TITANGRAY-512G": {
+      productName: "Samsung Galaxy S24 Ultra 512GB - Xám Titan",
+      imageUrl: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=500&auto=format&fit=crop&q=80",
+      attributesTitle: "Xám Titan / 512GB",
+      unitPrice: 35990000,
+      salePrice: 31490000,
+      isAvailable: true,
+      stock: 12
+    },
+    "ATTR-MI14U-WHITE-512G": {
+      productName: "Xiaomi 14 Ultra 512GB - Trắng Gốm",
+      imageUrl: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&auto=format&fit=crop&q=80",
+      attributesTitle: "Trắng Gốm / 512GB",
+      unitPrice: 31990000,
+      salePrice: 27990000,
+      isAvailable: true,
+      stock: 8
+    }
+  };
+
+  const resolveCartIdentity = (guestIdArg?: string | null, context?: any): { id: string; isUser: boolean; username?: string } => {
+    const authHeader = context?.token || "";
+    if (authHeader && authHeader.includes("Bearer ")) {
+      const token = authHeader.replace("Bearer ", "").trim();
+      try {
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
+          const username = payload.sub || payload.username || payload.preferred_username || "user";
+          return { id: `user:${username}`, isUser: true, username };
+        }
+      } catch (_) {}
+      return { id: "user:authenticated", isUser: true, username: "user" };
+    }
+    const guestId = guestIdArg || context?.guestId || "default-guest";
+    return { id: `guest:${guestId}`, isUser: false };
+  };
+
+  const getOrCreateCart = (identity: { id: string; isUser: boolean; username?: string }) => {
+    let cart = serverCartStore.get(identity.id);
+    if (!cart) {
+      cart = {
+        username: identity.username,
+        items: []
+      };
+      serverCartStore.set(identity.id, cart);
+    }
+    return cart;
+  };
+
+  const computeCart = (cartData: any) => {
+    let totalItems = 0;
+    let totalPrice = 0;
+    let totalSalePrice = 0;
+
+    const items = (cartData.items || []).map((item: any) => {
+      const quantity = Math.max(1, Math.min(99, item.quantity || 1));
+      totalItems += quantity;
+      
+      const meta = KNOWN_SKU_METADATA[item.sku] || {};
+      const productName = item.productName || meta.productName || item.sku;
+      const imageUrl = item.imageUrl || meta.imageUrl || "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&auto=format&fit=crop&q=80";
+      const attributesTitle = item.attributesTitle || meta.attributesTitle || "";
+      const unitPrice = item.unitPrice || meta.unitPrice || meta.salePrice || 1000000;
+      const salePrice = item.salePrice || meta.salePrice || unitPrice;
+      const subTotal = salePrice * quantity;
+      const isAvailable = item.isAvailable !== undefined ? item.isAvailable : (meta.isAvailable !== undefined ? meta.isAvailable : true);
+      const stock = typeof item.stock === "number" ? item.stock : (typeof meta.stock === "number" ? meta.stock : 99);
+      const specifications = item.specifications || meta.specifications || [];
+
+      totalPrice += unitPrice * quantity;
+      totalSalePrice += subTotal;
+
+      return {
+        sku: item.sku,
+        quantity,
+        productName,
+        imageUrl,
+        attributesTitle,
+        unitPrice,
+        salePrice,
+        subTotal,
+        isAvailable,
+        stock,
+        specifications
+      };
+    });
+
+    const totalDiscount = Math.max(0, totalPrice - totalSalePrice);
+    const finalAmount = totalSalePrice;
+
+    return {
+      username: cartData.username,
+      totalItems,
+      totalPrice,
+      totalSalePrice,
+      totalDiscount,
+      finalAmount,
+      items
+    };
   };
 
   const RootQuery = new GraphQLObjectType({
@@ -838,6 +1179,37 @@ async function startServer() {
             };
           }
         }
+      },
+      cartBadge: {
+        type: CartSummaryBadgeType,
+        args: {
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const identity = resolveCartIdentity(args.guestId, context);
+            const cart = getOrCreateCart(identity);
+            const computed = computeCart(cart);
+            return { totalItems: computed.totalItems };
+          } catch (error: any) {
+            return { totalItems: 0 };
+          }
+        }
+      },
+      cart: {
+        type: CartType,
+        args: {
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const identity = resolveCartIdentity(args.guestId, context);
+            const cart = getOrCreateCart(identity);
+            return computeCart(cart);
+          } catch (error: any) {
+            return computeCart({ username: undefined, items: [] });
+          }
+        }
       }
     }
   });
@@ -966,26 +1338,193 @@ async function startServer() {
         },
         resolve: async (_, args, context: any) => {
           try {
+            const { voucherCode, discountCode, discountCodes, orderNumber, orderSessionId, ...rest } = args.input;
+            const resolvedOrderNumber = orderNumber || orderSessionId || undefined;
+            const resolvedOrderSessionId = orderSessionId || orderNumber || undefined;
+
+            const mergedDiscountCodes = Array.from(new Set([
+              voucherCode,
+              discountCode,
+              ...(discountCodes || [])
+            ].filter(Boolean)));
+
+            const forwardPayload: any = {
+              ...rest,
+              orderNumber: resolvedOrderNumber,
+              orderSessionId: resolvedOrderSessionId,
+              voucherCode: voucherCode || undefined,
+              discountCode: discountCode || undefined,
+              discountCodes: mergedDiscountCodes.length > 0 ? mergedDiscountCodes : undefined,
+            };
+
             const response = await callApiGateway("/api/orders", {
               method: "POST",
-              body: args.input,
+              body: forwardPayload,
               token: context?.token
             }, context);
 
-            const status = response?.status || { code: 201, message: "Order created successfully" };
+            const statusCode = typeof response?.status === "object" ? response.status.code : (typeof response?.status === "number" ? response.status : (response?.statusCode || 201));
+            const statusMessage = typeof response?.status === "object" ? response.status.message : (response?.message || response?.error || "Order created successfully");
+
+            if (statusCode >= 400) {
+              return {
+                status: {
+                  code: statusCode,
+                  message: statusMessage
+                },
+                data: null
+              };
+            }
+
             const rawData = response?.data || response;
             const cleanData = mapOrderData(rawData);
 
             return {
               status: {
-                code: status.code || 201,
-                message: status.message || "Order created successfully"
+                code: statusCode || 201,
+                message: statusMessage || "Order created successfully"
               },
               data: cleanData
             };
           } catch (error: any) {
-            throw new Error(error?.message || "Unable to create order");
+            return {
+              status: {
+                code: error.message === "Unauthorized" ? 401 : 500,
+                message: error?.message || "Unable to create order"
+              },
+              data: null
+            };
           }
+        }
+      },
+      addToCart: {
+        type: CartType,
+        args: {
+          items: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(CartItemInputType))) },
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          const identity = resolveCartIdentity(args.guestId, context);
+          const cart = getOrCreateCart(identity);
+          for (const input of args.items) {
+            if (input.quantity > 99) {
+              throw new Error("Số lượng không được vượt quá 99 cái/SKU");
+            }
+            if (cart.items.length >= 50 && !cart.items.some((it: any) => it.sku === input.sku)) {
+              throw new Error("Giỏ hàng không được vượt quá 50 SKU");
+            }
+            const existing = cart.items.find((it: any) => it.sku === input.sku);
+            if (existing) {
+              existing.quantity = Math.min(99, existing.quantity + input.quantity);
+            } else {
+              cart.items.push({
+                sku: input.sku,
+                quantity: input.quantity
+              });
+            }
+          }
+          persistCartStore();
+          return computeCart(cart);
+        }
+      },
+      updateCartItemQuantity: {
+        type: CartType,
+        args: {
+          sku: { type: new GraphQLNonNull(GraphQLID) },
+          quantity: { type: new GraphQLNonNull(GraphQLInt) },
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          const identity = resolveCartIdentity(args.guestId, context);
+          const cart = getOrCreateCart(identity);
+          if (args.quantity <= 0) {
+            cart.items = cart.items.filter((it: any) => it.sku !== String(args.sku));
+          } else {
+            const item = cart.items.find((it: any) => it.sku === String(args.sku));
+            if (item) {
+              item.quantity = Math.min(99, args.quantity);
+            }
+          }
+          persistCartStore();
+          return computeCart(cart);
+        }
+      },
+      removeCartItem: {
+        type: CartType,
+        args: {
+          sku: { type: new GraphQLNonNull(GraphQLID) },
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          const identity = resolveCartIdentity(args.guestId, context);
+          const cart = getOrCreateCart(identity);
+          cart.items = cart.items.filter((it: any) => it.sku !== String(args.sku));
+          persistCartStore();
+          return computeCart(cart);
+        }
+      },
+      removeCartItems: {
+        type: CartType,
+        args: {
+          skus: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLID))) },
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          const identity = resolveCartIdentity(args.guestId, context);
+          const cart = getOrCreateCart(identity);
+          const skuSet = new Set(args.skus.map((s: any) => String(s)));
+          cart.items = cart.items.filter((it: any) => !skuSet.has(it.sku));
+          persistCartStore();
+          return computeCart(cart);
+        }
+      },
+      clearCart: {
+        type: CartType,
+        args: {
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          const identity = resolveCartIdentity(args.guestId, context);
+          const cart = getOrCreateCart(identity);
+          cart.items = [];
+          persistCartStore();
+          return computeCart(cart);
+        }
+      },
+      mergeCart: {
+        type: CartType,
+        args: {
+          guestId: { type: new GraphQLNonNull(GraphQLString) }
+        },
+        resolve: async (_, args, context: any) => {
+          const token = context?.token;
+          if (!token || !token.includes("Bearer ")) {
+            const err: any = new Error("ACCESS_DENIED");
+            err.extensions = {
+              errorCode: "ACCESS_DENIED",
+              status: 403,
+              title: "Access Denied",
+              detail: "Gọi mergeCart khi chưa login"
+            };
+            throw err;
+          }
+          const userIdentity = resolveCartIdentity(null, context);
+          const userCart = getOrCreateCart(userIdentity);
+          const guestIdentity = { id: `guest:${args.guestId}`, isUser: false };
+          const guestCart = serverCartStore.get(guestIdentity.id);
+          if (guestCart && guestCart.items.length > 0) {
+            for (const gItem of guestCart.items) {
+              const existing = userCart.items.find((u: any) => u.sku === gItem.sku);
+              if (existing) {
+                existing.quantity = Math.min(99, existing.quantity + gItem.quantity);
+              } else {
+                userCart.items.push({ ...gItem });
+              }
+            }
+            guestCart.items = [];
+          }
+          persistCartStore();
+          return computeCart(userCart);
         }
       }
     }
@@ -999,7 +1538,7 @@ async function startServer() {
   // Mount GraphQL gateway at /graphql
   app.all("/graphql", (req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Guest-Id, x-guest-id, *");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     if (req.method === "OPTIONS") {
       return res.sendStatus(204);
@@ -1018,8 +1557,8 @@ async function startServer() {
       schema,
       context: () => {
         const authHeader = (req.headers.authorization as string) || "";
-        const bffGatewayUrl = (req.headers["x-bff-gateway-url"] as string) || "";
-        return { token: authHeader, bffGatewayUrl, res };
+        const guestId = (req.headers["x-guest-id"] as string) || "";
+        return { token: authHeader, guestId, res };
       }
     });
     handler(req, res, next);

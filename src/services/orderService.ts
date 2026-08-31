@@ -3,7 +3,7 @@
  * Primary Protocol: GraphQL Gateway (/graphql) with seamless REST API fallback
  */
 
-import { getApiBaseUrl } from "../lib/api";
+import { getApiBaseUrl, getUnifiedAccessToken, unifiedFetch } from "../lib/api";
 
 export type OrderStatus =
   | "PENDING"
@@ -30,15 +30,18 @@ export interface CreateOrderItemInput {
 }
 
 export interface CreateOrderInput {
+  orderNumber?: string;
+  orderSessionId?: string;
   items: CreateOrderItemInput[];
-  shippingAddress: string;
+  shippingAddress?: string;
   addressSku?: string;
   shippingMethod?: ShippingMethod | string;
   paymentMethod: PaymentMethod | string;
   isFromCart?: boolean;
   customerNotes?: string;
-  discountCodes?: string[];
+  voucherCode?: string;
   discountCode?: string;
+  discountCodes?: string[];
   language?: string;
   bankCode?: string;
 }
@@ -78,10 +81,13 @@ export interface OrderStatusHistoryItem {
 
 export interface OrderDto {
   orderNumber: string;
+  orderSessionId?: string;
+  status?: string[];
   currentStatus: string;
   currentStatusDescription?: string;
   shippingMethod?: string;
   paymentMethod?: string;
+  addressSku?: string;
   receiverName?: string;
   receiverPhone?: string;
   shippingAddress?: string;
@@ -91,6 +97,9 @@ export interface OrderDto {
   shippingDiscountAmount?: number;
   discountAmount?: number;
   discountCode?: string;
+  discountCodes?: string[];
+  bankCode?: string;
+  language?: string;
   totalAmount: number;
   customerNotes?: string;
   orderItems: OrderItemDto[];
@@ -146,21 +155,8 @@ export interface MyOrdersResponse {
   };
 }
 
-function getUnifiedAccessToken(): string {
-  const storedProfile = localStorage.getItem("horizon_redis_profile");
-  if (storedProfile) {
-    try {
-      const profile = JSON.parse(storedProfile);
-      if (profile?.accessToken) return profile.accessToken;
-    } catch (_) {
-      // Ignore
-    }
-  }
-  return localStorage.getItem("horizon_access_token") || "";
-}
-
 /**
- * 1. GraphQL Mutation: CreateOrder (v1.3.0 Standard)
+ * 1. GraphQL Mutation: CreateOrder (v1.3.0 Standard & Optimized)
  */
 export const CREATE_ORDER_MUTATION = `
   mutation CreateOrder($input: CreateOrderInput!) {
@@ -171,14 +167,25 @@ export const CREATE_ORDER_MUTATION = `
       }
       data {
         orderNumber
+        orderSessionId
+        status
+        currentStatus
+        currentStatusDescription
         shippingMethod
         paymentMethod
+        addressSku
+        shippingAddress
         subtotal
         shippingFee
+        discountAmount
         productDiscountAmount
         shippingDiscountAmount
+        discountCodes
         totalAmount
-        currentStatus
+        customerNotes
+        bankCode
+        language
+        createdAt
         customerInfo {
           fullName
           phone
@@ -189,8 +196,17 @@ export const CREATE_ORDER_MUTATION = `
           productName
           quantity
           unitPrice
+          salePrice
+          costPrice
           discountAmount
+          discountPercentage
           subtotal
+          taxAmount
+          imageUrl
+          variantOptions {
+            name
+            value
+          }
         }
       }
     }
@@ -280,21 +296,24 @@ export const GET_MY_ORDER_DETAIL_QUERY = `
 `;
 
 /**
- * Khởi tạo đơn hàng mới - REST API trực tiếp vào Backend Spring Boot (Port 8080)
- * Endpoint: POST /api/orders (Đặc tả ERP REST API Contracts v1.3.0)
+ * Khởi tạo đơn hàng mới - Thuần GraphQL Gateway (/graphql)
+ * GraphQL Operation: mutation CreateOrder($input: CreateOrderInput!)
  */
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResponse> {
   const token = getUnifiedAccessToken();
-  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
 
-  // Payload tuân thủ đặc tả REST API v1.3.0 từ NotebookLM
-  const payload: any = {
+  // Payload chuẩn hóa tuân thủ GraphQL Input
+  const normalizedInput: any = {
+    orderSessionId: input.orderSessionId || input.orderNumber || undefined,
+    orderNumber: input.orderNumber || input.orderSessionId || undefined,
     shippingMethod: input.shippingMethod || "DELIVERY",
     isFromCart: typeof input.isFromCart === "boolean" ? input.isFromCart : false,
     addressSku: input.addressSku || undefined,
-    voucherCode: input.discountCode || (input.discountCodes && input.discountCodes[0]) || undefined,
+    voucherCode: input.voucherCode || undefined,
+    discountCode: input.discountCode || undefined,
+    discountCodes: input.discountCodes && input.discountCodes.length > 0 ? input.discountCodes : undefined,
     shippingAddress: input.shippingAddress || "",
-    paymentMethod: input.paymentMethod || "COD",
+    paymentMethod: input.paymentMethod || "VNPAY",
     customerNotes: input.customerNotes || undefined,
     items: input.items.map((item) => ({
       attributesSku: item.attributesSku,
@@ -303,44 +322,50 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   };
 
   if (input.language) {
-    payload.language = input.language;
+    normalizedInput.language = input.language;
   }
   if (input.bankCode) {
-    payload.bankCode = input.bankCode;
+    normalizedInput.bankCode = input.bankCode;
   }
 
-  const response = await fetch(`${baseUrl}/api/orders`, {
+  const gqlResponse = await unifiedFetch("/graphql", {
     method: "POST",
     headers: {
-      "Accept": "application/json",
       "Content-Type": "application/json",
       ...(token ? { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      query: CREATE_ORDER_MUTATION,
+      variables: { input: normalizedInput },
+    }),
   });
 
-  if (!response.ok) {
-    let errorMsg = `Đặt hàng thất bại (${response.status})`;
-    try {
-      const errJson = await response.json();
-      if (errJson?.status?.message) {
-        errorMsg = errJson.status.message;
-      } else if (errJson?.detail) {
-        errorMsg = errJson.detail;
-      } else if (errJson?.message) {
-        errorMsg = errJson.message;
-      }
-    } catch (_) {}
-    throw new Error(errorMsg);
+  if (!gqlResponse.ok) {
+    throw new Error(`Lỗi kết nối GraphQL Gateway (${gqlResponse.status})`);
   }
 
-  const resData = await response.json();
+  const gqlResult = await gqlResponse.json();
+
+  if (gqlResult.errors?.length) {
+    const errorMsg = gqlResult.errors.map((e: any) => e.message).join("; ");
+    throw new Error(errorMsg || "Lỗi tạo đơn hàng qua GraphQL");
+  }
+
+  const createOrderRes = gqlResult.data?.createOrder;
+  if (!createOrderRes) {
+    throw new Error("Không nhận được dữ liệu phản hồi từ GraphQL Gateway");
+  }
+
+  if (createOrderRes.status?.code && createOrderRes.status.code >= 400) {
+    throw new Error(createOrderRes.status.message || `Đặt hàng thất bại (Mã lỗi ${createOrderRes.status.code})`);
+  }
+
   return {
     status: {
-      code: resData?.status?.code || 201,
-      message: resData?.status?.message || "Created",
+      code: createOrderRes.status?.code || 201,
+      message: createOrderRes.status?.message || "Created",
     },
-    data: resData?.data || resData,
+    data: createOrderRes.data,
   };
 }
 
@@ -352,11 +377,10 @@ export async function getMyOrders(params: MyOrdersQueryParams): Promise<MyOrders
 
   // 1. Thực thi qua GraphQL Gateway
   try {
-    const response = await fetch("/graphql", {
+    const response = await unifiedFetch("/graphql", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-BFF-Gateway-Url": localStorage.getItem("horizon_api_base_url") || "",
         ...(token ? { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
@@ -391,7 +415,7 @@ export async function getMyOrders(params: MyOrdersQueryParams): Promise<MyOrders
   if (params?.sortDirection) searchParams.append("sortDirection", params.sortDirection);
 
   const url = `${baseUrl}/api/orders/my-orders/list${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
-  const restRes = await fetch(url, {
+  const restRes = await unifiedFetch(url, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -414,11 +438,10 @@ export async function getOrderDetail(orderNumber: string): Promise<OrderDto> {
 
   // 1. Thực thi qua GraphQL Gateway
   try {
-    const response = await fetch("/graphql", {
+    const response = await unifiedFetch("/graphql", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-BFF-Gateway-Url": localStorage.getItem("horizon_api_base_url") || "",
         ...(token ? { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
@@ -439,7 +462,7 @@ export async function getOrderDetail(orderNumber: string): Promise<OrderDto> {
 
   // 2. Fallback sang REST API
   const baseUrl = getApiBaseUrl();
-  const restRes = await fetch(`${baseUrl}/api/orders/my-orders/${encodeURIComponent(orderNumber)}`, {
+  const restRes = await unifiedFetch(`${baseUrl}/api/orders/my-orders/${encodeURIComponent(orderNumber)}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",

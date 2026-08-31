@@ -9,6 +9,7 @@ interface Review {
   body: string;
   img: string;
   rating: 5 | 4.5;
+  key?: React.Key;
 }
 
 const reviews: Review[] = [

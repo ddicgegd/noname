@@ -5,16 +5,27 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package } from "lucide-react";
+import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, X, Check, Plus, Minus, ShoppingBag, ChevronDown } from "lucide-react";
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
+import { createAuthAction, savePendingAction } from "@/lib/authAction";
+import { addToCart as apiAddToCart, removeCartItem as apiRemoveCartItem } from "@/services/cartService";
 
-interface CartItem {
+export interface CartItem {
   id: string;
+  sku?: string;
   name: string;
   price: string;
+  oldPrice?: string;
   icon: string;
+  imageUrl?: string;
+  color?: string;
+  availableColors?: string[];
+  size?: string;
+  availableSizes?: string[];
+  quantity?: number;
 }
 
 interface NavbarProps {
@@ -250,7 +261,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   useEffect(() => {
     const readUser = () => {
       try {
-        const stored = localStorage.getItem("horizon_current_user");
+        const stored = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem("horizon_current_user");
         if (stored) {
           setLoggedInUser(JSON.parse(stored));
         } else {
@@ -348,37 +359,197 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     }
   };
 
-  // Group cart items by name & price
+const resolveProductMetadata = (skuOrName: string) => {
+  const s = (skuOrName || "").toUpperCase();
+  if (s.includes("GP9PXL") || s.includes("PIXEL 9") || s.includes("PIXEL9")) {
+    return {
+      name: "Google Pixel 9 Pro XL 128GB - Obsidian",
+      imageUrl: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&auto=format&fit=crop&q=80",
+      colors: ["Obsidian", "Porcelain", "Hazel", "Rose"],
+      sizes: ["128GB", "256GB", "512GB", "1TB"],
+      defaultColor: "Obsidian",
+      defaultSize: "128GB",
+    };
+  }
+  if (s.includes("IP16PM") || s.includes("IPHONE 16") || s.includes("IPHONE16")) {
+    return {
+      name: "iPhone 16 Pro Max 256GB - Titanium Sa Mạc",
+      imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
+      colors: ["Titan Sa Mạc", "Titan Tự Nhiên", "Titan Đen", "Titan Trắng"],
+      sizes: ["256GB", "512GB", "1TB"],
+      defaultColor: "Titan Sa Mạc",
+      defaultSize: "256GB",
+    };
+  }
+  if (s.includes("IP15PM") || s.includes("IPHONE 15") || s.includes("IPHONE15")) {
+    return {
+      name: "iPhone 15 Pro Max 256GB - Titan Tự Nhiên",
+      imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
+      colors: ["Titan Tự Nhiên", "Titan Xanh", "Titan Đen", "Titan Trắng"],
+      sizes: ["256GB", "512GB", "1TB"],
+      defaultColor: "Titan Tự Nhiên",
+      defaultSize: "256GB",
+    };
+  }
+  if (s.includes("S24U") || s.includes("S25U") || s.includes("SAMSUNG") || s.includes("GALAXY S24")) {
+    return {
+      name: "Samsung Galaxy S24 Ultra 512GB - Xám Titan",
+      imageUrl: "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&auto=format&fit=crop&q=80",
+      colors: ["Xám Titan", "Đen Titan", "Tím Titan", "Vàng Titan"],
+      sizes: ["256GB", "512GB", "1TB"],
+      defaultColor: "Xám Titan",
+      defaultSize: "512GB",
+    };
+  }
+  if (s.includes("MI14U") || s.includes("MI15U") || s.includes("XIAOMI")) {
+    return {
+      name: "Xiaomi 14 Ultra 512GB - Trắng Gốm Leica",
+      imageUrl: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&auto=format&fit=crop&q=80",
+      colors: ["Trắng Gốm", "Đen Da", "Xanh Titan"],
+      sizes: ["512GB", "1TB"],
+      defaultColor: "Trắng Gốm",
+      defaultSize: "512GB",
+    };
+  }
+  if (s.includes("AIRPOD") || s.includes("TAI NGHE")) {
+    return {
+      name: "AirPods Pro Gen 2 (MagSafe USB-C)",
+      imageUrl: "https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500&auto=format&fit=crop&q=80",
+      colors: ["Trắng", "Đen"],
+      sizes: ["Tiêu chuẩn", "USB-C MagSafe"],
+      defaultColor: "Trắng",
+      defaultSize: "USB-C MagSafe",
+    };
+  }
+  return {
+    name: skuOrName.startsWith("ATTR-") ? skuOrName.replace(/^ATTR-/, "").replace(/-/g, " ") : (skuOrName || "Sản phẩm công nghệ"),
+    imageUrl: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&auto=format&fit=crop&q=80",
+    colors: ["Titan Sa Mạc", "Titan Tự Nhiên", "Titan Đen", "Titan Trắng"],
+    sizes: ["128GB", "256GB", "512GB", "1TB"],
+    defaultColor: "Titan Sa Mạc",
+    defaultSize: "256GB",
+  };
+};
+
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+
+  const handleToggleExpand = (groupKey: string) => {
+    if (!selectedGroupKeys.includes(groupKey)) return;
+    setExpandedGroupKey(prev => prev === groupKey ? null : groupKey);
+  };
+
+  // Group cart items by name, color, and size
   const groupedCartItems = cartItems.reduce((acc, item) => {
-    const existing = acc.find(i => i.name === item.name && i.price === item.price);
+    const meta = resolveProductMetadata(item.name || item.sku || "");
+    const color = item.color || meta.defaultColor;
+    const size = item.size || meta.defaultSize;
+    const availableColors = item.availableColors || meta.colors;
+    const availableSizes = item.availableSizes || meta.sizes;
+    const displayName = (item.name && !item.name.startsWith("ATTR-")) ? item.name : meta.name;
+    const imageUrl = item.imageUrl || meta.imageUrl;
+
+    const groupKey = `${displayName}-${color}-${size}-${item.price}`;
+    const existing = acc.find(i => i.groupKey === groupKey);
+    const itemQty = item.quantity || 1;
     if (existing) {
       existing.ids.push(item.id);
-      existing.quantity += 1;
+      existing.quantity += itemQty;
     } else {
       acc.push({
-        name: item.name,
+        id: item.id,
+        groupKey,
+        sku: item.sku,
+        name: displayName,
         price: item.price,
+        unitPrice: item.price,
+        oldPrice: item.oldPrice,
         icon: item.icon,
+        imageUrl,
+        color,
+        availableColors,
+        size,
+        availableSizes,
         ids: [item.id],
-        quantity: 1,
+        quantity: itemQty,
       });
     }
     return acc;
-  }, [] as { name: string; price: string; icon: string; ids: string[]; quantity: number }[]);
+  }, [] as {
+    id: string;
+    groupKey: string;
+    sku?: string;
+    name: string;
+    price: string;
+    unitPrice: string;
+    oldPrice?: string;
+    icon: string;
+    imageUrl?: string;
+    color: string;
+    availableColors: string[];
+    size: string;
+    availableSizes: string[];
+    ids: string[];
+    quantity: number;
+  }[]);
 
   const [selectedGroupKeys, setSelectedGroupKeys] = useState<string[]>([]);
+  const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+  const knownGroupKeysRef = useRef<Set<string>>(new Set());
+  const variantCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Automatically select new groups as they are added to the cart
+  // Automatically select new groups only when they are genuinely newly added
   useEffect(() => {
-    const currentKeys = groupedCartItems.map(item => `${item.name}-${item.price}`);
-    setSelectedGroupKeys(prev => {
-      const newKeys = currentKeys.filter(k => !prev.includes(k));
-      if (newKeys.length > 0) {
-        return [...prev, ...newKeys];
+    const currentKeys = groupedCartItems.map(item => item.groupKey);
+    const brandNewKeys = currentKeys.filter(k => !knownGroupKeysRef.current.has(k));
+
+    currentKeys.forEach(k => knownGroupKeysRef.current.add(k));
+
+    // Prune deleted items from known set
+    knownGroupKeysRef.current.forEach((k) => {
+      if (!currentKeys.includes(k)) {
+        knownGroupKeysRef.current.delete(k);
       }
-      return prev;
     });
-  }, [cartItems]);
+
+    if (brandNewKeys.length > 0) {
+      setSelectedGroupKeys(prev => {
+        const toAdd = brandNewKeys.filter(k => !prev.includes(k));
+        return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+      });
+    } else {
+      setSelectedGroupKeys(prev => prev.filter(k => currentKeys.includes(k)));
+    }
+  }, [groupedCartItems]);
+
+  const handleSelectVariant = async (groupKey: string, newColor: string, newSize: string) => {
+    const target = groupedCartItems.find(g => g.groupKey === groupKey);
+    if (!target) return;
+    
+    // Determine new SKU
+    const isIphone = target.name.toLowerCase().includes("iphone");
+    const isSamsung = target.name.toLowerCase().includes("samsung") || target.name.toLowerCase().includes("s24");
+    const isPixel = target.name.toLowerCase().includes("pixel");
+    
+    let newSku = target.sku || "";
+    if (isIphone) {
+      const colorCode = newColor.toLowerCase().includes("sa mạc") ? "DESERT" : newColor.toLowerCase().includes("tự nhiên") ? "NATURAL" : newColor.toLowerCase().includes("đen") ? "BLACK" : "WHITE";
+      newSku = `ATTR-IP16PM-${colorCode}-${newSize}`;
+    } else if (isSamsung) {
+      newSku = `ATTR-S24U-TITANGRAY-${newSize}`;
+    } else if (isPixel) {
+      newSku = `ATTR-GP9PXL-${newColor.toUpperCase()}-${newSize}`;
+    } else {
+      newSku = `ATTR-${target.name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8)}-${newSize}`;
+    }
+    
+    if (target.sku && target.sku !== newSku) {
+      try {
+        await apiRemoveCartItem(target.sku);
+        await apiAddToCart([{ sku: newSku, quantity: target.quantity }]);
+      } catch (_) {}
+    }
+    setExpandedGroupKey(null);
+  };
 
   const parsePrice = (priceStr: string) => {
     if (priceStr.includes("Trả góp")) return 0;
@@ -398,9 +569,8 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const calculateTotalValue = () => {
     let sum = 0;
     groupedCartItems.forEach((group) => {
-      const groupKey = `${group.name}-${group.price}`;
-      if (selectedGroupKeys.includes(groupKey)) {
-        sum += parsePrice(group.price) * group.quantity;
+      if (selectedGroupKeys.includes(group.groupKey)) {
+        sum += parsePrice(group.unitPrice || group.price) * group.quantity;
       }
     });
     return sum;
@@ -417,8 +587,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const getSelectedItemsCount = () => {
     let count = 0;
     groupedCartItems.forEach((group) => {
-      const groupKey = `${group.name}-${group.price}`;
-      if (selectedGroupKeys.includes(groupKey)) {
+      if (selectedGroupKeys.includes(group.groupKey)) {
         count += group.quantity;
       }
     });
@@ -428,8 +597,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const handleDeleteSelected = () => {
     const idsToRemove: string[] = [];
     groupedCartItems.forEach((group) => {
-      const groupKey = `${group.name}-${group.price}`;
-      if (selectedGroupKeys.includes(groupKey)) {
+      if (selectedGroupKeys.includes(group.groupKey)) {
         idsToRemove.push(...group.ids);
       }
     });
@@ -441,17 +609,16 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     
     if (onRemoveCartItem) {
       onRemoveCartItem(idsToRemove);
-      // Remove selected keys for deleted items
-      setSelectedGroupKeys(prev => prev.filter(k => !groupedCartItems.some(g => `${g.name}-${g.price}` === k && selectedGroupKeys.includes(k))));
+      setSelectedGroupKeys(prev => prev.filter(k => !groupedCartItems.some(g => g.groupKey === k && selectedGroupKeys.includes(k))));
     }
   };
 
   return (
-    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[66%] max-w-[1300px] rounded-full border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.05)] z-50 flex justify-between items-center py-3 px-6">
-      <div className="flex items-center gap-24 lg:gap-32">
+    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.05)] z-50 flex justify-between items-center py-2.5 px-5 sm:px-6">
+      <div className="flex items-center gap-8 lg:gap-12 shrink-0">
         {/* Brand Logo */}
         <a
-        className="font-display text-headline-md tracking-tighter text-primary flex items-center gap-2 scale-95 active:scale-90 transition-transform cursor-pointer"
+        className="font-display text-headline-md tracking-tighter text-primary flex items-center gap-2 scale-95 active:scale-90 transition-transform cursor-pointer shrink-0 whitespace-nowrap"
         href="#"
         onClick={(e) => {
           e.preventDefault();
@@ -480,13 +647,13 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
           <circle cx="5.5" cy="15.8" r="1.2" fill="#FF4D24" />
           <circle cx="18.5" cy="15.8" r="1.2" fill="#FF4D24" />
         </svg>
-        <span className="font-sans font-black text-sm text-slate-900 uppercase tracking-tight ml-1.5">
+        <span className="font-sans font-black text-sm text-slate-900 uppercase tracking-tight ml-1.5 whitespace-nowrap">
           SYNAPSE<span className="text-[#FF4D24]">DIGITAL</span>
         </span>
       </a>
 
       {/* Navigation Links for Desktop */}
-      <div className="hidden md:flex items-center gap-6">
+      <div className="hidden md:flex items-center gap-6 shrink-0">
         {navLinks.map((link) => {
           const isActive = 
             ((link.href === "product" || link.href === "/p") && currentPage === "product") ||
@@ -498,7 +665,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
               <div 
                 key={link.label}
                 ref={megaMenuRef}
-                className="py-2"
+                className="py-2 shrink-0"
                 onMouseEnter={handleMegaMenuMouseEnter}
                 onMouseLeave={handleMegaMenuMouseLeave}
               >
@@ -511,7 +678,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       clearTimeout(megaMenuTimeoutRef.current);
                     }
                   }}
-                  className={`transition-colors duration-300 font-sans text-base scale-95 active:scale-90 transition-transform cursor-pointer select-none outline-none ${
+                  className={`transition-colors duration-300 font-sans text-base scale-95 active:scale-90 transition-transform cursor-pointer select-none outline-none whitespace-nowrap shrink-0 ${
                     (isActive || showProductMegaMenu)
                       ? "text-[#FF4D24] font-bold" 
                       : "text-[#555555] hover:text-primary font-medium"
@@ -611,7 +778,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
               key={link.label}
               href={link.href}
               onClick={(e) => handleLinkClick(e, link.label, link.href)}
-              className={`transition-colors duration-300 font-sans text-base scale-95 active:scale-90 transition-transform ${
+              className={`transition-colors duration-300 font-sans text-base scale-95 active:scale-90 transition-transform whitespace-nowrap shrink-0 ${
                 isActive 
                   ? "text-[#FF4D24] font-bold" 
                   : "text-[#555555] hover:text-primary font-medium"
@@ -625,19 +792,18 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
       </div>
 
       {/* Action Area (Search, Cart, CTA, and Profile) */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4 shrink-0">
         {/* Expanding Search */}
         <div className="relative flex items-center">
           <motion.div
             initial={false}
             animate={{ 
-              width: isSearchExpanded ? 300 : 48,
-              backgroundColor: isSearchExpanded ? "#ffffff" : "transparent",
-              borderColor: isSearchExpanded ? "#cbd5e1" : "transparent"
+              width: isSearchExpanded ? 240 : 48,
+              backgroundColor: isSearchExpanded ? "rgba(255, 255, 255, 0.3)" : "transparent",
+              borderColor: isSearchExpanded ? "rgba(255, 255, 255, 0.5)" : "transparent"
             }}
-            whileHover={!isSearchExpanded ? { backgroundColor: "rgba(255, 255, 255, 0.45)" } : {}}
             transition={{ type: "spring", stiffness: 400, damping: 28 }}
-            className="flex items-center overflow-hidden rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.04)] relative"
+            className="flex items-center overflow-hidden rounded-full border border-transparent relative"
             style={{ height: '48px' }}
           >
             {/* Fixed-width icon container to prevent jumping */}
@@ -664,7 +830,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
               ref={searchInputRef}
               type="text"
               placeholder="Tìm kiếm sản phẩm..."
-              className="w-full h-full bg-transparent border-none outline-none text-base text-slate-700 placeholder:text-slate-400 pr-5"
+              className="w-full h-full bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400 pr-4"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onBlur={() => {
@@ -690,44 +856,44 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-full mt-4 w-[380px] sm:w-[460px] rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-5 z-50 origin-top-right overflow-hidden"
+                className="absolute right-0 top-full mt-4 w-[290px] sm:w-[320px] rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-4 z-50 origin-top-right overflow-hidden"
               >
-                <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
-                <div className="flex flex-col gap-3">
-                  <span className="text-[14px] font-extrabold text-[#111111] uppercase tracking-wide font-display mb-2">Từ khóa phổ biến</span>
+                <div className="absolute top-0 right-0 w-36 h-36 bg-[#FF4D24]/15 rounded-full blur-[40px] pointer-events-none -z-10" />
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11.5px] font-extrabold text-[#111111] uppercase tracking-wide font-display mb-0.5">Từ khóa phổ biến</span>
                   
-                  <Dock orientation="vertical" iconMagnification={43} iconDistance={80} className="flex flex-col gap-1 w-full px-1">
+                  <Dock orientation="vertical" iconMagnification={36} iconDistance={60} className="flex flex-col gap-0.5 w-full px-0.5">
                     <DockIcon className="w-full">
-                      <div className="flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer w-full" onClick={() => onNavigate("product")}>
-                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                          <TrendingUp size={14} className="text-slate-500" />
+                      <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer w-full hover:bg-slate-50 transition-colors" onClick={() => onNavigate("product")}>
+                        <div className="w-6.5 h-6.5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                          <TrendingUp size={12} className="text-slate-500" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-800 truncate">Aero Compute Server</p>
+                          <p className="text-xs font-bold text-slate-800 truncate">Aero Compute Server</p>
                         </div>
-                        <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full shrink-0">🔥 HOT</span>
+                        <span className="text-[8.5px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full shrink-0">🔥 HOT</span>
                       </div>
                     </DockIcon>
                     
                     <DockIcon className="w-full">
-                      <div className="flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer w-full" onClick={() => onNavigate("product")}>
-                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                          <TrendingUp size={14} className="text-slate-500" />
+                      <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer w-full hover:bg-slate-50 transition-colors" onClick={() => onNavigate("product")}>
+                        <div className="w-6.5 h-6.5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                          <TrendingUp size={12} className="text-slate-500" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-800 truncate">Nexus AI Model</p>
+                          <p className="text-xs font-bold text-slate-800 truncate">Nexus AI Model</p>
                         </div>
-                        <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full shrink-0">🔥 HOT</span>
+                        <span className="text-[8.5px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full shrink-0">🔥 HOT</span>
                       </div>
                     </DockIcon>
 
                     <DockIcon className="w-full">
-                      <div className="flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer w-full" onClick={() => onNavigate("product")}>
-                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                          <Search size={14} className="text-slate-500" />
+                      <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer w-full hover:bg-slate-50 transition-colors" onClick={() => onNavigate("product")}>
+                        <div className="w-6.5 h-6.5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                          <Search size={12} className="text-slate-500" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-600 truncate">Glacier Storage 100TB</p>
+                          <p className="text-xs font-medium text-slate-600 truncate">Glacier Storage 100TB</p>
                         </div>
                       </div>
                     </DockIcon>
@@ -752,19 +918,23 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
             } : {}}
             transition={{ duration: 0.7, ease: "easeInOut" }}
             onClick={() => setShowCartMenu(!showCartMenu)}
-            className={`text-[#555555] hover:text-[#FF4D24] transition-colors duration-300 flex items-center justify-center w-12 h-12 rounded-full border shadow-[0_2px_8px_rgba(0,0,0,0.04)] relative cursor-pointer ${
-              isBouncing 
-                ? "bg-red-50 text-[#FF4D24] ring-2 ring-[#FF4D24]/30 border-transparent" 
-                : "hover:bg-white/45 bg-transparent border-transparent hover:border-slate-300"
+            className={`transition-all duration-300 flex items-center justify-center w-12 h-12 rounded-full border relative cursor-pointer ${
+              showCartMenu
+                ? "bg-white/80 text-[#FF4D24] border-transparent shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+                : isBouncing 
+                  ? "bg-red-50 text-[#FF4D24] ring-2 ring-[#FF4D24]/30 border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.04)]" 
+                  : "text-[#555555] hover:text-[#FF4D24] hover:bg-white/45 bg-transparent border-transparent hover:border-slate-300/40 shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
             }`}
           >
             <ShoppingCart size={24} className="stroke-[2]" />
-            {cartItems.length > 0 && (
-              <span className="absolute top-2 right-2 w-3 h-3 bg-[#FF4D24] rounded-full ring-2 ring-white" />
+            {totalCartCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-[#FF4D24] text-white text-[10px] font-bold rounded-full ring-2 ring-white flex items-center justify-center pointer-events-none">
+                {totalCartCount > 99 ? "99+" : totalCartCount}
+              </span>
             )}
           </motion.button>
 
-          {/* Cart Dropdown Menu */}
+            {/* Cart Dropdown Menu */}
           <AnimatePresence>
             {showCartMenu && (
               <motion.div 
@@ -772,208 +942,437 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 mt-4 w-[380px] sm:w-[460px] rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-5 z-50 origin-top-right overflow-hidden"
+                className="absolute right-0 top-full mt-3 w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/98 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] p-4 sm:p-5 z-50 origin-top-right overflow-hidden text-slate-900"
               >
-                {/* Decorative background glows */}
-                <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
+                {/* Decorative ambient glow (+20% radiance) */}
+                <div className="absolute top-0 right-0 w-72 h-72 bg-[#FF4D24]/36 rounded-full blur-[70px] pointer-events-none -z-10" />
+                <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#FF4D24]/18 rounded-full blur-[60px] pointer-events-none -z-10" />
 
-                {/* Header */}
-                <div className="flex flex-col gap-3 mb-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[14px] font-extrabold text-[#111111] uppercase tracking-wide font-display">Giỏ hàng của bạn</span>
-                    <span className="text-[10px] bg-[#FF4D24]/10 text-[#FF4D24] font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider">
-                      {cartItems.length} sản phẩm
-                    </span>
+                {/* 1. Header Row (No bottom border to avoid double lines) */}
+                <div className="flex items-center justify-between pb-2 mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="size-7 rounded-lg bg-[#FF4D24]/10 text-[#FF4D24] flex items-center justify-center font-bold">
+                      <ShoppingBag size={14} className="stroke-[2.5]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="font-sans font-black text-[13px] tracking-tight text-slate-900 uppercase">
+                          Giỏ hàng
+                        </h3>
+                        <span className="text-[10px] font-extrabold text-[#FF4D24] bg-[#FF4D24]/10 px-1.5 py-0.2 rounded-full">
+                          {totalCartCount}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Free Shipping Progress Bar */}
-                  <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-3 border border-red-100 flex flex-col gap-2 relative overflow-hidden shadow-inner">
-                    <div className="flex justify-between items-end">
-                      <span className="text-[11px] font-bold text-[#FF4D24]">Miễn phí giao hàng</span>
-                      <span className="text-[10px] font-bold text-[#FF4D24]/70">Còn $15.00 nữa</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-white rounded-full overflow-hidden shadow-sm">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: '75%' }}
-                        transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-                        className="h-full bg-gradient-to-r from-[#FF7C4A] to-[#FF4D24] rounded-full relative"
-                      >
-                         <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" />
-                      </motion.div>
-                    </div>
+                  <div className="flex items-center gap-1.5">
+                    {groupedCartItems.length > 0 && (
+                      <>
+                        <button
+                          onClick={() => {
+                            if (selectedGroupKeys.length === groupedCartItems.length) {
+                              setSelectedGroupKeys([]);
+                            } else {
+                              setSelectedGroupKeys(groupedCartItems.map(g => g.groupKey));
+                            }
+                          }}
+                          className="text-[11px] font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer px-1.5 py-0.5 rounded hover:bg-slate-100"
+                        >
+                          {selectedGroupKeys.length === groupedCartItems.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                        </button>
+                        {selectedGroupKeys.length > 0 && (
+                          <button
+                            onClick={handleDeleteSelected}
+                            className="text-[11px] font-bold text-rose-500 hover:text-rose-700 transition-colors cursor-pointer flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-rose-50"
+                            title="Xóa các mục đã chọn"
+                          >
+                            <Trash2 size={11} />
+                            <span>Xóa ({getSelectedItemsCount()})</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+                    <button
+                      onClick={() => setShowCartMenu(false)}
+                      className="size-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all active:scale-95 cursor-pointer ml-0.5"
+                    >
+                      <X size={13} className="stroke-[2.5]" />
+                    </button>
                   </div>
                 </div>
                 
-                {/* Item list */}
+                {/* 2. Item List with Dual Top & Bottom CSS Mask Fade */}
                 {groupedCartItems.length > 0 ? (
-                  <div className="flex flex-col gap-2.5 max-h-[280px] overflow-y-auto p-2 px-3 -mx-3 custom-scrollbar relative z-10">
+                  <div className="flex flex-col gap-2 max-h-[440px] overflow-y-auto p-1 pt-2 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-32px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-32px),transparent_100%)]">
                     <AnimatePresence initial={false}>
-                    {groupedCartItems.map((group, index) => {
-                      const groupKey = `${group.name}-${group.price}`;
-                      const isSelected = selectedGroupKeys.includes(groupKey);
-                      
-                      return (
-                        <motion.div 
-                          layout
-                          initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                          animate={{ opacity: 1, x: 0, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-                          whileHover={{ y: -2, scale: 1.01 }}
-                          transition={{ type: "spring", stiffness: 400, damping: 30, delay: index * 0.04 }}
-                          key={groupKey} 
-                          onClick={(e) => {
-                            const target = e.target as HTMLElement;
-                            if (target.closest('.qty-controls')) return;
-                            setSelectedGroupKeys(prev => 
-                              prev.includes(groupKey) ? prev.filter(k => k !== groupKey) : [...prev, groupKey]
-                            );
-                          }}
-                          className={`flex items-center gap-3 p-3 rounded-2xl border transition-all duration-300 relative overflow-hidden bg-white cursor-pointer select-none ${
-                            isSelected 
-                              ? "border-[#FF4D24] shadow-[0_4px_16px_rgba(255,77,36,0.1)] ring-1 ring-[#FF4D24]/40" 
-                              : "border-transparent shadow-sm hover:shadow-md hover:border-slate-200"
-                          }`}
-                        >
-                          {isSelected && <div className="absolute inset-0 bg-gradient-to-r from-[#FF4D24]/[0.02] to-transparent pointer-events-none" />}
-                          
-                          {/* Left: Custom Checkbox */}
-                          <div className="flex items-center justify-center shrink-0 z-10">
-                            <div className={`w-4.5 h-4.5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
-                              isSelected ? "border-[#FF4D24] bg-[#FF4D24] shadow-sm" : "border-slate-300 bg-slate-50 group-hover:border-slate-400"
-                            }`}>
-                              <span className={`material-symbols-outlined text-white text-[10px] font-black transition-transform duration-300 ${
-                                isSelected ? "scale-100 rotate-0" : "scale-0 -rotate-45"
-                              }`}>check</span>
+                      {groupedCartItems.map((group, index) => {
+                        const groupKey = group.groupKey;
+                        const isSelected = selectedGroupKeys.includes(groupKey);
+                        const rowTotalNumber = parsePrice(group.unitPrice) * group.quantity;
+                        const formattedRowTotal = formatPrice(rowTotalNumber);
+                        const isExpanded = expandedGroupKey === groupKey;
+                        const isNearBottom = groupedCartItems.length >= 2 && index === groupedCartItems.length - 1;
+                        
+                        return (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ 
+                              opacity: 1, 
+                              y: 0,
+                            }}
+                            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
+                            transition={{ duration: 0.15 }}
+                            key={groupKey} 
+                            onClick={() => {
+                              setSelectedGroupKeys(prev => {
+                                const willDeselect = prev.includes(groupKey);
+                                if (willDeselect) {
+                                  if (expandedGroupKey === groupKey) {
+                                    setExpandedGroupKey(null);
+                                  }
+                                  return prev.filter(k => k !== groupKey);
+                                } else {
+                                  return [...prev, groupKey];
+                                }
+                              });
+                            }}
+                            className={`p-2.5 sm:p-3 rounded-xl border select-none relative flex flex-col gap-2 cursor-pointer transition-colors duration-150 ${
+                              isExpanded ? "z-40" : "z-0"
+                            } ${
+                              isSelected 
+                                ? "bg-white border-slate-300 shadow-xs ring-1 ring-slate-900/5" 
+                                : "border-transparent bg-transparent"
+                            }`}
+                          >
+                            {/* Top Row: Thumbnail + Info & Variant + Delete */}
+                            <div className="flex items-start gap-2.5">
+                              {/* Smartphone Thumbnail Photo */}
+                              <div className={`w-11 h-13 sm:w-12 sm:h-14 rounded-lg shrink-0 p-0.5 flex items-center justify-center overflow-hidden ${
+                                isSelected 
+                                ? "bg-slate-50 border border-slate-300/90 shadow-2xs" 
+                                : "bg-neutral-100/70 border-transparent grayscale opacity-50"
+                              }`}>
+                                {group.imageUrl ? (
+                                  <img 
+                                    src={group.imageUrl} 
+                                    alt={group.name} 
+                                    className="size-full object-contain object-center" 
+                                  />
+                                ) : (
+                                  <span className="text-sm">{group.icon || "📦"}</span>
+                                )}
+                              </div>
+
+                              {/* Info & Variant Pill */}
+                              <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                <h4 className={`text-xs font-semibold leading-snug line-clamp-2 transition-colors ${
+                                  isSelected ? "text-slate-900 font-bold" : "text-neutral-400 font-medium"
+                                }`}>
+                                  {group.name}
+                                </h4>
+
+                                  {/* Minimalist Variant Pill Button & Fixed Frame Popup */}
+                                  <div 
+                                    className="relative inline-block self-start z-40 pt-0.5" 
+                                    onClick={(e) => {
+                                      if (isSelected) e.stopPropagation();
+                                    }}
+                                    onMouseEnter={() => {
+                                      if (variantCloseTimeoutRef.current) {
+                                        clearTimeout(variantCloseTimeoutRef.current);
+                                        variantCloseTimeoutRef.current = null;
+                                      }
+                                    }}
+                                    onMouseLeave={() => {
+                                      if (variantCloseTimeoutRef.current) clearTimeout(variantCloseTimeoutRef.current);
+                                      variantCloseTimeoutRef.current = setTimeout(() => {
+                                        setExpandedGroupKey(null);
+                                      }, 450);
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        if (isSelected) {
+                                          e.stopPropagation();
+                                          handleToggleExpand(groupKey);
+                                        }
+                                      }}
+                                      className={`text-[10.5px] px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                                        !isSelected 
+                                          ? "bg-transparent border-transparent text-neutral-400 select-none"
+                                          : isExpanded
+                                            ? "bg-gradient-to-r from-orange-50 via-white to-orange-50/90 border-[#FF4D24]/40 text-[#FF4D24] font-medium shadow-[0_2px_10px_rgba(255,77,36,0.12)] ring-1 ring-[#FF4D24]/20"
+                                            : "bg-white/80 hover:bg-orange-50/60 border-slate-200/90 hover:border-[#FF4D24]/30 text-slate-700 hover:text-[#FF4D24] shadow-2xs"
+                                      }`}
+                                    >
+                                      <span>Phiên bản: <strong className={isSelected ? (isExpanded ? "text-[#FF4D24] font-bold" : "text-slate-800 font-semibold") : "text-neutral-400 font-normal"}>{group.color}</strong>, <strong className={isSelected ? (isExpanded ? "text-[#FF4D24] font-bold" : "text-slate-800 font-semibold") : "text-neutral-400 font-normal"}>{group.size}</strong></span>
+                                      <ChevronDown className={`size-3 transition-transform duration-200 ${isExpanded ? "rotate-180 text-[#FF4D24]" : ""} ${isSelected ? (isExpanded ? "text-[#FF4D24]" : "text-slate-500") : "text-neutral-400"}`} />
+                                    </button>
+
+                                    {/* Popup Khung cố định với hiệu ứng bung mở vòng tròn (Trắng pha cam nhẹ) */}
+                                    <AnimatePresence>
+                                      {isExpanded && isSelected && (
+                                        <motion.div
+                                          initial={{ 
+                                            opacity: 0, 
+                                            clipPath: isNearBottom 
+                                              ? "circle(0% at 30px calc(100% + 10px))" 
+                                              : "circle(0% at 30px -10px)", 
+                                            filter: "blur(10px)" 
+                                          }}
+                                          animate={{ 
+                                            opacity: 1, 
+                                            clipPath: isNearBottom 
+                                              ? "circle(160% at 30px calc(100% + 10px))" 
+                                              : "circle(160% at 30px -10px)", 
+                                            filter: "blur(0px)" 
+                                          }}
+                                          exit={{ 
+                                            opacity: 0, 
+                                            clipPath: isNearBottom 
+                                              ? "circle(0% at 30px calc(100% + 10px))" 
+                                              : "circle(0% at 30px -10px)", 
+                                            filter: "blur(10px)" 
+                                          }}
+                                          transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
+                                          className={`absolute left-0 z-50 bg-gradient-to-b from-white via-orange-50/20 to-white/98 backdrop-blur-3xl border border-orange-200/70 rounded-2xl shadow-[0_25px_60px_-12px_rgba(255,77,36,0.15),0_10px_25px_-5px_rgba(0,0,0,0.06)] p-3.5 w-[290px] sm:w-[310px] flex flex-col gap-2.5 text-xs ring-1 ring-[#FF4D24]/10 overflow-hidden ${
+                                            isNearBottom 
+                                              ? "bottom-full mb-2 origin-bottom-left" 
+                                              : "top-full mt-2 origin-top-left"
+                                          }`}
+                                        >
+                                          {/* Decorative ambient glow (Trắng pha cam nhẹ) */}
+                                          <div className="absolute top-0 right-0 w-36 h-36 bg-[#FF4D24]/18 rounded-full blur-[40px] pointer-events-none -z-10" />
+                                          <div className="absolute bottom-0 left-0 w-28 h-28 bg-[#FF4D24]/10 rounded-full blur-[30px] pointer-events-none -z-10" />
+
+                                          {/* Color Options - Grid 2 cột thẳng hàng */}
+                                          <div>
+                                            <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+                                              Màu sắc:
+                                            </span>
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                              {group.availableColors.map((c) => (
+                                                <button
+                                                  key={c}
+                                                  type="button"
+                                                  onClick={() => handleSelectVariant(groupKey, c, group.size)}
+                                                  className={`w-full py-1.5 px-2 text-center text-[10.5px] rounded-xl border transition-all truncate flex items-center justify-center cursor-pointer bg-white ${
+                                                    group.color === c
+                                                      ? "border-[#FF4D24] text-[#FF4D24] font-bold shadow-xs ring-1 ring-[#FF4D24]/40"
+                                                      : "border-slate-200 text-slate-700 hover:border-[#FF4D24]/60 hover:text-[#FF4D24] font-medium"
+                                                  }`}
+                                                >
+                                                  {c}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </div>
+
+                                          <Separator className="bg-orange-100/60" />
+
+                                          {/* Size Options - Grid 3 cột thẳng hàng */}
+                                          <div>
+                                            <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+                                              Dung lượng bộ nhớ:
+                                            </span>
+                                            <div className={`grid gap-1.5 ${group.availableSizes.length <= 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                                              {group.availableSizes.map((s) => (
+                                                <button
+                                                  key={s}
+                                                  type="button"
+                                                  onClick={() => handleSelectVariant(groupKey, group.color, s)}
+                                                  className={`w-full py-1.5 px-1.5 text-center text-[10.5px] rounded-xl border transition-all truncate flex items-center justify-center cursor-pointer bg-white ${
+                                                    group.size === s
+                                                      ? "border-[#FF4D24] text-[#FF4D24] font-bold shadow-xs ring-1 ring-[#FF4D24]/40"
+                                                      : "border-slate-200 text-slate-700 hover:border-[#FF4D24]/60 hover:text-[#FF4D24] font-medium"
+                                                  }`}
+                                                >
+                                                  {s}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </div>
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Product Icon */}
-                          <div className={`w-11 h-11 rounded-[10px] bg-slate-50 flex items-center justify-center text-[20px] shrink-0 select-none transition-opacity z-10 shadow-inner border border-slate-100 ${!isSelected ? 'opacity-60 grayscale-[30%]' : ''}`}>
-                            {group.icon}
-                          </div>
+                            {/* Bottom Row: Price on Left, Stepper on Right */}
+                            <div className={`flex items-center justify-between pt-1 border-t transition-colors ${
+                              isSelected ? "border-slate-200/90" : "border-transparent"
+                            }`} onClick={(e) => {
+                              if (isSelected) e.stopPropagation();
+                            }}>
+                              {/* Price display */}
+                              <div className="flex items-center gap-1.5 pl-0.5">
+                                {group.oldPrice && (
+                                  <span className="text-[10px] text-slate-400 line-through">
+                                    {group.oldPrice}
+                                  </span>
+                                )}
+                                <span className={`text-xs sm:text-[13px] ${isSelected ? "font-bold text-slate-900" : "font-medium text-neutral-400"}`}>
+                                  {formattedRowTotal}
+                                </span>
+                                {group.quantity > 1 && (
+                                  <span className={`text-[10px] font-normal ${isSelected ? "text-slate-400" : "text-neutral-300"}`}>
+                                    ({group.unitPrice}/món)
+                                  </span>
+                                )}
+                              </div>
 
-                          {/* Product details */}
-                          <div className="flex-1 min-w-0 z-10">
-                            <p className={`text-[12px] font-bold text-slate-800 truncate transition-all ${!isSelected ? 'text-slate-500 font-medium' : ''}`}>{group.name}</p>
-                            <p className="text-[9.5px] text-emerald-600 font-bold flex items-center gap-1.5 select-none mt-0.5">
-                              <span className="flex h-1.5 w-1.5 relative">
-                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 ${!isSelected ? 'hidden' : ''}`}></span>
-                                <span className={`relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500 ${!isSelected ? 'opacity-40' : ''}`}></span>
-                              </span>
-                              Giao hỏa tốc 2h
-                            </p>
-                          </div>
-
-                          {/* Right: Quantity Controls */}
-                          <div className="flex flex-col items-end gap-1.5 z-10">
-                            <p className={`text-[12px] font-mono font-black transition-all ${
-                              isSelected ? "text-[#FF4D24]" : "text-slate-400 line-through"
-                            }`}>{group.price}</p>
-                            <div className={`qty-controls flex items-center bg-slate-50 border border-slate-100 rounded-lg p-0.5 select-none shrink-0 transition-all ${
-                              !isSelected ? 'opacity-30 pointer-events-none' : ''
-                            }`}>
-                              <button
-                                onClick={() => onRemoveCartItem && onRemoveCartItem(group.ids[group.ids.length - 1])}
-                                className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-white text-slate-500 hover:text-rose-600 active:scale-90 transition-all shadow-sm cursor-pointer"
-                              ><span className="text-sm font-black">-</span></button>
-                              <div className="min-w-5 text-center font-mono font-bold text-[11px] text-slate-800">{group.quantity}</div>
-                              <button
-                                onClick={() => onAddToCart && onAddToCart(group.name, group.price)}
-                                className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-white text-slate-500 hover:text-emerald-600 active:scale-90 transition-all shadow-sm cursor-pointer"
-                              ><span className="text-sm font-black">+</span></button>
+                              {/* Quantity Stepper */}
+                              <div className={`flex items-center border rounded-lg h-6.5 transition-all ${
+                                isSelected 
+                                  ? "border-slate-300 bg-white shadow-2xs" 
+                                  : "border-neutral-200/50 bg-neutral-100/60 opacity-60"
+                              }`}>
+                                <button
+                                  type="button"
+                                  className={`size-5.5 flex items-center justify-center disabled:opacity-20 cursor-pointer ${
+                                    isSelected ? "text-slate-500 hover:text-slate-950" : "text-neutral-400"
+                                  }`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isSelected) {
+                                      onRemoveCartItem && onRemoveCartItem(group.ids[group.ids.length - 1]);
+                                    } else {
+                                      setSelectedGroupKeys(prev => [...prev, groupKey]);
+                                    }
+                                  }}
+                                >
+                                  <Minus size={11} className="stroke-[2.5]" />
+                                </button>
+                                <span className={`w-5 text-center text-xs font-semibold select-none ${
+                                  isSelected ? "text-slate-800" : "text-neutral-400"
+                                }`}>
+                                  {group.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  className={`size-5.5 flex items-center justify-center cursor-pointer ${
+                                    isSelected ? "text-slate-500 hover:text-slate-950" : "text-neutral-400"
+                                  }`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isSelected) {
+                                      onAddToCart && onAddToCart(group.name, group.unitPrice);
+                                    } else {
+                                      setSelectedGroupKeys(prev => [...prev, groupKey]);
+                                    }
+                                  }}
+                                >
+                                  <Plus size={11} className="stroke-[2.5]" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
+                          </motion.div>
+                        );
+                      })}
                     </AnimatePresence>
                   </div>
                 ) : (
                   <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} 
-                    className="py-12 text-center flex flex-col items-center justify-center gap-3 text-slate-400 relative z-10 bg-white/40 rounded-2xl border border-white/60 shadow-inner"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
+                    className="py-12 text-center flex flex-col items-center justify-center gap-2.5 text-slate-400 bg-slate-50/60 rounded-xl border border-dashed border-slate-200"
                   >
-                    <motion.div 
-                      animate={{ y: [0, -8, 0] }} 
-                      transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                      className="text-4xl opacity-50"
+                    <div className="size-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                      <ShoppingBag size={22} className="stroke-[1.75]" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">Giỏ hàng của bạn đang trống</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Khám phá các sản phẩm và dịch vụ đám mây ngay</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowCartMenu(false);
+                        onNavigate("product");
+                      }}
+                      className="mt-1 text-xs font-bold text-[#FF4D24] bg-orange-50 hover:bg-orange-100 px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                     >
-                      <span className="material-symbols-outlined">shopping_cart_off</span>
-                    </motion.div>
-                    <span className="text-[13px] font-medium text-slate-500">Giỏ hàng của bạn đang trống</span>
+                      Duyệt sản phẩm
+                    </button>
                   </motion.div>
                 )}
-  
-                <div className="my-4 border-t border-slate-200/60 w-[calc(100%+40px)] -ml-5" />
-  
-                {/* Advanced Pricing Breakdown */}
-                <div className="flex flex-col gap-2 text-[12px] text-slate-600 mb-4 relative z-10 px-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-slate-500">Tạm tính:</span>
-                    <span className="font-mono font-bold text-slate-800">{formatPrice(calculateTotalValue())}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
-                      <span className="material-symbols-outlined text-[12px] font-bold">local_offer</span>
-                      Khuyến mãi Smember:
-                    </span>
-                    <span className="font-mono font-bold text-emerald-600">-{formatPrice(calculateTotalValue() * 0.05)}</span>
-                  </div>
-                  
-                  <div className="bg-[#FF4D24] rounded-xl p-3.5 mt-1.5 text-white shadow-[0_8px_16px_rgba(255,77,36,0.2)] relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/20 rounded-full blur-[24px] pointer-events-none" />
-                    <div className="flex items-center justify-between relative z-10">
-                      <span className="text-[11px] font-extrabold uppercase tracking-widest text-white/90">Tổng thanh toán</span>
-                      <span className="text-lg font-black font-mono tracking-tight">{formatPrice(calculateTotalValue() * 1.05)}</span>
+
+                {/* 3. Footer (Tóm tắt & Nút thanh toán) */}
+                {groupedCartItems.length > 0 && (
+                  <div className="pt-1 mt-1 flex flex-col gap-1.5">
+                    {/* Summary row */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                      <span>Đã chọn ({getSelectedItemsCount()} món)</span>
+                      <span>Ưu đãi thành viên: <strong className="text-emerald-600 font-mono">-5%</strong></span>
+                    </div>
+
+                    {/* Action row */}
+                    <div className="flex items-center justify-between gap-3 pt-0.5">
+                      <div className="flex flex-col">
+                        <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Tổng thanh toán</span>
+                        <div className="overflow-hidden h-6 flex items-center">
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            <motion.span
+                              key={calculateTotalValue()}
+                              initial={{ y: 10, opacity: 0, filter: "blur(2px)" }}
+                              animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                              exit={{ y: -10, opacity: 0, filter: "blur(2px)" }}
+                              transition={{ type: "spring", stiffness: 450, damping: 28 }}
+                              className="text-base sm:text-[17px] font-black font-mono text-[#FF4D24] leading-tight block"
+                            >
+                              {formatPrice(calculateTotalValue())}
+                            </motion.span>
+                          </AnimatePresence>
+                        </div>
+                      </div>
+
+                      <motion.button
+                        whileHover={{ 
+                          scale: 1.02, 
+                          boxShadow: "0 8px 20px -3px rgba(17, 17, 17, 0.35), 0 0 10px 1px rgba(255, 77, 36, 0.25)" 
+                        }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          const totalSelected = selectedGroupKeys.length;
+                          if (totalSelected === 0) {
+                            alert("Vui lòng tích chọn ít nhất 1 sản phẩm để thanh toán!");
+                            return;
+                          }
+                          const executeCheckout = createAuthAction({
+                            onAuthenticated: () => {
+                              setShowCartMenu(false);
+                              onNavigate("order");
+                            },
+                            onGuest: () => {
+                              savePendingAction({
+                                actionId: "CART_CHECKOUT",
+                                returnUrl: "/o"
+                              });
+                              setShowCartMenu(false);
+                              window.location.hash = "login";
+                              onNavigate("auth");
+                            }
+                          });
+                          executeCheckout();
+                        }}
+                        disabled={getSelectedItemsCount() === 0}
+                        className="group w-auto min-w-[150px] justify-center bg-[#111111] hover:bg-black text-white font-sans text-xs font-extrabold px-5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer overflow-hidden"
+                      >
+                        <span>Thanh toán</span>
+                        <span className="material-symbols-outlined text-[14px] font-bold transition-transform duration-300 group-hover:translate-x-1">
+                          arrow_forward
+                        </span>
+                      </motion.button>
                     </div>
                   </div>
-                </div>
-  
-                <div className="flex gap-2.5 relative z-10">
-                  <motion.button 
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                    onClick={() => setShowCartMenu(false)}
-                    className="flex-[0.8] rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 font-bold text-xs py-2.5 transition-colors text-center shadow-sm cursor-pointer"
-                  >
-                    Đóng
-                  </motion.button>
-
-                  <motion.button
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                    onClick={handleDeleteSelected}
-                    disabled={getSelectedItemsCount() === 0}
-                    className="flex-none px-3.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                    title="Xóa đã chọn"
-                  >
-                    <Trash2 size={14} className="stroke-[2.5]" />
-                    {getSelectedItemsCount() > 0 && (
-                      <span>{getSelectedItemsCount()}</span>
-                    )}
-                  </motion.button>
-
-                  <motion.button 
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                    onClick={() => {
-                      const totalSelected = selectedGroupKeys.length;
-                      if (totalSelected === 0) {
-                        alert("Vui lòng tích chọn sản phẩm bạn muốn thanh toán!");
-                        return;
-                      }
-                      setShowCartMenu(false);
-                      onNavigate("order");
-                    }}
-                    disabled={cartItems.length === 0}
-                    className="flex-[1.2] bg-[#111111] text-white disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed font-sans text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer hover:bg-black"
-                  >
-                    <span>Thanh toán</span>
-                    <span className="material-symbols-outlined text-[14px] font-bold">arrow_forward</span>
-                  </motion.button>
-                </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
+
 
         {/* Account Button / Profile Section */}
         <div className="relative" ref={menuRef}>
@@ -986,10 +1385,14 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
               }
               setShowAccountMenu(!showAccountMenu);
             }}
-            className="flex items-center gap-2.5 bg-white/40 text-[#111111] border border-white/60 shadow-sm backdrop-blur-md font-sans text-base font-semibold pl-3 pr-5 py-2 rounded-full hover:bg-white/60 transition-all duration-300 active:scale-95 cursor-pointer select-none"
+            className={`flex items-center gap-2.5 shadow-sm backdrop-blur-md font-sans text-base font-semibold pl-3 pr-5 py-2 rounded-full transition-all duration-300 active:scale-95 cursor-pointer select-none shrink-0 whitespace-nowrap border ${
+              showAccountMenu
+                ? "bg-white/80 text-[#FF4D24] border-white/90 shadow-md ring-2 ring-[#FF4D24]/20"
+                : "bg-white/40 text-[#111111] border-white/60 hover:bg-white/60"
+            }`}
           >
             {/* Elegant glassmorphism circle with user avatar or icon */}
-            <div className="w-8 h-8 rounded-full bg-slate-950/5 flex items-center justify-center text-[#111111]/80 overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-slate-950/5 flex items-center justify-center text-[#111111]/80 overflow-hidden shrink-0">
               {loggedInUser ? (
                 loggedInUser.avatarUrl ? (
                   <img src={loggedInUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -1002,7 +1405,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                 <User size={16} className="stroke-[2.5]" />
               )}
             </div>
-            <span className="font-semibold text-base text-[#111111] tracking-tight">
+            <span className="font-semibold text-base text-[#111111] tracking-tight whitespace-nowrap">
               {loggedInUser ? (loggedInUser.fullName.length > 0 ? loggedInUser.fullName : `@${loggedInUser.username}`) : "Đăng nhập"}
             </span>
           </button>
@@ -1015,7 +1418,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 mt-4 w-64 rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
+                className="absolute right-0 top-full mt-4 w-64 rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
               >
                 {/* Decorative background glows */}
                 <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
@@ -1126,8 +1529,15 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
                       <button 
                         onClick={() => {
                           setShowAccountMenu(false);
+                          localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+                          localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+                          localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+                          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+                          localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKENS_MAP);
                           localStorage.removeItem("horizon_redis_profile");
                           localStorage.removeItem("horizon_current_user");
+                          localStorage.removeItem("horizon_access_token");
+                          localStorage.removeItem("horizon_refresh_token");
                           setLoggedInUser(null);
                           window.location.hash = "register";
                           onNavigate("auth");

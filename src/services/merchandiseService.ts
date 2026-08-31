@@ -1,4 +1,5 @@
 import type { Product, ProductAttributeOption } from "../lib/productCatalog";
+import { getUnifiedAccessToken, unifiedFetch } from "../lib/api";
 
 export interface ProductSearchFilter {
   keyword?: string;
@@ -27,27 +28,12 @@ interface ProductSearchResult {
 
 const VND_RATE = 24000;
 
-function getUnifiedAccessToken(): string {
-  const storedProfile = localStorage.getItem("horizon_redis_profile");
-  if (storedProfile) {
-    try {
-      const profile = JSON.parse(storedProfile);
-      if (profile?.accessToken) return profile.accessToken;
-    } catch (_) {
-      // Ignore malformed profile and fall back to the legacy token key.
-    }
-  }
-
-  return localStorage.getItem("horizon_access_token") || "";
-}
-
 async function localGraphqlRequest<T>(query: string, variables?: Record<string, any>): Promise<T> {
   const token = getUnifiedAccessToken();
-  const response = await fetch("/graphql", {
+  const response = await unifiedFetch("/graphql", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-BFF-Gateway-Url": localStorage.getItem("horizon_api_base_url") || "",
       ...(token ? { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } : {})
     },
     body: JSON.stringify({ query, variables })

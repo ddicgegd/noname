@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Mail, Lock, User, ArrowRight, Eye, EyeOff, ShieldCheck, CheckCircle, CheckCircle2, XCircle, AlertCircle, Shield, Cpu, RefreshCw, Check, Loader2, Settings, Key, Terminal, Server, ChevronDown, ChevronUp } from "lucide-react";
-import { apiRequest, isProxyEnabled } from "../lib/api";
+import { apiRequest, isProxyEnabled, getApiBaseUrl } from "../lib/api";
 import { extractBackendMessage, sanitizeErrorMessage } from "../lib/responseExtractor";
+import { STORAGE_KEYS } from "../lib/storageKeys";
 import { ApiResponse } from "../types/api";
 import {
   loginUser,
@@ -13,9 +14,11 @@ import {
   validateResetToken as apiValidateResetToken
 } from "../services/authService";
 import { UserLoginRequest, UserRegisterRequest } from "../types/auth";
+import { consumePendingAction } from "../lib/authAction";
+import { mergeGuestCart } from "../services/cartService";
 
 interface RegisterPageProps {
-  onNavigate: (page: "landing" | "product" | "auth" | "terms") => void;
+  onNavigate: (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms") => void;
 }
 
 export default function RegisterPage({ onNavigate }: RegisterPageProps) {
@@ -139,15 +142,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     };
   }, [lastRegEmail]);
   const [verificationTokenInput, setVerificationTokenInput] = useState("");
-  const [apiBaseUrl, setApiBaseUrl] = useState(() => {
-    const stored = localStorage.getItem("horizon_api_base_url");
-    if (!stored) {
-      localStorage.setItem("horizon_api_base_url", "http://localhost:8080");
-      return "http://localhost:8080";
-    }
-    return stored;
-  });
-  const [verifyApiPath, setVerifyApiPath] = useState(() => localStorage.getItem("horizon_verify_api_path") ?? "/api/auth/verify-email");
+  const apiBaseUrl = getApiBaseUrl();
+  const [verifyApiPath, setVerifyApiPath] = useState(() => localStorage.getItem(STORAGE_KEYS.VERIFY_API_PATH) || localStorage.getItem("horizon_verify_api_path") || "/api/auth/verify-email");
   const [verifyMethod, setVerifyMethod] = useState<"GET" | "POST">("GET");
   const [isVerifyingRequest, setIsVerifyingRequest] = useState(false);
   const [verificationLogs, setVerificationLogs] = useState<string[]>([]);
@@ -179,10 +175,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
   // Get dynamic Client device details for deviceInfo
   const getClientDeviceInfo = () => {
-    let deviceId = localStorage.getItem("horizon_device_id");
+    let deviceId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID) || localStorage.getItem("horizon_device_id");
     if (!deviceId) {
       deviceId = "dev-" + Math.random().toString(36).substring(2, 11) + "-" + Date.now();
-      localStorage.setItem("horizon_device_id", deviceId);
+      localStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
     }
 
     let timeZone;
@@ -211,7 +207,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     devInfo: any
   ) => {
     try {
-      const stored = localStorage.getItem("horizon_auth_audit_logs");
+      const stored = localStorage.getItem(STORAGE_KEYS.AUTH_AUDIT_LOGS) || localStorage.getItem("horizon_auth_audit_logs");
       let logs = stored ? JSON.parse(stored) : [];
 
       const newLog = {
@@ -227,19 +223,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       logs.unshift(newLog);
       if (logs.length > 50) logs = logs.slice(0, 50);
-      localStorage.setItem("horizon_auth_audit_logs", JSON.stringify(logs));
+      localStorage.setItem(STORAGE_KEYS.AUTH_AUDIT_LOGS, JSON.stringify(logs));
     } catch (e) {
       console.error("Lỗi ghi nhật ký chẩn đoán:", e);
     }
   };
 
-  // Save API Base URL and Path to localStorage on change
   useEffect(() => {
-    localStorage.setItem("horizon_api_base_url", apiBaseUrl);
-  }, [apiBaseUrl]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_verify_api_path", verifyApiPath);
+    localStorage.setItem(STORAGE_KEYS.VERIFY_API_PATH, verifyApiPath);
   }, [verifyApiPath]);
 
   // Helper to validate the recovery/reset token with the backend
@@ -256,7 +247,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       if (response.data !== undefined && response.data !== null) {
         setRecoveryUser(response.data);
         if (response.data.roles !== undefined) {
-          localStorage.setItem("horizon_recovery_user_roles", JSON.stringify(response.data.roles));
+          localStorage.setItem(STORAGE_KEYS.RECOVERY_USER_ROLES, JSON.stringify(response.data.roles));
         }
       } else {
         setTokenValidationError(extracted.message);
@@ -515,13 +506,13 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     if (savedEmail.length === 0) {
       if (lastRegEmail !== null && lastRegEmail.length > 0) savedEmail = lastRegEmail;
       else {
-        const storedEmail = localStorage.getItem("horizon_last_registration_email");
+        const storedEmail = localStorage.getItem(STORAGE_KEYS.LAST_REGISTRATION_EMAIL) || localStorage.getItem("horizon_last_registration_email");
         if (storedEmail !== null) savedEmail = storedEmail;
       }
     }
 
-    const savedUsername = localStorage.getItem("horizon_last_registration_username");
-    const savedPassword = localStorage.getItem("horizon_last_registration_password");
+    const savedUsername = localStorage.getItem(STORAGE_KEYS.LAST_REGISTRATION_USERNAME) || localStorage.getItem("horizon_last_registration_username");
+    const savedPassword = localStorage.getItem(STORAGE_KEYS.LAST_REGISTRATION_PASSWORD) || localStorage.getItem("horizon_last_registration_password");
 
     setTimeout(async () => {
       let canAutoLogin = false;
@@ -586,10 +577,15 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 }
               };
 
-              localStorage.setItem("horizon_redis_profile", JSON.stringify(redisProfile));
-              localStorage.setItem("horizon_redis_refresh_tokens", JSON.stringify(redisRefreshTokens));
-              localStorage.setItem("horizon_current_user", JSON.stringify(realUserObj));
+              localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessJWT);
+              localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshJWT);
+              localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(redisProfile));
+              localStorage.setItem(STORAGE_KEYS.REFRESH_TOKENS_MAP, JSON.stringify(redisRefreshTokens));
+              localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(realUserObj));
             }
+
+            // Merge guest cart with authenticated user cart
+            mergeGuestCart().catch((e) => console.warn("mergeGuestCart failed:", e));
 
             setLoading(false);
             addAuditLog("LOGIN", payload, "SUCCESS", extractedMsg.message, apiBaseUrl, devInfo);
@@ -756,7 +752,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     let targetEmail = email;
     if (targetEmail.length === 0 && lastRegEmail !== null) targetEmail = lastRegEmail;
     if (targetEmail.length === 0) {
-      const stored = localStorage.getItem("horizon_last_registration_email");
+      const stored = localStorage.getItem(STORAGE_KEYS.LAST_REGISTRATION_EMAIL) || localStorage.getItem("horizon_last_registration_email");
       if (stored !== null) targetEmail = stored;
     }
 
@@ -797,11 +793,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       }
 
       if (token.length > 0) {
-        localStorage.setItem("horizon_last_registration_token", token);
+        localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_TOKEN, token);
         setLastRegToken(token);
       }
-      localStorage.setItem("horizon_last_registration_email", payload.email);
-      localStorage.setItem("horizon_last_registration_message", extractedMsg.message);
+      localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_EMAIL, payload.email);
+      localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_MESSAGE, extractedMsg.message);
 
       setLastRegEmail(payload.email);
       setTimeLeft(300);
@@ -899,13 +895,13 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
             else if (typeof res.data.accessToken === "string") token = res.data.accessToken;
           }
           if (token.length > 0) {
-            localStorage.setItem("horizon_last_registration_token", token);
+            localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_TOKEN, token);
             setLastRegToken(token);
           }
-          localStorage.setItem("horizon_last_registration_email", payload.email);
-          localStorage.setItem("horizon_last_registration_message", extractedMsg.message);
-          localStorage.setItem("horizon_last_registration_username", username.trim());
-          localStorage.setItem("horizon_last_registration_password", password);
+          localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_EMAIL, payload.email);
+          localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_MESSAGE, extractedMsg.message);
+          localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_USERNAME, username.trim());
+          localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_PASSWORD, password);
 
           setLastRegEmail(payload.email);
           setLoading(false);
@@ -954,13 +950,54 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
               [devInfo.deviceId]: { token: refreshJWT, deviceInfo: devInfo }
             };
 
-            localStorage.setItem("horizon_redis_profile", JSON.stringify(redisProfile));
-            localStorage.setItem("horizon_redis_refresh_tokens", JSON.stringify(redisRefreshTokens));
-            localStorage.setItem("horizon_current_user", JSON.stringify(realUserObj));
+            localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessJWT);
+            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshJWT);
+            localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(redisProfile));
+            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKENS_MAP, JSON.stringify(redisRefreshTokens));
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(realUserObj));
           }
+
+          // Merge guest cart with authenticated user cart
+          mergeGuestCart().catch((e) => console.warn("mergeGuestCart failed:", e));
 
           setLoading(false);
           addAuditLog("LOGIN", payload, "SUCCESS", extractedMsg.message, apiBaseUrl, devInfo);
+
+          const pendingAction = consumePendingAction();
+          if (pendingAction) {
+            if (pendingAction.returnUrl) {
+              const url = pendingAction.returnUrl;
+              if (url.includes("#")) {
+                const hashPart = url.substring(url.indexOf("#") + 1);
+                window.location.hash = hashPart;
+              }
+              if (url.startsWith("/o") || url.startsWith("/order") || pendingAction.actionId === "BUY_NOW") {
+                onNavigate("order");
+                return;
+              } else if (url.startsWith("/profile")) {
+                onNavigate("profile");
+                return;
+              } else if (url.startsWith("/p") || url.startsWith("/product")) {
+                onNavigate("product");
+                return;
+              }
+            }
+          }
+
+          const redirectTarget = sessionStorage.getItem("auth_redirect_target");
+          if (redirectTarget) {
+            sessionStorage.removeItem("auth_redirect_target");
+            if (redirectTarget === "/o" || redirectTarget === "order") {
+              onNavigate("order");
+              return;
+            } else if (redirectTarget === "/profile" || redirectTarget === "profile") {
+              onNavigate("profile");
+              return;
+            } else if (redirectTarget === "/p" || redirectTarget === "product") {
+              onNavigate("product");
+              return;
+            }
+          }
           onNavigate("landing");
         }
         return;
@@ -989,10 +1026,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
           const resendMessage = extracted?.message || "Tài khoản chưa được xác thực. Vui lòng kích hoạt.";
           setSuccessMsg(resendMessage);
           if (typeof errorResponse?.data?.token === "string") {
-            localStorage.setItem("horizon_last_registration_token", errorResponse.data.token);
+            localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_TOKEN, errorResponse.data.token);
             setLastRegToken(errorResponse.data.token);
           }
-          localStorage.setItem("horizon_last_registration_email", unverifiedEmail);
+          localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_EMAIL, unverifiedEmail);
           setLastRegEmail(unverifiedEmail);
           window.location.hash = "verify";
           setIsSignUp(false);
