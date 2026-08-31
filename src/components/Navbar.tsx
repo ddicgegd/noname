@@ -5,10 +5,11 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, X, Check, Plus, Minus, ShoppingBag, ChevronDown } from "lucide-react";
+import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame } from "lucide-react";
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
+import { Bevel, BevelButton, BevelDivider } from "@/components/ui/bevel";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { createAuthAction, savePendingAction } from "@/lib/authAction";
 import { addToCart as apiAddToCart, removeCartItem as apiRemoveCartItem } from "@/services/cartService";
@@ -248,6 +249,110 @@ const COSMIC_STARS_DATA = [
   { left: "92%", size: 8, delay: "5.8s", duration: "6.5s", opacity: 0.55, drift: "35px" },
 ];
 
+const AnimatedFlame = () => (
+  <div className="relative flex items-center justify-center size-3.5 mr-0.5">
+    {/* Ambient heat pulse aura */}
+    <motion.div
+      animate={{
+        scale: [1, 1.3, 1],
+        opacity: [0.35, 0.75, 0.35],
+      }}
+      transition={{
+        duration: 1.1,
+        repeat: Infinity,
+        ease: "easeInOut",
+      }}
+      className="absolute inset-0 bg-gradient-to-t from-[#FF4D24] via-amber-400 to-yellow-300 rounded-full blur-[2.5px] pointer-events-none"
+    />
+
+    {/* SVG Real Fire Flame with multi-layer flickering embers */}
+    <motion.svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className="size-3.5 relative z-10 filter drop-shadow-[0_0_2.5px_rgba(255,100,0,0.85)]"
+      animate={{
+        scaleY: [1, 1.18, 0.94, 1.2, 1],
+        scaleX: [1, 0.93, 1.05, 0.92, 1],
+        rotate: [-1.5, 2, -2, 2.5, -1.5],
+      }}
+      transition={{
+        duration: 0.8,
+        repeat: Infinity,
+        repeatType: "mirror",
+        ease: "easeInOut",
+      }}
+    >
+      <defs>
+        <linearGradient id="flameOuterGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor="#E02600" />
+          <stop offset="50%" stopColor="#FF5500" />
+          <stop offset="100%" stopColor="#FFAA00" />
+        </linearGradient>
+        <linearGradient id="flameInnerGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor="#FF7700" />
+          <stop offset="55%" stopColor="#FFDD00" />
+          <stop offset="100%" stopColor="#FFFFFF" />
+        </linearGradient>
+      </defs>
+
+      {/* Outer Main Flame */}
+      <path
+        d="M12 2C9.5 5 7 8.5 7 13C7 17.5 10 21 14 21C18 21 20.5 17 19 13.5C18.5 12 17.5 10.5 16 9.5C16.5 11 16 12.5 15 13C15 9.5 13.5 6 12 2Z"
+        fill="url(#flameOuterGrad)"
+      />
+
+      {/* Inner Hot Core Flame */}
+      <motion.path
+        d="M12 11C10.8 12.5 10 14.5 10 16.5C10 18.8 11.2 20.5 13 20.5C14.8 20.5 16 18.5 15.5 16.5C15 15.5 14.2 14.8 13.5 14.2C13.8 15 13.5 15.8 13 16C13 14 12.5 12.5 12 11Z"
+        fill="url(#flameInnerGrad)"
+        animate={{
+          scaleY: [1, 1.25, 0.9, 1.3, 1],
+          opacity: [0.85, 1, 0.75, 1, 0.85],
+        }}
+        transition={{
+          duration: 0.55,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+    </motion.svg>
+
+    {/* Spark Particle 1 */}
+    <motion.div
+      animate={{
+        y: [-1, -6, -11],
+        x: [0, 2, -1],
+        opacity: [0, 1, 0],
+        scale: [0.5, 1, 0.2],
+      }}
+      transition={{
+        duration: 1,
+        repeat: Infinity,
+        delay: 0.1,
+        ease: "easeOut",
+      }}
+      className="absolute top-0.5 size-1 bg-yellow-300 rounded-full shadow-[0_0_2px_#FF5500] pointer-events-none"
+    />
+
+    {/* Spark Particle 2 */}
+    <motion.div
+      animate={{
+        y: [0, -5, -9],
+        x: [0, -2, 1],
+        opacity: [0, 0.9, 0],
+        scale: [0.4, 0.9, 0.2],
+      }}
+      transition={{
+        duration: 0.85,
+        repeat: Infinity,
+        delay: 0.45,
+        ease: "easeOut",
+      }}
+      className="absolute top-1 size-0.5 bg-orange-400 rounded-full shadow-[0_0_2px_#FF5500] pointer-events-none"
+    />
+  </div>
+);
+
 export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCartItem, onAddToCart }: NavbarProps) {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showCartMenu, setShowCartMenu] = useState(false);
@@ -257,6 +362,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const readUser = () => {
@@ -318,7 +424,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     }, 195); // 30% faster hide after mouse leave (from 280ms to 195ms)
   };
 
-  // Close dropdown on click outside
+  // Close dropdown on click outside & handle Escape key
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -330,9 +436,25 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
       if (megaMenuRef.current && !megaMenuRef.current.contains(event.target as Node)) {
         setShowProductMegaMenu(false);
       }
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsSearchExpanded(false);
+        setSearchQuery("");
+      }
     }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsSearchExpanded(false);
+        setSearchQuery("");
+      }
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   const navLinks = [
@@ -614,7 +736,7 @@ const resolveProductMetadata = (skuOrName: string) => {
   };
 
   return (
-    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.05)] z-50 flex justify-between items-center py-2.5 px-5 sm:px-6">
+    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.05)] z-50 flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-1.5 sm:pr-2">
       <div className="flex items-center gap-8 lg:gap-12 shrink-0">
         {/* Brand Logo */}
         <a
@@ -791,24 +913,31 @@ const resolveProductMetadata = (skuOrName: string) => {
       </div>
       </div>
 
-      {/* Action Area (Search, Cart, CTA, and Profile) */}
-      <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-        {/* Expanding Search */}
-        <div className="relative flex items-center">
+      {/* Segmented Action Dock (Search, Cart, and Profile) with 3D Optical Bevel Component */}
+      <Bevel variant="dock" className="flex items-center p-1 shrink-0">
+        {/* 1. Expanding Search */}
+        <div className="relative flex items-center" ref={searchContainerRef}>
           <motion.div
             initial={false}
             animate={{ 
-              width: isSearchExpanded ? 240 : 48,
-              backgroundColor: isSearchExpanded ? "rgba(255, 255, 255, 0.3)" : "transparent",
-              borderColor: isSearchExpanded ? "rgba(255, 255, 255, 0.5)" : "transparent"
+              width: isSearchExpanded ? 310 : 44,
+              backgroundColor: isSearchExpanded ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0)",
             }}
-            transition={{ type: "spring", stiffness: 400, damping: 28 }}
-            className="flex items-center overflow-hidden rounded-full border border-transparent relative"
-            style={{ height: '48px' }}
+            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            className={`flex items-center overflow-hidden rounded-full ${
+              isSearchExpanded 
+                ? "shadow-[0_2px_6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] border-t border-t-white/90 border-b border-b-slate-300/40" 
+                : ""
+            }`}
+            style={{ height: '44px', willChange: 'width, background-color' }}
           >
-            {/* Fixed-width icon container to prevent jumping */}
+            {/* Fixed-width icon container */}
             <div 
-              className="w-12 h-12 shrink-0 flex items-center justify-center cursor-pointer z-10"
+              className={`w-[44px] h-[44px] shrink-0 flex items-center justify-center cursor-pointer transition-colors rounded-full ${
+                isSearchExpanded 
+                  ? "text-[#FF4D24]" 
+                  : "text-[#555555] hover:text-[#FF4D24] hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)]"
+              }`}
               onClick={() => {
                 if (!isSearchExpanded) {
                   setIsSearchExpanded(true);
@@ -822,7 +951,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             >
               <Search 
                 size={22} 
-                className={`transition-colors ${isSearchExpanded ? 'text-slate-400 hover:text-slate-600' : 'text-[#555555] hover:text-[#FF4D24]'}`}
+                className="stroke-[2.1]"
               />
             </div>
             
@@ -830,7 +959,13 @@ const resolveProductMetadata = (skuOrName: string) => {
               ref={searchInputRef}
               type="text"
               placeholder="Tìm kiếm sản phẩm..."
-              className="w-full h-full bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400 pr-4"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              autoComplete="off"
+              className={`w-full h-full bg-transparent border-none outline-none text-[17px] text-slate-900 font-medium tracking-tight leading-none placeholder:text-slate-400/90 placeholder:font-normal placeholder:text-[15.5px] caret-[#FF4D24] selection:bg-[#FF4D24]/20 selection:text-[#FF4D24] pl-1 pr-2 transition-opacity duration-300 ${
+                isSearchExpanded ? "opacity-100 delay-100" : "opacity-0 pointer-events-none"
+              }`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onBlur={() => {
@@ -847,6 +982,25 @@ const resolveProductMetadata = (skuOrName: string) => {
                 }
               }}
             />
+
+            {/* Borderless Naked Enter Icon with Simple Appear/Disappear Animation */}
+            <AnimatePresence>
+              {isSearchExpanded && searchQuery.trim().length > 0 && (
+                <motion.button
+                  key="search-enter-icon"
+                  initial={{ scale: 0.75, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.75, opacity: 0 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  type="button"
+                  onClick={() => onNavigate("product")}
+                  className="mr-3 text-slate-400 hover:text-[#FF4D24] active:scale-90 transition-colors flex items-center justify-center cursor-pointer shrink-0 border-none bg-transparent outline-none p-0"
+                  title="Nhấn Enter để tìm kiếm"
+                >
+                  <CornerDownLeft size={16} className="stroke-[2.2]" />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </motion.div>
 
           <AnimatePresence>
@@ -856,55 +1010,135 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-full mt-4 w-[290px] sm:w-[320px] rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-4 z-50 origin-top-right overflow-hidden"
+                className="absolute right-0 top-full mt-3 w-[330px] sm:w-[360px] rounded-2xl border border-slate-200/90 bg-white/98 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] p-4 sm:p-4.5 z-50 origin-top-right overflow-hidden text-slate-900"
               >
-                <div className="absolute top-0 right-0 w-36 h-36 bg-[#FF4D24]/15 rounded-full blur-[40px] pointer-events-none -z-10" />
-                <div className="flex flex-col gap-2">
-                  <span className="text-[11.5px] font-extrabold text-[#111111] uppercase tracking-wide font-display mb-0.5">Từ khóa phổ biến</span>
-                  
-                  <Dock orientation="vertical" iconMagnification={36} iconDistance={60} className="flex flex-col gap-0.5 w-full px-0.5">
-                    <DockIcon className="w-full">
-                      <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer w-full hover:bg-slate-50 transition-colors" onClick={() => onNavigate("product")}>
-                        <div className="w-6.5 h-6.5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                          <TrendingUp size={12} className="text-slate-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate">Aero Compute Server</p>
-                        </div>
-                        <span className="text-[8.5px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full shrink-0">🔥 HOT</span>
-                      </div>
-                    </DockIcon>
-                    
-                    <DockIcon className="w-full">
-                      <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer w-full hover:bg-slate-50 transition-colors" onClick={() => onNavigate("product")}>
-                        <div className="w-6.5 h-6.5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                          <TrendingUp size={12} className="text-slate-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate">Nexus AI Model</p>
-                        </div>
-                        <span className="text-[8.5px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full shrink-0">🔥 HOT</span>
-                      </div>
-                    </DockIcon>
+                {/* Multi-layered Artistic Sunset Amber-Coral Ambient Glow (+15% Vibrancy) */}
+                <div className="absolute -top-14 -right-14 w-56 h-56 bg-gradient-to-br from-[#FF5722]/46 via-[#FF8A00]/30 to-[#FFA000]/18 rounded-full blur-[50px] pointer-events-none" />
+                <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-gradient-to-tr from-[#FF5E3A]/28 via-[#FFA07A]/20 to-transparent rounded-full blur-[45px] pointer-events-none" />
 
-                    <DockIcon className="w-full">
-                      <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer w-full hover:bg-slate-50 transition-colors" onClick={() => onNavigate("product")}>
-                        <div className="w-6.5 h-6.5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                          <Search size={12} className="text-slate-500" />
+                <div className="relative z-10 flex flex-col gap-1.5">
+                  {/* Trending Items List: Clean Product-First Layout with Burning Fiery Tags (Aligned with Footer) */}
+                  <div className="flex flex-col gap-0.5">
+                    {[
+                      { name: "Samsung Galaxy S24 Ultra", tag: "Flagship" },
+                      { name: "iPhone 16 Pro Max 256GB", tag: "Apple" },
+                      { name: "Google Pixel 9 Pro XL", tag: "AI Phone" },
+                      { name: "MacBook Pro M3 Max", tag: "Laptop" },
+                      { name: "iPad Pro M4 Ultra Thin", tag: "Tablet" },
+                    ].map((item, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, x: -6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.2, delay: 0.04 + idx * 0.03, ease: "easeOut" }}
+                        whileHover={{ x: 3 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setSearchQuery(item.name);
+                          onNavigate("product");
+                        }}
+                        className="group flex items-center justify-between px-2.5 py-[9px] -mx-1.5 rounded-xl border border-transparent hover:border-slate-200/70 hover:bg-white/80 hover:backdrop-blur-md hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(255,255,255,1)] transition-all duration-150 cursor-pointer select-none"
+                      >
+                        {/* 1. Product Name (Crisp Semibold Typography on Frosted Glass) */}
+                        <span 
+                          className="text-[13.5px] font-semibold text-slate-700 group-hover:text-slate-900 truncate min-w-0 flex-1 transition-colors duration-150 mr-2 tracking-tight"
+                          title={item.name}
+                        >
+                          {item.name}
+                        </span>
+
+                        {/* 2. Burning Fiery Category Tag & Curved Action Arrow (Right-Aligned) */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <motion.div
+                            animate={{
+                              boxShadow: [
+                                "0 0 6px rgba(255,77,36,0.2), 0 0 12px rgba(255,140,0,0.1), inset 0 1px 0 rgba(255,255,255,0.9)",
+                                "0 0 10px rgba(255,77,36,0.38), 0 0 18px rgba(255,140,0,0.2), inset 0 1px 0 rgba(255,255,255,0.95)",
+                                "0 0 6px rgba(255,77,36,0.2), 0 0 12px rgba(255,140,0,0.1), inset 0 1px 0 rgba(255,255,255,0.9)"
+                              ]
+                            }}
+                            transition={{
+                              duration: 1.8,
+                              repeat: Infinity,
+                              delay: idx * 0.3,
+                              ease: "easeInOut"
+                            }}
+                            className="relative inline-flex items-center gap-1 px-2.5 py-[2px] rounded-full bg-gradient-to-r from-orange-500/[0.14] via-[#FF4D24]/[0.08] to-amber-500/[0.06] border-t border-t-white/95 border-b border-b-[#FF4D24]/30 border-x border-x-[#FF4D24]/18 select-none overflow-visible"
+                          >
+                            {/* Ambient heat aura layer */}
+                            <motion.div
+                              animate={{
+                                opacity: [0.25, 0.55, 0.25],
+                                scale: [0.98, 1.04, 0.98]
+                              }}
+                              transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                delay: idx * 0.3,
+                                ease: "easeInOut"
+                              }}
+                              className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/15 via-orange-500/10 to-yellow-500/8 blur-[3px] pointer-events-none"
+                            />
+
+                            {/* Floating spark rising from tag */}
+                            <motion.div
+                              animate={{
+                                y: [0, -6, -12],
+                                x: [0, 2, 3],
+                                opacity: [0, 0.85, 0],
+                                scale: [0.3, 0.75, 0.15]
+                              }}
+                              transition={{
+                                duration: 1.3,
+                                repeat: Infinity,
+                                delay: 0.2 + idx * 0.25,
+                                ease: "easeOut"
+                              }}
+                              className="absolute -top-0.5 right-2 size-0.5 rounded-full bg-yellow-300 shadow-[0_0_2px_#FF5500] pointer-events-none"
+                            />
+
+                            <AnimatedFlame />
+
+                            {/* Fiery Tag Text */}
+                            <span className="relative z-10 font-sans font-bold text-[10.5px] bg-gradient-to-r from-[#E02600] via-[#FF4D24] to-[#FF8A00] bg-clip-text text-transparent tracking-tight">
+                              {item.tag}
+                            </span>
+                          </motion.div>
+
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="size-[17px] text-slate-300 group-hover:text-[#FF4D24] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all"
+                          >
+                            <path d="M4 18C7.5 18 12 15 16 8" />
+                            <path d="M10 6.5H17.5V14" />
+                          </svg>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-slate-600 truncate">Glacier Storage 100TB</p>
-                        </div>
-                      </div>
-                    </DockIcon>
-                  </Dock>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* Footer Hint (Seamless without divider, clean plain ESC text) */}
+                  <div className="pt-1.5 flex items-center justify-between text-[11px] text-slate-500 font-medium px-1 select-none">
+                    <span className="flex items-center gap-1.5 text-slate-500">
+                      Nhấn <CornerDownLeft size={11.5} className="stroke-[2.2] text-[#FF4D24]" /> để tìm kiếm
+                    </span>
+                    <span>ESC để đóng</span>
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* Shopping Cart Button */}
+        {/* Subtle 3D Divider */}
+        <BevelDivider />
+
+        {/* 2. Shopping Cart Button */}
         <div className="relative" ref={cartRef}>
           <motion.button 
             animate={isBouncing ? { 
@@ -918,17 +1152,17 @@ const resolveProductMetadata = (skuOrName: string) => {
             } : {}}
             transition={{ duration: 0.7, ease: "easeInOut" }}
             onClick={() => setShowCartMenu(!showCartMenu)}
-            className={`transition-all duration-300 flex items-center justify-center w-12 h-12 rounded-full border relative cursor-pointer ${
+            className={`w-[44px] h-[44px] rounded-full flex items-center justify-center relative cursor-pointer transition-all duration-200 ${
               showCartMenu
-                ? "bg-white/80 text-[#FF4D24] border-transparent shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+                ? "text-[#FF4D24]"
                 : isBouncing 
-                  ? "bg-red-50 text-[#FF4D24] ring-2 ring-[#FF4D24]/30 border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.04)]" 
-                  : "text-[#555555] hover:text-[#FF4D24] hover:bg-white/45 bg-transparent border-transparent hover:border-slate-300/40 shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                  ? "bg-red-50 text-[#FF4D24] ring-2 ring-[#FF4D24]/30" 
+                  : "text-[#555555] hover:text-[#FF4D24] hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] bg-transparent"
             }`}
           >
-            <ShoppingCart size={24} className="stroke-[2]" />
+            <ShoppingCart size={22} className="stroke-[2.2]" />
             {totalCartCount > 0 && (
-              <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-[#FF4D24] text-white text-[10px] font-bold rounded-full ring-2 ring-white flex items-center justify-center pointer-events-none">
+              <span className="absolute top-0.5 right-0.5 min-w-[17px] h-[17px] px-1 bg-[#FF4D24] text-white text-[9.5px] font-black rounded-full ring-2 ring-white flex items-center justify-center pointer-events-none shadow-2xs">
                 {totalCartCount > 99 ? "99+" : totalCartCount}
               </span>
             )}
@@ -1372,9 +1606,10 @@ const resolveProductMetadata = (skuOrName: string) => {
           </AnimatePresence>
         </div>
 
+        {/* Subtle 3D Divider */}
+        <BevelDivider />
 
-
-        {/* Account Button / Profile Section */}
+        {/* 3. Account Button / Profile Section */}
         <div className="relative" ref={menuRef}>
           <button
             id="navbar-account-button"
@@ -1385,19 +1620,19 @@ const resolveProductMetadata = (skuOrName: string) => {
               }
               setShowAccountMenu(!showAccountMenu);
             }}
-            className={`flex items-center gap-2.5 shadow-sm backdrop-blur-md font-sans text-base font-semibold pl-3 pr-5 py-2 rounded-full transition-all duration-300 active:scale-95 cursor-pointer select-none shrink-0 whitespace-nowrap border ${
+            className={`h-[44px] pl-2 pr-4.5 rounded-full flex items-center gap-2.5 transition-all duration-200 cursor-pointer select-none whitespace-nowrap ${
               showAccountMenu
-                ? "bg-white/80 text-[#FF4D24] border-white/90 shadow-md ring-2 ring-[#FF4D24]/20"
-                : "bg-white/40 text-[#111111] border-white/60 hover:bg-white/60"
+                ? "text-[#FF4D24]"
+                : "text-[#111111] hover:text-[#FF4D24] hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] bg-transparent"
             }`}
           >
-            {/* Elegant glassmorphism circle with user avatar or icon */}
+            {/* Elegant Circle Avatar */}
             <div className="w-8 h-8 rounded-full bg-slate-950/5 flex items-center justify-center text-[#111111]/80 overflow-hidden shrink-0">
               {loggedInUser ? (
                 loggedInUser.avatarUrl ? (
                   <img src={loggedInUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <span className="font-extrabold text-xs text-[#FF4D24]">
+                  <span className="font-black text-xs text-[#FF4D24]">
                     {(loggedInUser.fullName ?? loggedInUser.username ?? "U")[0].toUpperCase()}
                   </span>
                 )
@@ -1405,7 +1640,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 <User size={16} className="stroke-[2.5]" />
               )}
             </div>
-            <span className="font-semibold text-base text-[#111111] tracking-tight whitespace-nowrap">
+            <span className="font-semibold text-sm text-inherit tracking-tight max-w-[140px] sm:max-w-[180px] truncate">
               {loggedInUser ? (loggedInUser.fullName.length > 0 ? loggedInUser.fullName : `@${loggedInUser.username}`) : "Đăng nhập"}
             </span>
           </button>
@@ -1568,7 +1803,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             )}
           </AnimatePresence>
         </div>
-      </div>
+      </Bevel>
     </nav>
   );
 }
