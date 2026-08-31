@@ -9,7 +9,7 @@ import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, Trend
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
-import { Bevel, BevelButton, BevelDivider } from "@/components/ui/bevel";
+import { Bevel, BevelDivider } from "@/components/ui/bevel";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { createAuthAction, savePendingAction } from "@/lib/authAction";
 import { addToCart as apiAddToCart, removeCartItem as apiRemoveCartItem } from "@/services/cartService";
@@ -250,7 +250,7 @@ const COSMIC_STARS_DATA = [
 ];
 
 const AnimatedFlame = () => (
-  <div className="relative flex items-center justify-center size-3.5 mr-0.5">
+  <div className="relative flex items-center justify-center size-3.5 mr-0.5 shrink-0">
     {/* Ambient heat pulse aura */}
     <motion.div
       animate={{
@@ -735,9 +735,35 @@ const resolveProductMetadata = (skuOrName: string) => {
     }
   };
 
+  const renderHighlightedText = (text: string, query: string) => {
+    if (!query || query.trim() === "") {
+      return <span className="[text-shadow:0_1px_0_rgba(255,255,255,0.9)]">{text}</span>;
+    }
+    const cleanQuery = query.trim();
+    const escaped = cleanQuery.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    const parts = text.split(regex);
+    return (
+      <span className="[text-shadow:0_1px_0_rgba(255,255,255,0.9)]">
+        {parts.map((part, i) =>
+          part.toLowerCase() === cleanQuery.toLowerCase() ? (
+            <span
+              key={i}
+              className="text-[#FF4D24] font-extrabold bg-[#FF4D24]/[0.12] px-1 py-0.5 rounded-[4px] shadow-[inset_0_0_0_1px_rgba(255,77,36,0.25)]"
+            >
+              {part}
+            </span>
+          ) : (
+            <span key={i}>{part}</span>
+          )
+        )}
+      </span>
+    );
+  };
+
   return (
-    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.05)] z-50 flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-1.5 sm:pr-2">
-      <div className="flex items-center gap-8 lg:gap-12 shrink-0">
+    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.05)] z-50 flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-2 sm:pr-2.5 transition-all duration-300">
+      <div className={`flex items-center min-w-0 transition-all duration-300 ${isSearchExpanded ? 'gap-4 sm:gap-6 lg:gap-8' : 'gap-6 sm:gap-8 lg:gap-12'}`}>
         {/* Brand Logo */}
         <a
         className="font-display text-headline-md tracking-tighter text-primary flex items-center gap-2 scale-95 active:scale-90 transition-transform cursor-pointer shrink-0 whitespace-nowrap"
@@ -775,7 +801,7 @@ const resolveProductMetadata = (skuOrName: string) => {
       </a>
 
       {/* Navigation Links for Desktop */}
-      <div className="hidden md:flex items-center gap-6 shrink-0">
+      <div className={`hidden md:flex items-center min-w-0 transition-all duration-300 ${isSearchExpanded ? 'gap-4 lg:gap-5' : 'gap-6'}`}>
         {navLinks.map((link) => {
           const isActive = 
             ((link.href === "product" || link.href === "/p") && currentPage === "product") ||
@@ -914,19 +940,19 @@ const resolveProductMetadata = (skuOrName: string) => {
       </div>
 
       {/* Segmented Action Dock (Search, Cart, and Profile) with 3D Optical Bevel Component */}
-      <Bevel variant="dock" className="flex items-center p-1 shrink-0">
+      <Bevel variant="dock" className="flex items-center p-1 gap-1 shrink-0">
         {/* 1. Expanding Search */}
         <div className="relative flex items-center" ref={searchContainerRef}>
           <motion.div
             initial={false}
             animate={{ 
-              width: isSearchExpanded ? 310 : 44,
+              width: isSearchExpanded ? 260 : 44,
               backgroundColor: isSearchExpanded ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0)",
             }}
-            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             className={`flex items-center overflow-hidden rounded-full ${
               isSearchExpanded 
-                ? "shadow-[0_2px_6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] border-t border-t-white/90 border-b border-b-slate-300/40" 
+                ? "shadow-[0_1px_4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)]" 
                 : ""
             }`}
             style={{ height: '44px', willChange: 'width, background-color' }}
@@ -941,6 +967,9 @@ const resolveProductMetadata = (skuOrName: string) => {
               onClick={() => {
                 if (!isSearchExpanded) {
                   setIsSearchExpanded(true);
+                  setShowCartMenu(false);
+                  setShowAccountMenu(false);
+                  setShowProductMegaMenu(false);
                   setTimeout(() => searchInputRef.current?.focus(), 50);
                 } else if (searchQuery.trim() === "") {
                   setIsSearchExpanded(false);
@@ -963,8 +992,8 @@ const resolveProductMetadata = (skuOrName: string) => {
               autoCorrect="off"
               autoCapitalize="off"
               autoComplete="off"
-              className={`w-full h-full bg-transparent border-none outline-none text-[17px] text-slate-900 font-medium tracking-tight leading-none placeholder:text-slate-400/90 placeholder:font-normal placeholder:text-[15.5px] caret-[#FF4D24] selection:bg-[#FF4D24]/20 selection:text-[#FF4D24] pl-1 pr-2 transition-opacity duration-300 ${
-                isSearchExpanded ? "opacity-100 delay-100" : "opacity-0 pointer-events-none"
+              className={`w-full h-full bg-transparent border-none outline-none text-[15px] sm:text-[16px] text-slate-900 font-medium tracking-tight leading-none placeholder:text-slate-400 placeholder:font-normal placeholder:text-[14px] sm:placeholder:text-[15px] caret-[#FF4D24] selection:bg-[#FF4D24]/20 selection:text-[#FF4D24] pl-1 pr-2 transition-opacity duration-200 ${
+                isSearchExpanded ? "opacity-100 delay-75" : "opacity-0 pointer-events-none"
               }`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -1006,18 +1035,18 @@ const resolveProductMetadata = (skuOrName: string) => {
           <AnimatePresence>
             {isSearchExpanded && (
               <motion.div 
-                initial={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
-                animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
-                exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
+                initial={{ opacity: 0, clipPath: "circle(0% at 24px -20px)", filter: "blur(10px)" }}
+                animate={{ opacity: 1, clipPath: "circle(160% at 24px -20px)", filter: "blur(0px)" }}
+                exit={{ opacity: 0, clipPath: "circle(0% at 24px -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-full mt-3 w-[330px] sm:w-[360px] rounded-2xl border border-slate-200/90 bg-white/98 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] p-4 sm:p-4.5 z-50 origin-top-right overflow-hidden text-slate-900"
+                className="absolute left-0 top-[calc(100%+14px)] w-[330px] sm:w-[360px] rounded-2xl border border-white/80 ring-1 ring-slate-900/[0.06] bg-white/95 backdrop-blur-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_0_0_rgba(255,255,255,1)] p-3 sm:p-3.5 z-50 origin-top-left overflow-hidden text-slate-900"
               >
-                {/* Multi-layered Artistic Sunset Amber-Coral Ambient Glow (+15% Vibrancy) */}
-                <div className="absolute -top-14 -right-14 w-56 h-56 bg-gradient-to-br from-[#FF5722]/46 via-[#FF8A00]/30 to-[#FFA000]/18 rounded-full blur-[50px] pointer-events-none" />
-                <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-gradient-to-tr from-[#FF5E3A]/28 via-[#FFA07A]/20 to-transparent rounded-full blur-[45px] pointer-events-none" />
+                {/* Refined Ambient Glow - Warm subtle diffusion */}
+                <div className="absolute -top-10 -right-10 w-36 h-36 bg-[#FF4D24]/[0.08] rounded-full blur-[32px] pointer-events-none" />
+                <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-amber-500/[0.05] rounded-full blur-[28px] pointer-events-none" />
 
-                <div className="relative z-10 flex flex-col gap-1.5">
-                  {/* Trending Items List: Clean Product-First Layout with Burning Fiery Tags (Aligned with Footer) */}
+                <div className="relative z-10 flex flex-col gap-1">
+                  {/* Trending Items List */}
                   <div className="flex flex-col gap-0.5">
                     {[
                       { name: "Samsung Galaxy S24 Ultra", tag: "Flagship" },
@@ -1028,27 +1057,28 @@ const resolveProductMetadata = (skuOrName: string) => {
                     ].map((item, idx) => (
                       <motion.div
                         key={idx}
-                        initial={{ opacity: 0, x: -6 }}
+                        initial={{ opacity: 0, x: -4 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.2, delay: 0.04 + idx * 0.03, ease: "easeOut" }}
-                        whileHover={{ x: 3 }}
-                        whileTap={{ scale: 0.98 }}
+                        transition={{ duration: 0.18, delay: 0.025 * idx, ease: "easeOut" }}
+                        whileTap={{ scale: 0.985 }}
                         onClick={() => {
                           setSearchQuery(item.name);
                           onNavigate("product");
                         }}
-                        className="group flex items-center justify-between px-2.5 py-[9px] -mx-1.5 rounded-xl border border-transparent hover:border-slate-200/70 hover:bg-white/80 hover:backdrop-blur-md hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(255,255,255,1)] transition-all duration-150 cursor-pointer select-none"
+                        className="group flex items-center justify-between px-3 py-2.5 -mx-1 rounded-xl border border-transparent hover:border-[#FF4D24]/20 hover:bg-white/90 hover:backdrop-blur-md hover:shadow-[0_4px_14px_-2px_rgba(255,77,36,0.1),inset_0_1px_0_0_rgba(255,255,255,1)] transition-all duration-150 ease-out cursor-pointer select-none"
                       >
-                        {/* 1. Product Name (Crisp Semibold Typography on Frosted Glass) */}
-                        <span 
-                          className="text-[13.5px] font-semibold text-slate-700 group-hover:text-slate-900 truncate min-w-0 flex-1 transition-colors duration-150 mr-2 tracking-tight"
-                          title={item.name}
-                        >
-                          {item.name}
-                        </span>
+                        {/* 1. Animated Flame Icon + Product Name with Optical Glass Depth & Search Highlight */}
+                        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                          <AnimatedFlame />
+                          <span 
+                            className="text-[13.5px] font-semibold text-slate-800 group-hover:text-slate-950 group-hover:translate-x-0.5 truncate min-w-0 flex-1 transition-all duration-150 tracking-tight"
+                          >
+                            {renderHighlightedText(item.name, searchQuery)}
+                          </span>
+                        </div>
 
-                        {/* 2. Burning Fiery Category Tag & Curved Action Arrow (Right-Aligned) */}
-                        <div className="flex items-center gap-2 shrink-0">
+                        {/* 2. Luminous Burning Category Tag & Arrow */}
+                        <div className="flex items-center shrink-0 gap-1.5">
                           <motion.div
                             animate={{
                               boxShadow: [
@@ -1063,7 +1093,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                               delay: idx * 0.3,
                               ease: "easeInOut"
                             }}
-                            className="relative inline-flex items-center gap-1 px-2.5 py-[2px] rounded-full bg-gradient-to-r from-orange-500/[0.14] via-[#FF4D24]/[0.08] to-amber-500/[0.06] border-t border-t-white/95 border-b border-b-[#FF4D24]/30 border-x border-x-[#FF4D24]/18 select-none overflow-visible"
+                            className="relative inline-flex items-center justify-center px-2.5 py-[2.5px] rounded-full bg-gradient-to-r from-orange-500/[0.14] via-[#FF4D24]/[0.08] to-amber-500/[0.06] border-t border-t-white/95 border-b border-b-[#FF4D24]/30 border-x border-x-[#FF4D24]/18 select-none overflow-visible"
                           >
                             {/* Ambient heat aura layer */}
                             <motion.div
@@ -1097,37 +1127,35 @@ const resolveProductMetadata = (skuOrName: string) => {
                               className="absolute -top-0.5 right-2 size-0.5 rounded-full bg-yellow-300 shadow-[0_0_2px_#FF5500] pointer-events-none"
                             />
 
-                            <AnimatedFlame />
-
                             {/* Fiery Tag Text */}
-                            <span className="relative z-10 font-sans font-bold text-[10.5px] bg-gradient-to-r from-[#E02600] via-[#FF4D24] to-[#FF8A00] bg-clip-text text-transparent tracking-tight">
+                            <span className="relative z-10 font-sans font-bold text-[10.5px] bg-gradient-to-r from-[#E02600] via-[#FF4D24] to-[#FF8A00] bg-clip-text text-transparent tracking-tight drop-shadow-[0_1px_0_rgba(255,255,255,0.8)]">
                               {item.tag}
                             </span>
                           </motion.div>
 
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="size-[17px] text-slate-300 group-hover:text-[#FF4D24] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all"
-                          >
-                            <path d="M4 18C7.5 18 12 15 16 8" />
-                            <path d="M10 6.5H17.5V14" />
-                          </svg>
+                          <div className="w-0 group-hover:w-4 overflow-hidden opacity-0 group-hover:opacity-100 transition-all duration-150 ease-out flex items-center justify-end">
+                            <ArrowRight size={14} className="text-[#FF4D24] stroke-[2.4] drop-shadow-[0_0_4px_rgba(255,77,36,0.4)]" />
+                          </div>
                         </div>
                       </motion.div>
                     ))}
                   </div>
 
-                  {/* Footer Hint (Seamless without divider, clean plain ESC text) */}
-                  <div className="pt-1.5 flex items-center justify-between text-[11px] text-slate-500 font-medium px-1 select-none">
-                    <span className="flex items-center gap-1.5 text-slate-500">
-                      Nhấn <CornerDownLeft size={11.5} className="stroke-[2.2] text-[#FF4D24]" /> để tìm kiếm
-                    </span>
-                    <span>ESC để đóng</span>
+                  {/* Footer Hint with Frosted Glass Key Badges */}
+                  <div className="pt-2 mt-1 border-t border-slate-100/90 flex items-center justify-between text-[11px] text-slate-500 font-medium px-1 select-none">
+                    <div className="flex items-center gap-1.5 text-slate-600">
+                      <span className="[text-shadow:0_1px_0_rgba(255,255,255,0.9)]">Nhấn</span>
+                      <kbd className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1 rounded bg-white/95 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] font-mono text-[10px] text-[#FF4D24] font-bold">
+                        <CornerDownLeft size={10.5} className="stroke-[2.5]" />
+                      </kbd>
+                      <span className="[text-shadow:0_1px_0_rgba(255,255,255,0.9)]">để tìm kiếm</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-slate-500">
+                      <kbd className="inline-flex items-center justify-center px-1.5 h-[18px] rounded bg-white/95 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] font-mono text-[9.5px] text-slate-600 font-bold uppercase">
+                        ESC
+                      </kbd>
+                      <span className="[text-shadow:0_1px_0_rgba(255,255,255,0.9)]">để đóng</span>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -1151,7 +1179,14 @@ const resolveProductMetadata = (skuOrName: string) => {
               ]
             } : {}}
             transition={{ duration: 0.7, ease: "easeInOut" }}
-            onClick={() => setShowCartMenu(!showCartMenu)}
+            onClick={() => {
+              if (!showCartMenu) {
+                setIsSearchExpanded(false);
+                setShowAccountMenu(false);
+                setShowProductMegaMenu(false);
+              }
+              setShowCartMenu(!showCartMenu);
+            }}
             className={`w-[44px] h-[44px] rounded-full flex items-center justify-center relative cursor-pointer transition-all duration-200 ${
               showCartMenu
                 ? "text-[#FF4D24]"
@@ -1176,7 +1211,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-full mt-3 w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/98 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] p-4 sm:p-5 z-50 origin-top-right overflow-hidden text-slate-900"
+                className="absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/98 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] p-4 sm:p-5 z-50 origin-top-right overflow-hidden text-slate-900"
               >
                 {/* Decorative ambient glow (+20% radiance) */}
                 <div className="absolute top-0 right-0 w-72 h-72 bg-[#FF4D24]/36 rounded-full blur-[70px] pointer-events-none -z-10" />
@@ -1618,6 +1653,11 @@ const resolveProductMetadata = (skuOrName: string) => {
                 onNavigate("auth");
                 return;
               }
+              if (!showAccountMenu) {
+                setIsSearchExpanded(false);
+                setShowCartMenu(false);
+                setShowProductMegaMenu(false);
+              }
               setShowAccountMenu(!showAccountMenu);
             }}
             className={`h-[44px] pl-2 pr-4.5 rounded-full flex items-center gap-2.5 transition-all duration-200 cursor-pointer select-none whitespace-nowrap ${
@@ -1640,7 +1680,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 <User size={16} className="stroke-[2.5]" />
               )}
             </div>
-            <span className="font-semibold text-sm text-inherit tracking-tight max-w-[140px] sm:max-w-[180px] truncate">
+            <span className={`font-semibold text-sm text-inherit tracking-tight transition-all duration-300 truncate ${isSearchExpanded ? 'max-w-[80px] sm:max-w-[110px] md:max-w-[140px]' : 'max-w-[130px] sm:max-w-[180px]'}`}>
               {loggedInUser ? (loggedInUser.fullName.length > 0 ? loggedInUser.fullName : `@${loggedInUser.username}`) : "Đăng nhập"}
             </span>
           </button>
@@ -1653,7 +1693,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-full mt-4 w-64 rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
+                className="absolute right-0 top-[calc(100%+14px)] w-64 rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
               >
                 {/* Decorative background glows */}
                 <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
