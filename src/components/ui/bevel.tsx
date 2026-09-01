@@ -19,6 +19,12 @@ const bevelVariants = cva(
         // Khung thẻ Card nổi khối 3D
         card: "bg-gradient-to-b from-white/90 via-white/75 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl shadow-[0_10px_30px_-5px_rgba(0,0,0,0.06),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)]",
         
+        // Khung vỏ lớn bao toàn bộ section (Shell container)
+        shell: "bg-gradient-to-b from-white/60 via-white/40 to-white/20 border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl shadow-[0_12px_40px_-8px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)]",
+
+        // Nút bấm chính màu cam nổi bật (Primary Action Bevel)
+        primary: "bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/50 border-b border-b-[#A8280A] border-x border-x-[#FF4D24]/80 text-white shadow-[0_4px_16px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 cursor-pointer flex items-center justify-center font-bold",
+
         // Phiên bản tối sang trọng (YouTube Dark Mode Bevel)
         dark: "bg-gradient-to-b from-neutral-800 via-neutral-850 to-neutral-900 border-t border-t-neutral-700/80 border-b border-b-black/80 border-x border-x-neutral-800/60 text-white shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15),inset_0_-1px_1px_rgba(0,0,0,0.4)] hover:from-neutral-750 hover:to-neutral-850 active:scale-95 cursor-pointer flex items-center justify-center font-medium",
         

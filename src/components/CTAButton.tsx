@@ -109,16 +109,16 @@ export default function CTAButton({ text, variant = "primary", onClick, id }: CT
         onClick={onClick}
         className="group relative overflow-hidden flex items-center border-none bg-transparent cursor-pointer rounded-full p-1.5 gap-2 select-none"
       >
-        {/* Dynamic sliding pill background */}
-        <span className="absolute top-1.5 bottom-1.5 left-2 w-[calc(100%-8px-8px-38px-8px)] rounded-full bg-white z-0 transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:w-[calc(100%-12px)]" />
+        {/* Dynamic sliding pill background with 3D Optical Bevel */}
+        <span className="absolute top-1.5 bottom-1.5 left-2 w-[calc(100%-8px-8px-38px-8px)] rounded-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 backdrop-blur-md shadow-[0_2px_8px_-1px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] z-0 transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:w-[calc(100%-12px)]" />
 
         {/* Text with Scramble effect */}
         <span className="relative z-10 text-[#111111] font-medium text-sm px-10 py-2 whitespace-nowrap">
           <TextScramble text={text} />
         </span>
 
-        {/* Small arrow circle */}
-        <span className="relative z-10 flex items-center justify-center w-[38px] height-[38px] h-[38px] rounded-full bg-[#75C5DE] shrink-0 transition-transform duration-300 ease-out group-hover:-translate-x-1">
+        {/* Small arrow circle with Bevel styling */}
+        <span className="relative z-10 flex items-center justify-center w-[38px] height-[38px] h-[38px] rounded-full bg-gradient-to-b from-[#8AD5EC] via-[#75C5DE] to-[#5DB5D0] border-t border-t-white/80 border-b border-b-[#4295AF] shadow-[0_2px_6px_rgba(117,197,222,0.35),inset_0_1px_0_rgba(255,255,255,0.8)] shrink-0 transition-transform duration-300 ease-out group-hover:-translate-x-1">
           <svg
             width="14"
             height="14"
@@ -144,7 +144,7 @@ export default function CTAButton({ text, variant = "primary", onClick, id }: CT
     <motion.button
       id={id}
       onClick={onClick}
-      className="group relative overflow-hidden flex items-center border-none bg-transparent cursor-pointer rounded-full p-2 gap-3 select-none"
+      className="group relative overflow-hidden flex items-center border-none bg-transparent cursor-pointer rounded-full p-2 gap-3 select-none active:scale-95 transition-transform duration-200"
       initial={{ opacity: 0, y: 60, scale: 0.8 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{
@@ -153,16 +153,16 @@ export default function CTAButton({ text, variant = "primary", onClick, id }: CT
         delay: 1.0,
       }}
     >
-      {/* Expanding Capsule Background */}
-      <span className="absolute top-1.5 bottom-1.5 left-2 w-[calc(100%-8px-8px-48px-12px)] md:w-[calc(100%-8px-8px-54px-12px)] rounded-full bg-white z-0 transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:w-[calc(100%-16px)]" />
+      {/* Expanding Capsule Background with 3D Optical Bevel */}
+      <span className="absolute top-1.5 bottom-1.5 left-2 w-[calc(100%-8px-8px-48px-12px)] md:w-[calc(100%-8px-8px-54px-12px)] rounded-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] z-0 transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:w-[calc(100%-16px)]" />
 
       {/* Button Text with Text Scramble Effect */}
-      <span className="relative z-10 text-[#111111] font-medium text-base md:text-lg px-8 md:px-10 py-3 md:py-4 whitespace-nowrap">
+      <span className="relative z-10 text-[#111111] font-semibold text-base md:text-lg px-8 md:px-10 py-3 md:py-4 whitespace-nowrap">
         <TextScramble text={text} />
       </span>
 
-      {/* Arrow Circle */}
-      <span className="relative z-10 flex items-center justify-center w-12 h-12 md:w-[54px] md:h-[54px] rounded-full bg-[#75C5DE] shrink-0 transition-transform duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:-translate-x-1.5">
+      {/* Arrow Circle with Bevel styling */}
+      <span className="relative z-10 flex items-center justify-center w-12 h-12 md:w-[54px] md:h-[54px] rounded-full bg-gradient-to-b from-[#8AD5EC] via-[#75C5DE] to-[#5DB5D0] border-t border-t-white/80 border-b border-b-[#4295AF] shadow-[0_4px_12px_rgba(117,197,222,0.4),inset_0_1px_0_rgba(255,255,255,0.85)] shrink-0 transition-transform duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:-translate-x-1.5">
         <svg
           width="18"
           height="18"

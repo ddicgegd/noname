@@ -23,7 +23,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import { Separator } from "@/components/ui/separator";
-import { Meteors } from "@/components/ui/meteors";
 import {
   BadgeCheckIcon,
   BrainCircuitIcon,
@@ -932,150 +931,176 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
 
   return (
     <div className="min-h-screen bg-background px-4 pb-24 pt-16 md:pt-[72px] text-foreground sm:px-6 relative z-0">
-      {/* Ambient background glow & Meteors - Fixed so it persists during infinite scroll */}
+      {/* Ambient background glow - Fixed so it persists during infinite scroll */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <Meteors number={30} />
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vh] rounded-full bg-[#C084FC]/15 blur-[120px] mix-blend-normal opacity-75" />
-        <div className="absolute top-[30%] right-[-10%] w-[40vw] h-[60vh] rounded-full bg-[#FF9A9E]/15 blur-[120px] mix-blend-normal opacity-75" />
-        <div className="absolute bottom-[-10%] left-[20%] w-[60vw] h-[50vh] rounded-full bg-[#C084FC]/15 blur-[120px] mix-blend-normal opacity-75" />
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vh] rounded-full bg-[#C084FC]/22 blur-[130px] mix-blend-normal opacity-85" />
+        <div className="absolute top-[30%] right-[-10%] w-[40vw] h-[60vh] rounded-full bg-[#FF9A9E]/22 blur-[130px] mix-blend-normal opacity-85" />
+        <div className="absolute bottom-[-10%] left-[20%] w-[60vw] h-[50vh] rounded-full bg-[#C084FC]/22 blur-[130px] mix-blend-normal opacity-85" />
       </div>
 
       <main className="mx-auto flex w-full max-w-[1760px] flex-col gap-4">
-        <Card className="overflow-hidden py-0">
-          <section className="relative min-h-[480px] overflow-hidden rounded-xl bg-zinc-950 text-white sm:min-h-[510px] lg:min-h-[550px]">
-            <AnimatePresence initial={false}>
-              <motion.div
-                key={activeBannerIdx}
-                className="absolute inset-0"
-                initial={{ opacity: 0, scale: 1.08, x: 80 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 1.02, x: -80 }}
-                transition={{ duration: 1.25, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <img
-                  src={BANNERS[activeBannerIdx]?.image}
-                  alt={BANNERS[activeBannerIdx]?.title}
-                  className="absolute inset-0 size-full object-cover brightness-[0.82] contrast-125 saturate-125"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-black/5" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 to-transparent" />
-                <div className="relative flex min-h-[480px] flex-col justify-end p-5 sm:min-h-[510px] sm:p-7 lg:min-h-[550px] lg:p-9">
-                  <div className="flex max-w-3xl flex-col gap-3 pb-3">
-                    <div className="w-fit rounded-full bg-white px-2.5 py-1 text-xs font-medium text-zinc-950">
-                      {BANNERS[activeBannerIdx]?.badge}
-                    </div>
-                    <h1 className="max-w-3xl font-heading text-4xl font-medium leading-tight text-white sm:text-5xl lg:text-6xl">
-                      {BANNERS[activeBannerIdx]?.title}
-                    </h1>
-                    <p className="max-w-2xl text-base font-medium leading-7 text-white/80 sm:text-lg">
-                      {BANNERS[activeBannerIdx]?.sub}
-                    </p>
+        {/* 1. Hero Poster Banner (Unframed clean presentation) */}
+        <section className="relative min-h-[480px] overflow-hidden rounded-2xl bg-zinc-950 text-white sm:min-h-[510px] lg:min-h-[550px] shadow-sm">
+          <AnimatePresence initial={false}>
+            <motion.div
+              key={activeBannerIdx}
+              className="absolute inset-0"
+              initial={{ opacity: 0, scale: 1.08, x: 80 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 1.02, x: -80 }}
+              transition={{ duration: 1.25, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <img
+                src={BANNERS[activeBannerIdx]?.image}
+                alt={BANNERS[activeBannerIdx]?.title}
+                className="absolute inset-0 size-full object-cover brightness-[0.82] contrast-125 saturate-125"
+                referrerPolicy="no-referrer"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-black/5" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 to-transparent" />
+              <div className="relative flex min-h-[480px] flex-col justify-end p-5 sm:min-h-[510px] sm:p-7 lg:min-h-[550px] lg:p-9">
+                <div className="flex max-w-3xl flex-col gap-3 pb-3">
+                  <div className="w-fit rounded-full bg-white px-2.5 py-1 text-xs font-medium text-zinc-950 shadow-xs">
+                    {BANNERS[activeBannerIdx]?.badge}
                   </div>
+                  <h1 className="max-w-3xl font-heading text-4xl font-medium leading-tight text-white sm:text-5xl lg:text-6xl">
+                    {BANNERS[activeBannerIdx]?.title}
+                  </h1>
+                  <p className="max-w-2xl text-base font-medium leading-7 text-white/80 sm:text-lg">
+                    {BANNERS[activeBannerIdx]?.sub}
+                  </p>
                 </div>
-              </motion.div>
-            </AnimatePresence>
+              </div>
+            </motion.div>
+          </AnimatePresence>
 
-            <div className="absolute bottom-5 right-5 z-20 flex items-center gap-2">
-              {BANNERS.map((banner, index) => (
-                <button
-                  key={banner.title}
-                  className={index === activeBannerIdx ? "h-1.5 w-8 rounded-full bg-white" : "size-1.5 rounded-full bg-white/45"}
-                  aria-label={`Chuyển poster ${index + 1}`}
-                  onClick={() => setActiveBannerIdx(index)}
-                />
-              ))}
-            </div>
-          </section>
-        </Card>
+          <div className="absolute bottom-5 right-5 z-20 flex items-center gap-2">
+            {BANNERS.map((banner, index) => (
+              <button
+                key={banner.title}
+                className={index === activeBannerIdx ? "h-1.5 w-8 rounded-full bg-white shadow-xs" : "size-1.5 rounded-full bg-white/45"}
+                aria-label={`Chuyển poster ${index + 1}`}
+                onClick={() => setActiveBannerIdx(index)}
+              />
+            ))}
+          </div>
+        </section>
 
-        <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="flex flex-col gap-4 lg:sticky lg:top-[max(1.25rem,calc(50vh-365px))] lg:self-start max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
-            <Card size="sm" className="py-0 overflow-hidden shadow-xs border border-border/80 ring-1 ring-border/50 bg-card/95 backdrop-blur-xs transition-shadow hover:shadow-sm">
-              <CardHeader className="py-2.5 px-3 border-b border-border/60 bg-muted/20">
-                <CardTitle className="flex items-center gap-2 text-sm">
+        <div className="grid gap-3.5 lg:grid-cols-[290px_minmax(0,1fr)]">
+          {/* 2. Left Sidebar Filter Dock with Bevel Styling for all inner components (+15% width: 290px) */}
+          <aside className="flex flex-col gap-3.5 lg:sticky lg:top-[max(1.25rem,calc(50vh-365px))] lg:self-start max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
+            <div className="overflow-hidden bg-gradient-to-b from-white/90 via-white/80 to-white/65 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] rounded-xl">
+              <div className="py-2.5 px-3.5 border-b border-slate-200/60 bg-white/40 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
                   <FilterIcon className="size-4 text-primary" />
                   Bộ lọc
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2.5 py-3 px-3">
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2.5 py-3 px-3">
+                {/* Categories */}
                 <div className="flex flex-col gap-1.5">
-                  <div className="text-[11px] font-semibold text-muted-foreground">Danh mục</div>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Danh mục</div>
+                  <div className="flex flex-col gap-1">
                     {categoryItems.map((category) => {
                       const Icon = category.icon;
                       const isActive = activeCategory === category.id;
                       return (
-                        <Button
+                        <button
                           key={category.id}
-                          variant={isActive ? "default" : "ghost"}
-                          className="justify-between h-7 text-xs py-1 px-2"
+                          type="button"
+                          className={`flex items-center justify-between h-7.5 text-xs py-1 px-2.5 rounded-lg font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
+                            isActive
+                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.18)]"
+                              : "bg-white/40 hover:bg-white/80 text-slate-700 border border-slate-200/50 hover:border-slate-300 shadow-2xs"
+                          }`}
                           onClick={() => setActiveCategory(category.id)}
                         >
-                          <span className="inline-flex items-center gap-1.5">
-                            <Icon data-icon="inline-start" className="size-3.5" />
+                          <span className="inline-flex items-center gap-2">
+                            <Icon className="size-3.5" />
                             {category.label}
                           </span>
-                          <Badge variant={isActive ? "secondary" : "outline"} className="text-[10px] h-4 px-1.5">{getCategoryCount(category.id)}</Badge>
-                        </Button>
+                          <span
+                            className={`text-[10px] h-4 px-1.5 rounded-full inline-flex items-center justify-center font-bold ${
+                              isActive
+                                ? "bg-white/20 text-white border border-white/10"
+                                : "bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-700 shadow-2xs"
+                            }`}
+                          >
+                            {getCategoryCount(category.id)}
+                          </span>
+                        </button>
                       );
                     })}
                   </div>
                 </div>
 
-                <Separator className="bg-border/60" />
+                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
+
+                {/* Brands */}
                 <div className="flex flex-col gap-1.5">
-                  <div className="text-[11px] font-semibold text-muted-foreground">Hãng hạ tầng</div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Hãng hạ tầng</div>
                   <div className="grid grid-cols-2 gap-1.5">
-                    <Button
-                      variant={selectedBrand === null ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 text-xs px-2"
+                    <button
+                      type="button"
+                      className={`h-7 text-xs px-2 rounded-lg font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 ${
+                        selectedBrand === null
+                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.18)]"
+                          : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
+                      }`}
                       onClick={() => setSelectedBrand(null)}
                     >
                       Tất cả
-                    </Button>
+                    </button>
                     {BRANDS.map((brand) => (
-                      <Button
+                      <button
                         key={brand.name}
-                        variant={selectedBrand === brand.name ? "default" : "outline"}
-                        size="sm"
-                        className="h-7 text-xs px-2"
+                        type="button"
+                        className={`h-7 text-xs px-2 rounded-lg font-medium truncate transition-all duration-150 cursor-pointer select-none active:scale-95 ${
+                          selectedBrand === brand.name
+                            ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.18)]"
+                            : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
+                        }`}
                         onClick={() => setSelectedBrand(brand.name)}
                       >
-                        <span className="truncate">{brand.name}</span>
-                      </Button>
+                        {brand.name}
+                      </button>
                     ))}
                   </div>
                 </div>
 
-                <Separator className="bg-border/60" />
+                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
+
+                {/* Advanced Filters */}
                 <div className="flex flex-col gap-2">
-                  <div className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
-                    <SlidersHorizontalIcon className="size-3.5" />
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <SlidersHorizontalIcon className="size-3.5 text-primary" />
                     Bộ lọc nâng cao
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <div className="text-[10px] text-muted-foreground">Hình thức thanh toán</div>
+                    <div className="text-[10px] font-semibold text-slate-500">Hình thức thanh toán</div>
                     <div className="grid grid-cols-3 gap-1">
                       {[
                         { id: "all", label: "Tất cả" },
                         { id: "hourly", label: "Theo giờ" },
                         { id: "usage", label: "Lưu lượng" },
                       ].map((item) => (
-                        <Button
+                        <button
                           key={item.id}
-                          variant={selectedPricingModel === item.id ? "default" : "outline"}
-                          size="sm"
-                          className="h-6.5 text-[11px] px-1"
+                          type="button"
+                          className={`h-6.5 text-[11px] px-1 rounded-md font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 ${
+                            selectedPricingModel === item.id
+                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-2xs"
+                              : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
+                          }`}
                           onClick={() => setSelectedPricingModel(item.id as any)}
                         >
                           {item.label}
-                        </Button>
+                        </button>
                       ))}
                     </div>
 
-                    <div className="text-[10px] text-muted-foreground mt-0.5">Tính năng & Tiêu chuẩn</div>
+                    <div className="text-[10px] font-semibold text-slate-500 mt-1">Tính năng & Tiêu chuẩn</div>
                     {[
                       { key: "gpu", active: selectedGPU, label: "GPU Boost", setter: setSelectedGPU, icon: ServerIcon },
                       { key: "sla", active: selectedSLA, label: "SLA 99.99%+", setter: setSelectedSLA, icon: ShieldCheckIcon },
@@ -1083,27 +1108,33 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                     ].map((item) => {
                       const Icon = item.icon;
                       return (
-                        <Button
+                        <button
                           key={item.key}
-                          variant={item.active ? "default" : "outline"}
-                          size="sm"
-                          className="justify-start h-6.5 text-[11px] px-2"
+                          type="button"
+                          className={`flex items-center gap-1.5 h-6.5 text-[11px] px-2 rounded-md font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 ${
+                            item.active
+                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-2xs"
+                              : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
+                          }`}
                           onClick={() => item.setter(!item.active)}
                         >
-                          <Icon data-icon="inline-start" className="size-3" />
+                          <Icon className="size-3" />
                           {item.label}
-                        </Button>
+                        </button>
                       );
                     })}
 
-                    <div className="text-[10px] text-muted-foreground mt-0.5">Nhãn nổi bật</div>
+                    <div className="text-[10px] font-semibold text-slate-500 mt-1">Nhãn nổi bật</div>
                     <div className="flex flex-wrap gap-1">
                       {["New", "Popular", "Updated"].map((tag) => (
-                        <Button
+                        <button
                           key={tag}
-                          variant={selectedTags.includes(tag) ? "default" : "outline"}
-                          size="sm"
-                          className="h-6.5 text-[11px] px-2"
+                          type="button"
+                          className={`h-6.5 text-[11px] px-2 rounded-md font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 ${
+                            selectedTags.includes(tag)
+                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-2xs"
+                              : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
+                          }`}
                           onClick={() => {
                             setSelectedTags(
                               selectedTags.includes(tag)
@@ -1113,62 +1144,74 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                           }}
                         >
                           {tag === "Popular" ? "Hot" : tag}
-                        </Button>
+                        </button>
                       ))}
                     </div>
                   </div>
                 </div>
-              </CardContent>
-              <CardFooter className="bg-muted/20 border-t border-border/60 py-2.5 px-3 justify-between">
-                <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={handleReset}>
-                  <RefreshCcwIcon data-icon="inline-start" className="size-3" />
+              </div>
+
+              <div className="bg-white/40 border-t border-slate-200/60 py-2.5 px-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 h-7 text-xs px-2.5 rounded-lg bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-2xs text-slate-800 font-semibold hover:from-white active:scale-95 cursor-pointer"
+                  onClick={handleReset}
+                >
+                  <RefreshCcwIcon className="size-3" />
                   Đặt lại
-                </Button>
-                <Badge variant="secondary" className="text-[11px] font-medium">{sortedFilteredProducts.length} sản phẩm</Badge>
-              </CardFooter>
-            </Card>
+                </button>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">
+                  {sortedFilteredProducts.length} sản phẩm
+                </span>
+              </div>
+            </div>
           </aside>
 
-          <section className="flex min-w-0 flex-col gap-4">
-            <Card size="sm">
-              <CardContent>
-                <Tabs value={sortBy} onValueChange={(value) => setSortBy(value as any)} className="w-full min-w-0">
-                  <TabsList className="grid w-full grid-cols-2 overflow-hidden sm:grid-cols-5">
-                    {sortItems.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <TabsTrigger
-                          key={item.id}
-                          value={item.id}
-                        >
-                          <Icon data-icon="inline-start" />
-                          <span>{item.label}</span>
-                        </TabsTrigger>
-                      );
-                    })}
-                  </TabsList>
-                  {sortItems.map((item) => (
-                    <TabsContent key={item.id} value={item.id} className="sr-only">
-                      {item.label}
-                    </TabsContent>
-                  ))}
-                </Tabs>
-              </CardContent>
-            </Card>
+          <section className="flex min-w-0 flex-col gap-3.5">
+            <div className="bg-gradient-to-b from-white/90 via-white/80 to-white/65 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-xl shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] rounded-xl p-1 w-full">
+              <div className="grid w-full grid-cols-2 overflow-hidden sm:grid-cols-5 gap-1">
+                {sortItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = sortBy === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSortBy(item.id as any)}
+                      className={`relative h-7.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors duration-200 cursor-pointer select-none ${
+                        isActive
+                          ? "text-white"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
+                      }`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeSortTabIndicator"
+                          className="absolute inset-0 bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] rounded-lg"
+                          transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                        />
+                      )}
+                      <Icon className="size-3.5 relative z-10" />
+                      <span className="relative z-10">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {isAnyFilterActive && (
-              <div className="flex flex-wrap gap-2">
-                {activeCategory !== "all" && <Badge variant="secondary">{activeCategory}</Badge>}
-                {selectedBrand && <Badge variant="secondary">{selectedBrand}</Badge>}
-                {selectedPricingModel !== "all" && <Badge variant="secondary">{selectedPricingModel === "hourly" ? "Theo giờ" : "Lưu lượng"}</Badge>}
-                {selectedGPU && <Badge variant="secondary">GPU Boost</Badge>}
-                {selectedSLA && <Badge variant="secondary">SLA 99.99%+</Badge>}
-                {selectedLatency && <Badge variant="secondary">Độ trễ thấp</Badge>}
-                {selectedTags.map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
+              <div className="flex flex-wrap gap-1.5">
+                {activeCategory !== "all" && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">{activeCategory}</span>}
+                {selectedBrand && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">{selectedBrand}</span>}
+                {selectedPricingModel !== "all" && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">{selectedPricingModel === "hourly" ? "Theo giờ" : "Lưu lượng"}</span>}
+                {selectedGPU && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">GPU Boost</span>}
+                {selectedSLA && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">SLA 99.99%+</span>}
+                {selectedLatency && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">Độ trễ thấp</span>}
+                {selectedTags.map((tag) => <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">{tag}</span>)}
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
               {sortedFilteredProducts.map((product, index) => {
                 const vndInfo = getProductVNDDetails(product);
                 const imgSrc = getProductImage(product);
@@ -1185,7 +1228,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                   >
                     <Card
                       size="sm"
-                      className="group relative h-full cursor-pointer gap-2 overflow-visible py-0 transition-shadow hover:shadow-md"
+                      className="group relative h-full cursor-pointer gap-1 overflow-visible py-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-xl shadow-[0_4px_16px_-2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_32px_-4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-1 rounded-2xl transition-all duration-200"
                       onClick={() => {
                         const productSku = getProductHashSku(product);
                         setProductHashSku(productSku);
@@ -1223,35 +1266,38 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                         )}
                       </div>
 
-                      <CardHeader className="px-3 pb-0">
-                        <div className="flex items-start justify-between gap-3">
+                      <CardHeader className="px-2.5 pt-2 pb-0">
+                        <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <CardTitle className="line-clamp-1">
+                            <CardTitle className="line-clamp-1 text-sm font-semibold">
                               {`${product.name} Cloud Platform`}
                             </CardTitle>
                             <CardDescription className="line-clamp-1 text-[11px] mt-0.5 leading-tight">
                               {product.desc}
                             </CardDescription>
                           </div>
-                          {product.tag && <Badge variant="outline" className="shrink-0">{product.tag}</Badge>}
+                          {product.tag && <Badge variant="outline" className="shrink-0 text-[9.5px] h-3.5 px-1.5">{product.tag}</Badge>}
                         </div>
                       </CardHeader>
 
-                      <CardContent className="flex flex-1 flex-col gap-2 px-3">
-                        <div className="flex flex-wrap items-baseline gap-2">
-                          <span className="text-base font-semibold text-primary">{vndInfo.present}</span>
-                          {vndInfo.old && <span className="text-sm text-muted-foreground line-through">{vndInfo.old}</span>}
+                      <CardContent className="flex flex-1 flex-col gap-1 px-2.5 py-0.5">
+                        <div className="flex flex-wrap items-baseline gap-1.5">
+                          <span className="text-[15px] font-semibold text-primary">{vndInfo.present}</span>
+                          {vndInfo.old && <span className="text-xs text-muted-foreground line-through">{vndInfo.old}</span>}
                         </div>
 
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-1">
                           {specs.slice(0, 2).map((spec, specIdx) => (
-                            <Badge key={`${spec.label}-${specIdx}`} variant="secondary">
+                            <span
+                              key={`${spec.label}-${specIdx}`}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-medium bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)] text-slate-700 select-none"
+                            >
                               {spec.value.length > 22 ? `${spec.value.slice(0, 22)}...` : spec.value}
-                            </Badge>
+                            </span>
                           ))}
                         </div>
 
-                        <div className="mt-auto flex min-h-4 items-center">
+                        <div className="mt-auto flex min-h-3.5 items-center">
                           {vndInfo.smember && (() => {
                             const isCyan = index % 2 === 0;
                             return (
@@ -1270,11 +1316,11 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                                   transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: (index % 3) * 0.5 }}
                                 />
                                 <BadgeCheckIcon
-                                  className={`size-3.5 shrink-0 relative z-10 ${
+                                  className={`size-3 shrink-0 relative z-10 ${
                                     isCyan ? "text-[#0284C7] dark:text-[#38BDF8]" : "text-[#9333EA] dark:text-[#C084FC]"
                                   }`}
                                 />
-                                <span className="truncate text-[11px] font-medium text-foreground/90 relative z-10">
+                                <span className="truncate text-[10.5px] font-medium text-foreground/90 relative z-10">
                                   {vndInfo.smember}
                                 </span>
                               </motion.div>
@@ -1283,16 +1329,14 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                         </div>
                       </CardContent>
 
-                      <CardFooter className="justify-between gap-2 bg-background px-3 py-1.5">
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <StarIcon className="fill-primary text-primary" />
-                          <span className="font-medium">5.0</span>
+                      <CardFooter className="justify-between gap-1 bg-background px-2.5 py-1.5">
+                        <div className="flex items-center gap-1 text-xs">
+                          <StarIcon className="fill-primary text-primary size-3" />
+                          <span className="font-medium text-xs">5.0</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant={compared ? "default" : "outline"}
-                            size="sm"
-                            className="h-7 px-3 text-xs"
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
                             aria-label={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
                             title={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
                             onClick={(event) => {
@@ -1305,10 +1349,15 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
                                 setComparedProductIds([...comparedProductIds, product.id]);
                               }
                             }}
+                            className={`inline-flex items-center justify-center gap-1.5 h-6.5 px-2.5 text-[11px] font-semibold rounded-lg transition-all duration-200 cursor-pointer select-none active:scale-95 ${
+                              compared
+                                ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)]"
+                                : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] text-slate-800 hover:from-white hover:to-white/80"
+                            }`}
                           >
-                            <SlidersHorizontalIcon className="mr-1.5 size-3.5" />
+                            <SlidersHorizontalIcon className="size-3" />
                             {compared ? "Đã so sánh" : "So sánh"}
-                          </Button>
+                          </button>
                         </div>
                       </CardFooter>
                     </Card>

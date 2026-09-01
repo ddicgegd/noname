@@ -84,9 +84,9 @@ const ReviewCard = ({
   return (
     <figure
       className={cn(
-        "group/card relative h-[180px] w-[350px] sm:w-[414px] shrink-0 cursor-pointer overflow-hidden rounded-2xl border p-6 sm:p-7 flex flex-col justify-between transition-all duration-300",
-        // Viền và khung card đầy đủ
-        "border-black/[0.08] bg-white/60 hover:bg-white shadow-sm hover:shadow-md backdrop-blur-md",
+        "group/card relative h-[180px] w-[350px] sm:w-[414px] shrink-0 cursor-pointer overflow-hidden rounded-2xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300",
+        // 3D Optical Bevel Card Frame
+        "bg-gradient-to-b from-white/90 via-white/75 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-xl shadow-[0_4px_16px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-0.5",
         "dark:border-white/[0.1] dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
       )}
     >

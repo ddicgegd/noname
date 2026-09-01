@@ -41,7 +41,7 @@ const PRICING_PLANS: PricingPlan[] = [
     hoverBorderColor: "rgba(56,189,248,0.55)",
     checkIconColor: "text-primary",
     buttonClass:
-      "w-full bg-white/50 backdrop-blur-md border border-white/60 shadow-sm text-black rounded-xl py-3.5 font-sans font-semibold hover:bg-primary hover:text-white hover:border-primary transition-colors duration-300",
+      "w-full bg-gradient-to-b from-white/90 via-white/75 to-white/55 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 backdrop-blur-md shadow-[0_2px_6px_-1px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] text-black rounded-xl py-3.5 font-sans font-semibold hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 active:scale-95 cursor-pointer select-none",
     foilTint: "#5cc8ff",
     glowColor: "rgba(56,189,248,0.30)",
     rimColor: "rgba(56,189,248,0.9)",
@@ -63,7 +63,7 @@ const PRICING_PLANS: PricingPlan[] = [
     hoverBorderColor: "rgba(192,132,252,0.55)",
     checkIconColor: "text-black",
     buttonClass:
-      "w-full bg-[#FF4D24] text-white border border-[#FF4D24] shadow-sm rounded-xl py-3.5 font-sans font-semibold hover:bg-black hover:border-black transition-colors duration-300",
+      "w-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/50 border-b border-b-[#A8280A] border-x border-x-[#FF4D24]/80 shadow-[0_4px_16px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] text-white rounded-xl py-3.5 font-sans font-semibold hover:brightness-105 active:scale-95 transition-all duration-300 cursor-pointer select-none",
     foilTint: "#c084fc",
     glowColor: "rgba(192,132,252,0.32)",
     rimColor: "rgba(192,132,252,0.95)",
@@ -294,7 +294,7 @@ export default function PricingSection() {
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <motion.div
-            className="p-3.5 sm:p-4.5 bg-white/50 backdrop-blur-xl rounded-2xl flex flex-col justify-between relative overflow-hidden h-full min-h-[550px] border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)]"
+            className="p-3.5 sm:p-4.5 bg-gradient-to-b from-white/80 via-white/65 to-white/45 backdrop-blur-xl rounded-2xl flex flex-col justify-between relative overflow-hidden h-full min-h-[550px] border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)]"
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
@@ -317,7 +317,7 @@ export default function PricingSection() {
         </div>
 
         <motion.div
-          className="mt-8 bg-white/40 backdrop-blur-xl rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.02)] relative overflow-hidden"
+          className="mt-8 bg-gradient-to-b from-white/80 via-white/65 to-white/45 backdrop-blur-xl rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] relative overflow-hidden"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -332,7 +332,7 @@ export default function PricingSection() {
               Custom SLAs, dedicated account managers, security reviews, and single sign-on.
             </p>
           </div>
-          <button className="mt-4 md:mt-0 bg-white/50 backdrop-blur-md border border-white/60 shadow-sm text-black rounded-xl px-8 py-3 font-sans font-semibold hover:bg-black hover:text-white hover:border-black transition-colors duration-300">
+          <button className="mt-4 md:mt-0 bg-gradient-to-b from-white/90 via-white/75 to-white/55 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 backdrop-blur-md shadow-[0_2px_6px_-1px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] text-black rounded-xl px-8 py-3 font-sans font-semibold hover:bg-black hover:text-white hover:border-black active:scale-95 transition-all duration-300 cursor-pointer select-none">
             Contact Sales
           </button>
         </motion.div>

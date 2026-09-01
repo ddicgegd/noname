@@ -49,7 +49,7 @@ export default function FeatureOne() {
 
   return (
     <section id="features" className="py-16 px-4 sm:px-8 md:px-16 relative">
-      <div className="w-[85%] 2xl:max-w-[1800px] mx-auto bg-white/40 backdrop-blur-2xl rounded-[20px] border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className="w-[85%] 2xl:max-w-[1800px] mx-auto bg-gradient-to-b from-white/60 via-white/40 to-white/20 border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-[24px] shadow-[0_12px_40px_-8px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] overflow-hidden">
         
         {/* FIRST FEATURE: Tell Horizon your SaaS idea... */}
         <div className="flex flex-col md:flex-row min-h-[596px]">
@@ -67,7 +67,7 @@ export default function FeatureOne() {
             <a
               href="#pricing"
               onClick={handleScrollToPricing}
-              className="inline-flex items-center justify-center gap-2 bg-white/50 border border-white/60 shadow-sm backdrop-blur-md text-[#111111] hover:bg-[#FF4D24] hover:text-white hover:border-[#FF4D24] font-medium px-8 py-4 rounded-[12px] w-fit transition-all duration-300 hover:scale-[1.03] active:scale-95"
+              className="inline-flex items-center justify-center gap-2 bg-gradient-to-b from-white/90 via-white/75 to-white/55 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_2px_8px_-1px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] backdrop-blur-md text-[#111111] hover:bg-[#FF4D24] hover:text-white hover:border-[#FF4D24] font-medium px-8 py-4 rounded-[14px] w-fit transition-all duration-300 hover:scale-[1.03] active:scale-95 cursor-pointer select-none"
             >
               Start building
             </a>
@@ -82,18 +82,18 @@ export default function FeatureOne() {
               <div className="absolute bottom-0 left-0 w-[60%] h-[80%] bg-[#326578]/20 rounded-full blur-[120px] -translate-x-1/4 translate-y-1/4" />
             </div>
 
-            {/* Glowing Glass Card */}
-            <div className="relative z-10 w-[80%] max-w-2xl min-h-[475px] bg-white/40 backdrop-blur-[32px] rounded-2xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden">
+            {/* Glowing Glass Card with Bevel Frame */}
+            <div className="relative z-10 w-[80%] max-w-2xl min-h-[475px] bg-gradient-to-b from-white/80 via-white/60 to-white/40 backdrop-blur-[32px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col overflow-hidden">
               {/* Custom Interactive Tabs */}
-              <div className="flex items-center justify-center p-4 border-b border-white/10 bg-white/20">
-                <div className="flex p-1 rounded-full border border-white/20 backdrop-blur-md bg-white/40">
+              <div className="flex items-center justify-center p-4 border-b border-white/15 bg-white/20">
+                <div className="flex p-1 rounded-full bg-gradient-to-b from-white/75 via-white/55 to-white/35 border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/60 backdrop-blur-md shadow-[0_2px_6px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.03)]">
                   {(["chat", "idea", "narration"] as TabType[]).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`px-4 py-1.5 rounded-full text-[12px] font-bold capitalize transition-all duration-300 ${
+                      className={`px-4 py-1.5 rounded-full text-[12px] font-bold capitalize transition-all duration-300 cursor-pointer ${
                         activeTab === tab
-                          ? "bg-white text-primary shadow-sm"
+                          ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] border border-slate-200/50"
                           : "text-[#111111] hover:text-primary"
                       }`}
                     >
@@ -244,8 +244,8 @@ export default function FeatureOne() {
                     )}
                   </AnimatePresence>
                   
-                  {/* Simulated Chat Input Area */}
-                  <div className="p-3 bg-white/70 backdrop-blur-xl rounded-2xl border border-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] flex flex-col gap-2 transition-all relative z-20 pointer-events-auto cursor-text" onClick={() => document.getElementById('chat-textarea')?.focus()}>
+                  {/* Simulated Chat Input Area with Bevel Styling */}
+                  <div className="p-3 bg-gradient-to-b from-white/90 via-white/80 to-white/65 backdrop-blur-xl rounded-2xl border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_8px_30px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2 transition-all relative z-20 pointer-events-auto cursor-text" onClick={() => document.getElementById('chat-textarea')?.focus()}>
                     <textarea
                       id="chat-textarea"
                       value={inputValue}
@@ -273,7 +273,7 @@ export default function FeatureOne() {
                       <button 
                         onClick={handleSendMessage}
                         disabled={!inputValue.trim() && !uploadedFile}
-                        className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto"
+                        className="w-8 h-8 rounded-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/50 border-b border-b-[#A8280A] shadow-[0_2px_8px_rgba(255,77,36,0.35),inset_0_1px_0_rgba(255,255,255,0.4)] flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto"
                       >
                         <span className="material-symbols-outlined text-white text-[16px]">
                           arrow_upward
@@ -287,8 +287,8 @@ export default function FeatureOne() {
           </div>
         </div>
 
-        {/* Horizontal Divider Line */}
-        <div className="border-t border-white/40" />
+        {/* Horizontal Divider Line with Optical Bevel Split */}
+        <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-white/80 to-transparent shadow-[0_1px_0_rgba(203,213,225,0.4)]" />
 
         {/* SECOND FEATURE: A backend for your SaaS */}
         <div className="flex flex-col md:flex-row-reverse min-h-[596px]">
@@ -313,9 +313,9 @@ export default function FeatureOne() {
               <div className="absolute top-1/2 left-1/2 w-[80%] h-[120%] bg-white/40 rounded-full blur-[150px] -translate-x-1/2 -translate-y-1/2" />
             </div>
 
-            {/* Glowing Glass Card */}
+            {/* Glowing Glass Card with Bevel Frame */}
             <motion.div
-              className="relative z-10 w-[80%] max-w-2xl min-h-[385px] bg-white/60 backdrop-blur-[40px] rounded-3xl border border-white/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15)] p-6 sm:p-8 overflow-hidden flex flex-col"
+              className="relative z-10 w-[80%] max-w-2xl min-h-[385px] bg-gradient-to-b from-white/85 via-white/70 to-white/50 backdrop-blur-[40px] rounded-3xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)] p-6 sm:p-8 overflow-hidden flex flex-col"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
@@ -324,7 +324,7 @@ export default function FeatureOne() {
               {/* Header section */}
               <div className="flex items-center justify-between mb-6 border-b border-black/5 pb-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-white/90 to-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_2px_6px_rgba(255,77,36,0.1),inset_0_1px_0_rgba(255,255,255,0.9)]">
                     <span className="material-symbols-outlined text-primary text-xl">
                       cloud_upload
                     </span>
@@ -401,8 +401,8 @@ export default function FeatureOne() {
                   </div>
                 </div>
 
-                {/* Bottom Live Banner */}
-                <div className="mt-4 p-3 bg-white/80 rounded-xl border border-white shadow-sm flex items-center justify-between">
+                {/* Bottom Live Banner with Bevel Pill */}
+                <div className="mt-4 p-3 bg-gradient-to-b from-white/95 via-white/85 to-white/70 rounded-xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-[#27C93F] text-[18px] font-bold">
                       check_circle
