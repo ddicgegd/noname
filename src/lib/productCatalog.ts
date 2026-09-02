@@ -34,7 +34,7 @@ export interface ProductAttributeOption {
   variantOptions?: { name: string; values: string[] }[];
   specifications?: {
     groupName?: string;
-    specifications?: { key?: string; value?: string }[];
+    specifications?: { key?: string; value?: string; data?: string; name?: string }[];
   }[];
   promotions?: any[];
   keywords?: string[];

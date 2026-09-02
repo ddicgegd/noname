@@ -23,10 +23,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import { Separator } from "@/components/ui/separator";
+import { Bevel, BevelButton, BevelDivider } from "@/components/ui/bevel";
+import { VoucherCard } from "@/components/VoucherCard";
 import {
   BadgeCheckIcon,
   BrainCircuitIcon,
   CheckIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   DatabaseIcon,
   FilterIcon,
@@ -460,10 +463,23 @@ const PRODUCTS: Product[] = [
   }
 ];
 
-const getProductImage = (product: Product | { id: string; category: string; mediaUrls?: string[] }) => {
-  if (product.mediaUrls && product.mediaUrls.length > 0) {
+const getProductImage = (product: Product | { id: string; category?: string; mediaUrls?: string[]; imageUrl?: string; name?: string }) => {
+  if (product.mediaUrls && product.mediaUrls.length > 0 && product.mediaUrls[0]) {
     return product.mediaUrls[0];
   }
+  if ((product as any).imageUrl) {
+    return (product as any).imageUrl;
+  }
+  const idLower = (product.id || "").toLowerCase();
+  const nameLower = ((product as any).name || "").toLowerCase();
+
+  if (idLower.includes("ip16") || idLower.includes("iphone") || nameLower.includes("iphone")) {
+    return "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?q=80&w=600&auto=format&fit=crop";
+  }
+  if (idLower.includes("s25") || idLower.includes("samsung") || idLower.includes("sgs25") || nameLower.includes("samsung")) {
+    return "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?q=80&w=600&auto=format&fit=crop";
+  }
+
   if (product.category === "ai") {
     if (product.id === "nexus-ai") return "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=400&auto=format&fit=crop";
     if (product.id === "vision-ai") return "https://images.unsplash.com/photo-1527474305487-b87b222841cc?q=80&w=400&auto=format&fit=crop";
@@ -566,14 +582,22 @@ interface ProductPageProps {
     color?: string,
     shadowColor?: string
   ) => void;
+  onDetailOpenChange?: (isOpen: boolean) => void;
 }
 
-export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductPageProps) {
+export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEffect, onSpawnStars, onFlyToAccount, onDetailOpenChange }: ProductPageProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeHashSku, setActiveHashSku] = useState(getCurrentHashSku);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    onDetailOpenChange?.(Boolean(selectedProduct));
+    return () => {
+      onDetailOpenChange?.(false);
+    };
+  }, [selectedProduct, onDetailOpenChange]);
 
   useEffect(() => {
     const syncHashSku = () => setActiveHashSku(getCurrentHashSku());
@@ -599,11 +623,39 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
     ) || PRODUCTS.find((product) => getProductHashSku(product).toLowerCase() === activeHashSku.toLowerCase());
 
     if (matchedCloudProduct) {
-      if (!selectedProduct || selectedProduct.id !== matchedCloudProduct.id) {
+      if (!selectedProduct || selectedProduct.id !== matchedCloudProduct.id || selectedProduct.name === selectedProduct.sku) {
         setSelectedProduct(matchedCloudProduct);
       }
       return;
     }
+
+    // Fetch product by SKU from API if not yet in catalog
+    let cancelled = false;
+    searchProductsForCatalog({ skus: [activeHashSku], size: 1 })
+      .then(({ products }) => {
+        if (cancelled || products.length === 0) return;
+        const apiProduct = products[0];
+        setSelectedProduct((current) => {
+          if (!current || getProductHashSku(current).toLowerCase() === activeHashSku.toLowerCase()) {
+            return {
+              ...apiProduct,
+              attributeOptions: current?.attributeOptions || apiProduct.attributeOptions
+            };
+          }
+          return current;
+        });
+        setCatalogProducts((prev) => {
+          if (prev.some((p) => getProductHashSku(p).toLowerCase() === activeHashSku.toLowerCase())) {
+            return prev.map((p) => getProductHashSku(p).toLowerCase() === activeHashSku.toLowerCase() ? { ...p, ...apiProduct } : p);
+          }
+          return [apiProduct, ...prev];
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeHashSku, catalogProducts, selectedProduct]);
 
   useEffect(() => {
@@ -1634,37 +1686,63 @@ const getProductImagesList = (product: Product, allowFallback = true) => {
 const getProductVersions = (product: Product) => {
   if (product.attributeOptions && product.attributeOptions.length > 0) {
     return product.attributeOptions.slice(0, 6).map((attribute, index) => {
-      const optionDesc = attribute.variantOptions?.flatMap((option) => option.values || []).join(", ");
+      let cleanTitle = attribute.name || `Phiên bản ${index + 1}`;
+      
+      // Remove product name prefix if present
+      if (product.name) {
+        cleanTitle = cleanTitle.replace(product.name, "").trim();
+      }
+      
+      // Remove known color words / swatches
+      const colorKeywords = [
+        "Đen Không Gian", "Bạc", "Vàng", "Xám Không Gian", "Titan Sa Mạc", "Sa Mạc",
+        "Titan Tự Nhiên", "Titan Xám", "Titan Xanh", "Titan Đen", "Titan Trắng",
+        "Xanh Dương", "Xanh Lá", "Xanh Mint", "Hồng", "Đỏ", "Tím", "Cam",
+        "Đen", "Trắng", "Xanh", "Xám", "Gold", "Silver", "Space Gray", "Space Black",
+        "Natural Titanium", "Desert Titanium", "Black Titanium", "White Titanium"
+      ];
+      for (const col of colorKeywords) {
+        cleanTitle = cleanTitle.replace(new RegExp(`\\b${col}\\b|${col}`, "gi"), "").trim();
+      }
+      cleanTitle = cleanTitle.replace(/^[-–—/,\s]+|[-–—/,\s]+$/g, "").trim();
+
+      // If empty or cleaned too aggressively, fallback to non-color variantOptions or SKU
+      if (!cleanTitle) {
+        const nonColorOption = attribute.variantOptions?.find(
+          (opt) => !/màu|color/i.test(opt.name || "")
+        );
+        cleanTitle = nonColorOption?.values?.join(" / ") || attribute.sku || `Phiên bản ${index + 1}`;
+      }
+
       return {
         id: attribute.id || `api-v${index + 1}`,
-        title: attribute.name || `Phiên bản ${index + 1}`,
-        desc: optionDesc || attribute.statusProduct || attribute.sku || "API option"
+        title: cleanTitle,
       };
     });
   }
 
   if (product.category === "ai") {
     return [
-      { id: "v1", title: "API Standard", desc: "FP16 Model Server" },
-      { id: "v2", title: "H100 Pro Cluster", desc: "Ultra-low Latency" },
-      { id: "v3", title: "INT8 Quantized", desc: "Cost-Effective Edge" },
+      { id: "v1", title: "API Standard" },
+      { id: "v2", title: "H100 Pro Cluster" },
+      { id: "v3", title: "INT8 Quantized" },
     ];
   } else if (product.category === "compute") {
     return [
-      { id: "v1", title: "8 Cores vCPU", desc: "32GB RAM" },
-      { id: "v2", title: "16 Cores vCPU", desc: "64GB RAM" },
-      { id: "v3", title: "32 Cores vCPU", desc: "128GB RAM" },
+      { id: "v1", title: "8 Cores vCPU (32GB)" },
+      { id: "v2", title: "16 Cores vCPU (64GB)" },
+      { id: "v3", title: "32 Cores vCPU (128GB)" },
     ];
   } else if (product.category === "storage") {
     return [
-      { id: "v1", title: "Hot Tier SSD", desc: "Instant Retrieve" },
-      { id: "v2", title: "Warm Archive HDD", desc: "Optimized Billing" },
-      { id: "v3", title: "Deep Ice Storage", desc: "Archival Backup" },
+      { id: "v1", title: "Hot Tier SSD" },
+      { id: "v2", title: "Warm Archive HDD" },
+      { id: "v3", title: "Deep Ice Storage" },
     ];
   } else {
     return [
-      { id: "v1", title: "Mesh Core Edge", desc: "120 Global Nodes" },
-      { id: "v2", title: "Enterprise Plus", desc: "Custom Routing" },
+      { id: "v1", title: "Mesh Core Edge" },
+      { id: "v2", title: "Enterprise Plus" },
     ];
   }
 };
@@ -1780,7 +1858,7 @@ const slugifySpecId = (value: string, index: number) => {
 type ProductSpecSection = {
   id: string;
   title: string;
-  items: { label: string; value: string }[];
+  items: { label?: string; value: string }[];
 };
 
 const getApiSpecificationSections = (
@@ -1790,13 +1868,17 @@ const getApiSpecificationSections = (
 
   return attribute.specifications
     .map((group, groupIndex) => {
-      const title = group.groupName || `Thông số ${groupIndex + 1}`;
-      const items = (group.specifications || [])
-        .map((spec) => ({
-          label: spec.key || "",
-          value: spec.value || ""
-        }))
-        .filter((spec) => spec.label || spec.value);
+      const title = group.groupName ?? `Thông số ${groupIndex + 1}`;
+      const items = (group.specifications ?? [])
+        .map<{ label?: string; value: string } | null>((spec) => {
+          const val = spec.data ?? spec.value;
+          if (!val) return null;
+          return {
+            label: spec.key ?? spec.name ?? undefined,
+            value: String(val)
+          };
+        })
+        .filter((spec): spec is { label?: string; value: string } => spec !== null);
 
       return {
         id: slugifySpecId(title, groupIndex),
@@ -1934,6 +2016,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
   const selectedVersion = versions.find((version) => version.id === activeVersion);
   const selectedColor = colors.find((color) => color.id === activeColor);
   const selectedOptionLabel = [selectedVersion?.title, selectedColor?.title].filter(Boolean).join(" - ");
+  const fullProductTitle = selectedOptionLabel ? `${product.name} ${selectedOptionLabel}` : product.name;
 
   const executeBuyNow = createAuthAction({
     onAuthenticated: () => {
@@ -2066,7 +2149,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
       price: "513.000đ",
       oldPrice: "570.000đ",
       smember: "Smember giảm thêm đến 26.000đ",
-      img: "https://images.unsplash.com/photo-1517502884422-41eaaced0168?q=80&w=200&auto=format&fit=crop"
+      img: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?q=80&w=400&auto=format&fit=crop"
     },
     {
       id: "w-acc-2",
@@ -2082,7 +2165,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
       price: "162.000đ",
       oldPrice: "180.000đ",
       smember: "Smember giảm thêm đến 8.000đ",
-      img: "https://images.unsplash.com/photo-1524805444758-089113d48a6d?q=80&w=200&auto=format&fit=crop"
+      img: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=400&auto=format&fit=crop"
     },
     {
       id: "w-acc-4",
@@ -2194,12 +2277,22 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
   ];
 
   const [showSpecsPopup, setShowSpecsPopup] = useState(false);
+  const [isSpecsExpanded, setIsSpecsExpanded] = useState(false);
   const [showTopFade, setShowTopFade] = useState(false);
   const [showBottomFade, setShowBottomFade] = useState(false);
+  const [inPlaceTopFade, setInPlaceTopFade] = useState(false);
+  const [inPlaceBottomFade, setInPlaceBottomFade] = useState(true);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const specsContentRef = useRef<HTMLDivElement>(null);
+  const inPlaceSpecsContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (isSpecsExpanded) {
+          setIsSpecsExpanded(false);
+          return;
+        }
         if (showSpecsPopup) {
           setShowSpecsPopup(false);
           return;
@@ -2210,7 +2303,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, showSpecsPopup]);
+  }, [onClose, isSpecsExpanded, showSpecsPopup]);
 
   const cloudSpecSections: ProductSpecSection[] = [
     {
@@ -2298,12 +2391,12 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
     }
   }, [activeTab, specSections]);
 
-  const displayedSpecs = specSections.flatMap((section) => section.items).slice(0, 7);
+  const displayedSpecs = specSections.flatMap((section) => section.items).slice(0, 5);
   const vndInfo = getProductVNDDetails(product);
 
-  const handleModalScroll = () => {
-    if (!showSpecsPopup || !contentRef.current) return;
-    const container = contentRef.current;
+  const handleSpecsModalScroll = () => {
+    if (!showSpecsPopup || !specsContentRef.current) return;
+    const container = specsContentRef.current;
 
     let currentActive = specSections[0]?.id;
     let minDistance = Infinity;
@@ -2324,11 +2417,62 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
     }
   };
 
+  const handleInPlaceSpecsScroll = () => {
+    if (!inPlaceSpecsContentRef.current) return;
+    const container = inPlaceSpecsContentRef.current;
+
+    // Dynamic top & bottom fade visibility
+    setInPlaceTopFade(container.scrollTop > 8);
+    setInPlaceBottomFade(container.scrollHeight - container.scrollTop - container.clientHeight > 14);
+
+    const containerRect = container.getBoundingClientRect();
+    let currentActive = specSections[0]?.id;
+    let minDistance = Infinity;
+
+    for (const sec of specSections) {
+      const el = document.getElementById(`inplace-spec-${sec.id}`);
+      if (el) {
+        const elRect = el.getBoundingClientRect();
+        const distance = Math.abs(elRect.top - (containerRect.top + 20));
+        if (distance < minDistance) {
+          minDistance = distance;
+          currentActive = sec.id;
+        }
+      }
+    }
+
+    if (currentActive && currentActive !== activeTab) {
+      setActiveTab(currentActive);
+    }
+  };
+
+  const scrollToInPlaceSpec = (secId: string) => {
+    setActiveTab(secId);
+    const container = inPlaceSpecsContentRef.current;
+    const el = document.getElementById(`inplace-spec-${secId}`);
+    if (container && el) {
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const targetScrollTop = container.scrollTop + (elRect.top - containerRect.top) - 4;
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: "smooth"
+      });
+      setTimeout(() => {
+        if (inPlaceSpecsContentRef.current) {
+          const c = inPlaceSpecsContentRef.current;
+          setInPlaceTopFade(c.scrollTop > 8);
+          setInPlaceBottomFade(c.scrollHeight - c.scrollTop - c.clientHeight > 14);
+        }
+      }, 350);
+    }
+  };
+
   useEffect(() => {
     if (showSpecsPopup) {
       const timer = setTimeout(() => {
-        if (contentRef.current) {
-          const container = contentRef.current;
+        if (specsContentRef.current) {
+          const container = specsContentRef.current;
           setShowTopFade(container.scrollTop > 10);
           setShowBottomFade(container.scrollHeight - container.scrollTop - container.clientHeight > 10);
         }
@@ -2340,8 +2484,21 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
     }
   }, [showSpecsPopup, activeTab]);
 
+  useEffect(() => {
+    if (isSpecsExpanded) {
+      const timer = setTimeout(() => {
+        if (inPlaceSpecsContentRef.current) {
+          const c = inPlaceSpecsContentRef.current;
+          setInPlaceTopFade(c.scrollTop > 8);
+          setInPlaceBottomFade(c.scrollHeight - c.scrollTop - c.clientHeight > 14);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isSpecsExpanded, activeTab]);
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden p-2 pt-10 sm:p-3 sm:pt-12 md:pt-[64px] [perspective:1400px]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden [perspective:1400px]">
       {/* Backdrop overlay */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -2349,16 +2506,18 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
         exit={{ opacity: 0 }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         onClick={onClose}
-        className="absolute inset-0 cursor-pointer bg-background/80 backdrop-blur-xl"
+        className="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-xl"
       />
 
-      {/* Modal Body Container */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.78, y: 86, rotateX: 9, filter: "blur(18px)" }}
-        animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0, filter: "blur(0px)" }}
-        exit={{ opacity: 0, scale: 0.9, y: 32, rotateX: -5, filter: "blur(12px)" }}
-        transition={{ type: "spring", stiffness: 230, damping: 24, mass: 0.85 }}
-        className="relative z-10 flex h-full max-h-[calc(100vh-3rem)] w-[98vw] max-w-[1880px] flex-col overflow-hidden rounded-2xl border bg-background text-foreground shadow-2xl md:max-h-[calc(100vh-4.5rem)] md:w-[99vw]"
+      {/* Modal Body Container: 85vw x 85vh with 7.5% margins (15% total margin space) */}
+      <Bevel
+        as={motion.div}
+        variant="shell"
+        initial={{ opacity: 0, scale: 0.88, y: 35, filter: "blur(12px)" }}
+        animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+        exit={{ opacity: 0, scale: 0.9, y: 25, filter: "blur(8px)" }}
+        transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.85 }}
+        className="relative z-10 flex h-[85vh] w-[94vw] sm:w-[90vw] md:w-[85vw] max-w-[1600px] flex-col overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-b from-white/95 via-white/90 to-white/80 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/80 backdrop-blur-2xl text-foreground shadow-[0_24px_80px_rgba(0,0,0,0.35),0_0_0_1px_rgba(255,255,255,0.4),inset_0_1px_0_rgba(255,255,255,1)]"
       >
         <motion.div
           aria-hidden="true"
@@ -2370,110 +2529,144 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
 
         {/* Modal Main Scrollable Content Wrapper */}
         <div className="relative flex-1 min-h-0">
-          <ProgressiveBlur position="top" height={44} className="z-20" />
-
           <div
-            ref={contentRef}
-            onScroll={handleModalScroll}
-            className="h-full overflow-y-auto bg-muted/30 pb-28 scrollbar-thin"
+            ref={mainContentRef}
+            className="h-full overflow-y-auto bg-card/60 pb-3.5 sm:pb-4 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
-            {/* Header bar with Breadcrumb, Title & Social elements */}
-            <div className="relative shrink-0 border-b bg-card px-4 py-3 sm:px-6 mb-4 sm:mb-6">
-
-              {/* Breadcrumb line */}
-              <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5 mb-1 select-none overflow-x-auto whitespace-nowrap scrollbar-none">
-                &nbsp;
-              </div>
-
-              {/* Title & Reviews Row */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pr-8">
-                <div>
+            {/* Header bar with clean aligned Title, Badges & Action Dock (with subtle top bezel) */}
+            <div className="relative shrink-0 border-b bg-card px-3 pt-3.5 pb-2 sm:px-3.5 sm:pt-4 sm:pb-2.5 mb-2.5 sm:mb-3 pr-12">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-col gap-1 min-w-0">
                   <h1 className="font-sans font-bold text-sm sm:text-base text-foreground leading-tight flex flex-wrap items-center gap-2">
-                    <span>
-                      {`${product.name} Cloud Server (5G) Viền Titan Dây Cao Su Size S/M | Chính hãng Cloud Việt Nam`}
-                    </span>
-                    <span className="text-[9px] font-black uppercase bg-primary text-white px-1.5 py-0.5 rounded-sm">
-                      CHÍNH HÃNG APPLET
-                    </span>
+                    <div className="inline-flex items-center min-w-0">
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span
+                          key={fullProductTitle}
+                          initial={{ opacity: 0, y: 3, filter: "blur(4px)" }}
+                          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                          exit={{ opacity: 0, y: -3, filter: "blur(4px)" }}
+                          transition={{ duration: 0.18, ease: "easeOut" }}
+                          className="truncate"
+                        >
+                          {fullProductTitle}
+                        </motion.span>
+                      </AnimatePresence>
+                    </div>
+                    <span className="text-muted-foreground font-normal text-xs sm:text-sm shrink-0">| Chính hãng Cloud Việt Nam</span>
+                    {/* Luminous Burning Brand Tag with Optical Glow & Spark */}
+                    <motion.div
+                      animate={{
+                        boxShadow: [
+                          "0 0 6px rgba(255,77,36,0.25), 0 0 12px rgba(255,140,0,0.12), inset 0 1px 0 rgba(255,255,255,0.9)",
+                          "0 0 12px rgba(255,77,36,0.45), 0 0 20px rgba(255,140,0,0.25), inset 0 1px 0 rgba(255,255,255,0.95)",
+                          "0 0 6px rgba(255,77,36,0.25), 0 0 12px rgba(255,140,0,0.12), inset 0 1px 0 rgba(255,255,255,0.9)"
+                        ]
+                      }}
+                      transition={{
+                        duration: 1.8,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className="relative inline-flex items-center justify-center h-5 px-2 rounded-full bg-gradient-to-r from-orange-500/[0.16] via-[#FF4D24]/[0.10] to-amber-500/[0.08] border-t border-t-white/95 border-b border-b-[#FF4D24]/35 border-x border-x-[#FF4D24]/20 select-none overflow-visible cursor-default"
+                    >
+                      {/* Ambient heat aura layer */}
+                      <motion.div
+                        animate={{
+                          opacity: [0.3, 0.65, 0.3],
+                          scale: [0.98, 1.05, 0.98]
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/20 via-orange-500/15 to-yellow-500/10 blur-[3px] pointer-events-none"
+                      />
+
+                      {/* Floating spark rising from tag */}
+                      <motion.div
+                        animate={{
+                          x: [0, 1, -1, 0.5, 0],
+                          y: [0, -3, -7, -11, -15],
+                          opacity: [0, 1, 0.8, 0.4, 0],
+                          scale: [0.6, 1, 0.9, 0.5, 0.2]
+                        }}
+                        transition={{
+                          duration: 2.2,
+                          repeat: Infinity,
+                          ease: "easeOut",
+                          times: [0, 0.2, 0.5, 0.8, 1]
+                        }}
+                        className="absolute -top-0.5 right-2 size-0.5 rounded-full bg-yellow-300 shadow-[0_0_2px_#FF5500] pointer-events-none"
+                      />
+
+                      {/* Fiery Tag Text */}
+                      <span className="relative z-10 font-sans font-black text-[9px] uppercase bg-gradient-to-r from-[#E02600] via-[#FF4D24] to-[#FF8A00] bg-clip-text text-transparent tracking-wider drop-shadow-[0_1px_0_rgba(255,255,255,0.8)]">
+                        CHÍNH HÃNG APPLET
+                      </span>
+                    </motion.div>
                   </h1>
 
-                  {/* Stars & Reviews */}
-                  <div className="flex items-center gap-4 mt-1">
+                  {/* Stars & Reviews Sub-row */}
+                  <div className="flex items-center gap-3 text-xs">
                     <div className="flex items-center gap-0.5 text-primary select-none">
-                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
-                      <span className="material-symbols-outlined text-[14px] fill-current">star</span>
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <span key={s} className="material-symbols-outlined text-[14px] fill-current">star</span>
+                      ))}
                       <span className="text-muted-foreground text-[11.5px] font-bold ml-1">5 (1 đánh giá)</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Social Share & Actions */}
-                <div className="flex shrink-0 select-none items-center gap-2 self-start text-[11px] font-bold text-muted-foreground sm:self-center">
-                  <button
+                {/* Aligned Segmented Action Dock */}
+                <Bevel variant="dock" className="flex shrink-0 select-none items-center p-1 gap-1 text-[11px] font-bold text-muted-foreground self-start sm:self-center">
+                  <BevelButton
+                    variant="subtle"
+                    size="sm"
                     onClick={() => handleQA()}
-                    className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary"
+                    className="h-7 px-2.5 gap-1 rounded-lg"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-primary">chat_bubble</span>
+                    <span className="material-symbols-outlined text-[15px] text-primary">chat_bubble</span>
                     <span>Hỏi đáp</span>
-                  </button>
-                  <span className="text-border">|</span>
-                  <button
+                  </BevelButton>
+                  <BevelDivider orientation="vertical" className="h-3.5" />
+                  <BevelButton
+                    variant="subtle"
+                    size="sm"
                     onClick={() => {
+                      setIsSpecsExpanded(true);
                       const specsEl = document.getElementById("specs-section");
                       if (specsEl) {
                         specsEl.scrollIntoView({ behavior: "smooth", block: "center" });
                       }
-                      setShowSpecsPopup(true);
                     }}
-                    className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary"
+                    className="h-7 px-2.5 gap-1 rounded-lg"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-primary">info</span>
+                    <span className="material-symbols-outlined text-[15px] text-primary">info</span>
                     <span>Thông số</span>
-                  </button>
-                  <span className="text-border">|</span>
-                  <button className="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary">
-                    <span className="material-symbols-outlined text-[16px] text-primary">compare_arrows</span>
+                  </BevelButton>
+                  <BevelDivider orientation="vertical" className="h-3.5" />
+                  <BevelButton
+                    variant="subtle"
+                    size="sm"
+                    className="h-7 px-2.5 gap-1 rounded-lg"
+                  >
+                    <span className="material-symbols-outlined text-[15px] text-primary">compare_arrows</span>
                     <span>So sánh</span>
-                  </button>
-                </div>
+                  </BevelButton>
+                </Bevel>
               </div>
-
-
             </div>
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-5 xl:gap-6 items-start lg:items-stretch px-4 sm:px-6">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-3 xl:gap-3.5 items-start px-2.5 sm:px-3.5">
 
             {/* LEFT COLUMN: Image Box, Highlights, Commitments */}
-            <div className="lg:col-span-8 flex flex-col gap-5">
-
-              {/* Minimalist Member Promotion Bar */}
-              <div className="flex select-none items-center gap-2 rounded-xl border bg-secondary p-3 text-secondary-foreground shadow-sm">
-                <span className="material-symbols-outlined text-primary text-[18px] font-bold">loyalty</span>
-                  <span className="text-[13px] font-bold leading-snug">
-                  Tiết kiệm thêm tới <span className="font-extrabold">230.000đ</span> cho Smember. <span onClick={() => { window.location.hash = "register"; if (onNavigate) onNavigate("auth"); }} className="cursor-pointer font-black underline transition-colors hover:text-foreground">Đăng ký ngay</span>
-                </span>
-              </div>
-
-              {/* Product Visual Area + Gallery Thumbnails grouped tightly for space optimization */}
-              <div className="flex flex-col gap-3">
-                {/* Product Visual & Image display area with 3D discount Ribbon */}
-                <div className="group relative flex h-[390px] min-h-[390px] flex-col items-center justify-center overflow-visible rounded-xl border bg-card p-0 shadow-sm transition-all hover:shadow-md sm:h-[500px] sm:min-h-[500px]">
-                  {formattedDiscount && (
-                    <>
-                      {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
-                      <div className="absolute -top-1.5 left-[-4px] h-[26px] bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] text-white text-[11px] font-black px-3 rounded-br-lg rounded-tr-sm shadow-[2px_2px_4px_rgba(0,0,0,0.15)] flex items-center justify-center z-20 select-none">
-                        {formattedDiscount}
-                      </div>
-                      {/* 3D Fold Corner for Left Ribbon */}
-                      <div className="absolute top-[20px] left-[-4px] w-[4px] h-[4px] bg-destructive z-10" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
-                    </>
-                  )}
-
-
-                  <div className="absolute inset-0 z-0 size-full overflow-hidden rounded-xl">
+            <div className="lg:col-span-8 flex flex-col gap-2.5 sm:gap-3">
+              {/* Product Visual Area + Gallery Thumbnails grouped with squarer corners & comfortable padding */}
+              <div className="flex flex-col gap-1.5">
+                {/* Product Visual & Image display area with squarer curvature */}
+                <div className="group relative flex h-[390px] min-h-[390px] flex-col items-center justify-center overflow-hidden rounded-md border border-border bg-card p-0 shadow-xs transition-all sm:h-[500px] sm:min-h-[500px]">
+                  <div className="absolute inset-0 z-0 size-full overflow-hidden rounded-md">
                     <AnimatePresence mode="wait">
                       {images[activeImgIdx] ? (
                         <motion.img
@@ -2501,35 +2694,37 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                     </AnimatePresence>
                   </div>
 
-                  {/* Indicator Dots - overlay on the bottom */}
+                  {/* Indicator Dots - subtle translucent glass overlay on the bottom */}
                   {images.length > 0 && (
-                  <div className="absolute bottom-3 z-10 flex select-none items-center gap-1.5 rounded-full border bg-card/90 px-2.5 py-1 shadow-sm backdrop-blur-sm">
+                  <div className="absolute bottom-3 z-10 flex select-none items-center gap-1.5 h-6 rounded-full px-2.5 bg-black/35 backdrop-blur-md border border-white/15 shadow-[0_2px_8px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]">
                     {images.map((_, idx) => (
                       <span
                         key={idx}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${activeImgIdx === idx ? "w-3 bg-primary" : "w-1.5 bg-muted-foreground/35"}`}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${activeImgIdx === idx ? "w-3 bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]" : "w-1.5 bg-white/35"}`}
                       />
                     ))}
                   </div>
                   )}
                 </div>
 
-                {/* Gallery Thumbnail Strip - matching main image aspect ratio and optimized spacing */}
-                <div id="thumbnail-strip" className="flex items-center justify-center gap-2 overflow-x-auto select-none scrollbar-none py-1">
+                {/* Gallery Thumbnail Strip - with padding so active border/ring is never clipped */}
+                <div id="thumbnail-strip" className="flex items-center justify-center gap-1.5 overflow-x-auto select-none scrollbar-none py-1">
                   {images.map((img, idx) => (
-                    <button
+                    <BevelButton
                       key={idx}
+                      variant="button"
+                      size="none"
                       onClick={() => setActiveImgIdx(idx)}
-                      className={`flex h-[56px] w-[84px] shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-transparent p-0 shadow-xs transition-all ${
+                      className={`flex h-[56px] w-[84px] shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md p-0 shadow-xs transition-all ${
                         activeImgIdx === idx
-                          ? "scale-102 ring-2 ring-primary/40"
-                          : "hover:scale-101"
+                          ? "scale-[1.01] border-primary/70 ring-1 ring-primary/40 shadow-xs"
+                          : "hover:scale-101 opacity-80 hover:opacity-100"
                       }`}
                     >
                       <img
                         src={img}
                         alt={`Thumbnail ${idx + 1}`}
-                        className="size-full rounded-lg object-cover"
+                        className="size-full rounded-md object-cover"
                         referrerPolicy="no-referrer"
                         onError={(event) => {
                           const fallback = images[0] || getProductImage(product);
@@ -2538,170 +2733,431 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                           }
                         }}
                       />
-                    </button>
+                    </BevelButton>
                   ))}
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
+              {/* Unified Reference Container for Commitments + Specs */}
+              <div className="relative w-full h-[580px] sm:h-[506px]">
+                {/* Commitments Section - Sits at top */}
+                <motion.div
+                  animate={{
+                    opacity: isSpecsExpanded ? 0 : 1,
+                    y: isSpecsExpanded ? -10 : 0,
+                    pointerEvents: isSpecsExpanded ? "none" : "auto",
+                  }}
+                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex flex-col gap-2 w-full"
+                >
                   <h4 className="font-sans font-bold text-[14px] uppercase text-foreground tracking-wider flex items-center gap-1.5 select-none">
                     <span className="material-symbols-outlined text-primary text-[20px]">verified</span>
                     Cam kết sản phẩm
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {/* Commitment 1 */}
-                    <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                      <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">verified</span>
+                    <div className="flex select-none items-start gap-2.5 rounded-xl border border-border bg-card p-2.5 sm:p-3 shadow-xs">
+                      <span className="material-symbols-outlined text-emerald-500 text-[18px] font-bold shrink-0 mt-0.5">verified</span>
                       <div className="flex flex-col">
-                        <span className="font-sans font-extrabold text-[14px] text-foreground">Chính hãng Cloud Việt Nam</span>
-                        <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Hàng chính hãng Cloud, Mới 100% đầy đủ chứng chỉ bảo mật và cam kết SLA doanh nghiệp 99.99%.</span>
+                        <span className="font-sans font-extrabold text-[13.5px] text-foreground">Chính hãng Cloud Việt Nam</span>
+                        <span className="mt-0.5 text-[11.5px] font-medium leading-relaxed text-muted-foreground">Hàng chính hãng Cloud, Mới 100% đầy đủ chứng chỉ bảo mật và cam kết SLA doanh nghiệp 99.99%.</span>
                       </div>
                     </div>
 
                     {/* Commitment 2 */}
-                    <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                      <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">published_with_changes</span>
+                    <div className="flex select-none items-start gap-2.5 rounded-xl border border-border bg-card p-2.5 sm:p-3 shadow-xs">
+                      <span className="material-symbols-outlined text-emerald-500 text-[18px] font-bold shrink-0 mt-0.5">published_with_changes</span>
                       <div className="flex flex-col">
-                        <span className="font-sans font-extrabold text-[14px] text-foreground">1 Đổi 1 trong 30 ngày</span>
-                        <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Đổi trả tài nguyên hoặc bồi hoàn tức thì nếu có lỗi từ phần cứng vật lý hoặc xung đột tài nguyên.</span>
+                        <span className="font-sans font-extrabold text-[13.5px] text-foreground">1 Đổi 1 trong 30 ngày</span>
+                        <span className="mt-0.5 text-[11.5px] font-medium leading-relaxed text-muted-foreground">Đổi trả tài nguyên hoặc bồi hoàn tức thì nếu có lỗi từ phần cứng vật lý hoặc xung đột tài nguyên.</span>
                       </div>
                     </div>
 
                     {/* Commitment 3 */}
-                    <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                      <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">shield</span>
+                    <div className="flex select-none items-start gap-2.5 rounded-xl border border-border bg-card p-2.5 sm:p-3 shadow-xs">
+                      <span className="material-symbols-outlined text-emerald-500 text-[18px] font-bold shrink-0 mt-0.5">shield</span>
                       <div className="flex flex-col">
-                        <span className="font-sans font-extrabold text-[14px] text-foreground">Bảo mật Cloud Shield</span>
-                        <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Đi kèm lá chắn phòng thủ nâng cao, ngăn chặn DDoS và hỗ trợ di trú dữ liệu miễn phí 24/7.</span>
+                        <span className="font-sans font-extrabold text-[13.5px] text-foreground">Bảo mật Cloud Shield</span>
+                        <span className="mt-0.5 text-[11.5px] font-medium leading-relaxed text-muted-foreground">Đi kèm lá chắn phòng thủ nâng cao, ngăn chặn DDoS và hỗ trợ di trú dữ liệu miễn phí 24/7.</span>
                       </div>
                     </div>
 
                     {/* Commitment 4 */}
-                    <div className="flex select-none items-start gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                      <span className="material-symbols-outlined text-emerald-500 text-[20px] font-bold shrink-0 mt-0.5">receipt_long</span>
+                    <div className="flex select-none items-start gap-2.5 rounded-xl border border-border bg-card p-2.5 sm:p-3 shadow-xs">
+                      <span className="material-symbols-outlined text-emerald-500 text-[18px] font-bold shrink-0 mt-0.5">receipt_long</span>
                       <div className="flex flex-col">
-                        <span className="font-sans font-extrabold text-[14px] text-foreground">Đã bao gồm thuế VAT</span>
-                        <span className="mt-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">Giá sản phẩm đã bao gồm VAT 10%, hỗ trợ hoàn thuế VAT - Tax Refund cho doanh nghiệp.</span>
+                        <span className="font-sans font-extrabold text-[13.5px] text-foreground">Đã bao gồm thuế VAT</span>
+                        <span className="mt-0.5 text-[11.5px] font-medium leading-relaxed text-muted-foreground">Giá sản phẩm đã bao gồm VAT 10%, hỗ trợ hoàn thuế VAT - Tax Refund cho doanh nghiệp.</span>
                       </div>
                     </div>
                   </div>
-              </div>
+                </motion.div>
 
-              {/* Product Technical Specs Section */}
-              <div id="specs-section" className="mt-2 select-none rounded-xl border bg-card p-4 shadow-sm sticky top-4 z-20">
-                <div className="flex justify-between items-center mb-3 pb-2 border-b border-border">
-                  <h4 className="font-sans font-bold text-[12px] uppercase text-foreground tracking-wider flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[18px] text-muted-foreground">settings_suggest</span>
-                    Thông số kỹ thuật
-                  </h4>
-                  <button
-                    onClick={() => setShowSpecsPopup(true)}
-                    className="flex cursor-pointer items-center gap-0.5 text-[11px] font-bold text-muted-foreground hover:text-primary"
-                  >
-                    Xem thêm
-                    <span className="material-symbols-outlined text-[13px]">chevron_right</span>
-                  </button>
-                </div>
-                <div className="divide-y divide-border">
-                  {displayedSpecs.length > 0 ? (
-                    displayedSpecs.map((spec, sIdx) => (
-                      <div key={sIdx} className="grid grid-cols-12 px-1 py-2 text-[11.5px] transition-colors hover:bg-muted/50">
-                        {spec.label && <span className="col-span-5 font-medium text-muted-foreground">{spec.label}</span>}
-                        <span className={`${spec.label ? "col-span-7" : "col-span-12"} text-foreground font-semibold`}>{spec.value}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-[11.5px] py-3 px-1 text-muted-foreground font-semibold">
-                      Chưa có dữ liệu thông số kỹ thuật.
-                    </div>
-                  )}
-                </div>
+                {/* Specs Section - Pinned to bottom-0 with strictly fixed bottom edge */}
+                <motion.div
+                  id="specs-section"
+                  initial={false}
+                  animate={{
+                    height: isSpecsExpanded ? "100%" : 280,
+                  }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  className={`absolute bottom-0 left-0 right-0 select-none overflow-hidden rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 p-3 sm:p-3.5 z-10 flex flex-col ${
+                    isSpecsExpanded ? "z-20" : "justify-between"
+                  }`}
+                >
+                  {/* Multi-corner ambient luxury glow aura */}
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                    <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
+                    <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+                  </div>
+
+                  <AnimatePresence mode="wait" initial={false}>
+                    {!isSpecsExpanded ? (
+                      /* Collapsed View (Summary) - Spacious & Breathable with 4 Key Rows */
+                      <motion.div
+                        key="specs-collapsed"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.18 }}
+                        className="flex flex-col h-full justify-between"
+                      >
+                        <div className="relative z-10 flex justify-between items-center mb-1.5 pb-2 border-b border-slate-200/60 dark:border-white/10 shrink-0">
+                          <h4 className="font-sans font-bold text-[12px] uppercase text-foreground tracking-wider flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[18px] text-muted-foreground">settings_suggest</span>
+                            Thông số kỹ thuật
+                          </h4>
+                          <BevelButton
+                            variant="subtle"
+                            size="sm"
+                            onClick={() => setIsSpecsExpanded(true)}
+                            className="h-6 px-2 rounded-md gap-0.5 text-[11px] font-bold text-muted-foreground hover:text-primary"
+                          >
+                            Xem thêm
+                            <span className="material-symbols-outlined text-[13px]">chevron_right</span>
+                          </BevelButton>
+                        </div>
+                        <div className="relative z-10 divide-y divide-slate-200/50 dark:divide-white/10 flex-1 flex flex-col justify-around py-0.5">
+                          {displayedSpecs.length > 0 ? (
+                            displayedSpecs.map((spec, sIdx) => (
+                              <div key={sIdx} className="flex items-start gap-2.5 sm:gap-3 px-1 py-1 text-[11.5px] sm:text-[12px] transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                                {spec.label && <span className="w-[130px] sm:w-[145px] shrink-0 font-medium text-muted-foreground pt-0.5">{spec.label}</span>}
+                                <span className="flex-1 text-foreground font-semibold leading-relaxed line-clamp-1 sm:line-clamp-2">{spec.value}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-[12px] py-4 px-1 text-muted-foreground font-semibold">
+                              Chưa có dữ liệu thông số kỹ thuật.
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ) : (
+                      /* Expanded In-Place View (Full Tabs + Grouped Specs) - Compact & High-Density */
+                      <motion.div
+                        key="specs-expanded"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.22, delay: 0.05 }}
+                        className="relative z-10 flex-1 flex flex-col min-h-0"
+                      >
+                        {/* Compact Header */}
+                        <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-white/10 shrink-0">
+                          <h4 className="font-sans font-black text-[13px] sm:text-[13.5px] uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-primary text-[19px]">settings_suggest</span>
+                            Thông số kĩ thuật
+                          </h4>
+                          <BevelButton
+                            variant="subtle"
+                            size="icon"
+                            onClick={() => setIsSpecsExpanded(false)}
+                            className="size-6.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10"
+                            title="Thu gọn"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">close</span>
+                          </BevelButton>
+                        </div>
+
+                        {/* Compact Tabs bar */}
+                        <div className="flex items-center overflow-x-auto whitespace-nowrap scrollbar-none py-1.5 gap-1 shrink-0 border-b border-slate-200/40 dark:border-white/5">
+                          {specSections.map((sec) => {
+                            const isActive = activeTab === sec.id;
+                            return (
+                              <button
+                                key={sec.id}
+                                type="button"
+                                onClick={() => scrollToInPlaceSpec(sec.id)}
+                                className={`cursor-pointer transition-all duration-200 px-3 py-0.5 rounded-full text-[11px] sm:text-[11.5px] font-bold select-none ${
+                                  isActive
+                                    ? "bg-zinc-900 text-white shadow-xs dark:bg-white dark:text-zinc-900"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+                                }`}
+                              >
+                                {sec.title}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Content wrapper with clean scroll */}
+                        <div className="flex-1 relative overflow-hidden flex flex-col min-h-0 pt-0.5">
+                          <div
+                            ref={inPlaceSpecsContentRef}
+                            onScroll={handleInPlaceSpecsScroll}
+                            onWheel={(e) => e.stopPropagation()}
+                            className="flex-1 overflow-y-auto px-0.5 py-1.5 space-y-2.5 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth overscroll-contain [overscroll-behavior:contain] pb-2"
+                          >
+                            {specSections.length > 0 ? (
+                              specSections.map((sec) => (
+                                <div key={sec.id} id={`inplace-spec-${sec.id}`} className="space-y-1.5">
+                                  <div className="flex items-center gap-1.5 pb-0.5">
+                                    <span className="w-1.5 h-3 bg-primary rounded-xs shrink-0" />
+                                    <h5 className="font-sans font-black text-[11.5px] sm:text-[12px] text-foreground uppercase tracking-wider">
+                                      {sec.title}
+                                    </h5>
+                                  </div>
+                                  <div className="rounded-xl border border-slate-200/80 bg-white/70 dark:bg-zinc-900/60 dark:border-white/10 divide-y divide-slate-200/60 dark:divide-white/10 overflow-hidden shadow-2xs">
+                                    {sec.items.map((item, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex items-start gap-3 sm:gap-4 text-[11.5px] sm:text-[12px] py-1.5 sm:py-2 px-3 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                                      >
+                                        {item.label && (
+                                          <div className="w-[135px] sm:w-[155px] shrink-0 text-muted-foreground font-semibold pt-0.5">
+                                            {item.label}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 text-foreground font-semibold leading-relaxed">
+                                          {item.value}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="h-full flex items-center justify-center text-[12px] font-semibold text-muted-foreground py-8">
+                                Chưa có dữ liệu thông số kỹ thuật.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
               </div>
 
             </div>
 
             {/* RIGHT COLUMN: Pricing, Versions, Colors, Promo, Call To Action */}
-            <div className="lg:col-span-4 flex flex-col gap-5">
+            <div className="lg:col-span-4 flex flex-col gap-2 sm:gap-2.5">
 
-              {/* Premium Pricing & Quick Info Box */}
-              <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm">
-                <div className="flex items-baseline justify-between flex-wrap gap-2">
-                  <div className="flex items-baseline gap-2.5">
-                    <span className="font-sans font-black text-[28px] text-primary leading-none">
-                      {formattedCurrentPrice}
-                    </span>
-                    <span className="font-sans font-medium text-[14px] text-muted-foreground line-through leading-none">
+              {/* Premium Tactile Bevel Pricing & Smember Privilege Card - Optimized inner spacing with 3D ribbons */}
+              <div className="relative overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-2.5 sm:p-3 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 flex flex-col gap-2.5 select-none">
+                {/* Multi-corner ambient luxury glow aura wrapping around opposite corners - reduced by 20% */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                  <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
+                  <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+                </div>
+
+                {formattedDiscount && (
+                  <>
+                    {/* Top-Left 3D Ribbon: Giảm X% */}
+                    <div className="absolute -top-1.5 left-[-4px] h-[25px] bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] text-white text-[10.5px] font-black px-2.5 rounded-br-lg rounded-tr-sm shadow-[2px_2px_4px_rgba(0,0,0,0.15)] flex items-center justify-center z-30 select-none">
+                      {formattedDiscount}
+                    </div>
+                    {/* 3D Fold Corner for Left Ribbon */}
+                    <div className="absolute top-[19px] left-[-4px] w-[4px] h-[4px] bg-[#B43C00] z-20" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
+                  </>
+                )}
+
+                {/* Top-Right 3D Ribbon: Trả góp 0% in Emerald Theme with Animated Logo */}
+                <div className="absolute -top-1.5 right-[-4px] h-[25px] bg-gradient-to-l from-emerald-600 via-emerald-500 to-teal-500 text-white text-[10.5px] font-black px-2.5 rounded-bl-lg rounded-tl-sm shadow-[-2px_2px_5px_rgba(5,150,105,0.25)] flex items-center justify-center z-30 select-none">
+                  <motion.span
+                    animate={{ scale: [1, 1.25, 1], rotate: [0, -10, 10, 0] }}
+                    transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                    className="material-symbols-outlined text-[12.5px] leading-none mr-1 text-emerald-100 font-bold"
+                  >
+                    percent
+                  </motion.span>
+                  Trả góp 0%
+                </div>
+                {/* 3D Fold Corner for Right Ribbon */}
+                <div className="absolute top-[19px] right-[-4px] w-[4px] h-[4px] bg-[#065F46] z-20" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />
+
+                {/* Row 1: Primary Price & Old Price with comfortable breathing room under ribbons */}
+                <div className="relative z-10 flex items-center justify-between gap-2 flex-wrap px-0.5 pt-2.5 sm:pt-3">
+                  <div className="flex items-baseline gap-2 flex-wrap min-w-0">
+                    <div className="overflow-hidden h-[32px] sm:h-[34px] flex items-center">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={formattedCurrentPrice}
+                          initial={{ y: 12, opacity: 0, filter: "blur(3px)" }}
+                          animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                          exit={{ y: -12, opacity: 0, filter: "blur(3px)" }}
+                          transition={{ type: "spring", stiffness: 450, damping: 28 }}
+                          className="font-sans font-black text-[28px] sm:text-[30px] tracking-tight leading-none bg-gradient-to-r from-[#E02600] via-[#FF4D24] to-[#FF7A00] bg-clip-text text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.8)] block"
+                        >
+                          {formattedCurrentPrice}
+                        </motion.span>
+                      </AnimatePresence>
+                    </div>
+                    <span className="font-sans font-medium text-[13.5px] text-muted-foreground/80 line-through leading-none">
                       {formattedCurrentOldPrice}
                     </span>
                   </div>
-                  <span className="select-none rounded-full bg-secondary px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-secondary-foreground">
-                    Trả góp 0%
-                  </span>
                 </div>
 
-                <div className="flex items-center justify-between border-t pt-2.5 text-[13px] font-semibold text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px] text-emerald-500">verified</span>
-                    Giá đã bao gồm VAT
-                  </span>
-                  <span className="flex cursor-pointer items-center gap-0.5 text-primary hover:underline">
-                    Thu cũ đổi mới chỉ từ {formattedCurrentPrice}
-                  </span>
-                </div>
-              </div>
+                {/* Row 2: Smember Luxury Member Privilege Strip with Multi-Corner Animated Ambient Glow & Shimmer */}
+                <div className="group relative z-10 overflow-hidden flex select-none items-center justify-between gap-2 rounded-xl border border-white/80 bg-gradient-to-r from-orange-500/[0.08] via-amber-500/[0.05] to-secondary/80 p-2 sm:px-2.5 text-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_3px_rgba(0,0,0,0.03)] dark:border-white/10 dark:from-orange-500/10 dark:to-zinc-800/80">
+                  {/* Multi-corner animated ambient glow aura */}
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+                    {/* Top-Right drifting ambient warm spot */}
+                    <motion.div
+                      animate={{
+                        x: [0, 10, -6, 0],
+                        y: [0, -6, 4, 0],
+                        scale: [1, 1.25, 0.95, 1],
+                        opacity: [0.85, 1, 0.75, 0.85]
+                      }}
+                      transition={{
+                        duration: 4.2,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className="absolute -top-4 -right-4 h-16 w-16 rounded-full bg-gradient-to-br from-primary/[0.12] via-orange-500/[0.08] to-transparent blur-lg"
+                    />
 
-              {/* Minimalist Member Promotion Bar */}
-              <div className="flex select-none items-center gap-2 rounded-xl border bg-secondary p-3 text-secondary-foreground shadow-sm">
-                <span className="material-symbols-outlined text-primary text-[18px] font-bold">loyalty</span>
-                  <span className="text-[13px] font-bold leading-snug">
-                  Tiết kiệm thêm tới <span className="font-extrabold">230.000đ</span> cho Smember. <span className="cursor-pointer font-black underline transition-colors hover:text-foreground">Đăng ký ngay</span>
-                </span>
+                    {/* Bottom-Left drifting amber spot */}
+                    <motion.div
+                      animate={{
+                        x: [0, -10, 6, 0],
+                        y: [0, 6, -4, 0],
+                        scale: [1, 1.2, 0.9, 1],
+                        opacity: [0.75, 1, 0.7, 0.75]
+                      }}
+                      transition={{
+                        duration: 4.8,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className="absolute -bottom-4 -left-4 h-16 w-16 rounded-full bg-gradient-to-tr from-amber-500/[0.10] via-orange-400/[0.06] to-transparent blur-lg"
+                    />
+
+                    {/* Periodic smooth light shimmer sweep across the strip */}
+                    <motion.div
+                      animate={{
+                        x: ["-100%", "250%"]
+                      }}
+                      transition={{
+                        duration: 3.2,
+                        repeat: Infinity,
+                        repeatDelay: 1.5,
+                        ease: "easeInOut"
+                      }}
+                      className="absolute inset-y-0 w-2/5 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-12 pointer-events-none"
+                    />
+                  </div>
+
+                  <div className="relative z-10 flex items-center gap-2 min-w-0">
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.05, 1]
+                      }}
+                      transition={{
+                        duration: 2.8,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className="flex size-6 items-center justify-center rounded-lg bg-gradient-to-br from-[#FF5E3A] to-[#E03A12] text-white shadow-[0_2px_6px_rgba(255,77,36,0.35)] shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[15px] font-bold">workspace_premium</span>
+                    </motion.div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[12px] sm:text-[12.5px] font-semibold leading-tight truncate text-foreground">
+                        Smember giảm thêm <span className="font-black text-primary">230.000đ</span>
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-medium leading-none truncate mt-0.5">
+                        Tích lũy điểm & quà sinh nhật VIP
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { window.location.hash = "register"; if (onNavigate) onNavigate("auth"); }}
+                    className="relative z-10 flex items-center gap-0.5 px-2.5 py-1 rounded-lg bg-white/90 dark:bg-zinc-800 hover:bg-white text-primary text-[11px] font-black border border-primary/20 shadow-2xs hover:shadow-xs transition-all shrink-0 cursor-pointer group/btn"
+                  >
+                    <span>Đăng ký</span>
+                    <motion.span
+                      animate={{ x: [0, 2, 0] }}
+                      transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                      className="material-symbols-outlined text-[13px] font-bold"
+                    >
+                      chevron_right
+                    </motion.span>
+                  </button>
+                </div>
               </div>
 
               {/* Version Selection Grid */}
-              <div className="flex flex-col gap-2">
-                <h4 className="flex items-center justify-between font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <span>Chọn phiên bản:</span>
+              <div className="flex flex-col gap-1.5">
+                <h4 className="font-sans text-[12px] font-medium text-muted-foreground">
+                  Chọn phiên bản:
                 </h4>
                 <div className="grid grid-cols-2 gap-2">
                   {versions.map((ver) => {
                     const isSelected = activeVersion === ver.id;
+                    const verAttribute = product.attributeOptions?.find((attribute) => attribute.id === ver.id);
+                    const verPriceDetails = getApiAttributePriceDetails(verAttribute);
+                    const verPriceInt = verPriceDetails
+                      ? parseInt(verPriceDetails.present.replace(/\./g, "").replace("đ", ""), 10)
+                      : basePriceInt + getVersionModifier(ver.id) + getColorModifier(activeColor);
+                    const formattedVerPrice = verPriceDetails?.present || verPriceInt.toLocaleString("vi-VN") + "đ";
+
                     return (
                       <button
                         key={ver.id}
+                        type="button"
                         onClick={() => {
                           setActiveVersion(ver.id);
                           if (product.attributeOptions?.some((attribute) => attribute.id === ver.id)) {
                             setActiveColor(ver.id);
                           }
                         }}
-                        className={`relative p-3 rounded-xl border text-left flex flex-col justify-center min-h-[52px] cursor-pointer transition-all ${
+                        className={`group relative overflow-hidden p-2 rounded-xl text-center flex items-center justify-center min-h-[46px] cursor-pointer select-none transition-all duration-200 active:scale-[0.97] bg-gradient-to-b from-white/95 via-white/80 to-white/60 dark:from-zinc-900/90 dark:to-zinc-950/80 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] ${
                           isSelected
-                            ? "border-primary bg-secondary ring-1 ring-primary/30 shadow-sm"
-                            : "border-border bg-card hover:border-primary/40"
+                            ? "border-t border-t-[#FF7A50]/90 border-b border-b-[#D03008]/50 border-x border-x-[#FF4D24]/60"
+                            : "border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 dark:border-white/10 hover:from-white hover:via-white/85 hover:to-white/65 hover:border-primary/40"
                         }`}
                       >
-                        {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
-                            <span className="material-symbols-outlined text-[10px] font-black">check</span>
-                          </div>
-                        )}
-                        <span className={`font-sans text-[13px] font-bold ${isSelected ? "font-black text-foreground" : "text-foreground"}`}>
-                          {ver.title}
-                        </span>
-                        <span className="text-[11px] font-medium text-muted-foreground block mt-0.5 truncate">
-                          {ver.desc}
-                        </span>
+                        {/* Multi-corner subtle ambient aura - reduced by 20% */}
+                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+                          <div className={`absolute -top-3 -right-3 h-10 w-10 rounded-full transition-opacity duration-300 ${isSelected ? "bg-gradient-to-br from-primary/[0.14] to-transparent opacity-100" : "bg-gradient-to-br from-primary/[0.064] to-transparent opacity-50 group-hover:opacity-100"} blur-md`} />
+                          <div className={`absolute -bottom-3 -left-3 h-10 w-10 rounded-full transition-opacity duration-300 ${isSelected ? "bg-gradient-to-tr from-amber-500/[0.13] to-transparent opacity-100" : "bg-gradient-to-tr from-amber-500/[0.055] to-transparent opacity-40 group-hover:opacity-100"} blur-md`} />
+                        </div>
+
+                        <div className="relative z-10 flex flex-col justify-center min-w-0 py-0.5 px-2 text-center w-full">
+                          <span className="font-sans font-bold text-[12.5px] sm:text-[13px] leading-tight truncate text-foreground">
+                            {ver.title}
+                          </span>
+                          <span className="text-[10.5px] font-medium mt-0.5 leading-none text-muted-foreground">
+                            {formattedVerPrice}
+                          </span>
+                        </div>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Color Selection Grid */}
-              <div className="flex flex-col gap-2">
-                <h4 className="font-sans text-[13px] font-bold uppercase tracking-wider text-muted-foreground">
-                Màu sắc: <span className="font-extrabold text-foreground">{colors.find(c => c.id === activeColor)?.title}</span>
+              {/* Color Selection Grid with Synchronized Gentle Header & Softened Active Border */}
+              <div className="flex flex-col gap-1.5">
+                <h4 className="font-sans text-[12px] font-medium text-muted-foreground">
+                  Màu sắc:
                 </h4>
                 <div className="grid grid-cols-2 gap-2">
                   {colors.map((color) => {
@@ -2715,34 +3171,34 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                     return (
                       <button
                         key={color.id}
+                        type="button"
                         onClick={() => {
                           setActiveColor(color.id);
                           if (colorAttribute) {
                             setActiveVersion(colorAttribute.id);
                           }
                         }}
-                        className={`relative p-2 rounded-xl border text-left flex items-center gap-2 cursor-pointer transition-all ${
+                        className={`group relative overflow-hidden rounded-xl text-left flex items-center min-h-[46px] cursor-pointer select-none transition-all duration-200 active:scale-[0.97] bg-gradient-to-b from-white/95 via-white/80 to-white/60 dark:from-zinc-900/90 dark:to-zinc-950/80 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] ${
                           isSelected
-                            ? "border-primary bg-secondary ring-1 ring-primary/30 shadow-sm"
-                            : "border-border bg-card hover:border-primary/40"
+                            ? "border-t border-t-[#FF7A50]/90 border-b border-b-[#D03008]/50 border-x border-x-[#FF4D24]/60"
+                            : "border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 dark:border-white/10 hover:from-white hover:via-white/85 hover:to-white/65 hover:border-primary/40"
                         }`}
                       >
-                        {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 bg-primary text-white w-3.5 h-3.5 rounded-full flex items-center justify-center select-none z-10">
-                            <span className="material-symbols-outlined text-[10px] font-black">check</span>
-                          </div>
-                        )}
-                        <div className="flex size-7 shrink-0 items-center justify-center">
-                          <span
-                            className={`size-5 rounded-full ${color.swatchClass}`}
-                            aria-hidden="true"
-                          />
+                        {/* Multi-corner subtle ambient aura - reduced by 20% */}
+                        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+                          <div className={`absolute -top-3 -right-3 h-10 w-10 rounded-full transition-opacity duration-300 ${isSelected ? "bg-gradient-to-br from-primary/[0.14] to-transparent opacity-100" : "bg-gradient-to-br from-primary/[0.064] to-transparent opacity-50 group-hover:opacity-100"} blur-md`} />
+                          <div className={`absolute -bottom-3 -left-3 h-10 w-10 rounded-full transition-opacity duration-300 ${isSelected ? "bg-gradient-to-tr from-amber-500/[0.13] to-transparent opacity-100" : "bg-gradient-to-tr from-amber-500/[0.055] to-transparent opacity-40 group-hover:opacity-100"} blur-md`} />
                         </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-sans font-bold text-[13px] text-foreground leading-tight truncate">
+
+                        {/* Left Color Swatch Strip - Pinned flush to left edge with rounded corners and zero gap */}
+                        <div className={`absolute left-0 inset-y-0 w-[7px] ${color.swatchClass} rounded-l-[11px] border-r border-dashed border-black/25 dark:border-white/25 pointer-events-none z-10`} />
+
+                        {/* Right Content with Clean Neutral Typography */}
+                        <div className="relative z-10 flex flex-col justify-center min-w-0 py-1.5 pl-4 pr-2">
+                          <span className="font-sans font-bold text-[12.5px] sm:text-[13px] leading-tight truncate text-foreground">
                             {color.title}
                           </span>
-                          <span className="text-[10.5px] font-medium text-muted-foreground mt-0.5 leading-none">
+                          <span className="text-[10.5px] font-medium mt-0.5 leading-none text-muted-foreground">
                             {formattedColorPrice}
                           </span>
                         </div>
@@ -2752,110 +3208,106 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                 </div>
               </div>
 
-              {/* Promotion & Coupon Card - Seamless borderless design */}
-              <div className="overflow-hidden rounded-xl border bg-card p-1 shadow-sm">
-                {/* Promo header */}
-                <div className="px-3 py-1.5 flex items-center gap-2 select-none">
-                  <span className="material-symbols-outlined text-primary text-[15px] font-bold">redeem</span>
-                  <span className="font-sans font-bold text-[11px] text-primary uppercase tracking-wider">Khuyến mãi đi kèm</span>
+              {/* Promotion & Coupon Card with Tactile Bevel Glass & Ambient Luxury Glow Aura */}
+              <div className="relative overflow-hidden rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-3 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 flex flex-col gap-2.5">
+                {/* Multi-corner ambient luxury glow aura wrapping around opposite corners - reduced by 20% */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                  <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
+                  <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
                 </div>
 
-                <div className="p-2.5 flex flex-col gap-2.5">
-                  <div className="relative flex h-[52px] items-stretch overflow-hidden rounded-lg border bg-card">
-                    <div className="w-[40px] bg-primary flex flex-col justify-center items-center shrink-0 px-0.5 select-none">
-                      <span className="text-white text-[8px] font-black leading-none uppercase">GIẢM</span>
-                      <span className="text-white text-[11px] font-black leading-none mt-0.5">5%</span>
-                    </div>
-                    <div className="flex flex-col justify-between flex-1 py-1.5 px-3 bg-card border-l border-dashed border-border/60 min-w-0">
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-foreground text-[10.5px] leading-tight truncate">Voucher 5% cho thành viên mới</span>
-                        <span className="text-[9px] text-muted-foreground font-semibold leading-none truncate mt-0.5">Tối đa 500K cho hóa đơn đầu</span>
-                      </div>
-                      <div className="flex items-center justify-between mt-auto">
-                        <span className="text-[8.5px] text-muted-foreground font-bold uppercase font-mono tracking-wider">CLOUD5%</span>
-                        <button
-                          onClick={handleClaimVoucher}
-                          disabled={voucherCollected}
-                          className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all leading-none ${
-                            voucherCollected
-                              ? "cursor-default bg-secondary text-secondary-foreground"
-                              : "cursor-pointer bg-primary text-primary-foreground hover:bg-primary/80"
-                          }`}
-                        >
-                          {voucherCollected ? "Đã nhận" : "Nhận ngay"}
-                        </button>
-                      </div>
-                    </div>
+                {/* Promo header */}
+                <div className="relative z-10 flex items-center justify-between select-none">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-primary text-[16px] font-bold">redeem</span>
+                    <span className="font-sans font-bold text-[11px] text-primary uppercase tracking-wider">Khuyến mãi & Mã giảm giá</span>
                   </div>
+                  <span className="text-[10.5px] font-semibold text-muted-foreground">1 mã có sẵn</span>
+                </div>
 
-                  {/* Coupon Terms list */}
-                  <div className="flex flex-col gap-2 text-[11px] font-medium leading-relaxed text-muted-foreground">
-                    <div className="flex items-start gap-2">
-                      <span className="text-emerald-500 font-bold shrink-0">1</span>
-                      <p>
-                        Trả góp <span className="font-bold text-foreground">0% lãi suất</span>, tối đa 9 tháng, trả trước từ 10% qua CTTC hoặc 0đ qua thẻ tín dụng. <span className="cursor-pointer select-none font-bold text-primary hover:underline">Xem chi tiết</span>
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-emerald-500 font-bold shrink-0">2</span>
-                      <p>Nhận thêm miễn phí 1 năm bảo mật Cloud Shield và hỗ trợ di trú dữ liệu.</p>
-                    </div>
+                {/* Optical Bevel Voucher Ticket Component */}
+                <div className="relative z-10">
+                  <VoucherCard
+                    code="CLOUD5%"
+                    discount="5%"
+                    discountLabel="GIẢM"
+                    title="Voucher 5% thành viên mới"
+                    description="Tối đa 500K đơn đầu"
+                    isCollected={voucherCollected}
+                    onClaim={handleClaimVoucher}
+                  />
+                </div>
+
+                {/* Coupon Terms list */}
+                <div className="relative z-10 flex flex-col gap-1.5 text-[11px] font-medium leading-relaxed text-muted-foreground pt-1 border-t border-slate-200/60 dark:border-white/10">
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-500 font-bold shrink-0">1</span>
+                    <p>
+                      Trả góp <span className="font-bold text-foreground">0% lãi suất</span>, tối đa 9 tháng qua CTTC hoặc thẻ tín dụng. <span className="cursor-pointer select-none font-bold text-primary hover:underline">Xem chi tiết</span>
+                    </p>
                   </div>
-
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-500 font-bold shrink-0">2</span>
+                    <p>Nhận thêm miễn phí 1 năm bảo mật Cloud Shield và hỗ trợ di trú dữ liệu.</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex select-none flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sticky top-6 z-20">
-                <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="relative flex select-none flex-col gap-2.5 rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-3 sm:p-3.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 sticky top-6 z-20">
+                {/* Multi-corner ambient luxury glow aura - reduced by 20% */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                  <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
+                  <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
+                </div>
+
+                <div className="relative z-10 flex items-center justify-between flex-wrap gap-2">
                   <h4 className="font-sans font-bold text-[11.5px] uppercase text-foreground tracking-wider flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-primary text-[18px]">add_circle</span>
                     Phụ kiện mua cùng
                   </h4>
-                  {/* Page indicator dots moved to header */}
-                  <div className="flex items-center justify-center gap-1.5 select-none">
-                    {Array.from({ length: Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) }).map((_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setAccPage(idx)}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${accPage === idx ? "w-3 bg-primary" : "w-1.5 bg-muted-foreground/35"}`}
-                        aria-label={`Go to page ${idx + 1}`}
-                      />
-                    ))}
+                  {/* Header navigation with tactile Bevel arrow controls and indicator dots */}
+                  <div className="flex items-center gap-2 select-none">
+                    <div className="flex items-center justify-center gap-1.5 mr-0.5">
+                      {Array.from({ length: Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) }).map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setAccPage(idx)}
+                          className={`h-1.5 rounded-full transition-all duration-300 ${accPage === idx ? "w-3 bg-primary" : "w-1.5 bg-muted-foreground/35"}`}
+                          aria-label={`Go to page ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+                    {/* Sleek Bevel Navigation Arrows */}
+                    <div className="flex items-center gap-1">
+                      <BevelButton
+                        type="button"
+                        variant="button"
+                        size="none"
+                        onClick={() => setAccPage(prev => Math.max(0, prev - 1))}
+                        disabled={accPage === 0}
+                        className="size-6.5 rounded-lg flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none text-foreground hover:text-primary cursor-pointer"
+                        aria-label="Trang trước"
+                      >
+                        <ChevronLeftIcon className="size-3.5" />
+                      </BevelButton>
+                      <BevelButton
+                        type="button"
+                        variant="button"
+                        size="none"
+                        onClick={() => setAccPage(prev => Math.min(Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1, prev + 1))}
+                        disabled={accPage === Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1}
+                        className="size-6.5 rounded-lg flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none text-foreground hover:text-primary cursor-pointer"
+                        aria-label="Trang tiếp"
+                      >
+                        <ChevronRightIcon className="size-3.5" />
+                      </BevelButton>
+                    </div>
                   </div>
                 </div>
 
-                {/* Left/Right Carousel Control Zones & Grid Wrapper */}
-                <div className="group/carousel relative -mx-4 px-4">
-                  <button
-                    onClick={() => setAccPage(prev => Math.max(0, prev - 1))}
-                    disabled={accPage === 0}
-                    className={`group/btn absolute inset-y-0 left-0 z-20 flex w-16 items-center justify-start rounded-l-xl bg-gradient-to-r from-card via-card/70 to-transparent pl-3 text-primary transition-all duration-500 ${
-                      accPage === 0
-                        ? "pointer-events-none opacity-0"
-                        : "cursor-pointer opacity-0 hover:opacity-100 active:scale-[0.99] group-hover/carousel:opacity-100"
-                    }`}
-                    aria-label="Previous Page"
-                  >
-                    <span className="flex size-9 items-center justify-center rounded-full border border-primary/20 bg-background/90 shadow-[0_4px_14px_rgba(0,0,0,0.08)] backdrop-blur-md transition-transform duration-300 group-hover/btn:scale-110">
-                      <span className="material-symbols-outlined text-[18px] font-bold">west</span>
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => setAccPage(prev => Math.min(Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1, prev + 1))}
-                    disabled={accPage === Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1}
-                    className={`group/btn absolute inset-y-0 right-0 z-20 flex w-16 items-center justify-end rounded-r-xl bg-gradient-to-l from-card via-card/70 to-transparent pr-3 text-primary transition-all duration-500 ${
-                      accPage === Math.ceil((accTab === "watch" ? watchAccessories : cloudAccessories).length / 3) - 1
-                        ? "pointer-events-none opacity-0"
-                        : "cursor-pointer opacity-0 hover:opacity-100 active:scale-[0.99] group-hover/carousel:opacity-100"
-                    }`}
-                    aria-label="Next Page"
-                  >
-                    <span className="flex size-9 items-center justify-center rounded-full border border-primary/20 bg-background/90 shadow-[0_4px_14px_rgba(0,0,0,0.08)] backdrop-blur-md transition-transform duration-300 group-hover/btn:scale-110">
-                      <span className="material-symbols-outlined text-[18px] font-bold">east</span>
-                    </span>
-                  </button>
-
+                {/* Grid Wrapper */}
+                <div className="relative z-10">
                   {/* Horizontal Grid of accessory items - Paginated (3 items per page in a beautiful single-column stack) */}
                   <AnimatePresence mode="wait">
                     <motion.div
@@ -2864,7 +3316,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -20 }}
                       transition={{ duration: 0.2 }}
-                      className="grid grid-cols-1 gap-3 px-1 sm:px-2 w-full"
+                      className="grid grid-cols-1 gap-2 w-full"
                     >
                       {(accTab === "watch" ? watchAccessories : cloudAccessories)
                         .slice(accPage * 3, (accPage + 1) * 3)
@@ -2873,7 +3325,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                           return (
                           <div
                             key={item.id}
-                            className="relative flex h-[96px] items-center gap-2.5 overflow-visible rounded-xl border bg-card p-2 text-card-foreground transition-all hover:border-primary/40 hover:shadow-md sm:h-[112px] sm:gap-3 sm:p-2.5"
+                            className="relative flex h-[96px] items-center gap-2.5 overflow-visible rounded-xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-2 text-card-foreground shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 transition-all hover:border-primary/40 hover:shadow-md sm:h-[104px] sm:gap-3 sm:p-2.5"
                           >
                             {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
                             <div className="absolute -top-1.5 left-[-4px] h-[22px] bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] text-white text-[9.5px] font-black px-2 rounded-br-md rounded-tr-sm shadow-[1px_1px_3px_rgba(0,0,0,0.15)] flex items-center justify-center z-20 select-none">
@@ -2883,12 +3335,15 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                             <div className="absolute top-[16px] left-[-4px] w-[4px] h-[4px] bg-[#B43C00] z-10" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
 
                             {/* Left side: Product Image in a matching aspect ratio container */}
-                            <div className="relative -my-2 -ml-2 flex h-[calc(100%+1rem)] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-l-xl bg-transparent p-0 sm:-my-2.5 sm:-ml-2.5 sm:h-[calc(100%+1.25rem)] sm:w-[120px]">
+                            <div className="relative -my-2 -ml-2 flex h-[calc(100%+1rem)] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-l-xl bg-transparent p-0 sm:-my-2.5 sm:-ml-2.5 sm:h-[calc(100%+1.25rem)] sm:w-[114px]">
                               <img
                                 src={item.img}
                                 alt={item.name}
                                 className="size-full object-cover transition-transform duration-500 hover:scale-105"
                                 referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src = "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=400&auto=format&fit=crop";
+                                }}
                               />
                             </div>
 
@@ -2898,22 +3353,24 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                               <h5 className="font-bold text-[12px] sm:text-[13px] text-foreground leading-snug line-clamp-1 hover:text-black transition-colors cursor-pointer" title={item.name}>
                                 {item.name}
                               </h5>
-                              <span className="text-[9.5px] sm:text-[10px] font-semibold text-muted-foreground block mt-0.5 leading-none">
+                              <span className="text-[10px] sm:text-[10.5px] font-semibold text-muted-foreground block mt-0.5 leading-none">
                                 {item.smember}
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between gap-2 mt-1">
+                            <div className="flex items-center justify-between gap-2 mt-1.5">
                               <div className="flex flex-col min-w-0">
-                                <span className="font-extrabold text-[12.5px] sm:text-[13.5px] text-primary leading-none">
+                                <span className="font-extrabold text-[13px] sm:text-[14px] text-primary leading-none">
                                   {item.price}
                                 </span>
-                                <span className="text-[9.5px] sm:text-[10.5px] text-muted-foreground line-through leading-none mt-1">
+                                <span className="text-[10px] sm:text-[10.5px] text-muted-foreground line-through leading-none mt-0.5">
                                   {item.oldPrice}
                                 </span>
                               </div>
 
-                              <button
+                              <BevelButton
+                                variant={isAdded ? "button" : "primary"}
+                                size="sm"
                                 onClick={(e) => {
                                   if (isAdded) return;
                                   setAddedAccs([...addedAccs, item.id]);
@@ -2921,24 +3378,25 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                                     onAddToCart(item.name, item.price, e);
                                   }
                                 }}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shrink-0 select-none cursor-pointer ${
+                                disabled={isAdded}
+                                className={`h-7 px-3 text-[10.5px] font-bold rounded-lg shrink-0 select-none cursor-pointer transition-all ${
                                   isAdded
-                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                    : "border border-transparent bg-secondary text-secondary-foreground hover:bg-muted active:scale-95"
+                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-none cursor-default"
+                                    : "shadow-[0_2px_8px_rgba(255,77,36,0.35),inset_0_1px_0_rgba(255,255,255,0.4)]"
                                 }`}
                               >
                                 {isAdded ? (
-                                  <>
-                                    <span className="material-symbols-outlined text-[11px] font-bold">check</span>
+                                  <span className="flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[12px] font-bold">check</span>
                                     Đã thêm
-                                  </>
+                                  </span>
                                 ) : (
-                                  <>
+                                  <span className="flex items-center gap-1">
                                     Thêm
-                                    <span className="material-symbols-outlined text-[11px] font-bold">add</span>
-                                  </>
+                                    <span className="material-symbols-outlined text-[12px] font-bold">add</span>
+                                  </span>
                                 )}
-                              </button>
+                              </BevelButton>
                             </div>
                           </div>
                         </div>
@@ -2946,22 +3404,30 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                       })}
                     </motion.div>
                   </AnimatePresence>
-              </div>
+                </div>
               </div>
 
             </div>
 
-          </div>
+            </div>
 
-          {/* 2. ĐÁNH GIÁ & NHẬN XÉT SECTION (CellphoneS style but with premium airiness) */}
-          <div className="mt-6 sm:mt-8 rounded-xl border bg-card p-5 shadow-sm sm:p-6">
-            <h2 className="font-sans font-bold text-sm sm:text-base text-foreground mb-5 flex items-center gap-2 select-none">
-              <span className="material-symbols-outlined text-primary font-black text-[20px]">reviews</span>
-              <span>Đánh giá & nhận xét {product.name} Cloud Server</span>
-            </h2>
+          {/* 2. ĐÁNH GIÁ & NHẬN XÉT SECTION with Tactile Bevel Glass & Ambient Luxury Glow Aura */}
+          <div className="relative mt-4 sm:mt-5 mx-2.5 sm:mx-3.5 overflow-hidden rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-4 sm:p-5 pb-20 sm:pb-24 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10">
+            {/* Multi-corner ambient luxury glow aura - reduced by 20% */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+              <div className="absolute -top-12 -right-12 h-44 w-44 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-3xl" />
+              <div className="absolute -bottom-12 -left-12 h-44 w-44 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-3xl" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+            </div>
 
-            {/* Overall Summary Row */}
-            <div className="mb-6 grid grid-cols-1 items-center gap-6 rounded-xl border bg-background p-5 text-card-foreground shadow-sm md:grid-cols-3">
+            <div className="relative z-10">
+              <h2 className="font-sans font-bold text-sm sm:text-base text-foreground mb-4 flex items-center gap-2 select-none">
+                <span className="material-symbols-outlined text-primary font-black text-[20px]">reviews</span>
+                <span>Đánh giá & nhận xét {product.name} Cloud Server</span>
+              </h2>
+
+              {/* Overall Summary Row */}
+              <div className="mb-5 grid grid-cols-1 items-center gap-6 rounded-xl border border-slate-200/70 dark:border-white/10 bg-white/70 dark:bg-zinc-800/60 backdrop-blur-sm p-5 text-card-foreground shadow-2xs md:grid-cols-3">
 
               {/* Left Side: Score & Button */}
               <div className="flex flex-col items-center justify-center text-center md:border-r border-border md:pr-6 py-2">
@@ -2972,9 +3438,9 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                   ))}
                 </div>
                 <span className="text-[11.5px] font-bold text-muted-foreground mb-4">1 đánh giá và phản hồi</span>
-                <button className="cursor-pointer rounded-xl bg-primary px-5 py-2.5 font-sans text-[11px] font-black uppercase tracking-wider text-primary-foreground transition-all hover:bg-primary/80 active:scale-95">
+                <BevelButton variant="primary" size="md" className="h-9 px-5 rounded-xl font-sans text-[11px] font-black uppercase tracking-wider">
                   Viết đánh giá
-                </button>
+                </BevelButton>
               </div>
 
               {/* Middle Side: Progress Bars */}
@@ -3020,7 +3486,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
             </div>
 
             {/* Filter Chips Bar */}
-            <div className="flex items-center gap-2 flex-wrap mb-5 select-none border-b border-border pb-4">
+            <div className="flex items-center gap-2 flex-wrap mb-4 select-none border-b border-border pb-3">
               <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mr-1">Bộ lọc:</span>
               {[
                 { label: "Tất cả đánh giá", active: true },
@@ -3031,10 +3497,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
               ].map((chip, cIdx) => (
                 <button
                   key={cIdx}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                  className={`h-7 px-3 rounded-lg text-[11px] font-bold transition-all cursor-pointer select-none ${
                     chip.active
-                      ? "border-primary/30 bg-secondary text-primary"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                      ? "bg-foreground text-background shadow-xs"
+                      : "border border-border bg-card text-foreground hover:bg-muted"
                   }`}
                 >
                   {chip.label}
@@ -3042,14 +3508,14 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
               ))}
             </div>
 
-            {/* Reviews List */}
-            <div className="flex flex-col gap-4">
+            {/* Reviews List - Divided cleanly */}
+            <div className="divide-y divide-border">
 
-              {/* Review Card 1 */}
-              <div className="flex gap-4 rounded-xl border bg-background p-4 shadow-sm sm:p-5">
+              {/* Review Item */}
+              <div className="pt-2 pb-1 flex gap-4">
 
                 {/* User Avatar Circle */}
-                <div className="flex size-9 shrink-0 select-none items-center justify-center rounded-full border bg-muted text-xs font-extrabold uppercase text-muted-foreground">
+                <div className="flex size-9 shrink-0 select-none items-center justify-center rounded-full border border-border bg-muted text-xs font-extrabold uppercase text-muted-foreground">
                   C
                 </div>
 
@@ -3061,28 +3527,28 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                   </div>
 
                   {/* Stars & Verdict */}
-                  <div className="flex items-center gap-2 mb-2.5">
+                  <div className="flex items-center gap-2 mb-2">
                     <div className="flex items-center gap-0.5 text-primary select-none">
                       {[1, 2, 3, 4, 5].map((s) => (
                         <span key={s} className="material-symbols-outlined text-[12px] fill-current">star</span>
                       ))}
                     </div>
-                    <span className="text-emerald-600 text-[9.5px] font-bold uppercase bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/60 flex items-center gap-0.5 select-none">
+                    <span className="text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded flex items-center gap-0.5 select-none">
                       <span className="material-symbols-outlined text-[10px] font-bold">verified</span>
                       Tuyệt vời
                     </span>
                   </div>
 
                   {/* Experience tags */}
-                  <div className="flex items-center gap-2 flex-wrap mb-3.5 select-none">
-                    <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                      SLA hoạt động: <span className="text-emerald-600 font-bold">Cực ổn định (100%)</span>
+                  <div className="flex items-center gap-2 flex-wrap mb-2.5 select-none">
+                    <span className="h-5 px-2 text-[10px] font-semibold text-muted-foreground inline-flex items-center border border-border/80 bg-secondary/80 rounded-md">
+                      SLA hoạt động: <span className="text-emerald-600 font-bold ml-1">Cực ổn định (100%)</span>
                     </span>
-                    <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                      Hiệu năng xử lý: <span className="text-emerald-600 font-bold">Siêu tốc và mượt mà</span>
+                    <span className="h-5 px-2 text-[10px] font-semibold text-muted-foreground inline-flex items-center border border-border/80 bg-secondary/80 rounded-md">
+                      Hiệu năng xử lý: <span className="text-emerald-600 font-bold ml-1">Siêu tốc và mượt mà</span>
                     </span>
-                    <span className="rounded-md border bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                      Cấu hình: <span className="text-emerald-600 font-bold">Linh hoạt</span>
+                    <span className="h-5 px-2 text-[10px] font-semibold text-muted-foreground inline-flex items-center border border-border/80 bg-secondary/80 rounded-md">
+                      Cấu hình: <span className="text-emerald-600 font-bold ml-1">Linh hoạt</span>
                     </span>
                   </div>
 
@@ -3099,14 +3565,17 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
 
           </div>
 
+          </div>
+
+          </div>
+
+          {/* Progressive blur bottom overlay to smoothly fade out scrolling content before bottom bar */}
+          <ProgressiveBlur position="bottom" height={52} className="z-20 pointer-events-none rounded-b-2xl" />
         </div>
 
-          <ProgressiveBlur position="bottom" height={72} className="z-20" />
-        </div>
-
-        {/* Floating bottom actions bar with 3D discount ribbon */}
-        <div className="absolute bottom-5 left-1/2 z-30 flex h-[72px] w-[calc(100%-3rem)] max-w-[850px] -translate-x-1/2 items-center justify-between overflow-visible rounded-xl border border-white/20 bg-background/20 p-3 shadow-[0_20px_60px_rgba(255,77,36,0.11),0_8px_28px_rgba(0,0,0,0.07)] backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 sm:w-[85%]">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 via-transparent to-transparent" />
+        {/* Floating bottom actions bar with 3D discount ribbon & enhanced frosted glass */}
+        <div className="absolute bottom-5 left-1/2 z-30 flex h-[72px] w-[calc(100%-3rem)] max-w-[850px] -translate-x-1/2 items-center justify-between overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 sm:w-[85%] select-none">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/[0.04] via-transparent to-transparent" />
           {formattedDiscount && (
             <>
               {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
@@ -3118,42 +3587,62 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
             </>
           )}
 
-          {/* Left segment: Image, Name, Price */}
+          {/* Left segment: Image, Name, Price & Selected Variant */}
           <div className="relative -my-3 -ml-3 flex min-w-0 items-center gap-3 self-stretch">
-            <div className="hidden h-full w-20 shrink-0 items-center justify-center overflow-hidden rounded-l-xl bg-transparent p-0 sm:flex">
+            <div className="hidden h-full w-20 shrink-0 items-center justify-center overflow-hidden rounded-l-2xl bg-transparent p-0 sm:flex">
               <img
                 src={images[0]}
                 alt={product.name}
                 className="size-full object-cover"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=400&auto=format&fit=crop";
+                }}
               />
             </div>
-            <div className="flex flex-col min-w-0">
-              <h4 className="font-sans font-bold text-[12px] text-foreground truncate max-w-[140px] md:max-w-[280px] hidden md:block">
-                {product.name} Cloud Server
-              </h4>
-              {selectedOptionLabel && (
-                <span className="hidden max-w-[140px] truncate text-[10px] font-bold leading-none text-muted-foreground md:block md:max-w-[280px]">
-                  Đã chọn: {selectedOptionLabel}
-                </span>
-              )}
-              <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2">
-                <span className="font-sans font-extrabold text-[13px] sm:text-[14.5px] text-primary leading-tight">
-                  {formattedCurrentPrice}
-                </span>
-                <span className="font-sans font-medium text-[10px] sm:text-[11.5px] text-muted-foreground line-through leading-none">
-                  {formattedCurrentOldPrice}
-                </span>
+            <div className="flex flex-col justify-center min-w-0 pr-2">
+              <div className="flex items-center min-h-[18px]">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={fullProductTitle}
+                    initial={{ opacity: 0, y: 3, filter: "blur(4px)" }}
+                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, y: -3, filter: "blur(4px)" }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    className="font-sans font-bold text-[12.5px] sm:text-[13.5px] text-foreground truncate max-w-[180px] sm:max-w-[280px] md:max-w-[360px] leading-tight block"
+                  >
+                    {fullProductTitle}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+              <div className="flex items-baseline gap-2 mt-1">
+                <div className="overflow-hidden h-5 sm:h-6 flex items-center">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.span
+                      key={formattedCurrentPrice}
+                      initial={{ y: 8, opacity: 0, filter: "blur(2px)" }}
+                      animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                      exit={{ y: -8, opacity: 0, filter: "blur(2px)" }}
+                      transition={{ type: "spring", stiffness: 450, damping: 28 }}
+                      className="font-sans font-black text-[15px] sm:text-[16px] text-primary leading-none block"
+                    >
+                      {formattedCurrentPrice}
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
+                {formattedCurrentOldPrice && (
+                  <span className="font-sans font-medium text-[11px] sm:text-[11.5px] text-muted-foreground/75 line-through leading-none">
+                    {formattedCurrentOldPrice}
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
           {/* Right segment: Buttons */}
           <div className="relative flex items-center gap-2 shrink-0">
-
-
-            <Button
-              variant="outline"
+            <button
+              type="button"
               onClick={(e) => {
                 const executeInstallment = createAuthAction({
                   onAuthenticated: () => {
@@ -3177,22 +3666,22 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                 });
                 executeInstallment();
               }}
-              className="hidden h-10 rounded-xl border-primary text-[11.5px] font-bold text-primary hover:bg-secondary sm:flex sm:px-4 sm:text-[12px]"
+              className="hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] text-[11.5px] sm:text-[12px] font-black shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18),inset_0_1px_0_rgba(255,255,255,1)] active:scale-95 transition-all duration-200 cursor-pointer whitespace-nowrap"
             >
               Trả góp 0%
-            </Button>
+            </button>
 
-            <Button
-              variant="default"
+            <BevelButton
+              variant="primary"
+              size="none"
               onClick={handleBuyNow}
-              className="flex h-10 rounded-xl bg-primary px-5 py-2 text-[11.5px] font-extrabold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-97 sm:px-6 sm:text-[12px]"
+              className="flex h-10 rounded-xl px-5 sm:px-6 text-[11.5px] sm:text-[12px] font-black uppercase tracking-wider text-white shadow-[0_4px_16px_rgba(255,77,36,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 transition-all"
             >
               MUA NGAY
-            </Button>
+            </BevelButton>
 
-            <Button
-              variant="outline"
-              size="icon"
+            <button
+              type="button"
               onClick={(e) => {
                 if (onAddToCart) {
                   const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
@@ -3201,133 +3690,18 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                 }
                 onClose();
               }}
-              className="size-10 rounded-xl border-primary text-primary hover:bg-secondary active:scale-95"
+              className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0"
               title="Thêm vào giỏ hàng"
             >
               <ShoppingCartIcon className="size-5 font-bold" />
-            </Button>
+            </button>
           </div>
 
         </div>
 
-        {/* Specs detail popup modal */}
-        <AnimatePresence>
-          {showSpecsPopup && (
-            <div
-              className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 select-none"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {/* Backdrop with elegant glassmorphic blur */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setShowSpecsPopup(false);
-                }}
-                className="absolute inset-0 bg-black/40 backdrop-blur-md cursor-pointer"
-              />
 
-              {/* Specs modal container box - centered rectangle */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                transition={{ type: "spring", duration: 0.45 }}
-                className="relative w-full max-w-[850px] h-[80vh] max-h-[720px] min-h-[400px] bg-card rounded-3xl shadow-[0_24px_60px_rgba(0,0,0,0.2)] border border-slate-150 z-10 flex flex-col overflow-hidden text-foreground"
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/50/50 shrink-0">
-                  <h3 className="font-sans font-black text-[15px] sm:text-[17px] text-foreground uppercase tracking-wide flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary text-[20px] sm:text-[22px]">settings_suggest</span>
-                    Thông số kĩ thuật
-                  </h3>
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setShowSpecsPopup(false);
-                    }}
-                    className="w-8 h-8 rounded-full bg-muted hover:bg-slate-200 text-muted0 flex items-center justify-center cursor-pointer transition-all active:scale-95"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">close</span>
-                  </button>
-                </div>
 
-                {/* Tabs bar */}
-                <div className="flex items-center overflow-x-auto whitespace-nowrap scrollbar-none border-b border-border bg-card px-4 py-2 gap-1 shrink-0">
-                  {specSections.map((sec) => (
-                    <button
-                      key={sec.id}
-                      onClick={() => {
-                        setActiveTab(sec.id);
-                        const el = document.getElementById(`modal-spec-${sec.id}`);
-                        if (el) {
-                          el.scrollIntoView({ behavior: "smooth", block: "start" });
-                        }
-                      }}
-                      className={`px-4 py-2 text-[12.5px] sm:text-[13.5px] font-bold rounded-xl transition-all cursor-pointer ${
-                        activeTab === sec.id
-                          ? "text-primary bg-primary/5 font-extrabold"
-                          : "text-muted0 hover:text-foreground hover:bg-muted/50"
-                      }`}
-                    >
-                      {sec.title}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Content wrapper with scroll indicators */}
-                <div className="flex-1 relative overflow-hidden flex flex-col">
-                  {/* Top progressive blur overlay */}
-                  <ProgressiveBlur position="top" height={32} className="z-20" />
-
-                  {/* Content */}
-                  <div
-                    ref={contentRef}
-                    onScroll={handleModalScroll}
-                    className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scroll-smooth bg-card"
-                  >
-                    {specSections.length > 0 ? specSections.map((sec) => (
-                      <div key={sec.id} id={`modal-spec-${sec.id}`} className="space-y-3 pt-1">
-                        <h4 className="font-sans font-extrabold text-[13px] sm:text-[14px] text-foreground uppercase tracking-wider pb-1.5 border-b border-border flex items-center gap-1.5">
-                          <span className="w-1.5 h-4 bg-primary rounded-sm"></span>
-                          {sec.title}
-                        </h4>
-                        <div className="border border-border rounded-xl overflow-hidden divide-y divide-slate-100 shadow-sm bg-card">
-                          {sec.items.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className="grid grid-cols-1 sm:grid-cols-12 text-[12px] sm:text-[12.5px] py-3 px-4 transition-colors hover:bg-muted/50/40"
-                            >
-                              {item.label && (
-                                <div className="sm:col-span-4 text-muted0 font-bold sm:pr-4 flex items-center">
-                                  {item.label}
-                                </div>
-                              )}
-                              <div className={`${item.label ? "sm:col-span-8" : "sm:col-span-12"} text-foreground font-semibold mt-1 sm:mt-0 leading-relaxed`}>
-                                {item.value}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )) : (
-                      <div className="h-full flex items-center justify-center text-[12px] font-semibold text-muted-foreground">
-                        Chưa có dữ liệu specifications từ API.
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bottom progressive blur overlay */}
-                  <ProgressiveBlur position="bottom" height={40} className="z-20" />
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-
-      </motion.div>
+      </Bevel>
     </div>
   );
 }

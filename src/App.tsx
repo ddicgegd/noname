@@ -134,6 +134,7 @@ export default function App() {
 
   const [activeBrand, setActiveBrand] = useState("Samsung");
   const [buyNowProduct, setBuyNowProduct] = useState<any>(null);
+  const [isProductDetailOpen, setIsProductDetailOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     const cached = getCachedCart();
     return cached ? mapApiCartToCartItems(cached) : [];
@@ -188,6 +189,7 @@ export default function App() {
 
   // Custom navigate function to sync with address bar
   const navigate = (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms") => {
+    setIsProductDetailOpen(false);
     setCurrentPage(page);
     let targetPath = getPathFromPage(page);
     if (page === "auth") {
@@ -360,7 +362,7 @@ export default function App() {
       <SplashScreen />
 
       {/* 2. Synchronized Top Floating Glassmorphism Navbar */}
-      {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && (
+      {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && !isProductDetailOpen && (
         <Navbar 
           currentPage={currentPage}
           onNavigate={navigate}
@@ -404,6 +406,7 @@ export default function App() {
               onFlyEffect={handleFlyEffect}
               onSpawnStars={handleSpawnStars}
               onFlyToAccount={handleFlyToAccount}
+              onDetailOpenChange={setIsProductDetailOpen}
               onBuyNow={(product) => {
                 setBuyNowProduct(product);
                 navigate("order");

@@ -20,6 +20,7 @@ export interface CartItem {
   name: string;
   price: string;
   oldPrice?: string;
+  discount?: string;
   icon: string;
   imageUrl?: string;
   color?: string;
@@ -481,6 +482,19 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     }
   };
 
+const calculateCartDiscount = (priceStr?: string, oldPriceStr?: string) => {
+  if (!priceStr || !oldPriceStr) return undefined;
+  try {
+    const price = parseInt(priceStr.replace(/\./g, "").replace(/\D/g, ""), 10);
+    const oldPrice = parseInt(oldPriceStr.replace(/\./g, "").replace(/\D/g, ""), 10);
+    if (!isNaN(price) && !isNaN(oldPrice) && oldPrice > price) {
+      const pct = Math.round(((oldPrice - price) / oldPrice) * 100);
+      return `Giảm ${pct}%`;
+    }
+  } catch (_) {}
+  return undefined;
+};
+
 const resolveProductMetadata = (skuOrName: string) => {
   const s = (skuOrName || "").toUpperCase();
   if (s.includes("GP9PXL") || s.includes("PIXEL 9") || s.includes("PIXEL9")) {
@@ -491,6 +505,7 @@ const resolveProductMetadata = (skuOrName: string) => {
       sizes: ["128GB", "256GB", "512GB", "1TB"],
       defaultColor: "Obsidian",
       defaultSize: "128GB",
+      discount: "Giảm 12%",
     };
   }
   if (s.includes("IP16PM") || s.includes("IPHONE 16") || s.includes("IPHONE16")) {
@@ -501,6 +516,7 @@ const resolveProductMetadata = (skuOrName: string) => {
       sizes: ["256GB", "512GB", "1TB"],
       defaultColor: "Titan Sa Mạc",
       defaultSize: "256GB",
+      discount: "Giảm 8%",
     };
   }
   if (s.includes("IP15PM") || s.includes("IPHONE 15") || s.includes("IPHONE15")) {
@@ -511,6 +527,7 @@ const resolveProductMetadata = (skuOrName: string) => {
       sizes: ["256GB", "512GB", "1TB"],
       defaultColor: "Titan Tự Nhiên",
       defaultSize: "256GB",
+      discount: "Giảm 15%",
     };
   }
   if (s.includes("S24U") || s.includes("S25U") || s.includes("SAMSUNG") || s.includes("GALAXY S24")) {
@@ -521,6 +538,7 @@ const resolveProductMetadata = (skuOrName: string) => {
       sizes: ["256GB", "512GB", "1TB"],
       defaultColor: "Xám Titan",
       defaultSize: "512GB",
+      discount: "Giảm 11%",
     };
   }
   if (s.includes("MI14U") || s.includes("MI15U") || s.includes("XIAOMI")) {
@@ -531,6 +549,7 @@ const resolveProductMetadata = (skuOrName: string) => {
       sizes: ["512GB", "1TB"],
       defaultColor: "Trắng Gốm",
       defaultSize: "512GB",
+      discount: "Giảm 14%",
     };
   }
   if (s.includes("AIRPOD") || s.includes("TAI NGHE")) {
@@ -541,6 +560,40 @@ const resolveProductMetadata = (skuOrName: string) => {
       sizes: ["Tiêu chuẩn", "USB-C MagSafe"],
       defaultColor: "Trắng",
       defaultSize: "USB-C MagSafe",
+      discount: "Giảm 10%",
+    };
+  }
+  if (s.includes("IPAD")) {
+    return {
+      name: "iPad Pro M4 11-inch 256GB - Silver WiFi",
+      imageUrl: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=500&auto=format&fit=crop&q=80",
+      colors: ["Bạc Silver", "Xám Space"],
+      sizes: ["256GB", "512GB", "1TB"],
+      defaultColor: "Bạc Silver",
+      defaultSize: "256GB",
+      discount: "Giảm 9%",
+    };
+  }
+  if (s.includes("TABS10") || s.includes("TAB S10")) {
+    return {
+      name: "Samsung Galaxy Tab S10 Ultra 256GB 5G",
+      imageUrl: "https://images.unsplash.com/photo-1589739900243-4b52cd9b104e?w=500&auto=format&fit=crop&q=80",
+      colors: ["Xám Moonstone", "Bạc Platinum"],
+      sizes: ["256GB", "512GB"],
+      defaultColor: "Xám Moonstone",
+      defaultSize: "256GB",
+      discount: "Giảm 12%",
+    };
+  }
+  if (s.includes("MBP") || s.includes("MACBOOK")) {
+    return {
+      name: "MacBook Pro 16-inch M4 Pro 48GB 1TB",
+      imageUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500&auto=format&fit=crop&q=80",
+      colors: ["Đen Space Black", "Bạc Silver"],
+      sizes: ["512GB", "1TB", "2TB"],
+      defaultColor: "Đen Space Black",
+      defaultSize: "1TB",
+      discount: "Giảm 7%",
     };
   }
   return {
@@ -550,6 +603,7 @@ const resolveProductMetadata = (skuOrName: string) => {
     sizes: ["128GB", "256GB", "512GB", "1TB"],
     defaultColor: "Titan Sa Mạc",
     defaultSize: "256GB",
+    discount: "Giảm 10%",
   };
 };
 
@@ -569,6 +623,7 @@ const resolveProductMetadata = (skuOrName: string) => {
     const availableSizes = item.availableSizes || meta.sizes;
     const displayName = (item.name && !item.name.startsWith("ATTR-")) ? item.name : meta.name;
     const imageUrl = item.imageUrl || meta.imageUrl;
+    const discount = item.discount || (item.oldPrice ? calculateCartDiscount(item.price, item.oldPrice) : undefined) || meta.discount || "Giảm 10%";
 
     const groupKey = `${displayName}-${color}-${size}-${item.price}`;
     const existing = acc.find(i => i.groupKey === groupKey);
@@ -585,6 +640,7 @@ const resolveProductMetadata = (skuOrName: string) => {
         price: item.price,
         unitPrice: item.price,
         oldPrice: item.oldPrice,
+        discount,
         icon: item.icon,
         imageUrl,
         color,
@@ -604,6 +660,7 @@ const resolveProductMetadata = (skuOrName: string) => {
     price: string;
     unitPrice: string;
     oldPrice?: string;
+    discount?: string;
     icon: string;
     imageUrl?: string;
     color: string;
@@ -1211,7 +1268,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/98 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] p-4 sm:p-5 z-50 origin-top-right overflow-hidden text-slate-900"
+                className="absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/98 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900"
               >
                 {/* Decorative ambient glow (+20% radiance) */}
                 <div className="absolute top-0 right-0 w-72 h-72 bg-[#FF4D24]/36 rounded-full blur-[70px] pointer-events-none -z-10" />
@@ -1246,14 +1303,14 @@ const resolveProductMetadata = (skuOrName: string) => {
                               setSelectedGroupKeys(groupedCartItems.map(g => g.groupKey));
                             }
                           }}
-                          className="text-[11px] font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer px-1.5 py-0.5 rounded hover:bg-slate-100"
+                          className="text-[11px] font-bold text-slate-500 hover:text-[#FF4D24] hover:bg-orange-50/80 active:scale-95 transition-all duration-150 cursor-pointer px-2 py-0.5 rounded-md"
                         >
                           {selectedGroupKeys.length === groupedCartItems.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
                         </button>
                         {selectedGroupKeys.length > 0 && (
                           <button
                             onClick={handleDeleteSelected}
-                            className="text-[11px] font-bold text-rose-500 hover:text-rose-700 transition-colors cursor-pointer flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-rose-50"
+                            className="text-[11px] font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition-all duration-150 cursor-pointer flex items-center gap-1 px-2 py-0.5 rounded-md"
                             title="Xóa các mục đã chọn"
                           >
                             <Trash2 size={11} />
@@ -1264,16 +1321,18 @@ const resolveProductMetadata = (skuOrName: string) => {
                     )}
                     <button
                       onClick={() => setShowCartMenu(false)}
-                      className="size-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all active:scale-95 cursor-pointer ml-0.5"
+                      className="size-7 rounded-lg bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 text-slate-500 hover:text-slate-800 flex items-center justify-center shadow-2xs transition-colors duration-150 cursor-pointer ml-1"
+                      title="Đóng giỏ hàng"
+                      aria-label="Đóng giỏ hàng"
                     >
-                      <X size={13} className="stroke-[2.5]" />
+                      <X size={13} className="stroke-[2.25]" />
                     </button>
                   </div>
                 </div>
                 
                 {/* 2. Item List with Dual Top & Bottom CSS Mask Fade */}
                 {groupedCartItems.length > 0 ? (
-                  <div className="flex flex-col gap-2 max-h-[440px] overflow-y-auto p-1 pt-2 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-32px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-32px),transparent_100%)]">
+                  <div className="flex flex-col gap-2.5 max-h-[440px] overflow-y-auto px-1.5 pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)]">
                     <AnimatePresence initial={false}>
                       {groupedCartItems.map((group, index) => {
                         const groupKey = group.groupKey;
@@ -1306,7 +1365,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                                 }
                               });
                             }}
-                            className={`p-2.5 sm:p-3 rounded-xl border select-none relative flex flex-col gap-2 cursor-pointer transition-colors duration-150 ${
+                            className={`p-2.5 sm:p-3 pt-3.5 sm:pt-3.5 rounded-xl border select-none relative flex flex-col gap-2 cursor-pointer transition-colors duration-150 overflow-visible ${
                               isExpanded ? "z-40" : "z-0"
                             } ${
                               isSelected 
@@ -1314,22 +1373,42 @@ const resolveProductMetadata = (skuOrName: string) => {
                                 : "border-transparent bg-transparent"
                             }`}
                           >
+                            {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
+                            {group.discount && (
+                              <>
+                                <div className={`absolute -top-1.5 left-[-4px] h-[21px] text-white text-[9.5px] font-black px-2 rounded-br-md rounded-tr-xs shadow-[1px_2px_4px_rgba(255,77,36,0.22)] flex items-center justify-center z-20 select-none transition-all duration-200 ${
+                                  isSelected 
+                                    ? "bg-gradient-to-r from-[#FF4D24] to-[#FF6B35]" 
+                                    : "bg-slate-400 opacity-50 shadow-none"
+                                }`}>
+                                  {group.discount}
+                                </div>
+                                {/* 3D Fold Corner for Left Ribbon */}
+                                <div 
+                                  className={`absolute top-[15px] left-[-4px] w-[4px] h-[4px] z-10 transition-colors duration-200 ${
+                                    isSelected ? "bg-[#B43C00]" : "bg-slate-600 opacity-50"
+                                  }`} 
+                                  style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} 
+                                />
+                              </>
+                            )}
+
                             {/* Top Row: Thumbnail + Info & Variant + Delete */}
                             <div className="flex items-start gap-2.5">
-                              {/* Smartphone Thumbnail Photo */}
-                              <div className={`w-11 h-13 sm:w-12 sm:h-14 rounded-lg shrink-0 p-0.5 flex items-center justify-center overflow-hidden ${
+                              {/* Smartphone Thumbnail Photo - Seamlessly integrated */}
+                              <div className={`relative w-13 h-14 sm:w-14 sm:h-15 rounded-xl shrink-0 p-1 flex items-center justify-center overflow-hidden transition-all duration-200 ${
                                 isSelected 
-                                ? "bg-slate-50 border border-slate-300/90 shadow-2xs" 
-                                : "bg-neutral-100/70 border-transparent grayscale opacity-50"
+                                ? "bg-gradient-to-b from-slate-50 to-slate-100/70 border border-slate-200/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)]" 
+                                : "bg-neutral-100/60 border border-transparent grayscale opacity-40"
                               }`}>
                                 {group.imageUrl ? (
                                   <img 
                                     src={group.imageUrl} 
                                     alt={group.name} 
-                                    className="size-full object-contain object-center" 
+                                    className="size-full object-contain object-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)] transition-transform duration-200 hover:scale-105" 
                                   />
                                 ) : (
-                                  <span className="text-sm">{group.icon || "📦"}</span>
+                                  <span className="text-base">{group.icon || "📦"}</span>
                                 )}
                               </div>
 
@@ -1573,7 +1652,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                     {/* Summary row */}
                     <div className="flex items-center justify-between text-[11px] text-slate-500">
                       <span>Đã chọn ({getSelectedItemsCount()} món)</span>
-                      <span>Ưu đãi thành viên: <strong className="text-emerald-600 font-mono">-5%</strong></span>
+                      <span>Ưu đãi thành viên có thể trừ lên tới <strong className="text-emerald-600 font-mono">7%</strong></span>
                     </div>
 
                     {/* Action row */}
@@ -1626,12 +1705,9 @@ const resolveProductMetadata = (skuOrName: string) => {
                           executeCheckout();
                         }}
                         disabled={getSelectedItemsCount() === 0}
-                        className="group w-auto min-w-[150px] justify-center bg-[#111111] hover:bg-black text-white font-sans text-xs font-extrabold px-5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer overflow-hidden"
+                        className="group w-auto min-w-[165px] h-[36px] justify-center bg-[#111111] hover:bg-black text-white font-sans text-[13.5px] font-extrabold px-5.5 rounded-lg shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer overflow-hidden"
                       >
                         <span>Thanh toán</span>
-                        <span className="material-symbols-outlined text-[14px] font-bold transition-transform duration-300 group-hover:translate-x-1">
-                          arrow_forward
-                        </span>
                       </motion.button>
                     </div>
                   </div>

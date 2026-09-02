@@ -252,7 +252,6 @@ const GET_FULL_CART_QUERY = `
         specifications {
           groupName
           specifications {
-            key
             data
           }
         }

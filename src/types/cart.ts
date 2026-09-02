@@ -3,8 +3,10 @@
  */
 
 export interface SpecificationItem {
-  key: string;
-  data: string;
+  key?: string;
+  data?: string;
+  value?: string;
+  name?: string;
 }
 
 export interface SpecificationGroup {

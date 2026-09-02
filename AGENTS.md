@@ -1,59 +1,57 @@
-# QUY TẮC HOẠT ĐỘNG DÀNH CHO AGENT (AGENTS.md)
+# AGENT OPERATING CONTRACT & STRICT DIRECTIVES (AGENTS.md)
 
-Tất cả các quy tắc dưới đây là luật cứng bắt buộc tuân thủ tuyệt đối trong mọi phiên làm việc. Nghiêm cấm mọi hành vi tự suy diễn hoặc vượt ngoài phạm vi yêu cầu.
-
----
-
-## PHẦN 1: QUY TẮC CHUNG VÀ AN TOÀN HỆ THỐNG
-
-1. **Cấm hoàn toàn việc rollback/reset Git**:
-   - Nghiêm cấm tuyệt đối việc tự ý sử dụng bất kỳ lệnh Git nào (`git reset`, `git checkout`, `git revert`, `git restore` hoặc tương đương) để quay trở lại mã nguồn ở các commit cũ khi không có yêu cầu rõ ràng từ người dùng.
-
-2. **Quy định về nạp và trích xuất ngữ cảnh (Context)**:
-   - Khi prompt có yêu cầu nạp hoặc lấy "context", phiên làm việc chỉ được phép đọc và trích xuất ngữ cảnh của đúng phạm vi/đối tượng được chỉ định.
-   - Tuyệt đối không chỉnh sửa mã nguồn, không ghi đè, không lưu trữ và không ghi nhớ dữ liệu ngữ cảnh vào bộ nhớ dài hạn ngoài phạm vi nhiệm vụ.
-
-3. **Bắt buộc sử dụng Skills**:
-   - Luôn chủ động kích hoạt và áp dụng các skills sẵn có khi phù hợp với tác vụ đang thực hiện.
-
-4. **Quy định khởi động lại dự án sau khi thực hiện nghiệp vụ**:
-   - Sau khi hoàn thành thực hiện/chỉnh sửa nghiệp vụ, luôn phải tắt (stop/kill) tiến trình dự án đang chạy và khởi động lại (restart) để đảm bảo các thay đổi được nạp đầy đủ và hệ thống hoạt động ổn định.
-
-5. **Cấm tự ý lập kế hoạch (Plan) khi không được yêu cầu**:
-   - Nghiêm cấm tuyệt đối việc tự ý sinh kế hoạch (plan), lộ trình thực hiện hoặc các bước chuẩn bị dàn trải khi người dùng không yêu cầu rõ ràng (như lệnh `/plan`, yêu cầu "lên plan", "lập kế hoạch").
-   - Luôn tập trung xử lý trực tiếp yêu cầu hoặc phản hồi thẳng vào nội dung nhiệm vụ được giao.
+> **CRITICAL PROTOCOL — ZERO TOLERANCE FOR DEVIATION**
+> All directives below are non-negotiable hard constraints. You MUST NOT ignore, bypass, forget, or override any directive or context defined in this document under any circumstance. Speculation, hallucination, or actions outside explicit user scope are strictly prohibited.
 
 ---
 
-## PHẦN 2: ROLE PHÁT TRIỂN VÀ CHỈNH SỬA GIAO DIỆN (UI / FRONTEND)
+## 1. CORE OPERATING PRINCIPLES & SYSTEM SAFETY
 
-1. **Phạm vi can thiệp logic**:
-   - Tuyệt đối không can thiệp hoặc thay đổi thuật toán và logic xử lý nếu không có yêu cầu trực tiếp.
+### 1.1. DIRECT EXECUTION ONLY — STRICT BAN ON UNREQUESTED PLANNING
+- **NO SPONTANEOUS PLANS**: NEVER generate plans, execution outlines, step-by-step roadmaps, or speculative preparation phases unless the user explicitly requests one (e.g., via `/plan`, "create a plan", "lên kế hoạch").
+- **DEFAULT TO DIRECT ACTION**: Execute the requested task immediately and directly without unnecessary conversational overhead.
 
-2. **Giới hạn cấu trúc và thành phần giao diện**:
-   - Tuyệt đối không tự ý thêm mới giao diện, thành phần giao diện, khung thông báo lỗi, thay đổi bảng màu hoặc bổ sung bất kỳ phần tử đi kèm nào khi chưa có xác nhận yêu cầu cụ thể từ người dùng.
+### 1.2. MANDATORY POST-TASK SERVICE RESTART & HEALTH CHECK
+- **NO TASK IS COMPLETE WITHOUT RUNNING SERVER**: Running `npm run build` is ONLY a compile check. It is NOT the end of the task.
+- **EXACT RESTART SEQUENCE (MANDATORY)**:
+  1. Kill old process on port 3000: `fuser -k 3000/tcp 2>/dev/null || true`
+  2. Launch dev server in background via `run_command`: `npm run dev`
+  3. Verify health endpoint: `curl -s http://localhost:3000/api/health`
+- **DEFINITION OF DONE**: The agent MUST NOT end the turn or claim completion until `http://localhost:3000/api/health` returns `{"status":"ok",...}`.
 
-3. **Giới hạn phạm vi trang (Scope)**:
-   - Tuyệt đối không tự ý chỉnh sửa bất kỳ thành phần hoặc giao diện nào nằm ngoài phạm vi trang (page) được chỉ định.
+### 1.3. STRICT SCOPE ADHERENCE & IMMEDIATE REMEDIATION
+- **EXACT SCOPE COMPLIANCE**: Delivering incorrect output, exceeding requested scope, or performing unsolicited modifications is a critical system violation.
+- **IMMEDIATE HALT & REPAIR**: If any deviation or unintended modification occurs, IMMEDIATELY halt execution, assess the drift, and revert/fix the code strictly back to the original user specification.
 
-4. **Quy trình phát triển giao diện chuẩn**:
-   - Bắt buộc thực hiện đúng và đủ các bước theo yêu cầu đề ra.
-   - Điểm phát triển bắt buộc phải lấy ngữ cảnh từ trang (page), component hiện tại và các thành phần trực tiếp xung quanh.
-   - Tinh chỉnh và chuẩn hóa mọi thay đổi để đảm bảo tính đồng bộ tuyệt đối với toàn bộ trang (page).
+### 1.4. PRE-EXECUTION VERIFICATION
+- **PRE-ACTION AUDIT**: Before executing ANY tool, command, file edit, or code generation, verify that the action strictly matches user requirements and stays within permissible boundaries.
 
-5. **Bắt buộc áp dụng Skill design-taste-frontend**:
-   - Khi thực hiện các tác vụ phát triển hoặc chỉnh sửa giao diện UI/Frontend (Landing pages, Portfolios, Redesigns...), bắt buộc phải kích hoạt và tuân thủ hướng dẫn tại `.agents/skills/design-taste-frontend/SKILL.md`.
-   - Luôn thực hiện Brief Inference (xác định page kind, vibe, audience, brand assets), tránh các thiết kế mặc định kiểu AI (anti-slop) và đảm bảo chất lượng thẩm mỹ cao theo chuẩn của skill.
+### 1.5. ABSOLUTE BAN ON GIT ROLLBACK / RESET
+- **NO GIT RESET/REVERT**: NEVER run `git reset`, `git checkout`, `git revert`, `git restore`, or any equivalent destructive command to rollback repository state without explicit user instruction.
+
+### 1.6. STRICT CONTEXT EXTRACTION & BOUNDARIES
+- When prompted to load or extract context, only read and inspect the explicitly specified target files or endpoints.
+- DO NOT modify, overwrite, cache, or store context data outside the designated scope.
+
+### 1.7. MANDATORY SKILL ACTIVATION
+- Proactively identify and activate available project skills whenever applicable to the current task.
 
 ---
 
-## PHẦN 3: ROLE BACKEND GHÉP NỐI REST API VÀO DỰ ÁN
+## 2. FRONTEND & UI DEVELOPMENT DIRECTIVES
 
-1. **Giới hạn can thiệp giao diện**:
-   - Tuyệt đối không can thiệp hoặc chỉnh sửa mã nguồn giao diện nếu không có yêu cầu cụ thể.
+1. **Logic & Algorithm Preservation**: NEVER alter underlying business logic, state machines, or algorithmic code unless explicitly instructed.
+2. **UI Component & Style Boundaries**: NEVER introduce unsolicited UI components, error modals, arbitrary palette changes, or layout wrappers without explicit confirmation.
+3. **Strict Page-Level Scope**: Confine all UI modifications strictly to the designated page/component. Do not modify global themes or adjacent pages.
+4. **Context-Aware Design Standards**: Infer design patterns directly from neighboring components and maintain visual consistency across the entire page.
+5. **Mandatory `design-taste-frontend` Skill**:
+   - For all frontend UI development, redesigns, landing pages, or styling tasks, ALWAYS activate and follow `.agents/skills/design-taste-frontend/SKILL.md`.
+   - Apply Brief Inference (page kind, vibe, audience, brand assets) and enforce anti-slop aesthetics.
 
-2. **Giới hạn xử lý Endpoint**:
-   - Tuyệt đối không tự ý triển khai, chỉnh sửa hoặc mở rộng xử lý endpoint nằm ngoài phạm vi được chỉ định.
+---
 
-3. **Tuân thủ quy định trích xuất Context**:
-   - Khi có yêu cầu nạp hoặc lấy "context", chỉ đọc ngữ cảnh đúng đối tượng/endpoint chỉ định; tuyệt đối không sửa đổi, không lưu trữ và không ghi nhớ ngoài phạm vi tác vụ.
+## 3. BACKEND & REST API INTEGRATION DIRECTIVES
+
+1. **Frontend Isolation**: NEVER modify frontend/UI source files when performing backend or API integration tasks unless explicitly requested.
+2. **Strict Endpoint Scope**: DO NOT create, modify, or extend API endpoints beyond the explicitly assigned scope.
+3. **Targeted Context Isolation**: Restrict inspection strictly to the designated backend handlers, schemas, and endpoints.

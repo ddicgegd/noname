@@ -384,10 +384,22 @@ async function startServer() {
   const SpecificationItemType = new GraphQLObjectType({
     name: "SpecificationItem",
     fields: {
-      name: { type: GraphQLString },
-      value: { type: GraphQLString },
-      key: { type: GraphQLString },
-      data: { type: GraphQLString }
+      name: {
+        type: GraphQLString,
+        resolve: (spec: any) => spec?.name ?? spec?.key ?? null
+      },
+      value: {
+        type: GraphQLString,
+        resolve: (spec: any) => spec?.value ?? spec?.data ?? spec?.name ?? spec?.key ?? null
+      },
+      key: {
+        type: GraphQLString,
+        resolve: (spec: any) => spec?.key ?? spec?.name ?? null
+      },
+      data: {
+        type: GraphQLString,
+        resolve: (spec: any) => spec?.data ?? spec?.value ?? null
+      }
     }
   });
 

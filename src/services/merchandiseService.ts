@@ -223,8 +223,7 @@ export async function searchAttributesForProductSku(productSku: string): Promise
           specifications {
             groupName
             specifications {
-              key
-              value
+              data
             }
           }
           promotions {
