@@ -1769,152 +1769,170 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-[calc(100%+14px)] w-64 rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
+                className="absolute right-0 top-[calc(100%+14px)] w-[268px] rounded-2xl border border-white/80 dark:border-white/10 ring-1 ring-slate-900/[0.06] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_0_0_rgba(255,255,255,1)] p-2.5 z-50 flex flex-col gap-1 origin-top-right overflow-hidden select-none text-slate-900 dark:text-zinc-100"
               >
-                {/* Decorative background glows */}
-                <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
+                {/* Subtle soft ambient glow */}
+                <div className="absolute -top-10 -right-10 w-36 h-36 bg-[#FF4D24]/[0.08] rounded-full blur-[32px] pointer-events-none -z-10" />
+                <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-amber-500/[0.05] rounded-full blur-[28px] pointer-events-none -z-10" />
 
-                {/* User Quick Info Card with Elegant Avatar & Smember VIP Badge */}
-                <div className="p-2.5 mb-1.5 bg-slate-50/60 rounded-xl border border-slate-100/80 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#FF4D24] to-[#FF7C4A] flex items-center justify-center text-white font-black text-sm shadow-md select-none overflow-hidden">
+                {/* User Profile Header (Apple Minimalist Glass) */}
+                <div className="p-2.5 rounded-xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-100 dark:border-white/5 flex items-center gap-2.5">
+                  {/* Avatar */}
+                  <div className="size-10 rounded-full bg-slate-200/80 dark:bg-zinc-800 border border-white dark:border-zinc-700 flex items-center justify-center font-bold text-sm text-slate-800 dark:text-zinc-200 overflow-hidden shrink-0 shadow-2xs">
                     {loggedInUser ? (
                       loggedInUser.avatarUrl ? (
-                        <img src={loggedInUser.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img src={loggedInUser.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt="Avatar" />
                       ) : (
-                        (loggedInUser.fullName || loggedInUser.username || "U")[0].toUpperCase()
+                        <span className="font-extrabold text-[#FF4D24]">
+                          {(loggedInUser.fullName || loggedInUser.username || "U")[0].toUpperCase()}
+                        </span>
                       )
                     ) : (
                       "NK"
                     )}
                   </div>
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-slate-800 text-xs truncate">
-                        {loggedInUser ? (loggedInUser.fullName || `User @${loggedInUser.username}`) : "Nora Kessler"}
+
+                  {/* Details */}
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-[13px] text-slate-900 dark:text-white truncate">
+                        {loggedInUser ? (loggedInUser.fullName || `@${loggedInUser.username}`) : "Nora Kessler"}
                       </span>
-                      <span className="text-[8px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                      <span className="shrink-0 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#FF4D24]/10 text-[#FF4D24] dark:bg-[#FF4D24]/20 border border-[#FF4D24]/20">
                         {loggedInUser ? (loggedInUser.rank || "MEMBER") : "VIP"}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 font-mono tracking-tight truncate mt-0.5">
-                      {loggedInUser ? loggedInUser.email : "nora.kessler@domain.com"}
+                    <span className="text-[10.5px] text-slate-400 dark:text-zinc-400 font-mono truncate mt-0.5">
+                      {loggedInUser ? loggedInUser.email : "user@domain.com"}
                     </span>
-                    <span className="text-[9.5px] text-[#FF4D24] font-extrabold mt-1 flex items-center gap-1">
+                    <span className="text-[9.5px] text-[#FF4D24] font-semibold flex items-center gap-1 mt-1">
                       <span className="material-symbols-outlined text-[12px] font-black">verified</span>
                       Hội viên Smember
                     </span>
                   </div>
                 </div>
-  
-                {/* Vertical Magic UI Dock Menu Items */}
-                <Dock orientation="vertical" iconMagnification={46} iconDistance={100} className="flex flex-col gap-1 w-full">
+
+                {/* Menu Action Items (macOS / Apple Menu Style) */}
+                <div className="flex flex-col gap-0.5 w-full pt-1">
                   {loggedInUser ? (
-                    <DockIcon className="w-full">
-                      <button 
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          onNavigate("profile");
-                        }}
-                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                      >
-                        <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                        <span className="font-extrabold text-[#FF4D24]">Xem trang cá nhân</span>
-                      </button>
-                    </DockIcon>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setShowAccountMenu(false);
+                        onNavigate("profile");
+                      }}
+                      className="group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:text-[#FF4D24] dark:hover:text-[#FF4D24] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all duration-150 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <User size={15} className="text-slate-400 dark:text-zinc-400 group-hover:text-[#FF4D24] transition-colors" />
+                        <span>Xem trang cá nhân</span>
+                      </div>
+                      <ChevronRight size={13} className="text-slate-300 dark:text-zinc-600 group-hover:text-[#FF4D24] group-hover:translate-x-0.5 transition-all" />
+                    </button>
                   ) : (
-                    <DockIcon className="w-full">
-                      <button 
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }}
-                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                      >
-                        <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                        <span className="font-extrabold text-[#FF4D24]">Đăng ký / Đăng nhập</span>
-                      </button>
-                    </DockIcon>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setShowAccountMenu(false);
+                        window.location.hash = "register";
+                        onNavigate("auth");
+                      }}
+                      className="group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:text-[#FF4D24] dark:hover:text-[#FF4D24] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all duration-150 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <User size={15} className="text-slate-400 dark:text-zinc-400 group-hover:text-[#FF4D24] transition-colors" />
+                        <span className="text-[#FF4D24] font-bold">Đăng ký / Đăng nhập</span>
+                      </div>
+                      <ChevronRight size={13} className="text-slate-300 dark:text-zinc-600 group-hover:text-[#FF4D24] group-hover:translate-x-0.5 transition-all" />
+                    </button>
                   )}
-    
-                  <DockIcon className="w-full">
-                    <button 
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        if (loggedInUser) {
-                          onNavigate("profile");
-                        } else {
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }
-                      }}
-                      className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                    >
-                      <Settings size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      if (loggedInUser) {
+                        onNavigate("profile");
+                      } else {
+                        window.location.hash = "register";
+                        onNavigate("auth");
+                      }
+                    }}
+                    className="group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:text-[#FF4D24] dark:hover:text-[#FF4D24] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all duration-150 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Settings size={15} className="text-slate-400 dark:text-zinc-400 group-hover:text-[#FF4D24] transition-colors" />
                       <span>Thiết lập tài khoản</span>
-                    </button>
-                  </DockIcon>
-    
-                  <DockIcon className="w-full">
+                    </div>
+                    <ChevronRight size={13} className="text-slate-300 dark:text-zinc-600 group-hover:text-[#FF4D24] group-hover:translate-x-0.5 transition-all" />
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      if (loggedInUser) {
+                        onNavigate("profile");
+                      } else {
+                        window.location.hash = "register";
+                        onNavigate("auth");
+                      }
+                    }}
+                    className="group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:text-[#FF4D24] dark:hover:text-[#FF4D24] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all duration-150 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <CreditCard size={15} className="text-slate-400 dark:text-zinc-400 group-hover:text-[#FF4D24] transition-colors" />
+                      <span>Gói đăng ký</span>
+                    </div>
+                    <ChevronRight size={13} className="text-slate-300 dark:text-zinc-600 group-hover:text-[#FF4D24] group-hover:translate-x-0.5 transition-all" />
+                  </button>
+
+                  <div className="my-1 border-t border-black/[0.05] dark:border-white/[0.08]" />
+
+                  {loggedInUser ? (
                     <button 
+                      type="button"
                       onClick={() => {
                         setShowAccountMenu(false);
-                        if (loggedInUser) {
-                          onNavigate("profile");
-                        } else {
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }
+                        localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+                        localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+                        localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+                        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+                        localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKENS_MAP);
+                        localStorage.removeItem("horizon_redis_profile");
+                        localStorage.removeItem("horizon_current_user");
+                        localStorage.removeItem("horizon_access_token");
+                        localStorage.removeItem("horizon_refresh_token");
+                        setLoggedInUser(null);
+                        window.location.hash = "register";
+                        onNavigate("auth");
                       }}
-                      className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
+                      className="group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-all duration-150 cursor-pointer"
                     >
-                      <CreditCard size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                      <span>Gói đăng ký</span>
-                    </button>
-                  </DockIcon>
-    
-                  <div className="my-1.5 border-t border-slate-100" />
-    
-                  {loggedInUser ? (
-                    <DockIcon className="w-full">
-                      <button 
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-                          localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-                          localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
-                          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-                          localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKENS_MAP);
-                          localStorage.removeItem("horizon_redis_profile");
-                          localStorage.removeItem("horizon_current_user");
-                          localStorage.removeItem("horizon_access_token");
-                          localStorage.removeItem("horizon_refresh_token");
-                          setLoggedInUser(null);
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }}
-                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-rose-600 hover:text-rose-700 rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                      >
-                        <LogOut size={15} className="text-rose-600" />
+                      <div className="flex items-center gap-2.5">
+                        <LogOut size={15} className="text-rose-500" />
                         <span>Đăng xuất tài khoản</span>
-                      </button>
-                    </DockIcon>
+                      </div>
+                      <ChevronRight size={13} className="text-rose-300 dark:text-rose-500/50 group-hover:text-rose-600 group-hover:translate-x-0.5 transition-all" />
+                    </button>
                   ) : (
-                    <DockIcon className="w-full">
-                      <button 
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }}
-                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-[#FF4D24] hover:text-[#FF7C4A] rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                      >
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setShowAccountMenu(false);
+                        window.location.hash = "register";
+                        onNavigate("auth");
+                      }}
+                      className="group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold text-[#FF4D24] hover:bg-orange-500/10 transition-all duration-150 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
                         <LogOut size={15} className="text-[#FF4D24]" />
                         <span>Đăng nhập tài khoản khác</span>
-                      </button>
-                    </DockIcon>
+                      </div>
+                      <ChevronRight size={13} className="text-orange-300 group-hover:text-[#FF4D24] group-hover:translate-x-0.5 transition-all" />
+                    </button>
                   )}
-                </Dock>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

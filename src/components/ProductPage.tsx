@@ -2863,42 +2863,36 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                         transition={{ duration: 0.22, delay: 0.05 }}
                         className="relative z-10 flex-1 flex flex-col min-h-0"
                       >
-                        {/* Compact Header */}
-                        <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-white/10 shrink-0">
-                          <h4 className="font-sans font-black text-[13px] sm:text-[13.5px] uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-primary text-[19px]">settings_suggest</span>
-                            Thông số kĩ thuật
-                          </h4>
+                        {/* Compact Tabs bar with close (x) button on the right */}
+                        <div className="flex items-center justify-between pb-1.5 gap-2 shrink-0 border-b border-slate-200/40 dark:border-white/5">
+                          <div className="flex items-center overflow-x-auto whitespace-nowrap scrollbar-none gap-1 flex-1 min-w-0">
+                            {specSections.map((sec) => {
+                              const isActive = activeTab === sec.id;
+                              return (
+                                <button
+                                  key={sec.id}
+                                  type="button"
+                                  onClick={() => scrollToInPlaceSpec(sec.id)}
+                                  className={`cursor-pointer transition-all duration-200 px-3 py-0.5 rounded-full text-[11px] sm:text-[11.5px] font-bold select-none shrink-0 ${
+                                    isActive
+                                      ? "bg-zinc-900 text-white shadow-xs dark:bg-white dark:text-zinc-900"
+                                      : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+                                  }`}
+                                >
+                                  {sec.title}
+                                </button>
+                              );
+                            })}
+                          </div>
                           <BevelButton
                             variant="subtle"
                             size="icon"
                             onClick={() => setIsSpecsExpanded(false)}
-                            className="size-6.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10"
+                            className="size-6.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 shrink-0"
                             title="Thu gọn"
                           >
                             <span className="material-symbols-outlined text-[15px]">close</span>
                           </BevelButton>
-                        </div>
-
-                        {/* Compact Tabs bar */}
-                        <div className="flex items-center overflow-x-auto whitespace-nowrap scrollbar-none py-1.5 gap-1 shrink-0 border-b border-slate-200/40 dark:border-white/5">
-                          {specSections.map((sec) => {
-                            const isActive = activeTab === sec.id;
-                            return (
-                              <button
-                                key={sec.id}
-                                type="button"
-                                onClick={() => scrollToInPlaceSpec(sec.id)}
-                                className={`cursor-pointer transition-all duration-200 px-3 py-0.5 rounded-full text-[11px] sm:text-[11.5px] font-bold select-none ${
-                                  isActive
-                                    ? "bg-zinc-900 text-white shadow-xs dark:bg-white dark:text-zinc-900"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
-                                }`}
-                              >
-                                {sec.title}
-                              </button>
-                            );
-                          })}
                         </div>
 
                         {/* Content wrapper with clean scroll */}
@@ -2907,7 +2901,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                             ref={inPlaceSpecsContentRef}
                             onScroll={handleInPlaceSpecsScroll}
                             onWheel={(e) => e.stopPropagation()}
-                            className="flex-1 overflow-y-auto px-0.5 py-1.5 space-y-2.5 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth overscroll-contain [overscroll-behavior:contain] pb-2"
+                            className="flex-1 overflow-y-auto px-0.5 py-1.5 space-y-2.5 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth overscroll-contain [overscroll-behavior:contain]"
                           >
                             {specSections.length > 0 ? (
                               specSections.map((sec) => (

@@ -25,6 +25,7 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -62,12 +63,228 @@ export interface OrderProduct {
   availableSizes: string[];
   unitPrice: number;
   oldPrice?: number;
+  discount?: string;
   quantity: number;
   image: string;
   selected: boolean;
   isAvailable?: boolean;
   stock?: number;
 }
+
+const formatVND = (amount: number): string => {
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+};
+
+const calculateOrderDiscount = (unitPrice: number, oldPrice?: number, discountStr?: string): string | undefined => {
+  if (oldPrice && Number(oldPrice) > Number(unitPrice)) {
+    const pct = Math.round(((Number(oldPrice) - Number(unitPrice)) / Number(oldPrice)) * 100);
+    if (pct > 0 && pct < 100) return `Giảm ${pct}%`;
+  }
+  if (discountStr && discountStr.trim() !== "" && discountStr !== "Giảm 10%") {
+    return discountStr;
+  }
+  return undefined;
+};
+
+const cleanColorOptions = (colors?: string[]): string[] => {
+  if (!colors || colors.length === 0) return ["Mặc định"];
+  const mapped = colors.map((c) => {
+    let t = c.trim();
+    if (t.toLowerCase() === "graphite") return "Than Chì";
+    if (t.toLowerCase() === "platinum") return "Bạch Kim";
+    return t;
+  });
+  return Array.from(new Set(mapped));
+};
+
+const cleanSizeOptions = (sizes?: string[], colors: string[] = []): string[] => {
+  if (!sizes || sizes.length === 0) return ["Mặc định"];
+  const allColors = [...colors, "Bạch Kim", "Than Chì", "Graphite", "Platinum", "Titan Sa Mạc", "Titan Tự Nhiên", "Titan Đen", "Titan Trắng", "Trắng Gốm", "Đen Da", "Xanh Titan", "Titan Xám", "Xám Titan", "Titan Tím", "Titan Vàng", "Titan"];
+  const cleaned = sizes.map((s) => {
+    let val = s.trim();
+    // Strip redundant device/model names in size string like "Galaxy S25 Ultra 256GB" -> "256GB"
+    val = val.replace(/^(?:samsung|galaxy|iphone|ipad|macbook|xiaomi|dell|xps|google|pixel)[\s\w/-]*?(?=\b\d+(?:GB|TB|MB)\b)/i, "").trim();
+    for (const c of allColors) {
+      if (val.toLowerCase().startsWith(c.toLowerCase())) {
+        val = val.slice(c.length).trim();
+      }
+    }
+    val = val.replace(/^(?:h\s+kim|bạch\s+kim|kim|bạch|than\s+chì|graphite|platinum|titan\s+xám|xám\s+titan|titan)[\s,/-]*/i, "").trim();
+    val = val.replace(/^[\s,/-]+/, "").trim();
+    return val || s;
+  });
+  return Array.from(new Set(cleaned));
+};
+
+interface ScatteredFloatingVoucherTagsProps {
+  discountLabel?: string;
+  selected?: boolean;
+}
+
+const ScatteredFloatingVoucherTags: React.FC<ScatteredFloatingVoucherTagsProps> = ({
+  discountLabel,
+  selected = true,
+}) => {
+  if (!selected) return null;
+
+  return (
+    <div className="absolute -top-1.5 right-0 pointer-events-none z-30 select-none overflow-visible">
+      {/* Luminous Blue-to-White Backdrop Light Aura (Hào quang ánh sáng xanh dương - trắng) */}
+      <div className="absolute -inset-x-6 -inset-y-3 pointer-events-none -z-10 flex items-center justify-center">
+        <motion.div
+          animate={{
+            scale: [0.8, 1.25, 0.8],
+            opacity: [0.25, 0.65, 0.25],
+          }}
+          transition={{
+            duration: 3.2,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="w-28 h-10 rounded-full bg-gradient-to-r from-[#0284C7]/25 via-[#38BDF8]/35 to-white/30 blur-md"
+        />
+        <motion.div
+          animate={{
+            opacity: [0.3, 0.8, 0.3],
+            scaleX: [0.8, 1.3, 0.8],
+          }}
+          transition={{
+            duration: 2.8,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute w-16 h-2 bg-white/60 blur-[2px] rounded-full"
+        />
+      </div>
+
+      {/* Orbiting Sparkle Star 1: Pure White with Cyan Flare ✦ */}
+      <motion.span
+        animate={{
+          y: [2, -14, -30, -44],
+          x: [0, -8, -16, -22],
+          opacity: [0, 1, 0.85, 0],
+          scale: [0.3, 1.3, 0.9, 0],
+          rotate: [0, 60, 120, 180],
+        }}
+        transition={{
+          duration: 3.0,
+          repeat: Infinity,
+          delay: 0.3,
+          ease: "easeInOut",
+        }}
+        className="absolute right-4 text-[10px] text-white drop-shadow-[0_0_8px_#38BDF8]"
+      >
+        ✦
+      </motion.span>
+
+      {/* Orbiting Sparkle Star 2: Radiant Star ★ */}
+      <motion.span
+        animate={{
+          y: [0, -16, -34, -48],
+          x: [0, 12, 22, 28],
+          opacity: [0, 1, 0.8, 0],
+          scale: [0.2, 1.2, 0.8, 0],
+          rotate: [0, -45, -90, -135],
+        }}
+        transition={{
+          duration: 3.2,
+          repeat: Infinity,
+          delay: 1.4,
+          ease: "easeInOut",
+        }}
+        className="absolute -right-1 text-[9px] text-[#E0F2FE] drop-shadow-[0_0_8px_#FFFFFF]"
+      >
+        ★
+      </motion.span>
+
+      {/* Tag 1: Main Discount Tag - Blue-to-White Gradient (Tilted -14deg) */}
+      <motion.div
+        animate={{
+          opacity: [0, 1, 0.95, 0],
+          y: [4, -14, -28, -42],
+          x: [0, -10, -22, -32],
+          scale: [0.5, 1.05, 0.95, 0.7],
+          rotate: [-14, -8, -18, -24],
+        }}
+        transition={{
+          duration: 3.4,
+          repeat: Infinity,
+          delay: 0,
+          times: [0, 0.22, 0.7, 1],
+          ease: "easeInOut",
+        }}
+        className="absolute right-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#0284C7] via-[#0EA5E9] to-[#38BDF8] text-white text-[8.5px] font-black shadow-[0_0_14px_rgba(56,189,248,0.8),0_2px_6px_rgba(2,132,199,0.5)] ring-1 ring-white/90 backdrop-blur-sm whitespace-nowrap"
+      >
+        <Sparkles className="size-2 text-[#E0F2FE] animate-spin [animation-duration:4s]" />
+        <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">{discountLabel || "-10%"}</span>
+      </motion.div>
+
+      {/* Tag 2: Mini Voucher Ticket - Ice White & Cyan Gradient (Tilted +18deg) */}
+      <motion.div
+        animate={{
+          opacity: [0, 1, 0.9, 0],
+          y: [2, -12, -26, -38],
+          x: [0, 14, 26, 36],
+          scale: [0.45, 1.05, 0.9, 0.65],
+          rotate: [18, 26, 16, 22],
+        }}
+        transition={{
+          duration: 3.6,
+          repeat: Infinity,
+          delay: 0.9,
+          times: [0, 0.25, 0.72, 1],
+          ease: "easeInOut",
+        }}
+        className="absolute right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-white via-[#E0F2FE] to-[#38BDF8] text-[#0369A1] text-[8px] font-black shadow-[0_0_12px_rgba(56,189,248,0.65)] ring-1 ring-white/95 whitespace-nowrap"
+      >
+        <Ticket className="size-2 text-[#0284C7]" />
+        <span className="tracking-tight">VOUCHER</span>
+      </motion.div>
+
+      {/* Tag 3: Mini GIẢM GIÁ Pill - Royal Blue-to-White (Tilted -6deg) */}
+      <motion.div
+        animate={{
+          opacity: [0, 1, 0.85, 0],
+          y: [0, -18, -36, -50],
+          x: [0, -4, 2, -6],
+          scale: [0.4, 1.0, 0.85, 0.5],
+          rotate: [-6, 6, -4, 8],
+        }}
+        transition={{
+          duration: 3.2,
+          repeat: Infinity,
+          delay: 1.8,
+          times: [0, 0.2, 0.7, 1],
+          ease: "easeInOut",
+        }}
+        className="absolute right-5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#0369A1] via-[#0284C7] to-white text-white text-[7.5px] font-extrabold tracking-wider shadow-[0_0_12px_rgba(14,165,233,0.7)] ring-1 ring-white/80 whitespace-nowrap uppercase"
+      >
+        <span>GIẢM GIÁ</span>
+      </motion.div>
+
+      {/* Tag 4: Mini Sparkle Chip - Cyan to White Gradient (Tilted +22deg) */}
+      <motion.div
+        animate={{
+          opacity: [0, 1, 0.85, 0],
+          y: [4, -14, -30, -44],
+          x: [0, 20, 32, 42],
+          scale: [0.35, 1.1, 0.85, 0.5],
+          rotate: [22, 12, 28, 36],
+        }}
+        transition={{
+          duration: 3.5,
+          repeat: Infinity,
+          delay: 2.7,
+          times: [0, 0.22, 0.7, 1],
+          ease: "easeInOut",
+        }}
+        className="absolute -right-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-[#38BDF8] via-white to-[#BAE6FD] text-[#075985] text-[8px] font-black shadow-[0_0_12px_rgba(56,189,248,0.7)] ring-1 ring-white/95 whitespace-nowrap"
+      >
+        <span>% OFF</span>
+      </motion.div>
+    </div>
+  );
+};
 
 const INITIAL_PRODUCTS: OrderProduct[] = [
   {
@@ -291,28 +508,180 @@ interface OrderPageProps {
   buyNowProduct?: OrderProduct | null;
 }
 
+const resolveProductMetadata = (skuOrName: string) => {
+  const s = (skuOrName || "").toUpperCase();
+  if (s.includes("GP9PXL") || s.includes("PIXEL 9") || s.includes("PIXEL9")) {
+    return {
+      name: "Google Pixel 9 Pro XL 128GB - Obsidian",
+      imageUrl: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&auto=format&fit=crop&q=80",
+      colors: ["Obsidian", "Porcelain", "Hazel", "Rose"],
+      sizes: ["128GB", "256GB", "512GB", "1TB"],
+      defaultColor: "Obsidian",
+      defaultSize: "128GB",
+      discount: "Giảm 12%",
+    };
+  }
+  if (s.includes("IP16PM") || s.includes("IPHONE 16") || s.includes("IPHONE16")) {
+    return {
+      name: "iPhone 16 Pro Max 256GB - Titanium Sa Mạc",
+      imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
+      colors: ["Titan Sa Mạc", "Titan Tự Nhiên", "Titan Đen", "Titan Trắng"],
+      sizes: ["256GB", "512GB", "1TB"],
+      defaultColor: "Titan Sa Mạc",
+      defaultSize: "256GB",
+      discount: "Giảm 8%",
+    };
+  }
+  if (s.includes("IP15PM") || s.includes("IPHONE 15") || s.includes("IPHONE15")) {
+    return {
+      name: "iPhone 15 Pro Max 256GB - Titan Tự Nhiên",
+      imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
+      colors: ["Titan Tự Nhiên", "Titan Xanh", "Titan Đen", "Titan Trắng"],
+      sizes: ["256GB", "512GB", "1TB"],
+      defaultColor: "Titan Tự Nhiên",
+      defaultSize: "256GB",
+      discount: "Giảm 15%",
+    };
+  }
+  if (s.includes("S24U") || s.includes("S25U") || s.includes("SAMSUNG") || s.includes("GALAXY S24") || s.includes("GALAXY S25")) {
+    return {
+      name: "Samsung Galaxy S24 Ultra 512GB - Xám Titan",
+      imageUrl: "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&auto=format&fit=crop&q=80",
+      colors: ["Xám Titan", "Đen Titan", "Tím Titan", "Vàng Titan"],
+      sizes: ["256GB", "512GB", "1TB"],
+      defaultColor: "Xám Titan",
+      defaultSize: "512GB",
+      discount: "Giảm 11%",
+    };
+  }
+  if (s.includes("MI14U") || s.includes("MI15U") || s.includes("XIAOMI")) {
+    return {
+      name: "Xiaomi 14 Ultra 512GB - Trắng Gốm Leica",
+      imageUrl: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&auto=format&fit=crop&q=80",
+      colors: ["Trắng Gốm", "Đen Da", "Xanh Titan"],
+      sizes: ["512GB", "1TB"],
+      defaultColor: "Trắng Gốm",
+      defaultSize: "512GB",
+      discount: "Giảm 14%",
+    };
+  }
+  if (s.includes("AIRPOD") || s.includes("TAI NGHE")) {
+    return {
+      name: "AirPods Pro Gen 2 (MagSafe USB-C)",
+      imageUrl: "https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500&auto=format&fit=crop&q=80",
+      colors: ["Trắng", "Đen"],
+      sizes: ["Tiêu chuẩn", "USB-C MagSafe"],
+      defaultColor: "Trắng",
+      defaultSize: "USB-C MagSafe",
+      discount: "Giảm 10%",
+    };
+  }
+  if (s.includes("IPAD")) {
+    return {
+      name: "iPad Pro M4 11-inch 256GB - Silver WiFi",
+      imageUrl: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=500&auto=format&fit=crop&q=80",
+      colors: ["Bạc Silver", "Xám Space"],
+      sizes: ["256GB", "512GB", "1TB"],
+      defaultColor: "Bạc Silver",
+      defaultSize: "256GB",
+      discount: "Giảm 9%",
+    };
+  }
+  if (s.includes("TABS10") || s.includes("TAB S10")) {
+    return {
+      name: "Samsung Galaxy Tab S10 Ultra 256GB 5G",
+      imageUrl: "https://images.unsplash.com/photo-1589739900243-4b52cd9b104e?w=500&auto=format&fit=crop&q=80",
+      colors: ["Xám Moonstone", "Bạc Platinum"],
+      sizes: ["256GB", "512GB"],
+      defaultColor: "Xám Moonstone",
+      defaultSize: "256GB",
+      discount: "Giảm 12%",
+    };
+  }
+  if (s.includes("MBP") || s.includes("MACBOOK")) {
+    return {
+      name: "MacBook Pro 16-inch M4 Pro 48GB 1TB",
+      imageUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500&auto=format&fit=crop&q=80",
+      colors: ["Đen Space Black", "Bạc Silver"],
+      sizes: ["512GB", "1TB", "2TB"],
+      defaultColor: "Đen Space Black",
+      defaultSize: "1TB",
+      discount: "Giảm 7%",
+    };
+  }
+  if (s.includes("XPS") || s.includes("DELL")) {
+    return {
+      name: "Dell XPS 16 9640 Core Ultra 7 32GB 1TB",
+      imageUrl: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=600",
+      colors: ["Bạch Kim", "Than Chì"],
+      sizes: ["16GB/512GB", "32GB/1TB", "64GB/2TB"],
+      defaultColor: "Bạch Kim",
+      defaultSize: "32GB/1TB",
+      discount: "Giảm 10%",
+    };
+  }
+  return {
+    name: skuOrName.startsWith("ATTR-") ? skuOrName.replace(/^ATTR-/, "").replace(/-/g, " ") : (skuOrName || "Sản phẩm công nghệ"),
+    imageUrl: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&auto=format&fit=crop&q=80",
+    colors: ["Titan Sa Mạc", "Titan Tự Nhiên", "Titan Đen", "Titan Trắng"],
+    sizes: ["128GB", "256GB", "512GB", "1TB"],
+    defaultColor: "Titan Sa Mạc",
+    defaultSize: "256GB",
+    discount: "Giảm 10%",
+  };
+};
+
 const mapApiCartToOrderProducts = (cart: ApiCart): OrderProduct[] => {
   if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
     return [];
   }
   return cart.items.map((item, idx) => {
+    const meta = resolveProductMetadata(item.productName || item.sku || "");
     const rawTitle = item.attributesTitle || "";
-    const parts = rawTitle.split("/");
-    const color = parts[0]?.trim() || "Tiêu chuẩn";
-    const size = parts[1]?.trim() || "Mặc định";
+    
+    let color = meta.defaultColor;
+    let size = meta.defaultSize;
+
+    if (rawTitle.includes(" / ")) {
+      const parts = rawTitle.split(" / ");
+      if (parts[0]) color = parts[0].trim();
+      if (parts[1]) size = parts.slice(1).join(" / ").trim();
+    } else if (rawTitle.includes(" - ")) {
+      const parts = rawTitle.split(" - ");
+      if (parts[0]) color = parts[0].trim();
+      if (parts[1]) size = parts.slice(1).join(" - ").trim();
+    } else if (rawTitle.includes(",")) {
+      const parts = rawTitle.split(",");
+      if (parts[0]) color = parts[0].trim();
+      if (parts[1]) size = parts.slice(1).join(",").trim();
+    } else if (rawTitle.trim() !== "") {
+      color = rawTitle.trim();
+    }
+
+    color = cleanColorOptions([color])[0] || meta.defaultColor;
+    size = cleanSizeOptions([size], meta.colors)[0] || meta.defaultSize;
+
+    const rawColors = item.availableColors || meta.colors;
+    const rawSizes = item.availableSizes || meta.sizes;
+
+    const availableColors = cleanColorOptions([color, ...rawColors]);
+    const availableSizes = cleanSizeOptions([size, ...rawSizes], availableColors);
+    const displayName = (item.productName && !item.productName.startsWith("ATTR-")) ? item.productName : meta.name;
+    const imageUrl = item.imageUrl || meta.imageUrl;
 
     return {
       id: item.sku || `cart-item-${idx}`,
       attributesSku: item.sku,
-      name: item.productName || item.sku,
+      name: displayName,
       color,
-      availableColors: [color],
+      availableColors,
       size,
-      availableSizes: [size],
+      availableSizes,
       unitPrice: item.salePrice || item.unitPrice || 0,
       oldPrice: (item.unitPrice && item.unitPrice > (item.salePrice || 0)) ? item.unitPrice : undefined,
+      discount: item.discount || meta.discount,
       quantity: Math.max(1, item.quantity || 1),
-      image: item.imageUrl || "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
+      image: imageUrl,
       selected: item.isAvailable !== false && (item.stock === undefined || item.stock > 0),
       isAvailable: item.isAvailable !== false,
       stock: item.stock !== undefined ? item.stock : 99,
@@ -458,6 +827,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
 
   // Variant editing popover
   const [activeVariantDropdown, setActiveVariantDropdown] = useState<string | null>(null);
+  const variantCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Payment Method State
   const [paymentType, setPaymentType] = useState<"momo" | "bank" | "paypal" | "card" | "cod">("momo");
@@ -476,13 +846,6 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   const appliedDiscount = selectedVoucher && subtotal >= selectedVoucher.minOrder ? selectedVoucher.discountAmount : 0;
   const total = Math.max(0, subtotal > 0 ? subtotal + shippingFee - appliedDiscount : 0);
   const isAllSelected = products.length > 0 && products.every((p) => p.selected);
-
-  // Currency Formatter - Clean Natural VND format
-  const formatVND = (amount: number) => {
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" })
-      .format(amount)
-      .replace("₫", "₫");
-  };
 
   // Handlers
   const handleToggleSelectAll = () => {
@@ -754,53 +1117,81 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
             <div className="absolute top-[40%] -right-20 w-72 h-72 rounded-full bg-[#FF8A00]/6 blur-[90px] pointer-events-none" />
           </div>
 
-          {/* Table Header Bar with Back Button, Orange-Red Checkbox & Black Column Headers */}
-          <div className="relative z-10 pb-3 border-b border-neutral-200/80 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
+          {/* Table Header Bar with Back Button, Selection Toggle & Quick Bulk Actions */}
+          <div className="relative z-10 pb-3 border-b border-slate-200/80 flex items-center justify-between shrink-0 gap-3">
+            {/* Left: Back button + Select All Checkbox & Count */}
+            <div className="flex items-center gap-2.5 sm:gap-3">
               <button
                 type="button"
                 onClick={() => onNavigate && onNavigate("product")}
-                className="size-8 rounded-full hover:bg-neutral-100 flex items-center justify-center text-neutral-800 hover:text-black transition-colors cursor-pointer mr-0.5"
+                className="size-8 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
                 title="Quay lại danh mục"
               >
-                <ArrowLeft className="size-4 stroke-[2]" />
+                <ArrowLeft className="size-4 stroke-[2.2]" />
               </button>
 
-              {/* Standard Clean E-Commerce Select All Toggle with 30% Orange-Red Checkbox */}
+              {/* Standard Clean Select All Toggle */}
               <div
                 role="button"
                 onClick={handleToggleSelectAll}
-                className="flex items-center gap-2.5 cursor-pointer select-none group py-1"
+                className="flex items-center gap-2 cursor-pointer select-none group py-0.5"
               >
                 <div
                   className={`size-4.5 rounded-md border flex items-center justify-center transition-all ${
                     isAllSelected
-                      ? "bg-orange-600 border-orange-600 text-white shadow-2xs"
-                      : "border-neutral-300 bg-white group-hover:border-neutral-500"
+                      ? "bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] border-[#FF4D24] text-white shadow-2xs"
+                      : "border-slate-300 bg-white group-hover:border-slate-400"
                   }`}
                 >
                   {isAllSelected && <Check className="size-3 stroke-[3]" />}
                 </div>
-                <span className="text-xs font-bold text-neutral-900 tracking-wider uppercase">
+                <span className="text-[12px] font-bold text-slate-900 tracking-wide uppercase group-hover:text-[#FF4D24] transition-colors">
                   Chọn tất cả
                 </span>
-                <span className="text-[11px] font-semibold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-full">
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full transition-colors ${
+                  selectedProducts.length > 0 
+                    ? "bg-orange-50 text-[#FF4D24] border border-orange-200/70" 
+                    : "bg-slate-100 text-slate-500 border border-slate-200/60"
+                }`}>
                   ({selectedProducts.length}/{products.length})
                 </span>
               </div>
             </div>
 
-            {/* Black Bold Column Headers (70% Dominant Black) */}
-            <div className="flex items-center gap-8 sm:gap-14 text-neutral-900 font-bold text-xs tracking-wider pr-2">
-              <span className="w-24 text-center">SỐ LƯỢNG</span>
-              <span className="w-28 text-right">THÀNH TIỀN</span>
+            {/* Right: Quick Bulk Actions */}
+            <div className="flex items-center gap-2 text-xs">
+              {selectedProducts.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setProducts(prev => prev.map(p => ({ ...p, selected: false })))}
+                    className="text-[11.5px] text-slate-500 hover:text-slate-900 font-medium px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Bỏ chọn tất cả
+                  </button>
+                  {onRemoveCartItem && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const idsToRemove = selectedProducts.map(p => p.id);
+                        onRemoveCartItem(idsToRemove);
+                        setProducts(prev => prev.filter(p => !p.selected));
+                      }}
+                      className="flex items-center gap-1.5 text-[11.5px] text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/90 border border-rose-200/70 px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
+                    >
+                      <Trash2 className="size-3.5" />
+                      <span>Xóa ({selectedProducts.length})</span>
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
           {/* Scrollable Products List Container */}
-          <div className="relative z-10 flex-1 min-h-0 overflow-hidden flex flex-col pt-1">
+          <div className="relative z-10 flex-1 min-h-0 overflow-hidden flex flex-col">
             <div 
-              className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto hide-scrollbar pr-1 pb-2 pt-1"
+              className="flex-1 min-h-0 flex flex-col gap-2.5 overflow-y-auto px-1.5 pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             >
               {products.length === 0 ? (
                 <div className="h-full min-h-[300px] flex flex-col items-center justify-center p-12 text-center gap-3">
@@ -814,80 +1205,165 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                   </Button>
                 </div>
               ) : (
-                products.map((item) => {
+                products.map((item, index) => {
                   const lineTotal = item.unitPrice * item.quantity;
+                  const discountLabel = calculateOrderDiscount(item.unitPrice, item.oldPrice, item.discount);
+                  const isVariantExpanded = activeVariantDropdown === item.id;
+                  const isNearBottom = products.length >= 2 && index === products.length - 1;
+
+                  const displayTitle = item.name;
+
                   return (
                     <div 
                       key={item.id} 
-                      onClick={() => handleToggleProduct(item.id)}
-                      className={`py-3.5 px-3.5 sm:px-4 rounded-2xl flex items-center justify-between gap-4 transition-all duration-200 cursor-pointer select-none ${
+                      onClick={() => {
+                        handleToggleProduct(item.id);
+                      }}
+                      className={`p-3 sm:p-3.5 rounded-2xl border select-none relative flex items-center justify-between gap-4 cursor-pointer transition-all duration-200 overflow-visible ${
+                        isVariantExpanded ? "z-40" : "z-0"
+                      } ${
                         item.selected 
-                          ? "opacity-100 bg-white/95 border border-neutral-300 shadow-sm ring-1 ring-black/5 hover:border-neutral-400 hover:shadow-md" 
-                          : "opacity-35 grayscale-[35%] hover:opacity-65 bg-neutral-100/35 border border-transparent"
+                          ? "bg-white border-slate-300 shadow-xs ring-1 ring-slate-900/5" 
+                          : "border-transparent bg-transparent opacity-40 grayscale-[35%]"
                       }`}
                     >
-                      {/* Left: Smartphone Photo & Details */}
-                      <div className="flex items-center gap-3.5 sm:gap-4.5 flex-1 min-w-0">
-                        {/* Smartphone Photo - Clean Portrait Proportion (Showing Full Device) */}
-                        <div className={`w-18 h-22 sm:w-20 sm:h-24 rounded-xl shrink-0 p-1 sm:p-1.5 flex items-center justify-center overflow-hidden transition-all ${
-                          item.selected 
-                            ? "bg-white border border-neutral-200/90 shadow-2xs" 
-                            : "bg-neutral-100/60 border border-neutral-200/50"
-                        }`}>
-                          <img 
-                            src={item.image} 
-                            alt={item.name} 
-                            className="size-full object-contain object-center hover:scale-105 transition-transform duration-200" 
+                      {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
+                      {discountLabel && (
+                        <>
+                          <div className={`absolute -top-1.5 left-[-4px] h-[21px] text-white text-[9.5px] font-black px-2 rounded-br-md rounded-tr-xs shadow-[1px_2px_4px_rgba(255,77,36,0.22)] flex items-center justify-center z-20 select-none transition-all duration-200 ${
+                            item.selected 
+                              ? "bg-gradient-to-r from-[#FF4D24] to-[#FF6B35]" 
+                              : "bg-slate-400 opacity-50 shadow-none"
+                          }`}>
+                            {discountLabel}
+                          </div>
+                          {/* 3D Fold Corner for Left Ribbon */}
+                          <div 
+                            className={`absolute top-[15px] left-[-4px] w-[4px] h-[4px] z-10 transition-colors duration-200 ${
+                              item.selected ? "bg-[#B43C00]" : "bg-slate-600 opacity-50"
+                            }`} 
+                            style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} 
                           />
+                        </>
+                      )}
+
+                      {/* Left: Smartphone Thumbnail Photo + Info + Variant + Unit Price */}
+                      <div className="flex items-center gap-3 sm:gap-3.5 flex-1 min-w-0">
+                        {/* Smartphone Thumbnail Photo - Seamlessly integrated */}
+                        <div className={`relative w-14 h-15 sm:w-16 sm:h-17 rounded-xl shrink-0 p-1 flex items-center justify-center overflow-hidden transition-all duration-200 ${
+                          item.selected 
+                          ? "bg-gradient-to-b from-slate-50 to-slate-100/70 border border-slate-200/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)]" 
+                          : "bg-neutral-100/60 border border-transparent grayscale opacity-40"
+                        }`}>
+                          {item.image ? (
+                            <img 
+                              src={item.image} 
+                              alt={item.name} 
+                              className="size-full object-contain object-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)] transition-transform duration-200 hover:scale-105" 
+                            />
+                          ) : (
+                            <span className="text-base">📦</span>
+                          )}
                         </div>
 
-                        {/* Info & Storage / Color Pill */}
+                        {/* Info & Variant Pill */}
                         <div className="flex-1 min-w-0 flex flex-col gap-1">
-                          <h4 className={`text-xs sm:text-[13.5px] font-semibold leading-snug line-clamp-2 transition-colors ${
-                            item.selected ? "text-neutral-900 font-bold" : "text-neutral-700"
+                          <h4 className={`text-xs sm:text-[13px] font-bold leading-snug line-clamp-2 transition-colors ${
+                            item.selected ? "text-slate-900" : "text-neutral-400"
                           }`}>
-                            {item.name}
+                            {displayTitle}
                           </h4>
 
-                          {/* Minimalist Variant Dropdown */}
+                          {/* Minimalist Variant Pill Button & Fixed Frame Popup */}
                           <div 
-                            className="relative inline-block self-start z-30" 
-                            onClick={(e) => e.stopPropagation()}
-                            onMouseLeave={() => setActiveVariantDropdown(null)}
+                            className="relative inline-block self-start z-40" 
+                            onClick={(e) => {
+                              if (item.selected) e.stopPropagation();
+                            }}
+                            onMouseEnter={() => {
+                              if (variantCloseTimeoutRef.current) {
+                                clearTimeout(variantCloseTimeoutRef.current);
+                                variantCloseTimeoutRef.current = null;
+                              }
+                            }}
+                            onMouseLeave={() => {
+                              if (variantCloseTimeoutRef.current) clearTimeout(variantCloseTimeoutRef.current);
+                              variantCloseTimeoutRef.current = setTimeout(() => {
+                                setActiveVariantDropdown(null);
+                              }, 450);
+                            }}
                           >
                             <button
                               type="button"
-                              onClick={() =>
-                                setActiveVariantDropdown(activeVariantDropdown === item.id ? null : item.id)
-                              }
-                              className="text-[11.5px] text-neutral-500 hover:text-neutral-900 flex items-center gap-1 cursor-pointer transition-colors pt-0.5"
+                              onClick={(e) => {
+                                if (item.selected) {
+                                  e.stopPropagation();
+                                  setActiveVariantDropdown(activeVariantDropdown === item.id ? null : item.id);
+                                }
+                              }}
+                              className={`text-[10.5px] px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                                !item.selected 
+                                  ? "bg-transparent border-transparent text-neutral-400 select-none"
+                                  : isVariantExpanded
+                                    ? "bg-gradient-to-r from-orange-50 via-white to-orange-50/90 border-[#FF4D24]/40 text-[#FF4D24] font-medium shadow-[0_2px_10px_rgba(255,77,36,0.12)] ring-1 ring-[#FF4D24]/20"
+                                    : "bg-white/80 hover:bg-orange-50/60 border-slate-200/90 hover:border-[#FF4D24]/30 text-slate-700 hover:text-[#FF4D24] shadow-2xs"
+                              }`}
                             >
-                              <span>Phiên bản: <strong className="text-neutral-800 font-semibold">{item.color}</strong>, <strong className="text-neutral-800 font-semibold">{item.size}</strong></span>
-                              <ChevronDown className="size-2.5 text-neutral-400" />
+                              <span>Phiên bản: <strong className={item.selected ? (isVariantExpanded ? "text-[#FF4D24] font-bold" : "text-slate-800 font-semibold") : "text-neutral-400 font-normal"}>{item.color}</strong>, <strong className={item.selected ? (isVariantExpanded ? "text-[#FF4D24] font-bold" : "text-slate-800 font-semibold") : "text-neutral-400 font-normal"}>{item.size}</strong></span>
+                              <ChevronDown className={`size-3 transition-transform duration-200 ${isVariantExpanded ? "rotate-180 text-[#FF4D24]" : ""} ${item.selected ? (isVariantExpanded ? "text-[#FF4D24]" : "text-slate-500") : "text-neutral-400"}`} />
                             </button>
 
-                            {/* Popover */}
+                            {/* Popup Khung cố định với hiệu ứng bung mở vòng tròn (Trắng pha cam nhẹ) */}
                             <AnimatePresence>
-                              {activeVariantDropdown === item.id && (
+                              {isVariantExpanded && item.selected && (
                                 <motion.div
-                                  initial={{ opacity: 0, y: 4, scale: 0.97 }}
-                                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                                  exit={{ opacity: 0, y: 4, scale: 0.97 }}
-                                  transition={{ duration: 0.12 }}
-                                  className="absolute left-0 top-full mt-1.5 z-50 bg-white border border-neutral-200 rounded-2xl shadow-2xl p-3.5 w-76 flex flex-col gap-2.5 text-xs ring-1 ring-black/5"
+                                  initial={{ 
+                                    opacity: 0, 
+                                    clipPath: isNearBottom 
+                                      ? "circle(0% at 30px calc(100% + 10px))" 
+                                      : "circle(0% at 30px -10px)", 
+                                    filter: "blur(10px)" 
+                                  }}
+                                  animate={{ 
+                                    opacity: 1, 
+                                    clipPath: isNearBottom 
+                                      ? "circle(160% at 30px calc(100% + 10px))" 
+                                      : "circle(160% at 30px -10px)", 
+                                    filter: "blur(0px)" 
+                                  }}
+                                  exit={{ 
+                                    opacity: 0, 
+                                    clipPath: isNearBottom 
+                                      ? "circle(0% at 30px calc(100% + 10px))" 
+                                      : "circle(0% at 30px -10px)", 
+                                    filter: "blur(10px)" 
+                                  }}
+                                  transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
+                                  className={`absolute left-0 z-50 bg-gradient-to-b from-white via-orange-50/20 to-white/98 backdrop-blur-3xl border border-orange-200/70 rounded-2xl shadow-[0_25px_60px_-12px_rgba(255,77,36,0.15),0_10px_25px_-5px_rgba(0,0,0,0.06)] p-3.5 w-[290px] sm:w-[310px] flex flex-col gap-2.5 text-xs ring-1 ring-[#FF4D24]/10 overflow-hidden ${
+                                    isNearBottom 
+                                      ? "bottom-full mb-2 origin-bottom-left" 
+                                      : "top-full mt-2 origin-top-left"
+                                  }`}
                                 >
+                                  {/* Decorative ambient glow (Trắng pha cam nhẹ) */}
+                                  <div className="absolute top-0 right-0 w-36 h-36 bg-[#FF4D24]/18 rounded-full blur-[40px] pointer-events-none -z-10" />
+                                  <div className="absolute bottom-0 left-0 w-28 h-28 bg-[#FF4D24]/10 rounded-full blur-[30px] pointer-events-none -z-10" />
+
+                                  {/* Color Options - Grid 2 cột thẳng hàng */}
                                   <div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Màu sắc:</span>
-                                    <div className="flex flex-wrap gap-1.5 pt-1">
-                                      {item.availableColors.map((c) => (
+                                    <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+                                      Màu sắc:
+                                    </span>
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                      {cleanColorOptions(item.availableColors).map((c) => (
                                         <button
                                           key={c}
                                           type="button"
                                           onClick={() => handleSelectVariant(item.id, c, item.size)}
-                                          className={`px-2.5 py-1 border text-[11px] rounded-md cursor-pointer transition-colors ${
+                                          className={`w-full py-1.5 px-2 text-center text-[10.5px] rounded-xl border transition-all truncate flex items-center justify-center cursor-pointer bg-white ${
                                             item.color === c
-                                              ? "border-neutral-900 bg-neutral-900 text-white font-medium"
-                                              : "border-neutral-200 text-neutral-700 hover:border-neutral-400"
+                                              ? "border-[#FF4D24] text-[#FF4D24] font-bold shadow-xs ring-1 ring-[#FF4D24]/40"
+                                              : "border-slate-200 text-slate-700 hover:border-[#FF4D24]/60 hover:text-[#FF4D24] font-medium"
                                           }`}
                                         >
                                           {c}
@@ -896,20 +1372,23 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                                     </div>
                                   </div>
 
-                                  <Separator />
+                                  <Separator className="bg-orange-100/60" />
 
+                                  {/* Size Options - Grid 3 cột thẳng hàng */}
                                   <div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Dung lượng bộ nhớ:</span>
-                                    <div className="flex flex-wrap gap-1.5 pt-1">
-                                      {item.availableSizes.map((s) => (
+                                    <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+                                      Dung lượng bộ nhớ:
+                                    </span>
+                                    <div className={`grid gap-1.5 ${cleanSizeOptions(item.availableSizes, item.availableColors).length <= 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                                      {cleanSizeOptions(item.availableSizes, item.availableColors).map((s) => (
                                         <button
                                           key={s}
                                           type="button"
                                           onClick={() => handleSelectVariant(item.id, item.color, s)}
-                                          className={`px-2.5 py-1 border text-[11px] rounded-md cursor-pointer transition-colors ${
+                                          className={`w-full py-1.5 px-1.5 text-center text-[10.5px] rounded-xl border transition-all truncate flex items-center justify-center cursor-pointer bg-white ${
                                             item.size === s
-                                              ? "border-neutral-900 bg-neutral-900 text-white font-medium"
-                                              : "border-neutral-200 text-neutral-700 hover:border-neutral-400"
+                                              ? "border-[#FF4D24] text-[#FF4D24] font-bold shadow-xs ring-1 ring-[#FF4D24]/40"
+                                              : "border-slate-200 text-slate-700 hover:border-[#FF4D24]/60 hover:text-[#FF4D24] font-medium"
                                           }`}
                                         >
                                           {s}
@@ -922,60 +1401,83 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             </AnimatePresence>
                           </div>
 
-                          {/* Normal Sans-serif Price Display & Stock Badge */}
-                          <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                          {/* Normal Sans-serif Price Display */}
+                          <div className="flex items-center gap-2 pt-0.5">
                             {item.oldPrice && (
-                              <span className="text-xs text-neutral-400 line-through">
+                              <span className="text-[11px] text-slate-400 line-through font-normal">
                                 {formatVND(item.oldPrice)}
                               </span>
                             )}
-                            <span className="text-[13px] font-semibold text-neutral-800">
+                            <span className={`text-xs sm:text-[13px] font-bold transition-colors ${
+                              item.selected ? "text-slate-900" : "text-neutral-400"
+                            }`}>
                               {formatVND(item.unitPrice)}
                             </span>
-                            {(item.isAvailable === false || item.stock === 0) && (
-                              <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded-md">
-                                Hết hàng
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
 
                       {/* Right: Stepper & Normal Sans-serif Total Price */}
-                      <div className="flex items-center gap-6 sm:gap-10 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-4 sm:gap-7 shrink-0 pr-1" onClick={(e) => {
+                        if (item.selected) e.stopPropagation();
+                      }}>
                         {/* Stepper */}
-                        <div className="w-24 flex items-center justify-center">
-                          <div className="flex items-center border border-neutral-200 bg-white rounded-lg h-7.5 shadow-2xs">
+                        <div className="flex items-center justify-center">
+                          <div className={`flex items-center border rounded-lg h-7.5 transition-all ${
+                            item.selected 
+                              ? "border-slate-300 bg-white shadow-2xs" 
+                              : "border-neutral-200/50 bg-neutral-100/60 opacity-60"
+                          }`}>
                             <button
                               type="button"
-                              className="size-6.5 flex items-center justify-center text-neutral-500 hover:text-neutral-950 disabled:opacity-20 cursor-pointer"
+                              className={`size-6.5 flex items-center justify-center disabled:opacity-20 cursor-pointer ${
+                                item.selected ? "text-slate-500 hover:text-slate-950" : "text-neutral-400"
+                              }`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleUpdateQuantity(item.id, -1);
+                                if (item.selected) {
+                                  handleUpdateQuantity(item.id, -1);
+                                }
                               }}
                               disabled={item.quantity <= 1}
                             >
-                              <Minus className="size-3" />
+                              <Minus size={11} className="stroke-[2.5]" />
                             </button>
-                            <span className="w-8 text-center text-xs font-semibold text-neutral-900 select-none">
+                            <span className={`w-7 text-center text-xs font-bold select-none ${
+                              item.selected ? "text-slate-800" : "text-neutral-400"
+                            }`}>
                               {item.quantity}
                             </span>
                             <button
                               type="button"
-                              className="size-6.5 flex items-center justify-center text-neutral-500 hover:text-neutral-950 cursor-pointer"
+                              className={`size-6.5 flex items-center justify-center cursor-pointer ${
+                                item.selected ? "text-slate-500 hover:text-slate-950" : "text-neutral-400"
+                              }`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleUpdateQuantity(item.id, 1);
+                                if (item.selected) {
+                                  handleUpdateQuantity(item.id, 1);
+                                }
                               }}
                             >
-                              <Plus className="size-3" />
+                              <Plus size={11} className="stroke-[2.5]" />
                             </button>
                           </div>
                         </div>
 
-                        {/* Normal Sans Total Price (Black) */}
-                        <div className="w-28 text-right font-bold text-xs sm:text-[14px] text-neutral-900">
-                          {formatVND(lineTotal)}
+                        {/* Line Total Price with Scattered Floating Voucher Tags */}
+                        <div className="relative w-24 sm:w-28 text-right flex flex-col items-end justify-center select-none">
+                          {discountLabel && (
+                            <ScatteredFloatingVoucherTags
+                              discountLabel={discountLabel}
+                              selected={item.selected}
+                            />
+                          )}
+                          <div className={`font-bold text-xs sm:text-[14.5px] tracking-tight transition-colors ${
+                            item.selected ? "text-slate-900" : "text-neutral-400"
+                          }`}>
+                            {formatVND(lineTotal)}
+                          </div>
                         </div>
                       </div>
                     </div>
