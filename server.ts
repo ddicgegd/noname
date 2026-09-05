@@ -872,13 +872,20 @@ async function startServer() {
     }
 
     const data = response?.data || response;
+    const pageObj = data?.paging || data?.page || data?.pageable;
+    const rawPageNumber = pageObj?.pageNumber ?? data?.pageNumber;
+    const pageNumber = typeof rawPageNumber === "number" ? (pageObj === data?.pageable ? rawPageNumber + 1 : rawPageNumber) : 1;
+    const pageSize = pageObj?.pageSize ?? pageObj?.size ?? data?.pageSize ?? data?.size ?? (Array.isArray(data?.contents) ? data.contents.length : 0);
+    const totalPages = pageObj?.totalPages ?? data?.totalPages ?? (pageSize > 0 && pageObj?.totalElements ? Math.ceil(pageObj.totalElements / pageSize) : 0);
+    const totalElements = pageObj?.totalElements ?? pageObj?.total ?? data?.totalElements ?? data?.total ?? (Array.isArray(data?.contents) ? data.contents.length : 0);
+
     return {
       contents: data?.contents || data?.content || data?.items || [],
-      paging: data?.paging || data?.page || {
-        pageNumber: data?.pageNumber || 1,
-        pageSize: data?.pageSize || data?.size || 0,
-        totalPages: data?.totalPages || 0,
-        totalElements: data?.totalElements || data?.total || 0
+      paging: {
+        pageNumber,
+        pageSize,
+        totalPages,
+        totalElements
       }
     };
   };

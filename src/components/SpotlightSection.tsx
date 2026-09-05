@@ -6,8 +6,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useMotionValue, useSpring } from "motion/react";
 import CTAButton from "./CTAButton";
-import LogoMarquee from "./LogoMarquee";
 import { Particles } from "./ui/particles";
+import { BlurVignette } from "./ui/blur-vignette";
 
 interface SpotlightSectionProps {
   initialBgText?: string;
@@ -230,77 +230,53 @@ export default function SpotlightSection({
         refresh
       />
 
-      {/* Big text behind image - overflow-hidden removed to prevent clipping of the display text */}
-      <div className="hero-big-text absolute bottom-[-30px] md:bottom-[-40px] left-0 right-0 z-10 pointer-events-none w-full text-center">
-        {/* Layer A: High-performance spring-based coordinate displacement */}
-        <motion.div
-          style={{
-            x: springX,
-            y: springY,
-          }}
-          className="w-full flex justify-center"
+      {/* Base background layer with Blur Vignette and Video */}
+      <BlurVignette
+        radius="0px"
+        inset="0px"
+        transitionLength="160px"
+        blur="20px"
+        className="absolute top-[30vh] md:top-0 left-0 right-0 bottom-0 z-20 pointer-events-none"
+      >
+        {/* Background Video from context */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-90"
         >
-          {/* Layer B: Initial slide-up entry presentation */}
-          <motion.div
-            initial={{ y: 330 }}
-            animate={{ y: 0 }}
-            transition={{
-              duration: 1.0,
-              ease: [0.16, 1, 0.3, 1],
-              delay: 1.5,
-            }}
-            className="w-full flex justify-center"
-          >
-            {/* Layer C: Gentle continuous idle floating with extra vertical padding to ensure no browser rendering cuts */}
-            <motion.h2
-              className="font-mono font-medium text-[#F4F1E8] leading-[0.9] tracking-[-0.04em] whitespace-nowrap text-[180px] sm:text-[28vw] md:text-[32vw] lg:text-[40vw] xl:text-[500px] py-6 select-none"
-              animate={floatRange > 0 ? {
-                y: [floatRange / 2, -floatRange, floatRange / 2],
-                rotate: [0.15, -0.15, 0.15]
-              } : {}}
-              transition={{
-                y: {
-                  duration: 5.5,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                },
-                rotate: {
-                  duration: 7.5,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }
-              }}
-            >
-              {bgText}
-            </motion.h2>
-          </motion.div>
-        </motion.div>
-      </div>
+          <source
+            src="https://cdn.pixabay.com/video/2023/10/19/185726-876210695_large.mp4"
+            type="video/mp4"
+          />
+        </video>
 
-      {/* Base background image layer */}
-      <motion.div
-        className="hero-base-img absolute top-[30vh] md:top-0 left-0 right-0 bottom-0 bg-cover bg-no-repeat bg-[position:60%_center] md:bg-center z-20 pointer-events-none"
-        style={{
-          backgroundImage: `url('https://soft-zoom-63098134.figma.site/_assets/v11/5c9f982199fde1d9b85a20e5396f0fa7bacaf9a3.png?w=2560')`,
-        }}
-        initial={{ opacity: 0, scale: 1.5, rotate: 3 }}
-        animate={{ opacity: 1, scale: 1, rotate: 0 }}
-        transition={{
-          duration: 1.2,
-          ease: [0.25, 0.46, 0.45, 0.94],
-          delay: 1.0,
-        }}
-      />
+        {/* Base background image layer */}
+        <motion.div
+          className="hero-base-img absolute inset-0 bg-cover bg-no-repeat bg-[position:60%_center] md:bg-center mix-blend-multiply"
+          style={{
+            backgroundImage: `url('https://soft-zoom-63098134.figma.site/_assets/v11/5c9f982199fde1d9b85a20e5396f0fa7bacaf9a3.png?w=2560')`,
+          }}
+          initial={{ opacity: 0, scale: 1.5, rotate: 3 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          transition={{
+            duration: 1.2,
+            ease: [0.25, 0.46, 0.45, 0.94],
+            delay: 1.0,
+          }}
+        />
 
-      {/* Reveal spotlight background image layer */}
-      <div
-        id="reveal-img"
-        className="hero-reveal-img absolute top-[30vh] md:top-0 left-0 right-0 bottom-0 bg-cover bg-no-repeat bg-[position:60%_center] md:bg-center z-30 pointer-events-none transition-opacity duration-300"
-        style={{
-          backgroundImage: `url('https://soft-zoom-63098134.figma.site/_assets/v11/6be2165e31648955b4e071f4cf2a50bc572b9bfd.png?w=1536')`,
-          ...maskStyle,
-        }}
-      />
+        {/* Reveal spotlight background image layer */}
+        <div
+          id="reveal-img"
+          className="hero-reveal-img absolute inset-0 bg-cover bg-no-repeat bg-[position:60%_center] md:bg-center transition-opacity duration-300"
+          style={{
+            backgroundImage: `url('https://soft-zoom-63098134.figma.site/_assets/v11/6be2165e31648955b4e071f4cf2a50bc572b9bfd.png?w=1536')`,
+            ...maskStyle,
+          }}
+        />
+      </BlurVignette>
 
       {/* Foreground Interactive Content */}
       <div className="hero-content relative z-30 flex flex-col justify-start items-start w-full max-w-[1600px] mx-auto px-4 py-28 md:p-10 md:pt-40 md:pb-24 pointer-events-none h-full md:justify-between">
@@ -327,14 +303,6 @@ export default function SpotlightSection({
           {/* Action CTA Button */}
           <CTAButton text="Start a project now" id="main-cta" />
         </div>
-      </div>
-
-      {/* Seamless Infinite Logo Marquee Scroller behind subject images */}
-      <div 
-        className="absolute bottom-[35px] md:bottom-[60px] left-0 right-0 pointer-events-none"
-        style={{ zIndex: 15 }}
-      >
-        <LogoMarquee />
       </div>
     </main>
   );

@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence, LayoutGroup } from "motion/react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { motion, AnimatePresence, LayoutGroup, type Variants } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
   type Product,
@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { Bevel, BevelButton, BevelDivider } from "@/components/ui/bevel";
 import { VoucherCard } from "@/components/VoucherCard";
 import { useGenieCartFly } from "@/components/ui/genie-cart-fly";
+import { TimelineAnimation } from "@/components/ui/timeline-animation";
 import {
   BadgeCheckIcon,
   BrainCircuitIcon,
@@ -595,6 +596,30 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
   const [activeHashSku, setActiveHashSku] = useState(getCurrentHashSku);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
 
+  const productGridTimelineRef = useRef<HTMLDivElement>(null);
+  const revealVariants: Variants = {
+    visible: (i: number) => {
+      const batchIdx = i % 15;
+      const rowIdx = Math.floor(batchIdx / 5);
+      const colIdx = batchIdx % 5;
+      return {
+        y: 0,
+        opacity: 1,
+        filter: "blur(0px)",
+        transition: {
+          delay: rowIdx * 0.045 + colIdx * 0.012,
+          duration: 0.28,
+          ease: [0.21, 0.47, 0.32, 0.98],
+        },
+      };
+    },
+    hidden: {
+      filter: "blur(6px)",
+      y: -14,
+      opacity: 0,
+    },
+  };
+
   useEffect(() => {
     onDetailOpenChange?.(Boolean(selectedProduct));
     return () => {
@@ -738,11 +763,27 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
   const [catalogPage, setCatalogPage] = useState(1);
   const [hasMoreCatalogProducts, setHasMoreCatalogProducts] = useState(true);
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
+  const isCatalogLoadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  const handleLoadMore = useCallback(() => {
+    if (isCatalogLoadingRef.current || !hasMoreRef.current) return;
+    setCatalogPage((prev) => prev + 1);
+  }, []);
+
+  useEffect(() => {
+    isCatalogLoadingRef.current = isCatalogLoading;
+  }, [isCatalogLoading]);
+
+  useEffect(() => {
+    hasMoreRef.current = hasMoreCatalogProducts;
+  }, [hasMoreCatalogProducts]);
 
   useEffect(() => {
     let cancelled = false;
     setIsCatalogLoading(true);
+    isCatalogLoadingRef.current = true;
 
     const filter: Record<string, any> = {
       page: catalogPage,
@@ -766,7 +807,9 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
           });
           return [...current, ...nextProducts];
         });
-        setHasMoreCatalogProducts(totalElements > 0 ? catalogPage * 15 < totalElements : products.length > 0);
+        const hasMore = totalElements > 0 ? catalogPage * 15 < totalElements : products.length === 15;
+        setHasMoreCatalogProducts(hasMore);
+        hasMoreRef.current = hasMore;
       })
       .catch((error) => {
         if (!cancelled) {
@@ -775,11 +818,13 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
             setCatalogProducts(MAIN_GRID_PRODUCTS);
           }
           setHasMoreCatalogProducts(false);
+          hasMoreRef.current = false;
         }
       })
       .finally(() => {
         if (!cancelled) {
           setIsCatalogLoading(false);
+          isCatalogLoadingRef.current = false;
         }
       });
 
@@ -788,20 +833,43 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
     };
   }, [catalogPage]);
 
+  // Observer-based scroll trigger (expanded prefetch range)
   useEffect(() => {
+    if (!hasMoreCatalogProducts || isCatalogLoading) return;
+    const target = loadMoreRef.current;
+    if (!target) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMoreCatalogProducts && !isCatalogLoading) {
-          setCatalogPage((prev) => prev + 1);
+        if (entries[0].isIntersecting) {
+          handleLoadMore();
         }
       },
-      { rootMargin: "400px" }
+      { rootMargin: "900px" }
     );
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
-    }
+
+    observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMoreCatalogProducts, isCatalogLoading]);
+  }, [hasMoreCatalogProducts, isCatalogLoading, handleLoadMore]);
+
+  // Window scroll event fallback (early prefetch when approaching bottom)
+  useEffect(() => {
+    if (!hasMoreCatalogProducts) return;
+
+    const handleScroll = () => {
+      if (isCatalogLoadingRef.current || !hasMoreRef.current) return;
+      const scrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const clientHeight = window.innerHeight;
+
+      if (scrollTop + clientHeight >= scrollHeight - 950) {
+        handleLoadMore();
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [hasMoreCatalogProducts, handleLoadMore]);
 
   const comparedProducts = comparedProductIds.map(id => catalogProducts.find(p => p.id === id) || PRODUCTS.find(p => p.id === id)).filter((p): p is Product => !!p);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: "success" | "info" | "warning" }[]>([]);
@@ -1266,7 +1334,7 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+            <div ref={productGridTimelineRef} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
               {sortedFilteredProducts.map((product, index) => {
                 const vndInfo = getProductVNDDetails(product);
                 const imgSrc = getProductImage(product);
@@ -1274,11 +1342,12 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
                 const compared = comparedProductIds.includes(product.id);
 
                 return (
-                  <motion.div
+                  <TimelineAnimation
                     key={product.id}
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    as="div"
+                    animationNum={index}
+                    timelineRef={productGridTimelineRef}
+                    customVariants={revealVariants}
                     className="h-full"
                   >
                     <Card
@@ -1416,11 +1485,42 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
                         </div>
                       </CardFooter>
                     </Card>
-                  </motion.div>
+                  </TimelineAnimation>
                 );
               })}
 
-              {sortedFilteredProducts.length === 0 && (
+              {catalogProducts.length === 0 && isCatalogLoading && (
+                Array.from({ length: 15 }).map((_, idx) => (
+                  <TimelineAnimation
+                    key={`skeleton-${idx}`}
+                    as="div"
+                    animationNum={idx}
+                    timelineRef={productGridTimelineRef}
+                    customVariants={revealVariants}
+                    className="h-full"
+                  >
+                    <Card
+                      size="sm"
+                      className="group relative h-full gap-1 overflow-hidden py-0 bg-white/50 dark:bg-zinc-900/40 border border-slate-200/60 dark:border-zinc-800 rounded-2xl animate-pulse"
+                    >
+                      <div className="aspect-[4/5] w-full bg-slate-200/70 dark:bg-zinc-800" />
+                      <CardHeader className="px-2.5 pt-2 pb-0 space-y-1.5">
+                        <div className="h-4 w-3/4 bg-slate-200/80 dark:bg-zinc-800 rounded" />
+                        <div className="h-3 w-1/2 bg-slate-200/60 dark:bg-zinc-800 rounded" />
+                      </CardHeader>
+                      <CardContent className="flex flex-col gap-2 px-2.5 py-2">
+                        <div className="h-5 w-24 bg-slate-200/90 dark:bg-zinc-800 rounded" />
+                        <div className="flex gap-1">
+                          <div className="h-4 w-16 bg-slate-200/60 dark:bg-zinc-800 rounded-full" />
+                          <div className="h-4 w-16 bg-slate-200/60 dark:bg-zinc-800 rounded-full" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TimelineAnimation>
+                ))
+              )}
+
+              {sortedFilteredProducts.length === 0 && !isCatalogLoading && (
                 <Card className="col-span-full">
                   <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
                     <SearchIcon className="text-muted-foreground" />
@@ -1436,8 +1536,8 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
             </div>
 
             {hasMoreCatalogProducts && (
-              <div ref={loadMoreRef} className="flex justify-center items-center py-6 w-full min-h-[56px]">
-                {isCatalogLoading && (
+              <div ref={loadMoreRef} className="flex flex-col justify-center items-center py-8 w-full min-h-[72px]">
+                {isCatalogLoading ? (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -1446,8 +1546,17 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
                     className="flex items-center gap-2 rounded-full bg-card/90 backdrop-blur-md px-4 py-2 text-xs font-medium text-muted-foreground border border-border/60 shadow-xs"
                   >
                     <Loader2Icon className="size-3.5 animate-spin text-primary" />
-                    <span>Đang tải thêm 15 sản phẩm...</span>
+                    <span>Đang tải thêm sản phẩm...</span>
                   </motion.div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLoadMore}
+                    className="rounded-full px-5 text-xs text-muted-foreground hover:text-foreground cursor-pointer shadow-2xs"
+                  >
+                    Tải thêm sản phẩm ({catalogProducts.length} đã hiển thị)
+                  </Button>
                 )}
               </div>
             )}
