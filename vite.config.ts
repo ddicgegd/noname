@@ -15,8 +15,18 @@ export default defineConfig(() => {
       port: process.env.DISABLE_HMR === 'true' ? 3000 : 3999,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // Disable file watching on store files, data caches, and JSON files to prevent unwanted reloads
+      watch: {
+        ignored: [
+          '**/.cart-store.json',
+          '**/.cart-store.json*',
+          '**/.data/**',
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/dist/**',
+          '**/*.json',
+        ],
+      },
     },
   };
 });

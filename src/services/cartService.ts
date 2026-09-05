@@ -1,6 +1,7 @@
 /**
  * Shopping Cart GraphQL Service
- * Integrates Frontend with Shopping Cart GraphQL Endpoints
+ * Integrates Frontend with Shopping Cart GraphQL Gateway & Backend Services
+ * Endpoint: /graphql (Gateway: http://localhost:4000/graphql)
  */
 
 import { getUnifiedAccessToken, unifiedFetch } from "../lib/api";
@@ -10,15 +11,28 @@ import type {
   CartItemInput,
   CartSummaryBadge,
   GraphQLErrorExtensions,
+  ShoppingCartData,
+  ShoppingCartResponse,
+  CartCountResponse,
 } from "../types/cart";
 
 const CART_EVENT_NAME = "cart-updated";
 const LOCAL_STORAGE_CART_CACHE_KEY = "horizon_cached_cart";
 
+const EMPTY_CART: ShoppingCartData = {
+  username: "",
+  totalItems: 0,
+  totalPrice: 0,
+  totalSalePrice: 0,
+  totalDiscount: 0,
+  finalAmount: 0,
+  items: [],
+};
+
 /**
  * Get locally cached cart for instant (0ms) hydration on page load
  */
-export function getCachedCart(): Cart | null {
+export function getCachedCart(): ShoppingCartData | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_CART_CACHE_KEY);
@@ -32,7 +46,7 @@ export function getCachedCart(): Cart | null {
 /**
  * Save cart to local storage cache
  */
-export function setCachedCart(cart?: Cart | null) {
+export function setCachedCart(cart?: ShoppingCartData | null) {
   if (typeof window === "undefined") return;
   try {
     if (cart) {
@@ -99,9 +113,11 @@ export function getCartHeaders(): HeadersInit {
 /**
  * Helper to dispatch cart update event across components
  */
-export function notifyCartUpdated(cart?: Cart | null) {
+export function notifyCartUpdated(cart?: ShoppingCartData | null) {
   if (typeof window !== "undefined") {
-    setCachedCart(cart);
+    if (cart) {
+      setCachedCart(cart);
+    }
     window.dispatchEvent(new CustomEvent(CART_EVENT_NAME, { detail: cart }));
   }
 }
@@ -109,10 +125,10 @@ export function notifyCartUpdated(cart?: Cart | null) {
 /**
  * Subscribe to cart update events
  */
-export function subscribeToCartUpdates(callback: (cart?: Cart) => void): () => void {
+export function subscribeToCartUpdates(callback: (cart?: ShoppingCartData) => void): () => void {
   if (typeof window === "undefined") return () => {};
   const handler = (event: Event) => {
-    const customEvt = event as CustomEvent<Cart>;
+    const customEvt = event as CustomEvent<ShoppingCartData>;
     callback(customEvt.detail);
   };
   window.addEventListener(CART_EVENT_NAME, handler);
@@ -166,271 +182,417 @@ async function executeCartGraphql<T>(
 }
 
 // -------------------------------------------------------------
-// 1. FAST PATH: Lấy số lượng Badge Header (< 1ms)
+// GraphQL Query / Mutation Definitions
 // -------------------------------------------------------------
-const GET_CART_BADGE_QUERY = `
-  query GetCartBadge($guestId: String) {
-    cartBadge(guestId: $guestId) {
-      totalItems
-    }
-  }
-`;
 
-export async function getCartBadge(guestId?: string): Promise<CartSummaryBadge> {
-  try {
-    const data = await executeCartGraphql<{ cartBadge: CartSummaryBadge }>(
-      GET_CART_BADGE_QUERY,
-      { guestId: guestId || getOrCreateGuestId() }
-    );
-    return data?.cartBadge || { totalItems: 0 };
-  } catch (error) {
-    console.warn("[cartService] getCartBadge failed:", error);
-    return { totalItems: 0 };
-  }
-}
-
-// -------------------------------------------------------------
-// 2. MINI-CART DRAWER: Pop-up xem nhanh
-// -------------------------------------------------------------
-const GET_MINI_CART_QUERY = `
-  query GetMiniCart($guestId: String) {
-    cart(guestId: $guestId) {
-      totalItems
-      finalAmount
-      items {
-        sku
-        productName
-        imageUrl
-        salePrice
-        quantity
+const GET_CART_COUNT_QUERY = `
+  query GetCartCount($guestId: String) {
+    getCartCount(guestId: $guestId) {
+      status {
+        code
+        message
       }
+      data
     }
   }
 `;
 
-export async function getMiniCart(guestId?: string): Promise<Cart> {
-  const data = await executeCartGraphql<{ cart: Cart }>(
-    GET_MINI_CART_QUERY,
-    { guestId: guestId || getOrCreateGuestId() }
-  );
-  if (data?.cart) {
-    setCachedCart(data.cart);
-  }
-  return data?.cart || {
-    totalItems: 0,
-    totalPrice: 0,
-    totalSalePrice: 0,
-    totalDiscount: 0,
-    finalAmount: 0,
-    items: [],
-  };
-}
-
-// -------------------------------------------------------------
-// 3. FULL CART PAGE: Trang Giỏ hàng & Checkout
-// -------------------------------------------------------------
-const GET_FULL_CART_QUERY = `
-  query GetFullCart($guestId: String) {
-    cart(guestId: $guestId) {
-      username
-      totalItems
-      totalPrice
-      totalSalePrice
-      totalDiscount
-      finalAmount
-      items {
-        sku
-        productName
-        imageUrl
-        attributesTitle
-        unitPrice
-        salePrice
-        quantity
-        subTotal
-        isAvailable
-        stock
-        specifications {
-          groupName
-          specifications {
-            data
-          }
+const GET_CART_QUERY = `
+  query GetCart($fields: [String], $include: [String], $guestId: String) {
+    getCart(fields: $fields, include: $include, guestId: $guestId) {
+      status {
+        code
+        message
+      }
+      data {
+        username
+        totalItems
+        totalPrice
+        totalSalePrice
+        totalDiscount
+        finalAmount
+        items {
+          sku
+          productName
+          imageUrl
+          attributesTitle
+          unitPrice
+          salePrice
+          quantity
+          subTotal
+          isAvailable
+          stock
+          specifications
+          promotions
         }
       }
     }
   }
 `;
 
-export async function getFullCart(guestId?: string): Promise<Cart> {
-  const data = await executeCartGraphql<{ cart: Cart }>(
-    GET_FULL_CART_QUERY,
-    { guestId: guestId || getOrCreateGuestId() }
-  );
-  if (data?.cart) {
-    setCachedCart(data.cart);
-  }
-  return data?.cart || {
-    totalItems: 0,
-    totalPrice: 0,
-    totalSalePrice: 0,
-    totalDiscount: 0,
-    finalAmount: 0,
-    items: [],
-  };
-}
-
-// -------------------------------------------------------------
-// 4. THÊM SẢN PHẨM VÀO GIỎ (addToCart)
-// -------------------------------------------------------------
 const ADD_TO_CART_MUTATION = `
   mutation AddToCart($items: [CartItemInput!]!, $guestId: String) {
     addToCart(items: $items, guestId: $guestId) {
-      totalItems
-      finalAmount
-      items {
-        sku
-        productName
-        quantity
-        salePrice
-        subTotal
+      status {
+        code
+        message
+      }
+      data {
+        username
+        totalItems
+        totalPrice
+        totalSalePrice
+        totalDiscount
+        finalAmount
+        items {
+          sku
+          productName
+          imageUrl
+          attributesTitle
+          unitPrice
+          salePrice
+          quantity
+          subTotal
+          isAvailable
+          stock
+          specifications
+          promotions
+        }
       }
     }
   }
 `;
 
-export async function addToCart(items: CartItemInput[], guestId?: string): Promise<Cart> {
-  const data = await executeCartGraphql<{ addToCart: Cart }>(
+const UPDATE_QUANTITY_MUTATION = `
+  mutation UpdateQuantity($sku: String!, $quantity: Int!, $guestId: String) {
+    updateCartItemQuantity(sku: $sku, quantity: $quantity, guestId: $guestId) {
+      status {
+        code
+        message
+      }
+      data {
+        username
+        totalItems
+        totalPrice
+        totalSalePrice
+        totalDiscount
+        finalAmount
+        items {
+          sku
+          productName
+          imageUrl
+          attributesTitle
+          unitPrice
+          salePrice
+          quantity
+          subTotal
+          isAvailable
+          stock
+          specifications
+          promotions
+        }
+      }
+    }
+  }
+`;
+
+const REMOVE_ITEM_MUTATION = `
+  mutation RemoveCartItem($sku: String!, $guestId: String) {
+    removeCartItem(sku: $sku, guestId: $guestId) {
+      status {
+        code
+        message
+      }
+      data {
+        username
+        totalItems
+        totalPrice
+        totalSalePrice
+        totalDiscount
+        finalAmount
+        items {
+          sku
+          productName
+          imageUrl
+          attributesTitle
+          unitPrice
+          salePrice
+          quantity
+          subTotal
+          isAvailable
+          stock
+          specifications
+          promotions
+        }
+      }
+    }
+  }
+`;
+
+const DELETE_CART_MUTATION = `
+  mutation DeleteCart($skus: [String!], $guestId: String) {
+    deleteCart(skus: $skus, guestId: $guestId) {
+      status {
+        code
+        message
+      }
+      data {
+        username
+        totalItems
+        totalPrice
+        totalSalePrice
+        totalDiscount
+        finalAmount
+        items {
+          sku
+          productName
+          imageUrl
+          attributesTitle
+          unitPrice
+          salePrice
+          quantity
+          subTotal
+          isAvailable
+          stock
+          specifications
+          promotions
+        }
+      }
+    }
+  }
+`;
+
+const MERGE_CART_MUTATION = `
+  mutation MergeCart($guestId: String) {
+    mergeCart(guestId: $guestId) {
+      status {
+        code
+        message
+      }
+      data {
+        username
+        totalItems
+        totalPrice
+        totalSalePrice
+        totalDiscount
+        finalAmount
+        items {
+          sku
+          productName
+          imageUrl
+          attributesTitle
+          unitPrice
+          salePrice
+          quantity
+          subTotal
+          isAvailable
+          stock
+          specifications
+          promotions
+        }
+      }
+    }
+  }
+`;
+
+// -------------------------------------------------------------
+// Public Service Operations
+// -------------------------------------------------------------
+
+/**
+ * 1. Fast Path: Lấy số lượng Badge Header (getCartCount)
+ */
+export async function getCartBadge(guestId?: string): Promise<CartSummaryBadge> {
+  try {
+    const data = await executeCartGraphql<{ getCartCount: CartCountResponse }>(
+      GET_CART_COUNT_QUERY,
+      { guestId: guestId || getOrCreateGuestId() }
+    );
+    const count = data?.getCartCount?.data ?? 0;
+    return { totalItems: count };
+  } catch (error) {
+    console.warn("[cartService] getCartBadge failed:", error);
+    return { totalItems: 0 };
+  }
+}
+
+/**
+ * Fast Path: Lấy số lượng nguyên thủy
+ */
+export async function getCartCount(guestId?: string): Promise<number> {
+  try {
+    const data = await executeCartGraphql<{ getCartCount: CartCountResponse }>(
+      GET_CART_COUNT_QUERY,
+      { guestId: guestId || getOrCreateGuestId() }
+    );
+    return data?.getCartCount?.data ?? 0;
+  } catch (error) {
+    console.warn("[cartService] getCartCount failed:", error);
+    return 0;
+  }
+}
+
+/**
+ * 2. Lấy chi tiết giỏ hàng đầy đủ (getCart)
+ */
+export async function getCart(params?: {
+  fields?: string[];
+  include?: string[];
+  guestId?: string;
+}): Promise<ShoppingCartData> {
+  const guestId = params?.guestId || getOrCreateGuestId();
+  const data = await executeCartGraphql<{ getCart: ShoppingCartResponse }>(
+    GET_CART_QUERY,
+    {
+      fields: params?.fields,
+      include: params?.include,
+      guestId,
+    }
+  );
+
+  const cartData = data?.getCart?.data || { ...EMPTY_CART };
+  setCachedCart(cartData);
+  return cartData;
+}
+
+/**
+ * Alias cho getCart (Full Cart Page & Checkout)
+ */
+export async function getFullCart(guestId?: string): Promise<ShoppingCartData> {
+  return getCart({ guestId });
+}
+
+/**
+ * Alias cho Mini Cart Drawer (có thể tối ưu Sparse Fieldset)
+ */
+export async function getMiniCart(guestId?: string): Promise<ShoppingCartData> {
+  return getCart({
+    fields: ["totalItems", "finalAmount", "items"],
+    guestId,
+  });
+}
+
+/**
+ * 3. Thêm sản phẩm vào giỏ (addToCart)
+ */
+export async function addToCart(
+  items: CartItemInput[],
+  guestId?: string
+): Promise<ShoppingCartData> {
+  const data = await executeCartGraphql<{ addToCart: ShoppingCartResponse }>(
     ADD_TO_CART_MUTATION,
     { items, guestId: guestId || getOrCreateGuestId() }
   );
-  notifyCartUpdated(data.addToCart);
-  return data.addToCart;
+
+  const cartData = data?.addToCart?.data || { ...EMPTY_CART };
+  notifyCartUpdated(cartData);
+  return cartData;
 }
 
-// -------------------------------------------------------------
-// 5. CẬP NHẬT SỐ LƯỢNG SẢN PHẨM (updateCartItemQuantity)
-// -------------------------------------------------------------
-const UPDATE_QUANTITY_MUTATION = `
-  mutation UpdateQuantity($sku: ID!, $quantity: Int!, $guestId: String) {
-    updateCartItemQuantity(sku: $sku, quantity: $quantity, guestId: $guestId) {
-      totalItems
-      finalAmount
-      items {
-        sku
-        quantity
-        subTotal
-      }
-    }
-  }
-`;
-
+/**
+ * 4. Cập nhật số lượng sản phẩm (updateCartItemQuantity)
+ * Lưu ý: Khi quantity = 0, backend tự động xóa SKU khỏi giỏ hàng.
+ */
 export async function updateCartItemQuantity(
   sku: string,
   quantity: number,
   guestId?: string
-): Promise<Cart> {
-  const data = await executeCartGraphql<{ updateCartItemQuantity: Cart }>(
-    UPDATE_QUANTITY_MUTATION,
-    { sku, quantity, guestId: guestId || getOrCreateGuestId() }
-  );
-  notifyCartUpdated(data.updateCartItemQuantity);
-  return data.updateCartItemQuantity;
+): Promise<ShoppingCartData> {
+  const data = await executeCartGraphql<{
+    updateCartItemQuantity: ShoppingCartResponse;
+  }>(UPDATE_QUANTITY_MUTATION, {
+    sku,
+    quantity,
+    guestId: guestId || getOrCreateGuestId(),
+  });
+
+  const cartData = data?.updateCartItemQuantity?.data || { ...EMPTY_CART };
+  notifyCartUpdated(cartData);
+  return cartData;
 }
 
-// -------------------------------------------------------------
-// 6. XÓA 1 SẢN PHẨM (removeCartItem)
-// -------------------------------------------------------------
-const REMOVE_ITEM_MUTATION = `
-  mutation RemoveItem($sku: ID!, $guestId: String) {
-    removeCartItem(sku: $sku, guestId: $guestId) {
-      totalItems
-      finalAmount
-      items { sku }
-    }
-  }
-`;
+/**
+ * 5. Xóa 1 sản phẩm khỏi giỏ (removeCartItem)
+ */
+export async function removeCartItem(
+  sku: string,
+  guestId?: string
+): Promise<ShoppingCartData> {
+  const data = await executeCartGraphql<{
+    removeCartItem: ShoppingCartResponse;
+  }>(REMOVE_ITEM_MUTATION, {
+    sku,
+    guestId: guestId || getOrCreateGuestId(),
+  });
 
-export async function removeCartItem(sku: string, guestId?: string): Promise<Cart> {
-  const data = await executeCartGraphql<{ removeCartItem: Cart }>(
-    REMOVE_ITEM_MUTATION,
-    { sku, guestId: guestId || getOrCreateGuestId() }
-  );
-  notifyCartUpdated(data.removeCartItem);
-  return data.removeCartItem;
+  const cartData = data?.removeCartItem?.data || { ...EMPTY_CART };
+  notifyCartUpdated(cartData);
+  return cartData;
 }
 
-// -------------------------------------------------------------
-// 7. XÓA NHIỀU SẢN PHẨM CÙNG LÚC (removeCartItems - Bulk Delete)
-// -------------------------------------------------------------
-const REMOVE_ITEMS_MUTATION = `
-  mutation RemoveItems($skus: [ID!]!, $guestId: String) {
-    removeCartItems(skus: $skus, guestId: $guestId) {
-      totalItems
-      finalAmount
+/**
+ * 6. Xóa chọn lọc hoặc làm trống toàn bộ giỏ (deleteCart)
+ * - skus: string[] -> Xóa các SKU được chỉ định (Batch delete)
+ * - skus: null hoặc undefined -> Dọn sạch toàn bộ giỏ hàng (Clear all)
+ */
+export async function deleteCart(
+  skus?: string[] | null,
+  guestId?: string
+): Promise<ShoppingCartData> {
+  const data = await executeCartGraphql<{ deleteCart: ShoppingCartResponse }>(
+    DELETE_CART_MUTATION,
+    {
+      skus: skus && skus.length > 0 ? skus : null,
+      guestId: guestId || getOrCreateGuestId(),
     }
-  }
-`;
-
-export async function removeCartItems(skus: string[], guestId?: string): Promise<Cart> {
-  const data = await executeCartGraphql<{ removeCartItems: Cart }>(
-    REMOVE_ITEMS_MUTATION,
-    { skus, guestId: guestId || getOrCreateGuestId() }
   );
-  notifyCartUpdated(data.removeCartItems);
-  return data.removeCartItems;
+
+  const cartData = data?.deleteCart?.data || { ...EMPTY_CART };
+  notifyCartUpdated(cartData);
+  return cartData;
 }
 
-// -------------------------------------------------------------
-// 8. XÓA SẠCH GIỎ HÀNG (clearCart)
-// -------------------------------------------------------------
-const CLEAR_CART_MUTATION = `
-  mutation ClearCart($guestId: String) {
-    clearCart(guestId: $guestId) {
-      totalItems
-      items { sku }
-    }
-  }
-`;
-
-export async function clearCart(guestId?: string): Promise<Cart> {
-  const data = await executeCartGraphql<{ clearCart: Cart }>(
-    CLEAR_CART_MUTATION,
-    { guestId: guestId || getOrCreateGuestId() }
-  );
-  notifyCartUpdated(data.clearCart);
-  return data.clearCart;
+/**
+ * Helper tương thích: Xóa danh sách SKU (Bulk Delete)
+ */
+export async function removeCartItems(
+  skus: string[],
+  guestId?: string
+): Promise<ShoppingCartData> {
+  return deleteCart(skus, guestId);
 }
 
-// -------------------------------------------------------------
-// 9. HỢP NHẤT GIỎ HÀNG KHI ĐĂNG NHẬP (mergeCart)
-// -------------------------------------------------------------
-const MERGE_CART_MUTATION = `
-  mutation MergeGuestCart($guestId: String!) {
-    mergeCart(guestId: $guestId) {
-      username
-      totalItems
-      finalAmount
-      items {
-        sku
-        productName
-        quantity
-        subTotal
-      }
-    }
-  }
-`;
+/**
+ * Helper tương thích: Dọn sạch toàn bộ giỏ hàng
+ */
+export async function clearCart(guestId?: string): Promise<ShoppingCartData> {
+  return deleteCart(null, guestId);
+}
 
-export async function mergeGuestCart(guestIdOverride?: string): Promise<Cart | null> {
-  const guestId = guestIdOverride || localStorage.getItem(STORAGE_KEYS.GUEST_ID) || localStorage.getItem("guest_id");
+/**
+ * 7. Hợp nhất giỏ hàng khách khi đăng nhập (mergeCart)
+ * Chuyển toàn bộ sản phẩm hợp lệ từ guestId sang tài khoản thành viên.
+ */
+export async function mergeGuestCart(
+  guestIdOverride?: string
+): Promise<ShoppingCartData | null> {
+  const guestId =
+    guestIdOverride ||
+    localStorage.getItem(STORAGE_KEYS.GUEST_ID) ||
+    localStorage.getItem("guest_id");
   if (!guestId) return null;
 
   try {
-    const data = await executeCartGraphql<{ mergeCart: Cart }>(
+    const data = await executeCartGraphql<{ mergeCart: ShoppingCartResponse }>(
       MERGE_CART_MUTATION,
       { guestId }
     );
     clearGuestId();
-    notifyCartUpdated(data.mergeCart);
-    return data.mergeCart;
+    const cartData = data?.mergeCart?.data || null;
+    if (cartData) {
+      notifyCartUpdated(cartData);
+    }
+    return cartData;
   } catch (error: any) {
     console.error("[cartService] Failed to merge cart on login:", error);
     return null;

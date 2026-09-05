@@ -25,6 +25,7 @@ import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import { Separator } from "@/components/ui/separator";
 import { Bevel, BevelButton, BevelDivider } from "@/components/ui/bevel";
 import { VoucherCard } from "@/components/VoucherCard";
+import { useGenieCartFly } from "@/components/ui/genie-cart-fly";
 import {
   BadgeCheckIcon,
   BrainCircuitIcon,
@@ -1958,6 +1959,10 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
   const [activeVersion, setActiveVersion] = useState(versions[0]?.id || "v1");
   const [activeColor, setActiveColor] = useState("c1");
 
+  const { triggerGenieFly } = useGenieCartFly();
+  const heroImgRef = useRef<HTMLImageElement | null>(null);
+  const cartBtnRef = useRef<HTMLButtonElement | null>(null);
+
   const versionIds = versions.map((version) => version.id).join("|");
   useEffect(() => {
     if (versions.length > 0 && !versions.some((version) => version.id === activeVersion)) {
@@ -2670,6 +2675,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                     <AnimatePresence mode="wait">
                       {images[activeImgIdx] ? (
                         <motion.img
+                          ref={heroImgRef}
                           key={`${product.id}-${activeImgIdx}`}
                           src={images[activeImgIdx]}
                           alt={product.name}
@@ -3644,7 +3650,9 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                       const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
                       onAddToCart(variantLabel, "Trả góp 0%", e);
                     }
-                    onClose();
+                    if (showToast) {
+                      showToast("Đã thêm gói Trả góp 0% vào giỏ hàng!", "success");
+                    }
                   },
                   onGuest: () => {
                     if (showToast) {
@@ -3675,14 +3683,22 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
             </BevelButton>
 
             <button
+              ref={cartBtnRef}
               type="button"
               onClick={(e) => {
+                const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
+                const attrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || `ATTR-${product.id.toUpperCase()}`;
+                
+                triggerGenieFly({
+                  sourceEl: heroImgRef.current,
+                  targetEl: cartBtnRef.current,
+                  duration: 480,
+                  borderRadius: 12,
+                });
+
                 if (onAddToCart) {
-                  const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
-                  const attrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || `ATTR-${product.id.toUpperCase()}`;
                   onAddToCart(variantLabel, formattedCurrentPrice, e, String(attrSku));
                 }
-                onClose();
               }}
               className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0"
               title="Thêm vào giỏ hàng"

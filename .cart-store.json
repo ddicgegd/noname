@@ -25,6 +25,10 @@
       {
         "sku": "ATTR-TABS10UG-256GB",
         "quantity": 1
+      },
+      {
+        "sku": "ATTR-SWHXM6-BLACK",
+        "quantity": 4
       }
     ]
   },
@@ -60,6 +64,46 @@
       },
       {
         "sku": "ATTR-GP9PXL-OBSIDIAN-128",
+        "quantity": 1
+      }
+    ]
+  },
+  "guest:596be7b6-7b84-48a3-a3d1-7891c83bf078": {
+    "items": [
+      {
+        "sku": "ATTR-GP9PXL-OBSIDIAN-128",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-MI15U-BLACK-512",
+        "quantity": 2
+      },
+      {
+        "sku": "ATTR-SGS25U-GRAY-256",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-BOSEQCU-BLACK",
+        "quantity": 1
+      },
+      {
+        "sku": "ATTR-JBLTOURM2-BLACK",
+        "quantity": 1
+      }
+    ]
+  },
+  "guest:6fbdcaef-ace5-4177-bf4f-4768338e3a95": {
+    "items": [
+      {
+        "sku": "ATTR-IP16PM-DESERT-256",
+        "quantity": 1
+      }
+    ]
+  },
+  "guest:test-guest-1": {
+    "items": [
+      {
+        "sku": "tensor-tpu",
         "quantity": 1
       }
     ]

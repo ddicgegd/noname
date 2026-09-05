@@ -1671,7 +1671,20 @@ async function startServer() {
   // Serve static assets in production, or mount Vite middleware in development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        watch: {
+          ignored: [
+            "**/.cart-store.json",
+            "**/.cart-store.json*",
+            "**/.data/**",
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/dist/**",
+            "**/*.json",
+          ],
+        },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);

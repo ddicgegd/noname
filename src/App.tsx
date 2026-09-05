@@ -16,6 +16,7 @@ import AuthReportDashboard from "./components/AuthReportDashboard";
 import ProfilePage from "./components/ProfilePage";
 import TermsPage from "./components/TermsPage";
 import OrderPage from "./components/OrderPage";
+import { GenieCartFlyProvider } from "./components/ui/genie-cart-fly";
 import { AnimatePresence, motion } from "motion/react";
 import { 
   getFullCart, 
@@ -315,35 +316,6 @@ export default function App() {
     apiAddToCart([{ sku: targetSku, quantity: 1 }]).catch((err) => {
       console.warn("apiAddToCart error:", err);
     });
-
-    // Flying animation coordinates
-    let startX = window.innerWidth / 2;
-    let startY = window.innerHeight / 2;
-    if (clickEvent && "clientX" in clickEvent) {
-      startX = clickEvent.clientX;
-      startY = clickEvent.clientY;
-    }
-
-    let endX = window.innerWidth * 0.78;
-    let endY = 40;
-    const cartIconEl = document.querySelector(".lucide-shopping-cart");
-    if (cartIconEl) {
-      const rect = cartIconEl.getBoundingClientRect();
-      endX = rect.left + rect.width / 2;
-      endY = rect.top + rect.height / 2;
-    }
-
-    setFlyingItems(prev => [
-      ...prev,
-      {
-        id: `fly-cart-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        startX,
-        startY,
-        endX,
-        endY,
-        icon
-      }
-    ]);
   };
 
   const handleRemoveCartItem = (id: string | string[]) => {
@@ -357,7 +329,8 @@ export default function App() {
   };
 
   return (
-    <div className="relative w-full min-h-screen overflow-x-clip bg-[#E4E4E4] text-[#111111]">
+    <GenieCartFlyProvider>
+      <div className="relative w-full min-h-screen overflow-x-clip bg-[#E4E4E4] text-[#111111]">
       {/* 1. Splash Screen Transition Curtain */}
       <SplashScreen />
 
@@ -556,6 +529,7 @@ export default function App() {
           </motion.div>
         ))}
       </AnimatePresence>
-    </div>
+      </div>
+    </GenieCartFlyProvider>
   );
 }

@@ -10,6 +10,7 @@ import { Dock, DockIcon } from "@/components/ui/dock";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { Bevel, BevelDivider } from "@/components/ui/bevel";
+import { LiquidGlassCard } from "@/components/ui/liquid-glass";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { createAuthAction, savePendingAction } from "@/lib/authAction";
 import { addToCart as apiAddToCart, removeCartItem as apiRemoveCartItem } from "@/services/cartService";
@@ -819,7 +820,15 @@ const resolveProductMetadata = (skuOrName: string) => {
   };
 
   return (
-    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.05)] z-50 flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-2 sm:pr-2.5 transition-all duration-300">
+    <LiquidGlassCard
+      glowIntensity="lg"
+      shadowIntensity="md"
+      borderRadius="9999px"
+      blurIntensity="xl"
+      className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] z-50 flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-2 sm:pr-2.5 transition-all duration-300"
+      role="navigation"
+      aria-label="Main Navigation"
+    >
       <div className={`flex items-center min-w-0 transition-all duration-300 ${isSearchExpanded ? 'gap-4 sm:gap-6 lg:gap-8' : 'gap-6 sm:gap-8 lg:gap-12'}`}>
         {/* Brand Logo */}
         <a
@@ -1938,6 +1947,6 @@ const resolveProductMetadata = (skuOrName: string) => {
           </AnimatePresence>
         </div>
       </Bevel>
-    </nav>
+    </LiquidGlassCard>
   );
 }
