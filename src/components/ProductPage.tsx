@@ -14,6 +14,7 @@ import { searchAttributesForProductSku, searchProductsForCatalog } from "../serv
 import { createOrder, type CreateOrderInput } from "../services/orderService";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 import { createAuthAction, savePendingAction } from "../lib/authAction";
+import { getCachedCart, subscribeToCartUpdates } from "../services/cartService";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -560,6 +561,7 @@ const setProductHashSku = (sku: string) => {
 };
 
 interface ProductPageProps {
+  cartItems?: any[];
   onAddToCart?: (
     itemName: string,
     itemPrice: string,
@@ -586,7 +588,7 @@ interface ProductPageProps {
   onDetailOpenChange?: (isOpen: boolean) => void;
 }
 
-export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEffect, onSpawnStars, onFlyToAccount, onDetailOpenChange }: ProductPageProps) {
+export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyNow, onFlyEffect, onSpawnStars, onFlyToAccount, onDetailOpenChange }: ProductPageProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -1622,6 +1624,7 @@ export default function ProductPage({ onAddToCart, onNavigate, onBuyNow, onFlyEf
         {selectedProduct && (
           <ProductDetailModal
             product={selectedProduct}
+            cartItems={cartItems}
             onClose={() => {
               setSelectedProduct(null);
               setActiveHashSku("");
@@ -1892,6 +1895,7 @@ const getApiSpecificationSections = (
 
 interface ProductDetailModalProps {
   product: Product;
+  cartItems?: any[];
   onClose: () => void;
   onAddToCart?: (
     itemName: string,
@@ -1919,9 +1923,35 @@ interface ProductDetailModalProps {
   ) => void;
 }
 
-function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNow, showToast, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductDetailModalProps) {
+function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNavigate, onBuyNow, showToast, onFlyEffect, onSpawnStars, onFlyToAccount }: ProductDetailModalProps) {
   const images = getProductImagesList(product);
   const versions = getProductVersions(product);
+
+  const [liveCartCount, setLiveCartCount] = useState<number>(() => {
+    if (cartItems && cartItems.length > 0) {
+      return cartItems.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0);
+    }
+    const cached = getCachedCart();
+    if (cached && Array.isArray(cached.items)) {
+      return cached.items.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0);
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (cartItems) {
+      setLiveCartCount(cartItems.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0));
+    }
+  }, [cartItems]);
+
+  useEffect(() => {
+    const unsub = subscribeToCartUpdates((updatedCart) => {
+      if (updatedCart && Array.isArray(updatedCart.items)) {
+        setLiveCartCount(updatedCart.items.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0));
+      }
+    });
+    return unsub;
+  }, []);
 
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
@@ -3700,10 +3730,15 @@ function ProductDetailModal({ product, onClose, onAddToCart, onNavigate, onBuyNo
                   onAddToCart(variantLabel, formattedCurrentPrice, e, String(attrSku));
                 }
               }}
-              className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0"
+              className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0 relative"
               title="Thêm vào giỏ hàng"
             >
-              <ShoppingCartIcon className="size-5 font-bold" />
+              <ShoppingCartIcon className="size-5 stroke-[2.2]" />
+              {liveCartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#FF4D24] text-white text-[9.5px] font-black rounded-full border-none outline-none ring-0 flex items-center justify-center pointer-events-none shadow-2xs z-10">
+                  {liveCartCount > 99 ? "99+" : liveCartCount}
+                </span>
+              )}
             </button>
           </div>
 

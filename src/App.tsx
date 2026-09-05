@@ -121,7 +121,7 @@ export default function App() {
       const formattedPrice = (it.salePrice || it.unitPrice || 0).toLocaleString("vi-VN") + "đ";
 
       res.push({
-        id: `${it.sku}-${idx}`,
+        id: `${it.sku}__${idx}`,
         sku: it.sku,
         name,
         price: formattedPrice,
@@ -304,12 +304,15 @@ export default function App() {
     else if (name.toLowerCase().includes("compute") || name.toLowerCase().includes("vinh")) icon = "⚡";
 
     const targetSku = sku || (
-      name.toLowerCase().includes("iphone 16") ? "ATTR-IP16PM-DESERT-256G" :
-      name.toLowerCase().includes("iphone 15") ? "attr-ip15pm-256gb-titan" :
-      name.toLowerCase().includes("samsung") || name.toLowerCase().includes("s24") ? "ATTR-S24U-TITANGRAY-512G" :
-      name.toLowerCase().includes("xiaomi") ? "ATTR-MI14U-WHITE-512G" :
-      name.toLowerCase().includes("airpod") ? "attr-airpods-pro2-usbc" :
-      `attr-${name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").slice(0, 24)}`
+      name.toLowerCase().includes("iphone 16") ? "ATTR-IP16PM-WHITE-512" :
+      name.toLowerCase().includes("samsung") || name.toLowerCase().includes("s24") || name.toLowerCase().includes("s25") ? "ATTR-SGS25U-BLUE-512" :
+      name.toLowerCase().includes("pixel") ? "ATTR-GP9PXL-OBSIDIAN-128" :
+      name.toLowerCase().includes("xiaomi") ? "ATTR-MI15U-BLACK-512" :
+      name.toLowerCase().includes("macbook") ? "ATTR-MBP16M4-SILVER-64-2TB" :
+      name.toLowerCase().includes("dell") || name.toLowerCase().includes("xps") ? "ATTR-DXPS16-PLAT-32-1TB" :
+      name.toLowerCase().includes("airpod") ? "ATTR-AIRPODMAX-STARLIGHT" :
+      name.toLowerCase().includes("tab") ? "ATTR-TABS10U-GRAPH-5G-512" :
+      "ATTR-TABS10U-GRAPH-5G-512"
     );
 
     // Call GraphQL mutation asynchronously
@@ -319,13 +322,36 @@ export default function App() {
   };
 
   const handleRemoveCartItem = (id: string | string[]) => {
-    if (Array.isArray(id)) {
-      const skus = Array.from(new Set(id.map(i => i.split("-")[0])));
-      apiRemoveCartItems(skus).catch(() => {});
-    } else {
-      const sku = id.split("-")[0];
-      apiRemoveCartItem(sku).catch(() => {});
-    }
+    const rawIds = Array.isArray(id) ? id : [id];
+    const extractSku = (str: string) => {
+      if (!str) return "";
+      if (str.includes("__")) return str.split("__")[0];
+      return str;
+    };
+
+    const skusToRemove = Array.from(
+      new Set(
+        rawIds
+          .map((item) => {
+            const found = cartItems.find((ci) => ci.id === item || ci.sku === item);
+            return found?.sku || extractSku(item);
+          })
+          .filter(Boolean)
+      )
+    );
+
+    if (skusToRemove.length === 0) return;
+
+    // Optimistic UI state update
+    setCartItems((prev) =>
+      prev.filter((item) => !skusToRemove.includes(item.sku || extractSku(item.id)))
+    );
+
+    // Call GraphQL backend API
+    apiRemoveCartItems(skusToRemove).catch((err) => {
+      console.warn("apiRemoveCartItems error:", err);
+      getFullCart().then((c) => setCartItems(mapApiCartToCartItems(c))).catch(() => {});
+    });
   };
 
   return (
@@ -374,6 +400,7 @@ export default function App() {
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
             <ProductPage 
+              cartItems={cartItems}
               onAddToCart={handleAddToCart} 
               onNavigate={navigate} 
               onFlyEffect={handleFlyEffect}

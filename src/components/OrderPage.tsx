@@ -877,8 +877,8 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   const handleRemoveProduct = async (id: string) => {
     const target = products.find(p => p.id === id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
-    if (onRemoveCartItem) onRemoveCartItem(id);
     const sku = target?.attributesSku || id;
+    if (onRemoveCartItem) onRemoveCartItem(sku);
     try {
       await apiRemoveCartItem(sku);
     } catch (err) {
@@ -1173,7 +1173,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                     <button
                       type="button"
                       onClick={() => {
-                        const idsToRemove = selectedProducts.map(p => p.id);
+                        const idsToRemove = selectedProducts.map(p => p.attributesSku || p.id);
                         onRemoveCartItem(idsToRemove);
                         setProducts(prev => prev.filter(p => !p.selected));
                       }}

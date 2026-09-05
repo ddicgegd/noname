@@ -97,14 +97,42 @@ async function startServer() {
     }
   });
 
-  // --- MERCHANDISE MOCK DATA (High-Fidelity ERP Backend Simulator - DELETED) ---
-  const mockCategories: any[] = [];
-  const mockProducts: any[] = [];
-  const mockAttributes: any[] = [];
+  // In-memory Session Mock Storage
+  const inMemoryMockCart = new Map<string, { username: string; items: any[] }>();
+
+  function getMockCart(key: string) {
+    const k = key || "guest";
+    if (!inMemoryMockCart.has(k)) {
+      inMemoryMockCart.set(k, { username: k, items: [] });
+    }
+    return inMemoryMockCart.get(k)!;
+  }
+
+  function computeMockCart(cart: { username: string; items: any[] }) {
+    const totalItems = cart.items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
+    const totalPrice = cart.items.reduce((sum: number, it: any) => sum + (it.unitPrice || 0) * (it.quantity || 1), 0);
+    const totalSalePrice = cart.items.reduce((sum: number, it: any) => sum + (it.salePrice || it.unitPrice || 0) * (it.quantity || 1), 0);
+    const totalDiscount = Math.max(0, totalPrice - totalSalePrice);
+    return {
+      status: { code: 200, message: "Success" },
+      data: {
+        username: cart.username,
+        totalItems,
+        totalPrice,
+        totalSalePrice,
+        totalDiscount,
+        finalAmount: totalSalePrice,
+        items: cart.items.map((it: any) => ({
+          ...it,
+          subTotal: (it.salePrice || it.unitPrice || 0) * (it.quantity || 1)
+        }))
+      }
+    };
+  }
 
   // In-memory Mock REST API handlers
-  function mockRestApiCall(apiPath: string, method: string, body: any, queryParams: URLSearchParams) {
-    console.log(`[MOCK BACKEND FALLBACK] Intercepted ${method} ${apiPath}`);
+  function mockRestApiCall(apiPath: string, method: string, body: any, queryParams: URLSearchParams, identityKey = "guest") {
+    console.log(`[MOCK BACKEND FALLBACK] Intercepted ${method} ${apiPath} [key: ${identityKey}]`);
     
     if (apiPath === "/api/auth/me") {
       return {
@@ -238,11 +266,96 @@ async function startServer() {
       };
     }
 
+    if (apiPath.startsWith("/api/cart")) {
+      const idKey = identityKey && identityKey !== "guest" ? identityKey : (queryParams.get("guestId") || identityKey || "guest");
+      const cart = getMockCart(idKey);
+
+      if (apiPath.startsWith("/api/cart/count")) {
+        const count = cart.items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
+        return {
+          status: { code: 200, message: "Success" },
+          data: count
+        };
+      }
+
+      if (method === "POST" && apiPath.startsWith("/api/cart/items")) {
+        const incoming = Array.isArray(body) ? body : (body?.items || [body]);
+        incoming.forEach((it: any) => {
+          if (!it || !it.sku) return;
+          const existing = cart.items.find((x: any) => x.sku === it.sku);
+          if (existing) {
+            existing.quantity = (existing.quantity || 1) + (it.quantity || 1);
+          } else {
+            cart.items.push({
+              sku: it.sku,
+              productName: it.productName || it.sku,
+              imageUrl: it.imageUrl || "",
+              unitPrice: it.unitPrice || 30000000,
+              salePrice: it.salePrice || 27000000,
+              quantity: it.quantity || 1,
+              isAvailable: true,
+              stock: 99
+            });
+          }
+        });
+        return computeMockCart(cart);
+      }
+
+      if (method === "PUT" && apiPath.startsWith("/api/cart/items/")) {
+        const sku = decodeURIComponent(apiPath.substring("/api/cart/items/".length));
+        const target = cart.items.find((x: any) => x.sku === sku);
+        const qty = body?.quantity ?? 1;
+        if (target) {
+          if (qty <= 0) {
+            cart.items = cart.items.filter((x: any) => x.sku !== sku);
+          } else {
+            target.quantity = qty;
+          }
+        }
+        return computeMockCart(cart);
+      }
+
+      if (method === "DELETE" && apiPath.startsWith("/api/cart/items/")) {
+        const sku = decodeURIComponent(apiPath.substring("/api/cart/items/".length));
+        cart.items = cart.items.filter((x: any) => x.sku !== sku);
+        return computeMockCart(cart);
+      }
+
+      if (method === "DELETE" && apiPath === "/api/cart") {
+        const skus = body?.skus || body;
+        if (Array.isArray(skus) && skus.length > 0) {
+          cart.items = cart.items.filter((x: any) => !skus.includes(x.sku));
+        } else {
+          cart.items = [];
+        }
+        return computeMockCart(cart);
+      }
+
+      if (method === "POST" && apiPath.startsWith("/api/cart/merge")) {
+        const guestId = body?.guestId || queryParams.get("guestId") || "";
+        const guestCart = getMockCart(guestId);
+        if (guestCart && guestCart.items.length > 0) {
+          guestCart.items.forEach((it: any) => {
+            const existing = cart.items.find((x: any) => x.sku === it.sku);
+            if (existing) {
+              existing.quantity += it.quantity;
+            } else {
+              cart.items.push({ ...it });
+            }
+          });
+          guestCart.items = [];
+        }
+        return computeMockCart(cart);
+      }
+
+      return computeMockCart(cart);
+    }
+
     throw new Error(`Route mock not found: ${method} ${apiPath}`);
   }
 
   // API gateway client connector inside the GraphQL server with automatic Failover
-  async function callApiGateway(apiPath: string, options: { method?: string; body?: any; token?: string }, context: any) {
+  async function callApiGateway(apiPath: string, options: { method?: string; body?: any; token?: string; guestId?: string }, context: any) {
     const defaultBackendUrl = getBackendUrl().replace(/\/$/, "");
     const method = options.method || "GET";
     const body = options.body;
@@ -250,8 +363,13 @@ async function startServer() {
     const headers: Record<string, string> = {
       "Content-Type": "application/json"
     };
-    if (options.token) {
-      headers["Authorization"] = options.token;
+    const token = options.token || context?.token;
+    if (token) {
+      headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+    }
+    const guestId = options.guestId || context?.guestId;
+    if (guestId) {
+      headers["X-Guest-Id"] = guestId;
     }
 
     const config: any = {
@@ -271,6 +389,9 @@ async function startServer() {
           context.res.status(401);
         }
         throw new Error("Unauthorized");
+      }
+      if (statusCode === 404 || statusCode >= 500) {
+        throw new Error(`Backend returned status ${statusCode}`);
       }
       const text = await res.text();
       try {
@@ -292,7 +413,8 @@ async function startServer() {
       try {
         const parsedUrl = new URL(apiPath, "http://localhost");
         const queryParams = parsedUrl.searchParams;
-        return mockRestApiCall(parsedUrl.pathname, method, body, queryParams);
+        const identityKey = guestId || token || "guest";
+        return mockRestApiCall(parsedUrl.pathname, method, body, queryParams, identityKey);
       } catch (fallbackErr: any) {
         console.error("[API GATEWAY FALLBACK ERROR] Fallback also failed:", fallbackErr);
         throw err;
@@ -789,7 +911,7 @@ async function startServer() {
     return Array.from(new Set((normalized.contents || []).map(extractProductSku).filter(Boolean)));
   };
 
-  // --- CART GRAPHQL TYPES & IN-MEMORY REDIS-COMPLIANT GATEWAY STORE ---
+  // --- CART GRAPHQL TYPES (ALIGNED WITH REST BACKEND SPEC) ---
   const CartItemType = new GraphQLObjectType({
     name: "CartItem",
     fields: {
@@ -803,12 +925,35 @@ async function startServer() {
       subTotal: { type: GraphQLFloat },
       isAvailable: { type: GraphQLBoolean },
       stock: { type: GraphQLInt },
-      specifications: { type: new GraphQLList(SpecificationGroupType) },
+      specifications: {
+        type: GraphQLString,
+        resolve: (item: any) => {
+          if (!item.specifications) return null;
+          if (typeof item.specifications === "string") return item.specifications;
+          try {
+            return JSON.stringify(item.specifications);
+          } catch (_) {
+            return null;
+          }
+        }
+      },
+      promotions: {
+        type: GraphQLString,
+        resolve: (item: any) => {
+          if (!item.promotions) return null;
+          if (typeof item.promotions === "string") return item.promotions;
+          try {
+            return JSON.stringify(item.promotions);
+          } catch (_) {
+            return null;
+          }
+        }
+      },
     }
   });
 
-  const CartType = new GraphQLObjectType({
-    name: "Cart",
+  const ShoppingCartDataType = new GraphQLObjectType({
+    name: "ShoppingCartData",
     fields: {
       username: { type: GraphQLString },
       totalItems: { type: new GraphQLNonNull(GraphQLInt) },
@@ -819,6 +964,25 @@ async function startServer() {
       items: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(CartItemType))) },
     }
   });
+
+  const ShoppingCartResponseType = new GraphQLObjectType({
+    name: "ShoppingCartResponse",
+    fields: {
+      status: { type: StatusType },
+      data: { type: ShoppingCartDataType }
+    }
+  });
+
+  const CartCountResponseType = new GraphQLObjectType({
+    name: "CartCountResponse",
+    fields: {
+      status: { type: StatusType },
+      data: { type: GraphQLInt }
+    }
+  });
+
+  // Backward compatibility alias for CartType
+  const CartType = ShoppingCartDataType;
 
   const CartSummaryBadgeType = new GraphQLObjectType({
     name: "CartSummaryBadge",
@@ -835,181 +999,62 @@ async function startServer() {
     }
   });
 
-  const serverCartStore = new Map<string, {
-    username?: string;
-    items: Array<{
-      sku: string;
-      quantity: number;
-      productName?: string;
-      imageUrl?: string;
-      attributesTitle?: string;
-      unitPrice?: number;
-      salePrice?: number;
-      isAvailable?: boolean;
-      stock?: number;
-      specifications?: Array<{
-        groupName: string;
-        specifications: Array<{ key: string; data: string }>;
-      }>;
-    }>;
-  }>();
-
-  const CART_FILE_PATH = path.resolve(process.cwd(), ".cart-store.json");
-
-  const loadPersistedCartStore = () => {
-    try {
-      if (fs.existsSync(CART_FILE_PATH)) {
-        const raw = fs.readFileSync(CART_FILE_PATH, "utf-8");
-        const data = JSON.parse(raw);
-        if (typeof data === "object" && data !== null) {
-          Object.entries(data).forEach(([key, val]) => {
-            serverCartStore.set(key, val as any);
-          });
-        }
-      }
-    } catch (_) {}
-  };
-
-  const persistCartStore = () => {
-    try {
-      const obj: Record<string, any> = {};
-      serverCartStore.forEach((val, key) => {
-        obj[key] = val;
-      });
-      fs.writeFileSync(CART_FILE_PATH, JSON.stringify(obj, null, 2), "utf-8");
-    } catch (_) {}
-  };
-
-  loadPersistedCartStore();
-
-  const KNOWN_SKU_METADATA: Record<string, any> = {
-    "attr-ip15pm-256gb-titan": {
-      productName: "iPhone 15 Pro Max 256GB",
-      imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
-      attributesTitle: "Titan Tự Nhiên / 256GB",
-      unitPrice: 34990000,
-      salePrice: 29490000,
-      isAvailable: true,
-      stock: 15,
-      specifications: [
-        { groupName: "Màn hình", specifications: [{ key: "Kích thước", data: "6.7 inch" }] },
-        { groupName: "Hiệu năng", specifications: [{ key: "Chipset", data: "Apple A17 Pro" }] }
-      ]
-    },
-    "attr-airpods-pro2-usbc": {
-      productName: "AirPods Pro Gen 2 (MagSafe USB-C)",
-      imageUrl: "https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500&auto=format&fit=crop&q=80",
-      attributesTitle: "Trắng / USB-C",
-      unitPrice: 6190000,
-      salePrice: 5490000,
-      isAvailable: true,
-      stock: 30,
-      specifications: [
-        { groupName: "Âm thanh", specifications: [{ key: "Chống ồn", data: "Active Noise Cancellation" }] }
-      ]
-    },
-    "ATTR-IP16PM-DESERT-256G": {
-      productName: "iPhone 16 Pro Max 256GB - Titanium Sa Mạc",
-      imageUrl: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=500&auto=format&fit=crop&q=80",
-      attributesTitle: "Titan Sa Mạc / 256GB",
-      unitPrice: 37990000,
-      salePrice: 34990000,
-      isAvailable: true,
-      stock: 20
-    },
-    "ATTR-S24U-TITANGRAY-512G": {
-      productName: "Samsung Galaxy S24 Ultra 512GB - Xám Titan",
-      imageUrl: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=500&auto=format&fit=crop&q=80",
-      attributesTitle: "Xám Titan / 512GB",
-      unitPrice: 35990000,
-      salePrice: 31490000,
-      isAvailable: true,
-      stock: 12
-    },
-    "ATTR-MI14U-WHITE-512G": {
-      productName: "Xiaomi 14 Ultra 512GB - Trắng Gốm",
-      imageUrl: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&auto=format&fit=crop&q=80",
-      attributesTitle: "Trắng Gốm / 512GB",
-      unitPrice: 31990000,
-      salePrice: 27990000,
-      isAvailable: true,
-      stock: 8
-    }
-  };
-
-  const resolveCartIdentity = (guestIdArg?: string | null, context?: any): { id: string; isUser: boolean; username?: string } => {
-    const authHeader = context?.token || "";
-    if (authHeader && authHeader.includes("Bearer ")) {
-      const token = authHeader.replace("Bearer ", "").trim();
-      try {
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
-          const username = payload.sub || payload.username || payload.preferred_username || "user";
-          return { id: `user:${username}`, isUser: true, username };
-        }
-      } catch (_) {}
-      return { id: "user:authenticated", isUser: true, username: "user" };
-    }
-    const guestId = guestIdArg || context?.guestId || "default-guest";
-    return { id: `guest:${guestId}`, isUser: false };
-  };
-
-  const getOrCreateCart = (identity: { id: string; isUser: boolean; username?: string }) => {
-    let cart = serverCartStore.get(identity.id);
-    if (!cart) {
-      cart = {
-        username: identity.username,
-        items: []
-      };
-      serverCartStore.set(identity.id, cart);
-    }
-    return cart;
-  };
-
-  const computeCart = (cartData: any) => {
-    let totalItems = 0;
-    let totalPrice = 0;
-    let totalSalePrice = 0;
-
-    const items = (cartData.items || []).map((item: any) => {
-      const quantity = Math.max(1, Math.min(99, item.quantity || 1));
-      totalItems += quantity;
-      
-      const meta = KNOWN_SKU_METADATA[item.sku] || {};
-      const productName = item.productName || meta.productName || item.sku;
-      const imageUrl = item.imageUrl || meta.imageUrl || "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&auto=format&fit=crop&q=80";
-      const attributesTitle = item.attributesTitle || meta.attributesTitle || "";
-      const unitPrice = item.unitPrice || meta.unitPrice || meta.salePrice || 1000000;
-      const salePrice = item.salePrice || meta.salePrice || unitPrice;
-      const subTotal = salePrice * quantity;
-      const isAvailable = item.isAvailable !== undefined ? item.isAvailable : (meta.isAvailable !== undefined ? meta.isAvailable : true);
-      const stock = typeof item.stock === "number" ? item.stock : (typeof meta.stock === "number" ? meta.stock : 99);
-      const specifications = item.specifications || meta.specifications || [];
-
-      totalPrice += unitPrice * quantity;
-      totalSalePrice += subTotal;
-
+  const normalizeStatus = (response: any, defaultCode = 200, defaultMsg = "Success") => {
+    if (!response) return { code: defaultCode, message: defaultMsg };
+    if (response.status && typeof response.status === "object") {
       return {
-        sku: item.sku,
-        quantity,
-        productName,
-        imageUrl,
-        attributesTitle,
+        code: Number(response.status.code) || defaultCode,
+        message: String(response.status.message || defaultMsg)
+      };
+    }
+    if (typeof response.status === "number") {
+      return {
+        code: response.status,
+        message: String(response.message || response.error || defaultMsg)
+      };
+    }
+    if (typeof response.code === "number") {
+      return {
+        code: response.code,
+        message: String(response.message || defaultMsg)
+      };
+    }
+    return { code: defaultCode, message: defaultMsg };
+  };
+
+  const mapCartData = (data: any) => {
+    if (!data || typeof data !== "object") return null;
+    const rawItems = data.items || [];
+    const items = Array.isArray(rawItems) ? rawItems.map((item: any) => {
+      const sku = String(item.sku || item.attributesSku || "");
+      const quantity = Number(item.quantity) || 1;
+      const unitPrice = typeof item.unitPrice === "number" ? item.unitPrice : (typeof item.price === "number" ? item.price : 0);
+      const salePrice = typeof item.salePrice === "number" ? item.salePrice : unitPrice;
+      const subTotal = typeof item.subTotal === "number" ? item.subTotal : (salePrice * quantity);
+      return {
+        sku,
+        productName: item.productName || item.name || sku,
+        imageUrl: item.imageUrl || item.image || "",
+        attributesTitle: item.attributesTitle || item.variant || "",
         unitPrice,
         salePrice,
+        quantity,
         subTotal,
-        isAvailable,
-        stock,
-        specifications
+        isAvailable: item.isAvailable !== undefined ? Boolean(item.isAvailable) : true,
+        stock: typeof item.stock === "number" ? item.stock : 99,
+        specifications: typeof item.specifications === "string" ? item.specifications : (item.specifications ? JSON.stringify(item.specifications) : null),
+        promotions: typeof item.promotions === "string" ? item.promotions : (item.promotions ? JSON.stringify(item.promotions) : null)
       };
-    });
+    }) : [];
 
-    const totalDiscount = Math.max(0, totalPrice - totalSalePrice);
-    const finalAmount = totalSalePrice;
+    const totalItems = typeof data.totalItems === "number" ? data.totalItems : items.reduce((acc: number, it: any) => acc + it.quantity, 0);
+    const totalPrice = typeof data.totalPrice === "number" ? data.totalPrice : items.reduce((acc: number, it: any) => acc + ((it.unitPrice || 0) * it.quantity), 0);
+    const totalSalePrice = typeof data.totalSalePrice === "number" ? data.totalSalePrice : items.reduce((acc: number, it: any) => acc + (it.subTotal || 0), 0);
+    const totalDiscount = typeof data.totalDiscount === "number" ? data.totalDiscount : Math.max(0, totalPrice - totalSalePrice);
+    const finalAmount = typeof data.finalAmount === "number" ? data.finalAmount : totalSalePrice;
 
     return {
-      username: cartData.username,
+      username: data.username || undefined,
       totalItems,
       totalPrice,
       totalSalePrice,
@@ -1192,6 +1237,65 @@ async function startServer() {
           }
         }
       },
+      getCartCount: {
+        type: CartCountResponseType,
+        args: {
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const guestId = args.guestId || context?.guestId;
+            const path = `/api/cart/count${guestId ? `?guestId=${encodeURIComponent(guestId)}` : ""}`;
+            const response = await callApiGateway(path, { method: "GET", token: context?.token, guestId }, context);
+            const count = typeof response?.data === "number" ? response.data : (typeof response === "number" ? response : 0);
+            return {
+              status: normalizeStatus(response, 200, "Success"),
+              data: count
+            };
+          } catch (error: any) {
+            return {
+              status: { code: error.message === "Unauthorized" ? 401 : 500, message: error.message },
+              data: 0
+            };
+          }
+        }
+      },
+      getCart: {
+        type: ShoppingCartResponseType,
+        args: {
+          fields: { type: new GraphQLList(GraphQLString) },
+          include: { type: new GraphQLList(GraphQLString) },
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const guestId = args.guestId || context?.guestId;
+            const params = new URLSearchParams();
+            if (args.fields && args.fields.length > 0) {
+              params.append("fields", args.fields.join(","));
+            }
+            if (args.include && args.include.length > 0) {
+              params.append("include", args.include.join(","));
+            }
+            if (guestId) {
+              params.append("guestId", guestId);
+            }
+            const qs = params.toString();
+            const path = `/api/cart${qs ? `?${qs}` : ""}`;
+            const response = await callApiGateway(path, { method: "GET", token: context?.token, guestId }, context);
+            const rawData = response?.data || response;
+            return {
+              status: normalizeStatus(response, 200, "Success"),
+              data: mapCartData(rawData)
+            };
+          } catch (error: any) {
+            return {
+              status: { code: error.message === "Unauthorized" ? 401 : 500, message: error.message },
+              data: null
+            };
+          }
+        }
+      },
       cartBadge: {
         type: CartSummaryBadgeType,
         args: {
@@ -1199,27 +1303,30 @@ async function startServer() {
         },
         resolve: async (_, args, context: any) => {
           try {
-            const identity = resolveCartIdentity(args.guestId, context);
-            const cart = getOrCreateCart(identity);
-            const computed = computeCart(cart);
-            return { totalItems: computed.totalItems };
+            const guestId = args.guestId || context?.guestId;
+            const path = `/api/cart/count${guestId ? `?guestId=${encodeURIComponent(guestId)}` : ""}`;
+            const response = await callApiGateway(path, { method: "GET", token: context?.token, guestId }, context);
+            const count = typeof response?.data === "number" ? response.data : (typeof response === "number" ? response : 0);
+            return { totalItems: count };
           } catch (error: any) {
             return { totalItems: 0 };
           }
         }
       },
       cart: {
-        type: CartType,
+        type: ShoppingCartDataType,
         args: {
           guestId: { type: GraphQLString }
         },
         resolve: async (_, args, context: any) => {
           try {
-            const identity = resolveCartIdentity(args.guestId, context);
-            const cart = getOrCreateCart(identity);
-            return computeCart(cart);
+            const guestId = args.guestId || context?.guestId;
+            const path = `/api/cart${guestId ? `?guestId=${encodeURIComponent(guestId)}` : ""}`;
+            const response = await callApiGateway(path, { method: "GET", token: context?.token, guestId }, context);
+            const rawData = response?.data || response;
+            return mapCartData(rawData) || { username: undefined, items: [], totalItems: 0, totalPrice: 0, totalSalePrice: 0, totalDiscount: 0, finalAmount: 0 };
           } catch (error: any) {
-            return computeCart({ username: undefined, items: [] });
+            return { username: undefined, items: [], totalItems: 0, totalPrice: 0, totalSalePrice: 0, totalDiscount: 0, finalAmount: 0 };
           }
         }
       }
@@ -1410,133 +1517,186 @@ async function startServer() {
         }
       },
       addToCart: {
-        type: CartType,
+        type: ShoppingCartResponseType,
         args: {
           items: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(CartItemInputType))) },
           guestId: { type: GraphQLString }
         },
         resolve: async (_, args, context: any) => {
-          const identity = resolveCartIdentity(args.guestId, context);
-          const cart = getOrCreateCart(identity);
-          for (const input of args.items) {
-            if (input.quantity > 99) {
-              throw new Error("Số lượng không được vượt quá 99 cái/SKU");
-            }
-            if (cart.items.length >= 50 && !cart.items.some((it: any) => it.sku === input.sku)) {
-              throw new Error("Giỏ hàng không được vượt quá 50 SKU");
-            }
-            const existing = cart.items.find((it: any) => it.sku === input.sku);
-            if (existing) {
-              existing.quantity = Math.min(99, existing.quantity + input.quantity);
-            } else {
-              cart.items.push({
-                sku: input.sku,
-                quantity: input.quantity
-              });
-            }
+          try {
+            const guestId = args.guestId || context?.guestId;
+            const path = "/api/cart/items";
+            const payload = args.items.map((it: any) => ({
+              sku: String(it.sku),
+              quantity: Number(it.quantity)
+            }));
+            const response = await callApiGateway(path, { method: "POST", body: payload, token: context?.token, guestId }, context);
+            const rawData = response?.data || response;
+            return {
+              status: normalizeStatus(response, 200, "Success"),
+              data: mapCartData(rawData)
+            };
+          } catch (error: any) {
+            return {
+              status: { code: error.message === "Unauthorized" ? 401 : 500, message: error.message },
+              data: null
+            };
           }
-          persistCartStore();
-          return computeCart(cart);
         }
       },
       updateCartItemQuantity: {
-        type: CartType,
+        type: ShoppingCartResponseType,
         args: {
-          sku: { type: new GraphQLNonNull(GraphQLID) },
+          sku: { type: new GraphQLNonNull(GraphQLString) },
           quantity: { type: new GraphQLNonNull(GraphQLInt) },
           guestId: { type: GraphQLString }
         },
         resolve: async (_, args, context: any) => {
-          const identity = resolveCartIdentity(args.guestId, context);
-          const cart = getOrCreateCart(identity);
-          if (args.quantity <= 0) {
-            cart.items = cart.items.filter((it: any) => it.sku !== String(args.sku));
-          } else {
-            const item = cart.items.find((it: any) => it.sku === String(args.sku));
-            if (item) {
-              item.quantity = Math.min(99, args.quantity);
-            }
+          try {
+            const guestId = args.guestId || context?.guestId;
+            const path = `/api/cart/items/${encodeURIComponent(args.sku)}`;
+            const payload = { quantity: Number(args.quantity) };
+            const response = await callApiGateway(path, { method: "PUT", body: payload, token: context?.token, guestId }, context);
+            const rawData = response?.data || response;
+            return {
+              status: normalizeStatus(response, 200, "Success"),
+              data: mapCartData(rawData)
+            };
+          } catch (error: any) {
+            return {
+              status: { code: error.message === "Unauthorized" ? 401 : 500, message: error.message },
+              data: null
+            };
           }
-          persistCartStore();
-          return computeCart(cart);
         }
       },
       removeCartItem: {
-        type: CartType,
+        type: ShoppingCartResponseType,
         args: {
-          sku: { type: new GraphQLNonNull(GraphQLID) },
+          sku: { type: new GraphQLNonNull(GraphQLString) },
           guestId: { type: GraphQLString }
         },
         resolve: async (_, args, context: any) => {
-          const identity = resolveCartIdentity(args.guestId, context);
-          const cart = getOrCreateCart(identity);
-          cart.items = cart.items.filter((it: any) => it.sku !== String(args.sku));
-          persistCartStore();
-          return computeCart(cart);
+          try {
+            const guestId = args.guestId || context?.guestId;
+            const path = `/api/cart/items/${encodeURIComponent(args.sku)}`;
+            const response = await callApiGateway(path, { method: "DELETE", token: context?.token, guestId }, context);
+            const rawData = response?.data || response;
+            return {
+              status: normalizeStatus(response, 200, "Success"),
+              data: mapCartData(rawData)
+            };
+          } catch (error: any) {
+            return {
+              status: { code: error.message === "Unauthorized" ? 401 : 500, message: error.message },
+              data: null
+            };
+          }
+        }
+      },
+      deleteCart: {
+        type: ShoppingCartResponseType,
+        args: {
+          skus: { type: new GraphQLList(new GraphQLNonNull(GraphQLString)) },
+          guestId: { type: GraphQLString }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const guestId = args.guestId || context?.guestId;
+            let path = "/api/cart";
+            if (args.skus && args.skus.length > 0) {
+              path += `?skus=${encodeURIComponent(args.skus.join(","))}`;
+            }
+            const response = await callApiGateway(path, { method: "DELETE", token: context?.token, guestId }, context);
+            const rawData = response?.data || response;
+            return {
+              status: normalizeStatus(response, 200, "Success"),
+              data: mapCartData(rawData)
+            };
+          } catch (error: any) {
+            return {
+              status: { code: error.message === "Unauthorized" ? 401 : 500, message: error.message },
+              data: null
+            };
+          }
         }
       },
       removeCartItems: {
-        type: CartType,
+        type: ShoppingCartResponseType,
         args: {
-          skus: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLID))) },
+          skus: { type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLString))) },
           guestId: { type: GraphQLString }
         },
         resolve: async (_, args, context: any) => {
-          const identity = resolveCartIdentity(args.guestId, context);
-          const cart = getOrCreateCart(identity);
-          const skuSet = new Set(args.skus.map((s: any) => String(s)));
-          cart.items = cart.items.filter((it: any) => !skuSet.has(it.sku));
-          persistCartStore();
-          return computeCart(cart);
+          try {
+            const guestId = args.guestId || context?.guestId;
+            const path = `/api/cart?skus=${encodeURIComponent(args.skus.join(","))}`;
+            const response = await callApiGateway(path, { method: "DELETE", token: context?.token, guestId }, context);
+            const rawData = response?.data || response;
+            return {
+              status: normalizeStatus(response, 200, "Success"),
+              data: mapCartData(rawData)
+            };
+          } catch (error: any) {
+            return {
+              status: { code: error.message === "Unauthorized" ? 401 : 500, message: error.message },
+              data: null
+            };
+          }
         }
       },
       clearCart: {
-        type: CartType,
+        type: ShoppingCartResponseType,
         args: {
           guestId: { type: GraphQLString }
         },
         resolve: async (_, args, context: any) => {
-          const identity = resolveCartIdentity(args.guestId, context);
-          const cart = getOrCreateCart(identity);
-          cart.items = [];
-          persistCartStore();
-          return computeCart(cart);
+          try {
+            const guestId = args.guestId || context?.guestId;
+            const path = "/api/cart";
+            const response = await callApiGateway(path, { method: "DELETE", token: context?.token, guestId }, context);
+            const rawData = response?.data || response;
+            return {
+              status: normalizeStatus(response, 200, "Success"),
+              data: mapCartData(rawData)
+            };
+          } catch (error: any) {
+            return {
+              status: { code: error.message === "Unauthorized" ? 401 : 500, message: error.message },
+              data: null
+            };
+          }
         }
       },
       mergeCart: {
-        type: CartType,
+        type: ShoppingCartResponseType,
         args: {
-          guestId: { type: new GraphQLNonNull(GraphQLString) }
+          guestId: { type: GraphQLString }
         },
         resolve: async (_, args, context: any) => {
-          const token = context?.token;
-          if (!token || !token.includes("Bearer ")) {
-            const err: any = new Error("ACCESS_DENIED");
-            err.extensions = {
-              errorCode: "ACCESS_DENIED",
-              status: 403,
-              title: "Access Denied",
-              detail: "Gọi mergeCart khi chưa login"
-            };
-            throw err;
-          }
-          const userIdentity = resolveCartIdentity(null, context);
-          const userCart = getOrCreateCart(userIdentity);
-          const guestIdentity = { id: `guest:${args.guestId}`, isUser: false };
-          const guestCart = serverCartStore.get(guestIdentity.id);
-          if (guestCart && guestCart.items.length > 0) {
-            for (const gItem of guestCart.items) {
-              const existing = userCart.items.find((u: any) => u.sku === gItem.sku);
-              if (existing) {
-                existing.quantity = Math.min(99, existing.quantity + gItem.quantity);
-              } else {
-                userCart.items.push({ ...gItem });
-              }
+          try {
+            const token = context?.token;
+            if (!token || !token.includes("Bearer ")) {
+              return {
+                status: { code: 401, message: "Unauthorized: Vui lòng đăng nhập trước khi hợp nhất giỏ hàng" },
+                data: null
+              };
             }
-            guestCart.items = [];
+            const guestId = args.guestId || context?.guestId;
+            const path = "/api/cart/merge";
+            const payload = { guestId };
+            const response = await callApiGateway(path, { method: "POST", body: payload, token, guestId }, context);
+            const rawData = response?.data || response;
+            return {
+              status: normalizeStatus(response, 200, "Success"),
+              data: mapCartData(rawData)
+            };
+          } catch (error: any) {
+            return {
+              status: { code: error.message === "Unauthorized" ? 401 : 500, message: error.message },
+              data: null
+            };
           }
-          persistCartStore();
-          return computeCart(userCart);
         }
       }
     }
@@ -1675,8 +1835,6 @@ async function startServer() {
         middlewareMode: true,
         watch: {
           ignored: [
-            "**/.cart-store.json",
-            "**/.cart-store.json*",
             "**/.data/**",
             "**/node_modules/**",
             "**/.git/**",

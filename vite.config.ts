@@ -18,8 +18,6 @@ export default defineConfig(() => {
       // Disable file watching on store files, data caches, and JSON files to prevent unwanted reloads
       watch: {
         ignored: [
-          '**/.cart-store.json',
-          '**/.cart-store.json*',
           '**/.data/**',
           '**/node_modules/**',
           '**/.git/**',
