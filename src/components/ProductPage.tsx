@@ -2533,34 +2533,27 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
   }, [isSpecsExpanded, activeTab]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden [perspective:1400px]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden">
       {/* Backdrop overlay */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
         onClick={onClose}
-        className="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-xl"
+        className="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-md"
       />
 
       {/* Modal Body Container: 85vw x 85vh with 7.5% margins (15% total margin space) */}
       <Bevel
         as={motion.div}
         variant="shell"
-        initial={{ opacity: 0, scale: 0.88, y: 35, filter: "blur(12px)" }}
-        animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
-        exit={{ opacity: 0, scale: 0.9, y: 25, filter: "blur(8px)" }}
-        transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.85 }}
+        initial={{ opacity: 0, scale: 0.97, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97, y: 8 }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         className="relative z-10 flex h-[85vh] w-[94vw] sm:w-[90vw] md:w-[85vw] max-w-[1600px] flex-col overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-b from-white/95 via-white/90 to-white/80 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/80 backdrop-blur-2xl text-foreground shadow-[0_24px_80px_rgba(0,0,0,0.35),0_0_0_1px_rgba(255,255,255,0.4),inset_0_1px_0_rgba(255,255,255,1)]"
       >
-        <motion.div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-primary/10"
-          initial={{ opacity: 0.55 }}
-          animate={{ opacity: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-        />
 
         {/* Modal Main Scrollable Content Wrapper */}
         <div className="relative flex-1 min-h-0">
@@ -2711,10 +2704,10 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                           alt={product.name}
                           className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
                           referrerPolicy="no-referrer"
-                          initial={{ opacity: 0, scale: 1.04, x: 24, filter: "blur(10px)" }}
-                          animate={{ opacity: 1, scale: 1, x: 0, filter: "blur(0px)" }}
-                          exit={{ opacity: 0, scale: 0.985, x: -18, filter: "blur(8px)" }}
-                          transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.22, ease: "easeOut" }}
                         />
                       ) : (
                         <motion.div

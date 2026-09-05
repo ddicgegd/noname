@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame } from "lucide-react";
+import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, PackageOpen, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame } from "lucide-react";
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -13,6 +13,7 @@ import { Bevel, BevelDivider } from "@/components/ui/bevel";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { createAuthAction, savePendingAction } from "@/lib/authAction";
 import { addToCart as apiAddToCart, removeCartItem as apiRemoveCartItem, updateCartItemQuantity as apiUpdateCartQuantity } from "@/services/cartService";
+import { useChainedSpringList } from "@/hooks/useChainedSpringList";
 
 export interface CartItem {
   id: string;
@@ -773,10 +774,25 @@ const resolveProductMetadata = (skuOrName: string) => {
     return count;
   };
 
+  const { bindDrag, dismissIndices, isDismissing, offsets, activeIdx } = useChainedSpringList({
+    items: groupedCartItems,
+    onDismiss: (item) => {
+      const idsToRemove = item.sku ? [item.sku] : item.ids;
+      if (onRemoveCartItem) {
+        onRemoveCartItem(idsToRemove);
+        setSelectedGroupKeys(prev => prev.filter(k => k !== item.groupKey));
+      }
+    },
+    tensionDecay: 0.35,
+    maxChainedDepth: 3,
+  });
+
   const handleDeleteSelected = () => {
+    const selectedIndices: number[] = [];
     const idsToRemove: string[] = [];
-    groupedCartItems.forEach((group) => {
+    groupedCartItems.forEach((group, index) => {
       if (selectedGroupKeys.includes(group.groupKey)) {
+        selectedIndices.push(index);
         if (group.sku) {
           idsToRemove.push(group.sku);
         } else {
@@ -791,8 +807,10 @@ const resolveProductMetadata = (skuOrName: string) => {
     }
     
     if (onRemoveCartItem) {
-      onRemoveCartItem(idsToRemove);
-      setSelectedGroupKeys((prev) => prev.filter((k) => !selectedGroupKeys.includes(k)));
+      dismissIndices(selectedIndices, () => {
+        onRemoveCartItem(idsToRemove);
+        setSelectedGroupKeys((prev) => prev.filter((k) => !selectedGroupKeys.includes(k)));
+      });
     }
   };
 
@@ -1263,6 +1281,7 @@ const resolveProductMetadata = (skuOrName: string) => {
           <AnimatePresence>
             {showCartMenu && (
               <motion.div 
+                layout="position"
                 initial={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
@@ -1320,19 +1339,23 @@ const resolveProductMetadata = (skuOrName: string) => {
                     )}
                     <button
                       onClick={() => setShowCartMenu(false)}
-                      className="size-7 rounded-lg bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 text-slate-500 hover:text-slate-800 flex items-center justify-center shadow-2xs transition-colors duration-150 cursor-pointer ml-1"
+                      className="size-8 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 text-slate-500 hover:text-slate-800 flex items-center justify-center shadow-2xs transition-colors duration-150 cursor-pointer ml-1"
                       title="Đóng giỏ hàng"
                       aria-label="Đóng giỏ hàng"
                     >
-                      <X size={13} className="stroke-[2.25]" />
+                      <X size={14} className="stroke-[2.25]" />
                     </button>
                   </div>
                 </div>
                 
                 {/* 2. Item List with Dual Top & Bottom CSS Mask Fade */}
                 {groupedCartItems.length > 0 ? (
-                  <div className="flex flex-col gap-2.5 max-h-[440px] overflow-y-auto px-1.5 pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)]">
-                    <AnimatePresence initial={false}>
+                  <motion.div 
+                    layout
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex flex-col gap-2.5 max-h-[440px] overflow-y-auto px-1.5 pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)]"
+                  >
+                    <AnimatePresence initial={false} mode="popLayout">
                       {groupedCartItems.map((group, index) => {
                         const groupKey = group.groupKey;
                         const isSelected = selectedGroupKeys.includes(groupKey);
@@ -1343,15 +1366,54 @@ const resolveProductMetadata = (skuOrName: string) => {
                         
                         return (
                           <motion.div 
+                            layout
                             initial={{ opacity: 0, y: 6 }}
                             animate={{ 
-                              opacity: 1, 
+                              opacity: offsets[index] 
+                                ? Math.max(0, (isSelected ? 1 : 0.6) * (1 - Math.pow(Math.min(1, Math.max(0, offsets[index]) / 240), 1.2))) 
+                                : (isSelected ? 1 : 0.6), 
                               y: 0,
+                              x: offsets[index] || 0,
+                              rotate: offsets[index] ? Math.min(4, offsets[index] * 0.01) : 0,
+                              scale: offsets[index] && offsets[index] > 20 ? Math.max(0.95, 1 - offsets[index] / 3000) : 1,
+                              filter: offsets[index] && offsets[index] > 50 
+                                ? `blur(${Math.min(2.5, (offsets[index] - 50) * 0.015)}px)` 
+                                : "blur(0px)",
                             }}
-                            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
-                            transition={{ duration: 0.15 }}
+                            exit={{ 
+                              opacity: 0, 
+                              x: 480, 
+                              rotate: 3.5,
+                              scale: 0.93,
+                              filter: "blur(3px)",
+                              height: 0, 
+                              marginTop: 0, 
+                              marginBottom: 0, 
+                              paddingTop: 0, 
+                              paddingBottom: 0, 
+                              overflow: "hidden", 
+                              transition: { 
+                                x: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+                                opacity: { duration: 0.22, ease: "easeOut" },
+                                rotate: { duration: 0.28 },
+                                scale: { duration: 0.28 },
+                                height: { duration: 0.28, delay: 0.06, ease: [0.16, 1, 0.3, 1] },
+                              } 
+                            }}
+                            transition={{ 
+                              x: activeIdx === index && !isDismissing
+                                ? { duration: 0 }
+                                : { type: "spring", stiffness: 220, damping: 25, mass: 0.8 },
+                              rotate: { type: "spring", stiffness: 200, damping: 22 },
+                              scale: { type: "spring", stiffness: 220, damping: 25 },
+                              opacity: { duration: 0.2, ease: "easeOut" },
+                              filter: { duration: 0.18 },
+                              layout: { duration: 0.32, ease: [0.16, 1, 0.3, 1] } 
+                            }}
                             key={groupKey} 
+                            {...bindDrag(index)}
                             onClick={() => {
+                              if (isDismissing) return;
                               setSelectedGroupKeys(prev => {
                                 const willDeselect = prev.includes(groupKey);
                                 if (willDeselect) {
@@ -1632,14 +1694,14 @@ const resolveProductMetadata = (skuOrName: string) => {
                         );
                       })}
                     </AnimatePresence>
-                  </div>
+                  </motion.div>
                 ) : (
                   <motion.div 
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
-                    className="py-12 text-center flex flex-col items-center justify-center gap-2.5 text-slate-400 bg-slate-50/60 rounded-xl border border-dashed border-slate-200"
+                    className="py-12 text-center flex flex-col items-center justify-center gap-2.5 text-slate-400"
                   >
-                    <div className="size-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                      <ShoppingBag size={22} className="stroke-[1.75]" />
+                    <div className="size-12 rounded-full bg-slate-50/80 border border-slate-200/60 flex items-center justify-center text-slate-400 shadow-2xs">
+                      <PackageOpen size={22} className="stroke-[1.75]" />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-700">Giỏ hàng của bạn đang trống</p>
