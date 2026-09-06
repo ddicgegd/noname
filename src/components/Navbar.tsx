@@ -1456,22 +1456,23 @@ const resolveProductMetadata = (skuOrName: string) => {
 
                             {/* Top Row: Thumbnail + Info & Variant + Delete */}
                             <div className="flex items-start gap-2.5">
-                              {/* Smartphone Thumbnail Photo - Seamlessly integrated */}
-                              <div className={`relative w-13 h-14 sm:w-14 sm:h-15 rounded-xl shrink-0 p-1 flex items-center justify-center overflow-hidden transition-all duration-200 ${
-                                isSelected 
-                                ? "bg-gradient-to-b from-slate-50 to-slate-100/70 border border-slate-200/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)]" 
-                                : "bg-neutral-100/60 border border-transparent grayscale opacity-40"
-                              }`}>
-                                {group.imageUrl ? (
-                                  <img 
-                                    src={group.imageUrl} 
-                                    alt={group.name} 
-                                    className="size-full object-contain object-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)] transition-transform duration-200 hover:scale-105" 
-                                  />
-                                ) : (
-                                  <span className="text-base">{group.icon || "📦"}</span>
-                                )}
-                              </div>
+                                {/* Product Thumbnail Photo - Edge-to-edge full cover, zero gaps */}
+                                <div className={`relative w-14 h-14 sm:w-16 sm:h-16 aspect-square rounded-xl shrink-0 flex items-center justify-center overflow-hidden transition-all duration-200 group/thumb ${
+                                  isSelected 
+                                  ? "bg-slate-100 border border-slate-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/[0.03]" 
+                                  : "bg-neutral-100/70 border border-neutral-200/60 grayscale opacity-40"
+                                }`}>
+                                  {group.imageUrl ? (
+                                    <img 
+                                      src={group.imageUrl} 
+                                      alt={group.name} 
+                                      className="w-full h-full object-cover object-center block transition-transform duration-300 ease-out group-hover/thumb:scale-105" 
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <span className="text-base">{group.icon || "📦"}</span>
+                                  )}
+                                </div>
 
                               {/* Info & Variant Pill */}
                               <div className="flex-1 min-w-0 flex flex-col gap-0.5">

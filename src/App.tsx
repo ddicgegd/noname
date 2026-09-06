@@ -10,6 +10,7 @@ import SpotlightSection from "./components/SpotlightSection";
 import FeatureOne from "./components/FeatureOne";
 import ShowcaseSection from "./components/ShowcaseSection";
 import PricingSection from "./components/PricingSection";
+import { ScrollAnimation } from "./components/ui/scroll-animation";
 import ProductPage from "./components/ProductPage";
 import RegisterPage from "./components/RegisterPage";
 import AuthReportDashboard from "./components/AuthReportDashboard";
@@ -384,12 +385,18 @@ export default function App() {
             {/* 3. Immersive Spotlight Hero Area (Original Spotlight Effect) */}
             <SpotlightSection bgText={activeBrand} onBgTextChange={setActiveBrand} />
 
-            {/* 5. Scrollable SaaS Landing Sections */}
-            <FeatureOne />
+            {/* 5. Scrollable SaaS Landing Sections with Reveal Scroll Animation */}
+            <ScrollAnimation direction="up" duration={0.65} viewport={{ once: true, amount: 0.15 }}>
+              <FeatureOne />
+            </ScrollAnimation>
             
-            <ShowcaseSection />
+            <ScrollAnimation direction="up" duration={0.65} viewport={{ once: true, amount: 0.2 }}>
+              <ShowcaseSection />
+            </ScrollAnimation>
             
-            <PricingSection />
+            <ScrollAnimation direction="up" duration={0.65} viewport={{ once: true, amount: 0.15 }}>
+              <PricingSection />
+            </ScrollAnimation>
           </motion.div>
         ) : currentPage === "product" ? (
           <motion.div
