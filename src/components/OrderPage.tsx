@@ -2003,11 +2003,11 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             <div className="flex flex-col justify-between h-full flex-1 py-0.5 min-w-0 pr-1">
                               {/* 1. Ngân hàng thụ hưởng */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[10px] text-neutral-500 font-medium shrink-0">Ngân hàng:</span>
+                                <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Ngân hàng:</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyText(currentBank.name, "bankName")}
-                                  className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[10.5px] max-w-[210px] truncate text-right ml-1"
+                                  className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[10.5px] sm:text-[11px] max-w-[210px] truncate text-right ml-1 transition-colors"
                                   title="Sao chép tên ngân hàng"
                                 >
                                   <span className="truncate">{currentBank.shortName}</span>
@@ -2017,25 +2017,25 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
 
                               {/* 2. Số tài khoản */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[10px] text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
+                                <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyText(currentBank.accountNo, "acc")}
-                                  className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11px] ml-1"
+                                  className="flex items-center gap-1 font-mono font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11.5px] ml-1 transition-colors"
                                   title="Sao chép số tài khoản"
                                 >
-                                  <span className="tracking-wide">{currentBank.accountNo}</span>
+                                  <span className="tracking-wider">{currentBank.accountNo}</span>
                                   {copiedField === "acc" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
                                 </button>
                               </div>
 
                               {/* 3. Chủ tài khoản */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[10px] text-neutral-500 font-medium shrink-0">Chủ tài khoản:</span>
+                                <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Chủ tài khoản:</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyText(currentBank.accountName, "accName")}
-                                  className="flex items-center gap-1 font-semibold text-neutral-800 hover:text-orange-600 cursor-pointer text-[10px] max-w-[200px] truncate text-right ml-1"
+                                  className="flex items-center gap-1 font-bold text-neutral-800 hover:text-orange-600 cursor-pointer text-[10.5px] max-w-[200px] truncate text-right ml-1 transition-colors"
                                   title="Sao chép tên chủ tài khoản"
                                 >
                                   <span className="truncate">{currentBank.accountName}</span>
@@ -2045,11 +2045,11 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
 
                               {/* 4. Số tiền */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[10px] text-neutral-500 font-medium shrink-0">Số tiền:</span>
+                                <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Số tiền:</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyText(total.toString(), "amount")}
-                                  className="flex items-center gap-1 font-bold text-orange-600 hover:text-orange-700 cursor-pointer text-[11px] ml-1"
+                                  className="flex items-center gap-1 font-extrabold text-orange-600 hover:text-orange-700 cursor-pointer text-[11.5px] ml-1 transition-colors"
                                   title="Sao chép số tiền"
                                 >
                                   <span>{formatVND(total)}</span>
@@ -2057,29 +2057,29 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                                 </button>
                               </div>
 
-                              {/* 5. Option nhập email nhận thông báo giao dịch có check type email */}
-                              <div className="pt-1 mt-0.5 border-t border-neutral-200/60">
+                              {/* 5. Option nhập email nhận thông báo giao dịch (Giữ kích thước khung h-8, tăng font chữ bên trong lên 15%: text-[12.5px]) */}
+                              <div className="pt-1 mt-0.5 border-t border-neutral-200/70">
                                 <div className="relative flex items-center">
-                                  <Mail className="size-3 text-neutral-400 absolute left-2 pointer-events-none" />
+                                  <Mail className="size-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
                                   <input
                                     type="email"
                                     placeholder="Email nhận thông báo giao dịch..."
                                     value={transactionEmail}
                                     onChange={(e) => setTransactionEmail(e.target.value)}
-                                    className={`w-full h-7 pl-6 pr-6 text-[10px] rounded-md border transition-all placeholder:text-neutral-400 outline-none ${
+                                    className={`w-full h-8 pl-8 pr-8 text-[12.5px] rounded-lg border transition-all placeholder:text-[12px] placeholder:text-neutral-400 outline-none ${
                                       transactionEmail.trim() === ""
-                                        ? "border-neutral-200 bg-neutral-50/70 focus:bg-white focus:border-neutral-800"
+                                        ? "border-neutral-200 bg-neutral-50/70 focus:bg-white focus:border-neutral-800 focus:ring-1 focus:ring-neutral-800/10"
                                         : isEmailValid(transactionEmail)
-                                        ? "border-emerald-500/80 bg-emerald-50/40 text-emerald-950 focus:bg-white focus:border-emerald-600"
-                                        : "border-rose-400/80 bg-rose-50/40 text-rose-950 focus:bg-white focus:border-rose-500"
+                                        ? "border-emerald-500/80 bg-emerald-50/40 text-emerald-950 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500/20"
+                                        : "border-rose-400/80 bg-rose-50/40 text-rose-950 focus:bg-white focus:border-rose-500 focus:ring-1 focus:ring-rose-500/20"
                                     }`}
                                   />
                                   {transactionEmail.trim() !== "" && (
-                                    <div className="absolute right-2 pointer-events-none flex items-center" title={isEmailValid(transactionEmail) ? "Email hợp lệ" : "Định dạng email chưa hợp lệ"}>
+                                    <div className="absolute right-2.5 pointer-events-none flex items-center" title={isEmailValid(transactionEmail) ? "Email hợp lệ" : "Định dạng email chưa hợp lệ"}>
                                       {isEmailValid(transactionEmail) ? (
-                                        <CheckCircle2 className="size-3 text-emerald-600" />
+                                        <CheckCircle2 className="size-3.5 text-emerald-600" />
                                       ) : (
-                                        <AlertCircle className="size-3 text-rose-500" />
+                                        <AlertCircle className="size-3.5 text-rose-500" />
                                       )}
                                     </div>
                                   )}
@@ -2107,7 +2107,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                               <button
                                 type="button"
                                 onClick={() => handleCopyText(currentBank.name, "bankName")}
-                                className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11px] sm:text-[11.5px] max-w-[360px] truncate text-right ml-1"
+                                className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11px] sm:text-[11.5px] max-w-[360px] truncate text-right ml-1 transition-colors"
                                 title="Sao chép tên ngân hàng"
                               >
                                 <span className="truncate">{currentBank.shortName} - {currentBank.name}</span>
@@ -2121,10 +2121,10 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                               <button
                                 type="button"
                                 onClick={() => handleCopyText(currentBank.accountNo, "acc")}
-                                className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11px] sm:text-[11.5px] ml-1"
+                                className="flex items-center gap-1 font-mono font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11.5px] ml-1 transition-colors"
                                 title="Sao chép số tài khoản"
                               >
-                                <span className="tracking-wide">{currentBank.accountNo}</span>
+                                <span className="tracking-wider">{currentBank.accountNo}</span>
                                 {copiedField === "acc" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
                               </button>
                             </div>
@@ -2135,7 +2135,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                               <button
                                 type="button"
                                 onClick={() => handleCopyText(currentBank.accountName, "accName")}
-                                className="flex items-center gap-1 font-semibold text-neutral-800 hover:text-orange-600 cursor-pointer text-[10.5px] max-w-[340px] truncate text-right ml-1"
+                                className="flex items-center gap-1 font-bold text-neutral-800 hover:text-orange-600 cursor-pointer text-[10.5px] max-w-[340px] truncate text-right ml-1 transition-colors"
                                 title="Sao chép tên chủ tài khoản"
                               >
                                 <span className="truncate">{currentBank.accountName}</span>
@@ -2149,7 +2149,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                               <button
                                 type="button"
                                 onClick={() => handleCopyText(total.toString(), "amount")}
-                                className="flex items-center gap-1 font-bold text-orange-600 hover:text-orange-700 cursor-pointer text-[11px] sm:text-[11.5px] ml-1"
+                                className="flex items-center gap-1 font-extrabold text-orange-600 hover:text-orange-700 cursor-pointer text-[11.5px] ml-1 transition-colors"
                                 title="Sao chép số tiền"
                               >
                                 <span>{formatVND(total)}</span>
@@ -2157,8 +2157,8 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                               </button>
                             </div>
 
-                            {/* 5. Option nhập email nhận thông báo giao dịch có check type email */}
-                            <div className="pt-1 mt-0.5 border-t border-neutral-200/60">
+                            {/* 5. Option nhập email nhận thông báo giao dịch (Giữ kích thước khung h-8, tăng font chữ bên trong lên 15%: text-[12.5px]) */}
+                            <div className="pt-1 mt-0.5 border-t border-neutral-200/70">
                               <div className="relative flex items-center">
                                 <Mail className="size-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
                                 <input
@@ -2166,20 +2166,20 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                                   placeholder="Email nhận thông báo giao dịch..."
                                   value={transactionEmail}
                                   onChange={(e) => setTransactionEmail(e.target.value)}
-                                  className={`w-full h-7 pl-7 pr-7 text-[10.5px] rounded-md border transition-all placeholder:text-neutral-400 outline-none ${
+                                  className={`w-full h-8 pl-8 pr-8 text-[12.5px] rounded-lg border transition-all placeholder:text-[12px] placeholder:text-neutral-400 outline-none ${
                                     transactionEmail.trim() === ""
-                                      ? "border-neutral-200 bg-neutral-50/70 focus:bg-white focus:border-neutral-800"
+                                      ? "border-neutral-200 bg-neutral-50/70 focus:bg-white focus:border-neutral-800 focus:ring-1 focus:ring-neutral-800/10"
                                       : isEmailValid(transactionEmail)
-                                      ? "border-emerald-500/80 bg-emerald-50/40 text-emerald-950 focus:bg-white focus:border-emerald-600"
-                                      : "border-rose-400/80 bg-rose-50/40 text-rose-950 focus:bg-white focus:border-rose-500"
+                                      ? "border-emerald-500/80 bg-emerald-50/40 text-emerald-950 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500/20"
+                                      : "border-rose-400/80 bg-rose-50/40 text-rose-950 focus:bg-white focus:border-rose-500 focus:ring-1 focus:ring-rose-500/20"
                                   }`}
                                 />
                                 {transactionEmail.trim() !== "" && (
                                   <div className="absolute right-2.5 pointer-events-none flex items-center" title={isEmailValid(transactionEmail) ? "Email hợp lệ" : "Định dạng email chưa hợp lệ"}>
                                     {isEmailValid(transactionEmail) ? (
-                                      <CheckCircle2 className="size-3 text-emerald-600" />
+                                      <CheckCircle2 className="size-3.5 text-emerald-600" />
                                     ) : (
-                                      <AlertCircle className="size-3 text-rose-500" />
+                                      <AlertCircle className="size-3.5 text-rose-500" />
                                     )}
                                   </div>
                                 )}
