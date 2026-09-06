@@ -36,6 +36,10 @@
 ### 1.7. MANDATORY SKILL ACTIVATION
 - Proactively identify and activate available project skills whenever applicable to the current task.
 
+### 1.8. CONTEXT RESET & EXPLICIT TARGET CONFIRMATION
+- **CONTEXT INDEPENDENCE**: Nếu phiên prompt sau không có thông tin liên quan tới phiên trước thì bắt buộc phải quên/loại bỏ ngữ cảnh trước đó trước khi thực thi.
+- **EXPLICIT CONFIRMATION (NO GUESSING)**: Xác nhận cấu trúc và vị trí cần sửa rõ ràng qua prompt; TUYỆT ĐỐI CẤM việc tự đoán hoặc suy diễn vị trí/cấu trúc khi chưa có chỉ định rõ ràng.
+
 ---
 
 ## 2. FRONTEND & UI DEVELOPMENT DIRECTIVES

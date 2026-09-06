@@ -31,6 +31,7 @@ import {
   Info,
   Wallet,
   Coins,
+  Mail,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -887,6 +888,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   const [paypalAnimKey, setPaypalAnimKey] = useState(0);
   const [cardAnimKey, setCardAnimKey] = useState(0);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [transactionEmail, setTransactionEmail] = useState<string>("");
+
+  const isEmailValid = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   useEffect(() => {
     if (paymentType === "bank") {
@@ -1196,17 +1200,18 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
       <div className="h-16 sm:h-20 shrink-0 w-full" />
 
       {/* Main 2-Column Full-Height Container */}
-      <main className="max-w-[1680px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-2 flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch overflow-hidden">
+      <main className="max-w-[1680px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-1 sm:py-2 pb-3 flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch">
         
         {/* ========================================================================= */}
         {/* LEFT COLUMN (7/12): Smartphone Catalog Framed Product Table               */}
         {/* ========================================================================= */}
-        <div className="lg:col-span-7 xl:col-span-7 relative flex flex-col min-h-0 h-full overflow-hidden p-4 sm:p-5 rounded-2xl border border-neutral-200/90 bg-white/90 backdrop-blur-md shadow-2xs">
+        <div className="lg:col-span-7 xl:col-span-7 relative flex flex-col min-h-0 h-full overflow-hidden p-4 sm:p-5 rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] backdrop-blur-md">
           
-          {/* Subtle Ambient Color Glow inside Left Column */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl -z-0">
-            <div className="absolute -top-16 -left-16 w-80 h-80 rounded-full bg-[#FF5722]/6 blur-[80px] pointer-events-none" />
-            <div className="absolute top-[40%] -right-20 w-72 h-72 rounded-full bg-[#FF8A00]/6 blur-[90px] pointer-events-none" />
+          {/* Multi-corner Ambient Luxury Glow Aura */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+            <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
+            <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
           </div>
 
           {/* Table Header Bar with Back Button, Selection Toggle & Quick Bulk Actions */}
@@ -1591,13 +1596,20 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
         {/* ========================================================================= */}
         {/* RIGHT COLUMN (5/12): Synchronized Compact Layout (70% Black / 30% Orange) */}
         {/* ========================================================================= */}
-        <div className="lg:col-span-5 xl:col-span-5 flex flex-col h-full min-h-0 overflow-hidden gap-2.5">
+        <div className="lg:col-span-5 xl:col-span-5 flex flex-col h-full min-h-0 gap-2.5 pb-0.5">
           
           {/* ----------------------------------------------------------------------- */}
           {/* TẦNG 1: THÔNG TIN GIAO HÀNG + GHI CHÚ ĐƠN HÀNG                          */}
           {/* ----------------------------------------------------------------------- */}
-          <div className="shrink-0 flex flex-col gap-2 p-3.5 rounded-2xl border border-neutral-200/90 bg-white/90 backdrop-blur-md shadow-2xs">
-            <div className="flex items-center justify-between">
+          <div className="relative shrink-0 flex flex-col gap-2 p-3.5 rounded-2xl border border-white/90 bg-gradient-to-b from-white via-white/90 to-white/75 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md overflow-hidden">
+            {/* Multi-corner Ambient Luxury Glow Aura */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+              <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
+              <div className="absolute -bottom-8 -left-8 h-24 w-24 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+            </div>
+
+            <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-2">
                 <MapPin className="size-3.5 text-neutral-800" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-900">
@@ -1614,7 +1626,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               </button>
             </div>
 
-            <div className="flex flex-col gap-0.5 text-xs">
+            <div className="flex flex-col gap-0.5 text-xs relative z-10">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-neutral-900 text-[12.5px]">{userInfo.recipient}</span>
                 <span className="text-neutral-400">•</span>
@@ -1631,7 +1643,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
             </div>
 
             {/* Dedicated Delivery Note Sub-block with Inline Icon & Placeholder */}
-            <div className="pt-1.5 border-t border-neutral-200/60">
+            <div className="pt-1.5 border-t border-neutral-200/60 relative z-10">
               <div className="relative flex items-center">
                 <FileText className="size-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
                 <Input
@@ -1647,8 +1659,15 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
           {/* ----------------------------------------------------------------------- */}
           {/* TẦNG 2: PHƯƠNG THỨC THANH TOÁN (+15% DOWNWARDS EXPANSION)              */}
           {/* ----------------------------------------------------------------------- */}
-          <div className="h-[402px] shrink-0 flex flex-col justify-between p-3.5 rounded-2xl border border-neutral-200/90 bg-white/90 backdrop-blur-md shadow-2xs overflow-hidden">
-            <div className="flex items-center justify-between shrink-0">
+          <div className="relative h-[402px] shrink-0 flex flex-col justify-between p-3.5 rounded-2xl border border-white/90 bg-gradient-to-b from-white via-white/90 to-white/75 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md overflow-hidden">
+            {/* Multi-corner Ambient Luxury Glow Aura */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+              <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
+              <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+            </div>
+
+            <div className="flex items-center justify-between shrink-0 relative z-10">
               <div className="flex items-center gap-2">
                 <Building2 className="size-3.5 text-neutral-800" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-900">
@@ -1658,12 +1677,12 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
             </div>
 
             {/* Payment Category Selector Tabs with Smooth Sliding Indicator (4 Methods) */}
-            <div className="grid grid-cols-4 gap-1 bg-neutral-100/70 p-1 rounded-xl text-xs font-medium shrink-0 relative">
+            <div className="grid grid-cols-4 gap-1 bg-gradient-to-b from-neutral-200/50 via-neutral-100/60 to-neutral-200/40 p-1 rounded-xl border-t border-t-neutral-300/40 border-b border-b-white border-x border-x-neutral-200/50 shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-medium shrink-0 relative">
               {[
                 { id: "bank", label: "Ngân hàng", icon: Building2 },
                 { id: "paypal", label: "PayPal", icon: CreditCard },
                 { id: "cod", label: "COD", icon: Truck },
-                { id: "loan", label: "Khoản vay", icon: Landmark, badge: "Fineract" },
+                { id: "loan", label: "Khoản vay", icon: Landmark },
               ].map((tab) => {
                 const isSelected = paymentType === tab.id;
                 const IconComponent = tab.icon;
@@ -1681,17 +1700,12 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                     {isSelected && (
                       <motion.div
                         layoutId="activePaymentTabIndicator"
-                        className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                        className="absolute inset-0 bg-gradient-to-b from-white via-white to-neutral-50 border-t border-t-white border-b border-b-neutral-300/60 shadow-[0_1.5px_4px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] rounded-lg"
                         transition={{ type: "spring", stiffness: 500, damping: 35 }}
                       />
                     )}
                     <IconComponent className="size-3 relative z-10 shrink-0" />
                     <span className="relative z-10 truncate">{tab.label}</span>
-                    {tab.badge && !isSelected && (
-                      <span className="relative z-10 hidden sm:inline-block text-[7.5px] font-black text-white bg-sky-600 px-1 py-0.2 rounded-full leading-none">
-                        {tab.badge}
-                      </span>
-                    )}
                   </button>
                 );
               })}
@@ -1834,38 +1848,40 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
 
               {/* Option 2: Chọn Nhiều Loại Ngân Hàng (4 Ngân Hàng) */}
               {paymentType === "bank" && (
-                <div className="h-full flex flex-col justify-between gap-2">
-                  {/* 4 Bank Cards - Compact 4:3 Ratio (Logos only) */}
-                  <div className="grid grid-cols-4 gap-1.5 w-full shrink-0">
-                    {BANK_OPTIONS.map((b) => {
-                      const isSelected = selectedBank === b.id;
-                      return (
-                        <button
-                          key={b.id}
-                          type="button"
-                          onClick={() => setSelectedBank(b.id)}
-                          className={`h-12 sm:h-13 rounded-xl border-[1.5px] flex items-center justify-center p-2 transition-all cursor-pointer relative group ${
-                            isSelected
-                              ? "border-orange-500 bg-orange-50/50 shadow-2xs"
-                              : "border-neutral-200/90 hover:border-orange-300 hover:bg-orange-50/20 bg-white"
-                          }`}
-                          title={b.name}
-                        >
-                          <img
-                            src={b.logoUrl}
-                            alt={b.shortName}
-                            className="max-h-6 sm:max-h-7 max-w-[80%] object-contain select-none transition-transform duration-150 group-hover:scale-105"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        </button>
-                      );
-                    })}
+                <div className="h-full flex flex-col justify-between">
+                  {/* 4 Bank Cards - Compact 4:3 Ratio (Logos only) - Centered in available space */}
+                  <div className="flex-1 flex items-center justify-center w-full min-h-0 py-0.5">
+                    <div className="grid grid-cols-4 gap-1.5 w-full">
+                      {BANK_OPTIONS.map((b) => {
+                        const isSelected = selectedBank === b.id;
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => setSelectedBank(b.id)}
+                            className={`h-12 sm:h-13 rounded-xl flex items-center justify-center p-2 transition-all cursor-pointer relative group ${
+                              isSelected
+                                ? "border-t border-t-orange-400 border-b-2 border-b-orange-700/80 border-x border-x-orange-500/80 bg-gradient-to-b from-orange-50/90 via-orange-50/50 to-orange-100/40 shadow-[0_2px_8px_rgba(234,88,12,0.18),inset_0_1.5px_0_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(234,88,12,0.15)] ring-1 ring-orange-500/20"
+                                : "border-t border-t-white border-b-2 border-b-neutral-300/70 border-x border-x-neutral-200/80 bg-gradient-to-b from-white via-[#FCFCFC] to-[#F5F5F5] hover:from-orange-50/40 hover:to-orange-50/10 hover:border-orange-300 shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)]"
+                            }`}
+                            title={b.name}
+                          >
+                            <img
+                              src={b.logoUrl}
+                              alt={b.shortName}
+                              className="max-h-6 sm:max-h-7 max-w-[80%] object-contain select-none transition-transform duration-150 group-hover:scale-105"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = "none";
+                              }}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {/* Bank Account / Card Detail with Sub-option switch */}
-                  <div className="h-[232px] flex flex-col justify-between text-xs pt-1">
+                  <div className="h-[232px] flex flex-col justify-between text-xs pt-1 shrink-0">
                     {/* Header Bar with Sub-option Tabs */}
                     <div className="flex items-center justify-between pb-1.5 border-b border-neutral-100 gap-2 shrink-0">
                       <span className="font-bold text-neutral-900 text-xs sm:text-[12.5px] truncate" title={currentBank.name}>
@@ -1943,52 +1959,98 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             transition={{ duration: 0.2, ease: "easeInOut" }}
                             className="h-full flex items-center justify-between gap-2.5"
                           >
-                            <div className="flex flex-col justify-between h-full flex-1 py-0.5">
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[10px] font-semibold text-neutral-500">Ngân hàng thụ hưởng:</span>
-                                <span className="font-bold text-neutral-900 text-xs truncate" title={currentBank.name}>{currentBank.name}</span>
+                            <div className="flex flex-col justify-between h-full flex-1 py-0.5 min-w-0 pr-1">
+                              {/* 1. Ngân hàng thụ hưởng */}
+                              <div className="flex items-center justify-between py-0.5">
+                                <span className="text-[10px] text-neutral-500 font-medium shrink-0">Ngân hàng:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyText(currentBank.name, "bankName")}
+                                  className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[10.5px] max-w-[210px] truncate text-right ml-1"
+                                  title="Sao chép tên ngân hàng"
+                                >
+                                  <span className="truncate">{currentBank.shortName}</span>
+                                  {copiedField === "bankName" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                </button>
                               </div>
 
+                              {/* 2. Số tài khoản */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[11.5px] text-neutral-500 font-medium">Số tài khoản:</span>
+                                <span className="text-[10px] text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyText(currentBank.accountNo, "acc")}
-                                  className="flex items-center gap-1.5 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-xs sm:text-[12.5px]"
+                                  className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11px] ml-1"
+                                  title="Sao chép số tài khoản"
                                 >
                                   <span className="tracking-wide">{currentBank.accountNo}</span>
-                                  {copiedField === "acc" ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5 text-neutral-400" />}
+                                  {copiedField === "acc" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
                                 </button>
                               </div>
 
+                              {/* 3. Chủ tài khoản */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[11.5px] text-neutral-500 font-medium">Số tiền:</span>
-                                <span className="font-bold text-orange-600 text-xs sm:text-[12.5px]">{formatVND(total)}</span>
-                              </div>
-
-                              <div className="flex items-center justify-between bg-neutral-50 p-1.5 rounded-lg border border-neutral-200/60 py-0.5">
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] text-neutral-500 font-medium">Nội dung CK:</span>
-                                  <span className="font-mono font-bold text-neutral-900 text-[10.5px]">
-                                    NONAME {userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}
-                                  </span>
-                                </div>
+                                <span className="text-[10px] text-neutral-500 font-medium shrink-0">Chủ tài khoản:</span>
                                 <button
                                   type="button"
-                                  onClick={() => handleCopyText(`NONAME ${userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}`, "msg")}
-                                  className="flex items-center gap-1.5 font-bold text-orange-600 hover:text-orange-700 cursor-pointer text-xs"
-                                  title="Sao chép nội dung"
+                                  onClick={() => handleCopyText(currentBank.accountName, "accName")}
+                                  className="flex items-center gap-1 font-semibold text-neutral-800 hover:text-orange-600 cursor-pointer text-[10px] max-w-[200px] truncate text-right ml-1"
+                                  title="Sao chép tên chủ tài khoản"
                                 >
-                                  {copiedField === "msg" ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5 text-neutral-400" />}
+                                  <span className="truncate">{currentBank.accountName}</span>
+                                  {copiedField === "accName" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
                                 </button>
+                              </div>
+
+                              {/* 4. Số tiền */}
+                              <div className="flex items-center justify-between py-0.5">
+                                <span className="text-[10px] text-neutral-500 font-medium shrink-0">Số tiền:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyText(total.toString(), "amount")}
+                                  className="flex items-center gap-1 font-bold text-orange-600 hover:text-orange-700 cursor-pointer text-[11px] ml-1"
+                                  title="Sao chép số tiền"
+                                >
+                                  <span>{formatVND(total)}</span>
+                                  {copiedField === "amount" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                </button>
+                              </div>
+
+                              {/* 5. Option nhập email nhận thông báo giao dịch có check type email */}
+                              <div className="pt-1 mt-0.5 border-t border-neutral-200/60">
+                                <div className="relative flex items-center">
+                                  <Mail className="size-3 text-neutral-400 absolute left-2 pointer-events-none" />
+                                  <input
+                                    type="email"
+                                    placeholder="Email nhận thông báo giao dịch..."
+                                    value={transactionEmail}
+                                    onChange={(e) => setTransactionEmail(e.target.value)}
+                                    className={`w-full h-7 pl-6 pr-6 text-[10px] rounded-md border transition-all placeholder:text-neutral-400 outline-none ${
+                                      transactionEmail.trim() === ""
+                                        ? "border-neutral-200 bg-neutral-50/70 focus:bg-white focus:border-neutral-800"
+                                        : isEmailValid(transactionEmail)
+                                        ? "border-emerald-500/80 bg-emerald-50/40 text-emerald-950 focus:bg-white focus:border-emerald-600"
+                                        : "border-rose-400/80 bg-rose-50/40 text-rose-950 focus:bg-white focus:border-rose-500"
+                                    }`}
+                                  />
+                                  {transactionEmail.trim() !== "" && (
+                                    <div className="absolute right-2 pointer-events-none flex items-center" title={isEmailValid(transactionEmail) ? "Email hợp lệ" : "Định dạng email chưa hợp lệ"}>
+                                      {isEmailValid(transactionEmail) ? (
+                                        <CheckCircle2 className="size-3 text-emerald-600" />
+                                      ) : (
+                                        <AlertCircle className="size-3 text-rose-500" />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            {/* Dynamic VietQR code (Chỉ hiển thị ở chế độ QR) */}
-                            <div className="w-[124px] h-full flex flex-col items-center justify-center p-1.5 bg-white rounded-xl border border-neutral-200/90 shadow-2xs shrink-0">
-                              <div className="relative size-24 rounded-lg bg-neutral-50 flex items-center justify-center overflow-hidden">
+                            {/* Dynamic VietQR code (Chỉ hiển thị mã QR thuần, lấp đầy toàn bộ khung vuông) */}
+                            <div className="h-full aspect-square flex items-center justify-center p-1.5 bg-white rounded-xl border border-neutral-200/90 shadow-2xs shrink-0 overflow-hidden">
+                              <div className="relative w-full h-full rounded-lg bg-neutral-50 flex items-center justify-center overflow-hidden p-1">
                                 <img
-                                  src={`https://api.vietqr.io/image/${currentBank.bin}-${currentBank.accountNo}-compact2.png?amount=${total}&addInfo=NONAME%20${userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}&accountName=CONG%20TY%20TNHH%20NONAME%20VIETNAM`}
+                                  src={`https://api.vietqr.io/image/${currentBank.bin}-${currentBank.accountNo}-qr_only.png?amount=${total}&addInfo=NONAME%20${userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}&accountName=CONG%20TY%20TNHH%20NONAME%20VIETNAM`}
                                   alt={`VietQR ${currentBank.shortName}`}
                                   className="w-full h-full object-contain select-none"
                                   onError={(e) => {
@@ -1998,13 +2060,10 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                                   }}
                                 />
                                 <div className="hidden flex-col items-center justify-center gap-1 text-neutral-700">
-                                  <QrCode className="size-12 text-neutral-600" />
-                                  <span className="text-[8.5px] font-bold text-neutral-700">{currentBank.shortName} QR</span>
+                                  <QrCode className="size-20 text-neutral-600" />
+                                  <span className="text-[10px] font-bold text-neutral-700">{currentBank.shortName} QR</span>
                                 </div>
                               </div>
-                              <span className="text-[8.5px] text-neutral-500 font-medium text-center mt-1">
-                                Quét mã VietQR
-                              </span>
                             </div>
                           </motion.div>
                         ) : (
@@ -2014,43 +2073,91 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -6 }}
                             transition={{ duration: 0.2, ease: "easeInOut" }}
-                            className="h-full flex flex-col justify-between py-1"
+                            className="h-full flex flex-col justify-between py-0.5"
                           >
+                            {/* 1. Ngân hàng thụ hưởng */}
                             <div className="flex items-center justify-between py-0.5">
-                              <span className="text-[11.5px] text-neutral-500 font-medium">Số tài khoản:</span>
+                              <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Ngân hàng:</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(currentBank.name, "bankName")}
+                                className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11px] sm:text-[11.5px] max-w-[360px] truncate text-right ml-1"
+                                title="Sao chép tên ngân hàng"
+                              >
+                                <span className="truncate">{currentBank.shortName} - {currentBank.name}</span>
+                                {copiedField === "bankName" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                              </button>
+                            </div>
+
+                            {/* 2. Số tài khoản */}
+                            <div className="flex items-center justify-between py-0.5">
+                              <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
                               <button
                                 type="button"
                                 onClick={() => handleCopyText(currentBank.accountNo, "acc")}
-                                className="flex items-center gap-1.5 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-xs sm:text-[12.5px]"
+                                className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11px] sm:text-[11.5px] ml-1"
+                                title="Sao chép số tài khoản"
                               >
                                 <span className="tracking-wide">{currentBank.accountNo}</span>
-                                {copiedField === "acc" ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5 text-neutral-400" />}
+                                {copiedField === "acc" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
                               </button>
                             </div>
 
+                            {/* 3. Chủ tài khoản */}
                             <div className="flex items-center justify-between py-0.5">
-                              <span className="text-[11.5px] text-neutral-500 font-medium">Chủ tài khoản:</span>
-                              <span className="font-semibold text-neutral-800 text-[11px] sm:text-[11.5px] truncate">{currentBank.accountName}</span>
-                            </div>
-
-                            <div className="flex items-center justify-between py-0.5">
-                              <span className="text-[11.5px] text-neutral-500 font-medium">Số tiền:</span>
-                              <span className="font-bold text-orange-600 text-xs sm:text-[12.5px]">{formatVND(total)}</span>
-                            </div>
-
-                            <div className="flex items-center justify-between py-0.5">
-                              <div className="flex flex-col">
-                                <span className="text-[10px] text-neutral-500 font-medium">Nội dung CK:</span>
-                              </div>
+                              <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Chủ tài khoản:</span>
                               <button
                                 type="button"
-                                onClick={() => handleCopyText(`NONAME ${userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}`, "msg")}
-                                className="flex items-center gap-1.5 font-bold text-orange-600 hover:text-orange-700 cursor-pointer text-xs"
-                                title="Sao chép nội dung"
+                                onClick={() => handleCopyText(currentBank.accountName, "accName")}
+                                className="flex items-center gap-1 font-semibold text-neutral-800 hover:text-orange-600 cursor-pointer text-[10.5px] max-w-[340px] truncate text-right ml-1"
+                                title="Sao chép tên chủ tài khoản"
                               >
-                                <span>NONAME {userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}</span>
-                                {copiedField === "msg" ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5 text-neutral-400" />}
+                                <span className="truncate">{currentBank.accountName}</span>
+                                {copiedField === "accName" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
                               </button>
+                            </div>
+
+                            {/* 4. Số tiền */}
+                            <div className="flex items-center justify-between py-0.5">
+                              <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Số tiền:</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(total.toString(), "amount")}
+                                className="flex items-center gap-1 font-bold text-orange-600 hover:text-orange-700 cursor-pointer text-[11px] sm:text-[11.5px] ml-1"
+                                title="Sao chép số tiền"
+                              >
+                                <span>{formatVND(total)}</span>
+                                {copiedField === "amount" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                              </button>
+                            </div>
+
+                            {/* 5. Option nhập email nhận thông báo giao dịch có check type email */}
+                            <div className="pt-1 mt-0.5 border-t border-neutral-200/60">
+                              <div className="relative flex items-center">
+                                <Mail className="size-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
+                                <input
+                                  type="email"
+                                  placeholder="Email nhận thông báo giao dịch..."
+                                  value={transactionEmail}
+                                  onChange={(e) => setTransactionEmail(e.target.value)}
+                                  className={`w-full h-7 pl-7 pr-7 text-[10.5px] rounded-md border transition-all placeholder:text-neutral-400 outline-none ${
+                                    transactionEmail.trim() === ""
+                                      ? "border-neutral-200 bg-neutral-50/70 focus:bg-white focus:border-neutral-800"
+                                      : isEmailValid(transactionEmail)
+                                      ? "border-emerald-500/80 bg-emerald-50/40 text-emerald-950 focus:bg-white focus:border-emerald-600"
+                                      : "border-rose-400/80 bg-rose-50/40 text-rose-950 focus:bg-white focus:border-rose-500"
+                                  }`}
+                                />
+                                {transactionEmail.trim() !== "" && (
+                                  <div className="absolute right-2.5 pointer-events-none flex items-center" title={isEmailValid(transactionEmail) ? "Email hợp lệ" : "Định dạng email chưa hợp lệ"}>
+                                    {isEmailValid(transactionEmail) ? (
+                                      <CheckCircle2 className="size-3 text-emerald-600" />
+                                    ) : (
+                                      <AlertCircle className="size-3 text-rose-500" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </motion.div>
                         )}
@@ -2212,12 +2319,18 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
           {/* ======================================================================= */}
           {/* EXPANDED BOTTOM SECTION: Summary Breakdown + Place Order Action CTA     */}
           {/* ======================================================================= */}
-          <div className="flex-1 min-h-0 flex flex-col justify-between gap-2.5 bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-neutral-200/90 shadow-2xs z-10">
+          <div className="relative flex-1 min-h-0 flex flex-col justify-between gap-2.5 rounded-2xl p-4 border border-white/90 bg-gradient-to-b from-white via-white/90 to-white/75 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md overflow-hidden z-10">
+            {/* Multi-corner Ambient Luxury Glow Aura */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+              <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
+              <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+            </div>
             
             {/* --------------------------------------------------------------------- */}
             {/* TẦNG 3: BẢNG TỔNG THANH TOÁN (SUMMARY BREAKDOWN - +20% Sizing)        */}
             {/* --------------------------------------------------------------------- */}
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-2.5 relative z-10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Receipt className="size-4.5 text-neutral-800" />
@@ -2235,7 +2348,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                 <button
                   type="button"
                   onClick={() => setIsVoucherModalOpen(true)}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl border border-neutral-200/80 bg-neutral-50/80 hover:bg-neutral-100 transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl border-t border-t-white border-b-2 border-b-neutral-300/70 border-x border-x-neutral-200/80 bg-gradient-to-b from-white via-[#FCFCFC] to-[#F5F5F5] hover:from-orange-50/40 hover:to-orange-50/10 hover:border-orange-300 transition-all shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-3">
                     <div className="size-7 rounded-lg bg-neutral-900 text-white flex items-center justify-center shrink-0">
@@ -2291,7 +2404,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
             {/* --------------------------------------------------------------------- */}
             {/* TẦNG 4: NEO GIÁ TỔNG CỘNG XUỐNG DƯỚI & NÚT HÀNH ĐỘNG ĐẶT HÀNG        */}
             {/* --------------------------------------------------------------------- */}
-            <div className="mt-auto flex flex-col gap-2.5 pt-1">
+            <div className="mt-auto flex flex-col gap-2.5 pt-1 relative z-10">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[14.5px] sm:text-[16px] font-bold text-neutral-900 leading-snug block">Tổng cộng:</span>
