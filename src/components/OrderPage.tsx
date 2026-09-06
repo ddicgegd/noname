@@ -44,6 +44,7 @@ import paypalLottieData from "@/assets/paypal-lottie.json";
 import cardLottieData from "@/assets/card-lottie.json";
 import darkCardLottieData from "@/assets/dark-card-lottie.json";
 import qrLottieData from "@/assets/qr-lottie.json";
+import qrScannerLottieData from "@/assets/qr-scanner-lottie.json";
 import { getMyAddresses, AddressDto } from "@/services/addressService";
 import { createOrder, CreateOrderInput, PaymentMethod } from "@/services/orderService";
 import {
@@ -544,7 +545,42 @@ function QrLottieAnimation({ triggerKey }: { triggerKey?: number }) {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full flex items-center justify-center overflow-hidden shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-full pointer-events-none scale-110"
+      className="w-full h-full flex items-center justify-center overflow-hidden shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-full pointer-events-none scale-125"
+    />
+  );
+}
+
+function QrScannerLottieAnimation({ triggerKey }: { triggerKey?: number }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    if (animRef.current) {
+      animRef.current.destroy();
+    }
+    const anim = lottie.loadAnimation({
+      container: containerRef.current,
+      renderer: "svg",
+      loop: true,
+      autoplay: true,
+      animationData: qrScannerLottieData,
+      rendererSettings: {
+        preserveAspectRatio: "xMidYMid meet",
+      },
+    });
+    anim.setSpeed(1.0);
+    animRef.current = anim;
+
+    return () => {
+      anim.destroy();
+    };
+  }, [triggerKey]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full flex items-center justify-center overflow-hidden shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-full pointer-events-none scale-[1.38]"
     />
   );
 }
@@ -884,6 +920,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   const [bankSubMethod, setBankSubMethod] = useState<"card" | "qr">("card");
   const [bankCardAnimKey, setBankCardAnimKey] = useState(0);
   const [bankQrAnimKey, setBankQrAnimKey] = useState(0);
+  const [qrScannerAnimKey, setQrScannerAnimKey] = useState(0);
   const [paypalSubMethod, setPaypalSubMethod] = useState<"card" | "paypal">("card");
   const [paypalAnimKey, setPaypalAnimKey] = useState(0);
   const [cardAnimKey, setCardAnimKey] = useState(0);
@@ -898,6 +935,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
         setBankCardAnimKey((k) => k + 1);
       } else if (bankSubMethod === "qr") {
         setBankQrAnimKey((k) => k + 1);
+        setQrScannerAnimKey((k) => k + 1);
       }
     } else if (paymentType === "paypal" || paymentType === "card") {
       if (paypalSubMethod === "paypal") {
@@ -906,7 +944,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
         setCardAnimKey((k) => k + 1);
       }
     }
-  }, [paymentType, bankSubMethod, paypalSubMethod]);
+  }, [paymentType, bankSubMethod, paypalSubMethod, selectedBank]);
 
   // Loan Subsystem State (Khoản vay cố định & Vay theo đơn hàng)
   const [loanMode, setLoanMode] = useState<"existing_loan" | "order_loan">("existing_loan");
@@ -1051,6 +1089,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
     setIsPlacingOrder(true);
     setOrderError(null);
 
+    // Hold 0.5s to display the internal button processing animation smoothly
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     // Map UI payment option sang enum backend chuẩn:
     // - Thẻ nội địa (card): Gửi bankCode (NCB, VCB,...)
     // - Mã QR (qr): Gửi bankCode "VNPAYQR"
@@ -1189,11 +1230,11 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   return (
     <div className="min-h-screen lg:h-screen bg-background text-foreground font-sans selection:bg-neutral-900 selection:text-white flex flex-col overflow-hidden pb-3 relative z-0">
       
-      {/* 70% Black Base with Gentle 30% Warm Ambient Glow */}
-      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vh] rounded-full bg-[#FF5722]/8 blur-[130px] mix-blend-normal opacity-70" />
-        <div className="absolute top-[30%] right-[-10%] w-[42vw] h-[60vh] rounded-full bg-[#FF8A00]/8 blur-[130px] mix-blend-normal opacity-70" />
-        <div className="absolute bottom-[-10%] left-[20%] w-[55vw] h-[50vh] rounded-full bg-[#F43F5E]/6 blur-[130px] mix-blend-normal opacity-70" />
+      {/* Ambient background glowing lights (Đánh ánh sáng ám phong cách Indigo / Violet / Coral lấy cảm hứng từ /user) */}
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden select-none">
+        <div className="absolute top-[-6%] left-[15%] w-[640px] h-[640px] rounded-full bg-gradient-to-tr from-indigo-400/35 via-purple-300/25 to-[#FF4D24]/20 blur-[140px] animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute top-[26%] right-[-8%] w-[540px] h-[540px] rounded-full bg-gradient-to-br from-indigo-400/30 via-sky-400/20 to-purple-400/30 blur-[125px]" />
+        <div className="absolute bottom-[-6%] left-[-6%] w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-[#FF4D24]/18 via-indigo-400/30 to-violet-400/25 blur-[135px]" />
       </div>
 
       {/* Top Spacer Div to prevent floating Navbar overlapping */}
@@ -1205,13 +1246,13 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
         {/* ========================================================================= */}
         {/* LEFT COLUMN (7/12): Smartphone Catalog Framed Product Table               */}
         {/* ========================================================================= */}
-        <div className="lg:col-span-7 xl:col-span-7 relative flex flex-col min-h-0 h-full overflow-hidden p-4 sm:p-5 rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] backdrop-blur-md">
+        <div className="lg:col-span-7 xl:col-span-7 relative flex flex-col min-h-0 h-full overflow-hidden p-4 sm:p-5 rounded-2xl border border-white/90 bg-gradient-to-b from-white via-white/90 to-white/75 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md">
           
           {/* Multi-corner Ambient Luxury Glow Aura */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-            <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
-            <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+            <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.08] to-transparent blur-2xl" />
+            <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-gradient-to-tr from-purple-500/[0.10] via-[#FF4D24]/[0.07] to-transparent blur-2xl" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(99,102,241,0.05)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,77,36,0.035)_0%,transparent_70%)]" />
           </div>
 
           {/* Table Header Bar with Back Button, Selection Toggle & Quick Bulk Actions */}
@@ -1604,9 +1645,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
           <div className="relative shrink-0 flex flex-col gap-2 p-3.5 rounded-2xl border border-white/90 bg-gradient-to-b from-white via-white/90 to-white/75 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md overflow-hidden">
             {/* Multi-corner Ambient Luxury Glow Aura */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-              <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
-              <div className="absolute -bottom-8 -left-8 h-24 w-24 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+              <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.08] to-transparent blur-2xl" />
+              <div className="absolute -bottom-8 -left-8 h-24 w-24 rounded-full bg-gradient-to-tr from-purple-500/[0.10] via-[#FF4D24]/[0.07] to-transparent blur-2xl" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(99,102,241,0.05)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,77,36,0.035)_0%,transparent_70%)]" />
             </div>
 
             <div className="flex items-center justify-between relative z-10">
@@ -1662,9 +1703,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
           <div className="relative h-[402px] shrink-0 flex flex-col justify-between p-3.5 rounded-2xl border border-white/90 bg-gradient-to-b from-white via-white/90 to-white/75 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md overflow-hidden">
             {/* Multi-corner Ambient Luxury Glow Aura */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-              <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
-              <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+              <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.08] to-transparent blur-2xl" />
+              <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-purple-500/[0.10] via-[#FF4D24]/[0.07] to-transparent blur-2xl" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(99,102,241,0.05)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,77,36,0.035)_0%,transparent_70%)]" />
             </div>
 
             <div className="flex items-center justify-between shrink-0 relative z-10">
@@ -1861,8 +1902,8 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             onClick={() => setSelectedBank(b.id)}
                             className={`h-12 sm:h-13 rounded-xl flex items-center justify-center p-2 transition-all cursor-pointer relative group ${
                               isSelected
-                                ? "border-t border-t-orange-400 border-b-2 border-b-orange-700/80 border-x border-x-orange-500/80 bg-gradient-to-b from-orange-50/90 via-orange-50/50 to-orange-100/40 shadow-[0_2px_8px_rgba(234,88,12,0.18),inset_0_1.5px_0_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(234,88,12,0.15)] ring-1 ring-orange-500/20"
-                                : "border-t border-t-white border-b-2 border-b-neutral-300/70 border-x border-x-neutral-200/80 bg-gradient-to-b from-white via-[#FCFCFC] to-[#F5F5F5] hover:from-orange-50/40 hover:to-orange-50/10 hover:border-orange-300 shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)]"
+                                ? "border-2 border-[#FF4D24] bg-orange-50/40 shadow-xs"
+                                : "border-2 border-neutral-200/80 bg-white hover:border-orange-300 hover:bg-orange-50/20 shadow-2xs"
                             }`}
                             title={b.name}
                           >
@@ -2046,24 +2087,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                               </div>
                             </div>
 
-                            {/* Dynamic VietQR code (Chỉ hiển thị mã QR thuần, lấp đầy toàn bộ khung vuông) */}
-                            <div className="h-full aspect-square flex items-center justify-center p-1.5 bg-white rounded-xl border border-neutral-200/90 shadow-2xs shrink-0 overflow-hidden">
-                              <div className="relative w-full h-full rounded-lg bg-neutral-50 flex items-center justify-center overflow-hidden p-1">
-                                <img
-                                  src={`https://api.vietqr.io/image/${currentBank.bin}-${currentBank.accountNo}-qr_only.png?amount=${total}&addInfo=NONAME%20${userInfo.phone ? userInfo.phone.replace(/[^0-9]/g, "").slice(-4) : "79030"}&accountName=CONG%20TY%20TNHH%20NONAME%20VIETNAM`}
-                                  alt={`VietQR ${currentBank.shortName}`}
-                                  className="w-full h-full object-contain select-none"
-                                  onError={(e) => {
-                                    (e.currentTarget as HTMLElement).style.display = "none";
-                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                    if (fallback) fallback.style.display = "flex";
-                                  }}
-                                />
-                                <div className="hidden flex-col items-center justify-center gap-1 text-neutral-700">
-                                  <QrCode className="size-20 text-neutral-600" />
-                                  <span className="text-[10px] font-bold text-neutral-700">{currentBank.shortName} QR</span>
-                                </div>
-                              </div>
+                            {/* QR Code Scanner Lottie Animation (Bo cong rounded-xl ban đầu, hoạt ảnh quét mã QR) */}
+                            <div className="h-full aspect-square relative bg-white rounded-xl border border-neutral-200/90 shadow-2xs shrink-0 overflow-hidden flex items-center justify-center p-0">
+                              <QrScannerLottieAnimation triggerKey={qrScannerAnimKey} />
                             </div>
                           </motion.div>
                         ) : (
@@ -2232,7 +2258,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                           {paypalSubMethod === "paypal" ? (
                             <PaypalLottieAnimation triggerKey={paypalAnimKey} />
                           ) : (
-                            <span>Paypal</span>
+                            <span>PayPal</span>
                           )}
                         </span>
                       </button>
@@ -2322,9 +2348,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
           <div className="relative flex-1 min-h-0 flex flex-col justify-between gap-2.5 rounded-2xl p-4 border border-white/90 bg-gradient-to-b from-white via-white/90 to-white/75 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md overflow-hidden z-10">
             {/* Multi-corner Ambient Luxury Glow Aura */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-              <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
-              <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+              <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.08] to-transparent blur-2xl" />
+              <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-purple-500/[0.10] via-[#FF4D24]/[0.07] to-transparent blur-2xl" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(99,102,241,0.05)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,77,36,0.035)_0%,transparent_70%)]" />
             </div>
             
             {/* --------------------------------------------------------------------- */}
@@ -2348,7 +2374,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                 <button
                   type="button"
                   onClick={() => setIsVoucherModalOpen(true)}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl border-t border-t-white border-b-2 border-b-neutral-300/70 border-x border-x-neutral-200/80 bg-gradient-to-b from-white via-[#FCFCFC] to-[#F5F5F5] hover:from-orange-50/40 hover:to-orange-50/10 hover:border-orange-300 transition-all shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] cursor-pointer text-left"
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl border border-neutral-200/90 bg-gradient-to-b from-white to-neutral-50/80 hover:from-orange-50/30 hover:to-orange-50/10 hover:border-orange-300 transition-all shadow-2xs cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-3">
                     <div className="size-7 rounded-lg bg-neutral-900 text-white flex items-center justify-center shrink-0">
@@ -2421,23 +2447,49 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                 type="button"
                 onClick={handlePlaceOrder}
                 disabled={selectedProducts.length === 0 || isPlacingOrder}
-                className={`w-full rounded-full h-11.5 text-xs sm:text-[13px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 mt-0.5 ${
-                  selectedProducts.length > 0 && !isPlacingOrder
-                    ? "bg-gradient-to-r from-orange-600 via-orange-500 to-rose-600 hover:from-orange-700 hover:to-rose-700 text-white cursor-pointer shadow-md shadow-orange-500/20 active:scale-[0.99]"
-                    : "bg-neutral-900 text-neutral-400 cursor-not-allowed shadow-none"
+                className={`w-full rounded-full h-11.5 text-xs sm:text-[13px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 mt-0.5 relative overflow-hidden select-none ${
+                  isPlacingOrder
+                    ? "bg-gradient-to-r from-[#FF5722] via-[#FF461E] to-[#F43F1A] border border-white/30 text-white cursor-wait shadow-[0_4px_18px_rgba(255,77,36,0.32),0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.4),inset_0_-1px_1.5px_rgba(0,0,0,0.15)] scale-[0.99]"
+                    : selectedProducts.length > 0
+                    ? "bg-gradient-to-r from-[#FF5722] via-[#FF461E] to-[#F43F1A] border border-white/25 text-white cursor-pointer shadow-[0_4px_16px_rgba(255,77,36,0.28),0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.35),inset_0_-1px_1.5px_rgba(0,0,0,0.12)] hover:brightness-[1.03] active:scale-[0.99] active:shadow-[0_2px_6px_rgba(255,77,36,0.2)]"
+                    : "bg-neutral-900 text-neutral-400 border border-neutral-800 shadow-none cursor-not-allowed"
                 }`}
               >
-                {isPlacingOrder ? (
+                {isPlacingOrder && (
                   <>
-                    <Loader2 className="size-4.5 animate-spin text-white" />
-                    <span>ĐANG XỬ LÝ ĐƠN HÀNG...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="size-4.5" />
-                    <span>XÁC NHẬN ĐẶT HÀNG ({totalItemsCount} MÓN)</span>
+                    {/* Internal Shimmer Sweep */}
+                    <motion.div
+                      initial={{ x: "-100%" }}
+                      animate={{ x: "200%" }}
+                      transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 pointer-events-none"
+                    />
+                    <div className="absolute inset-0 bg-white/10 animate-pulse pointer-events-none" />
+                    {/* Internal Subtle Progress Indicator Line */}
+                    <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-black/10 overflow-hidden pointer-events-none">
+                      <motion.div
+                        initial={{ x: "-100%" }}
+                        animate={{ x: "100%" }}
+                        transition={{ repeat: Infinity, duration: 0.9, ease: "easeInOut" }}
+                        className="h-full w-1/2 bg-white/80 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                      />
+                    </div>
                   </>
                 )}
+
+                <div className="relative z-10 flex items-center justify-center gap-2">
+                  {isPlacingOrder ? (
+                    <>
+                      <Loader2 className="size-4.5 animate-spin text-white drop-shadow-sm" />
+                      <span className="drop-shadow-sm">ĐANG XỬ LÝ THANH TOÁN...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="size-4.5" />
+                      <span>XÁC NHẬN ĐẶT HÀNG ({totalItemsCount} MÓN)</span>
+                    </>
+                  )}
+                </div>
               </button>
             </div>
 
@@ -2565,23 +2617,23 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col max-h-[85vh] z-10"
+              className="relative w-full max-w-lg bg-gradient-to-b from-white via-white/95 to-[#F9FAFB] rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.05)] border border-neutral-200/90 overflow-hidden flex flex-col max-h-[85vh] z-10 backdrop-blur-md"
             >
               {/* Modal Header */}
-              <div className="px-4 py-2.5 sm:py-3 border-b border-neutral-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="px-4 py-2.5 sm:py-3 border-b border-neutral-200/70 flex items-center justify-between shrink-0 bg-gradient-to-b from-white to-neutral-50/60">
                 <div className="flex items-center gap-2">
                   <Ticket className="size-4 text-orange-600" />
                   <h3 className="text-sm font-bold text-neutral-900">
                     Chọn Mã Giảm Giá
                   </h3>
-                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-bold text-neutral-600 bg-neutral-100">
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-bold text-neutral-700 bg-gradient-to-b from-white via-[#FCFCFC] to-[#F5F5F5] border border-neutral-200/80 shadow-2xs">
                     {AVAILABLE_VOUCHERS.length}
                   </Badge>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsVoucherModalOpen(false)}
-                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+                  className="size-7.5 rounded-xl border border-neutral-200/90 bg-gradient-to-b from-white via-[#FCFCFC] to-[#F5F5F5] hover:from-orange-50/40 hover:to-orange-50/10 hover:border-orange-300 text-neutral-600 hover:text-neutral-900 flex items-center justify-center transition-all shadow-[0_1.5px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.04)] active:scale-95 cursor-pointer"
                 >
                   <X className="size-4" />
                 </button>
@@ -2599,22 +2651,22 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                         onClick={() => {
                           if (isEligible) handleSelectVoucher(v.id);
                         }}
-                        className={`h-[88px] p-3 rounded-xl border flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                        className={`h-[88px] p-3 rounded-xl flex items-center justify-between gap-3 transition-all cursor-pointer ${
                           !isEligible
-                            ? "opacity-50 border-neutral-200 bg-neutral-50/80 cursor-not-allowed"
+                            ? "opacity-50 border border-neutral-200 bg-neutral-100/80 shadow-2xs cursor-not-allowed"
                             : isSelected
-                            ? "border-orange-500 bg-orange-50/40 ring-1 ring-orange-500/20 shadow-xs"
-                            : "border-neutral-200 hover:border-orange-300 hover:bg-orange-50/10 bg-white"
+                            ? "border border-orange-500 bg-gradient-to-b from-orange-50 via-white to-orange-50/60 shadow-[0_2px_8px_rgba(234,88,12,0.15)] ring-1 ring-orange-500/20"
+                            : "border border-neutral-200/90 bg-gradient-to-b from-white to-neutral-50/80 hover:from-orange-50/30 hover:to-orange-50/10 hover:border-orange-300 shadow-2xs"
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1 h-full">
                           <div
                             className={`size-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
                               isSelected
-                                ? "bg-orange-500 text-white"
+                                ? "border border-orange-600 bg-gradient-to-b from-orange-500 to-orange-600 text-white shadow-2xs"
                                 : isEligible
-                                ? "bg-orange-50 text-orange-600 border border-orange-200"
-                                : "bg-neutral-100 text-neutral-400"
+                                ? "border border-orange-200 bg-gradient-to-b from-orange-50 via-orange-50/80 to-orange-100/60 text-orange-600 shadow-2xs"
+                                : "border border-neutral-200 bg-neutral-100 text-neutral-400"
                             }`}
                           >
                             %
@@ -2626,7 +2678,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                               </span>
                               <Badge
                                 variant="outline"
-                                className="text-[8.5px] py-0 px-1 font-bold text-orange-700 border-orange-200 bg-orange-50/50 shrink-0"
+                                className="text-[8.5px] py-0 px-1.5 font-bold text-orange-700 border border-orange-200/90 bg-gradient-to-b from-orange-50 to-orange-100/60 shadow-2xs rounded-md shrink-0"
                               >
                                 {v.tag}
                               </Badge>
@@ -2656,14 +2708,14 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                               }}
                               className={`w-20 py-1.5 rounded-lg text-[11px] font-bold tracking-wide transition-all cursor-pointer text-center ${
                                 isSelected
-                                  ? "bg-orange-500 hover:bg-orange-600 text-white shadow-xs"
-                                  : "border border-neutral-300 hover:border-orange-500 hover:text-orange-600 text-neutral-700 bg-white"
+                                  ? "border border-orange-600 bg-gradient-to-b from-orange-500 via-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-2xs active:scale-95"
+                                  : "border border-neutral-300 bg-gradient-to-b from-white via-neutral-50 to-neutral-100 hover:from-orange-50 hover:to-orange-100 hover:border-orange-300 text-neutral-800 shadow-2xs active:scale-95"
                               }`}
                             >
                               {isSelected ? "Bỏ chọn" : "Dùng ngay"}
                             </button>
                           ) : (
-                            <span className="w-20 inline-block text-[10px] font-medium text-neutral-400 px-2 py-1.5 bg-neutral-100 rounded-md text-center">
+                            <span className="w-20 inline-block text-[10px] font-medium text-neutral-400 py-1 px-2 border border-neutral-200 bg-neutral-100/90 rounded-lg shadow-2xs text-center">
                               Chưa đủ ĐK
                             </span>
                           )}
@@ -2677,10 +2729,10 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               </div>
 
               {/* Modal Footer */}
-              <div className="p-4 border-t border-neutral-100 flex justify-end">
+              <div className="p-3.5 border-t border-neutral-200/80 bg-gradient-to-b from-white to-neutral-50/80 flex justify-end">
                 <Button
                   onClick={() => setIsVoucherModalOpen(false)}
-                  className="w-full bg-neutral-900 hover:bg-black text-white text-xs font-bold uppercase tracking-wider rounded-xl h-9 cursor-pointer"
+                  className="w-full bg-gradient-to-b from-neutral-900 via-neutral-900 to-neutral-950 border border-neutral-800 text-white shadow-[0_3px_10px_rgba(0,0,0,0.2)] hover:from-black hover:to-black rounded-xl h-9.5 text-xs font-bold tracking-wider uppercase cursor-pointer active:scale-[0.99] transition-all"
                 >
                   XÁC NHẬN
                 </Button>
@@ -2706,21 +2758,21 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="relative w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col max-h-[85vh] z-10"
+              className="relative w-full max-w-2xl bg-gradient-to-b from-white via-white/95 to-[#F9FAFB] rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.05)] border border-neutral-200/90 overflow-hidden flex flex-col max-h-[85vh] z-10 backdrop-blur-md"
             >
               {/* Modal Header */}
-              <div className="px-4 py-2.5 sm:py-3 border-b border-neutral-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="px-4 py-2.5 sm:py-3 border-b border-neutral-200/70 flex items-center justify-between shrink-0 bg-gradient-to-b from-white to-neutral-50/60">
                 <div className="flex items-center gap-2">
                   <MapPin className="size-4 text-orange-600" />
                   <h3 className="text-sm font-bold text-neutral-900">Địa chỉ nhận hàng</h3>
-                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-bold text-neutral-600 bg-neutral-100">
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-bold text-neutral-700 bg-gradient-to-b from-white via-[#FCFCFC] to-[#F5F5F5] border border-neutral-200/80 shadow-2xs">
                     {addressList.length}
                   </Badge>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsEditingAddress(false)}
-                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+                  className="size-7.5 rounded-xl border border-neutral-200/90 bg-gradient-to-b from-white via-[#FCFCFC] to-[#F5F5F5] hover:from-orange-50/40 hover:to-orange-50/10 hover:border-orange-300 text-neutral-600 hover:text-neutral-900 flex items-center justify-center transition-all shadow-[0_1.5px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.04)] active:scale-95 cursor-pointer"
                 >
                   <X className="size-4" />
                 </button>
@@ -2735,10 +2787,10 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                       <div
                         key={addr.sku}
                         onClick={() => handleSelectExistingAddress(addr)}
-                        className={`p-3.5 rounded-xl border flex flex-col gap-1 transition-all cursor-pointer ${
+                        className={`p-3.5 rounded-xl flex flex-col gap-1 transition-all cursor-pointer ${
                           isSelected
-                            ? "border-orange-500 bg-orange-50/40 ring-1 ring-orange-500/20 shadow-xs"
-                            : "border-neutral-200 hover:border-orange-300 hover:bg-orange-50/10 bg-white"
+                            ? "border border-orange-500 bg-gradient-to-b from-orange-50 via-white to-orange-50/60 shadow-[0_2px_8px_rgba(234,88,12,0.15)] ring-1 ring-orange-500/20"
+                            : "border border-neutral-200/90 bg-gradient-to-b from-white to-neutral-50/80 hover:from-orange-50/30 hover:to-orange-50/10 hover:border-orange-300 shadow-2xs"
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -2749,12 +2801,12 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                           </div>
                           <div className="flex items-center gap-1.5">
                             {addr.isDefault && (
-                              <Badge variant="outline" className="text-[9px] py-0 px-1.5 font-bold text-orange-700 border-orange-200 bg-orange-50">
+                              <Badge variant="outline" className="text-[9px] py-0 px-1.5 font-bold text-orange-700 border border-orange-200/90 bg-gradient-to-b from-orange-50 to-orange-100/60 shadow-2xs rounded-md">
                                 Mặc định
                               </Badge>
                             )}
                             {isSelected && (
-                              <div className="size-4 rounded-full bg-orange-500 text-white flex items-center justify-center">
+                              <div className="size-4.5 rounded-full bg-gradient-to-b from-orange-500 to-orange-600 border border-orange-600 text-white flex items-center justify-center shadow-2xs">
                                 <Check className="size-2.5 stroke-[3]" />
                               </div>
                             )}
@@ -2791,12 +2843,12 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
-              className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[90vh] z-10"
+              className="relative w-full max-w-2xl bg-gradient-to-b from-white via-white/95 to-[#F9FAFB] rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3),0_4px_16px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.05)] border border-neutral-200/90 overflow-hidden flex flex-col max-h-[90vh] z-10 backdrop-blur-md"
             >
               {/* Modal Header */}
-              <div className="px-5 py-3.5 border-b border-neutral-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="px-5 py-3.5 border-b border-neutral-200/70 flex items-center justify-between shrink-0 bg-gradient-to-b from-white to-neutral-50/60">
                 <div className="flex items-center gap-2.5">
-                  <div className="size-8 rounded-lg bg-sky-100/80 text-sky-700 flex items-center justify-center">
+                  <div className="size-8 rounded-xl border border-sky-200/90 bg-gradient-to-b from-sky-100/90 to-sky-200/60 text-sky-700 flex items-center justify-center shadow-2xs">
                     <Landmark className="size-4" />
                   </div>
                   <div>
@@ -2811,7 +2863,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                 <button
                   type="button"
                   onClick={() => setIsLoanModalOpen(false)}
-                  className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+                  className="size-8 rounded-xl border border-neutral-200/90 bg-gradient-to-b from-white via-[#FCFCFC] to-[#F5F5F5] hover:bg-neutral-100 flex items-center justify-center text-neutral-500 hover:text-neutral-900 transition-all shadow-2xs active:scale-95 cursor-pointer"
                 >
                   <X className="size-4.5" />
                 </button>
@@ -2820,7 +2872,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               {/* Modal Body */}
               <div className="p-4 sm:p-5 flex flex-col gap-3.5 overflow-y-auto flex-1 min-h-0">
                 {/* Order total indicator banner */}
-                <div className="p-2.5 px-3 rounded-xl border border-sky-100 bg-sky-50/60 flex items-center justify-between text-xs">
+                <div className="p-2.5 px-3 rounded-xl border border-sky-200/90 bg-gradient-to-b from-sky-50 via-sky-50/80 to-sky-100/60 flex items-center justify-between text-xs shadow-2xs">
                   <span className="text-neutral-600 font-medium">Giá trị đơn hàng cần thanh toán:</span>
                   <span className="font-black text-sky-800 text-sm">{formatVND(total)}</span>
                 </div>
@@ -2840,17 +2892,19 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                       <div
                         key={loan.id}
                         onClick={() => setSelectedLoanId(loan.id)}
-                        className={`rounded-xl border p-3 flex flex-col gap-2 transition-all cursor-pointer relative ${
+                        className={`rounded-xl p-3 flex flex-col gap-2 transition-all cursor-pointer relative ${
                           isSelected
-                            ? "border-sky-600 bg-sky-50/20 ring-2 ring-sky-500/20 shadow-xs"
-                            : "border-neutral-200/90 hover:border-sky-300 bg-white"
+                            ? "border border-sky-600 bg-gradient-to-b from-sky-50 via-white to-sky-50/60 shadow-[0_2px_8px_rgba(2,132,199,0.15)] ring-1 ring-sky-500/20"
+                            : "border border-neutral-200/90 bg-gradient-to-b from-white to-neutral-50/80 hover:border-sky-300 shadow-2xs"
                         }`}
                       >
                         {/* Header: Radio + Product Name + Status Badge */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2.5 min-w-0">
-                            <div className={`mt-0.5 size-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                              isSelected ? "border-sky-600 bg-sky-600" : "border-neutral-300 bg-white"
+                            <div className={`mt-0.5 size-4.5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                              isSelected 
+                                ? "border border-sky-600 bg-gradient-to-b from-sky-600 to-sky-700 text-white shadow-2xs" 
+                                : "border border-neutral-300 bg-white"
                             }`}>
                               {isSelected && <Check className="size-2.5 text-white stroke-[3]" />}
                             </div>
@@ -2859,7 +2913,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                                 <span className="font-bold text-neutral-900 text-xs sm:text-[13px]">
                                   {loan.loanProductName}
                                 </span>
-                                <Badge className="text-[8px] sm:text-[8.5px] px-1.5 py-0 font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-none">
+                                <Badge className="text-[8px] sm:text-[8.5px] px-1.5 py-0 font-bold bg-gradient-to-b from-emerald-50 to-emerald-100/60 text-emerald-700 border border-emerald-200 shadow-2xs">
                                   {loan.statusText}
                                 </Badge>
                               </div>
@@ -2880,7 +2934,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                               Tổng hạn mức: {formatVND(loan.totalLimit)}
                             </span>
                           </div>
-                          <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                          <div className="w-full h-1.5 bg-neutral-200/60 rounded-full overflow-hidden shadow-inner">
                             <div
                               className="h-full bg-sky-600 rounded-full transition-all"
                               style={{ width: `${Math.max(5, 100 - usagePercent)}%` }}
@@ -2889,7 +2943,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                         </div>
 
                         {/* Specs grid */}
-                        <div className="grid grid-cols-3 gap-2 pt-1 border-t border-neutral-100 text-[10.5px] text-neutral-600">
+                        <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-neutral-200/60 text-[10.5px] text-neutral-600">
                           <div>
                             <span className="text-neutral-400 block text-[9.5px]">Lãi suất:</span>
                             <span className="font-bold text-neutral-800">{loan.interestRate}</span>
@@ -2917,7 +2971,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                 </div>
 
                 {/* Helpful Note */}
-                <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-200/70 flex items-start gap-2 text-[10.5px] text-neutral-600">
+                <div className="bg-gradient-to-b from-neutral-50 to-neutral-100/60 p-2.5 rounded-xl border border-neutral-200/80 flex items-start gap-2 text-[10.5px] text-neutral-600 shadow-2xs">
                   <Info className="size-4 text-neutral-500 shrink-0 mt-0.5" />
                   <p className="leading-snug">
                     Hệ thống tự động đồng bộ hạn mức từ các gói vay bạn vừa mua trên sàn hoặc đã kích hoạt qua Core Banking Fineract. Số tiền sẽ được trích trực tiếp khi đặt hàng thành công.
@@ -2926,11 +2980,11 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
               </div>
 
               {/* Modal Footer Actions */}
-              <div className="px-5 py-3 border-t border-neutral-100 bg-neutral-50/80 flex items-center justify-between shrink-0">
+              <div className="px-5 py-3 border-t border-neutral-200/80 bg-gradient-to-b from-white to-neutral-50/80 flex items-center justify-between shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsLoanModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100 text-xs font-bold transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-neutral-300 bg-gradient-to-b from-white via-neutral-50 to-neutral-100 text-neutral-700 hover:bg-neutral-100 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
                 >
                   Đóng
                 </button>
@@ -2941,7 +2995,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                     setLoanMode("existing_loan");
                     setIsLoanModalOpen(false);
                   }}
-                  className="px-6 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-black transition-all cursor-pointer shadow-sm hover:shadow-md active:scale-98"
+                  className="px-6 py-2 rounded-xl border border-sky-800 bg-gradient-to-b from-sky-600 via-sky-700 to-sky-800 text-white text-xs font-black transition-all cursor-pointer shadow-[0_2px_8px_rgba(3,105,161,0.25),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1.5px_0_rgba(3,105,161,0.6)] hover:shadow-md active:scale-95"
                 >
                   Áp dụng khoản vay này
                 </button>

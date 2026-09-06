@@ -1843,152 +1843,106 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-[calc(100%+14px)] w-64 rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
+                className="absolute right-0 top-[calc(100%+14px)] w-[295px] rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
               >
                 {/* Decorative background glows */}
                 <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />
 
-                {/* User Quick Info Card with Elegant Avatar & Smember VIP Badge */}
-                <div className="p-2.5 mb-1.5 bg-slate-50/60 rounded-xl border border-slate-100/80 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#FF4D24] to-[#FF7C4A] flex items-center justify-center text-white font-black text-sm shadow-md select-none overflow-hidden">
-                    {loggedInUser ? (
-                      loggedInUser.avatarUrl ? (
-                        <img src={loggedInUser.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        (loggedInUser.fullName || loggedInUser.username || "U")[0].toUpperCase()
-                      )
+                {/* User Quick Info Header Card */}
+                <div className="p-2.5 bg-neutral-50/80 rounded-2xl border border-neutral-200/70 flex items-center gap-2.5 relative overflow-hidden">
+                  <div className="size-10 rounded-full bg-gradient-to-tr from-[#FF4D24] to-[#FF7C4A] flex items-center justify-center text-white font-bold text-sm shadow-sm ring-2 ring-white shrink-0 select-none overflow-hidden">
+                    {loggedInUser?.avatarUrl ? (
+                      <img src={loggedInUser.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt="Avatar" />
                     ) : (
-                      "NK"
+                      (loggedInUser?.fullName || loggedInUser?.username || "U")[0].toUpperCase()
                     )}
                   </div>
-                  <div className="flex flex-col min-w-0">
+
+                  <div className="flex flex-col min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-slate-800 text-xs truncate">
-                        {loggedInUser ? (loggedInUser.fullName || `User @${loggedInUser.username}`) : "Nora Kessler"}
+                      <span className="font-bold text-neutral-800 text-xs sm:text-[13px] truncate">
+                        {loggedInUser?.fullName || `@${loggedInUser?.username}` || "Người dùng"}
                       </span>
-                      <span className="text-[8px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-                        {loggedInUser ? (loggedInUser.rank || "MEMBER") : "VIP"}
+                      <span className="text-[8px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                        {loggedInUser?.rank || "MEMBER"}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 font-mono tracking-tight truncate mt-0.5">
-                      {loggedInUser ? loggedInUser.email : "nora.kessler@domain.com"}
-                    </span>
-                    <span className="text-[9.5px] text-[#FF4D24] font-extrabold mt-1 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[12px] font-black">verified</span>
-                      Hội viên Smember
+                    <span className="text-[10.5px] text-neutral-400 font-mono tracking-tight truncate mt-0.5">
+                      {loggedInUser?.email || "email@example.com"}
                     </span>
                   </div>
                 </div>
-  
-                {/* Vertical Magic UI Dock Menu Items */}
-                <Dock orientation="vertical" iconMagnification={46} iconDistance={100} className="flex flex-col gap-1 w-full">
-                  {loggedInUser ? (
-                    <DockIcon className="w-full">
-                      <button 
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          onNavigate("profile");
-                        }}
-                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                      >
-                        <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                        <span className="font-extrabold text-[#FF4D24]">Xem trang cá nhân</span>
-                      </button>
-                    </DockIcon>
-                  ) : (
-                    <DockIcon className="w-full">
-                      <button 
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }}
-                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                      >
-                        <User size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                        <span className="font-extrabold text-[#FF4D24]">Đăng ký / Đăng nhập</span>
-                      </button>
-                    </DockIcon>
-                  )}
-    
-                  <DockIcon className="w-full">
-                    <button 
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        if (loggedInUser) {
-                          onNavigate("profile");
-                        } else {
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }
-                      }}
-                      className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                    >
-                      <Settings size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                      <span>Thiết lập tài khoản</span>
-                    </button>
-                  </DockIcon>
-    
-                  <DockIcon className="w-full">
-                    <button 
-                      onClick={() => {
-                        setShowAccountMenu(false);
-                        if (loggedInUser) {
-                          onNavigate("profile");
-                        } else {
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }
-                      }}
-                      className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#FF4D24] rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                    >
-                      <CreditCard size={15} className="text-slate-400 group-hover:text-[#FF4D24] transition-colors" />
-                      <span>Gói đăng ký</span>
-                    </button>
-                  </DockIcon>
-    
-                  <div className="my-1.5 border-t border-slate-100" />
-    
-                  {loggedInUser ? (
-                    <DockIcon className="w-full">
-                      <button 
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-                          localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-                          localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
-                          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-                          localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKENS_MAP);
-                          localStorage.removeItem("horizon_redis_profile");
-                          localStorage.removeItem("horizon_current_user");
-                          localStorage.removeItem("horizon_access_token");
-                          localStorage.removeItem("horizon_refresh_token");
-                          setLoggedInUser(null);
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }}
-                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-rose-600 hover:text-rose-700 rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                      >
-                        <LogOut size={15} className="text-rose-600" />
-                        <span>Đăng xuất tài khoản</span>
-                      </button>
-                    </DockIcon>
-                  ) : (
-                    <DockIcon className="w-full">
-                      <button 
-                        onClick={() => {
-                          setShowAccountMenu(false);
-                          window.location.hash = "register";
-                          onNavigate("auth");
-                        }}
-                        className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-black text-[#FF4D24] hover:text-[#FF7C4A] rounded-xl transition-colors duration-200 cursor-pointer text-left"
-                      >
-                        <LogOut size={15} className="text-[#FF4D24]" />
-                        <span>Đăng nhập tài khoản khác</span>
-                      </button>
-                    </DockIcon>
-                  )}
-                </Dock>
+
+                {/* Menu list */}
+                <div className="flex flex-col gap-0.5 w-full mt-1">
+                  <button 
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      onNavigate("profile");
+                    }}
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-[#FF4D24] hover:bg-orange-50/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
+                  >
+                    <User size={15} className="text-neutral-400 group-hover:text-[#FF4D24] transition-colors shrink-0" />
+                    <span className="font-bold text-[#FF4D24]">Trang cá nhân</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      onNavigate("order");
+                    }}
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
+                  >
+                    <ShoppingBag size={15} className="text-neutral-400 group-hover:text-neutral-700 transition-colors shrink-0" />
+                    <span>Đơn mua của tôi</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      onNavigate("profile");
+                    }}
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
+                  >
+                    <Settings size={15} className="text-neutral-400 group-hover:text-neutral-700 transition-colors shrink-0" />
+                    <span>Thiết lập tài khoản</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      onNavigate("profile");
+                    }}
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
+                  >
+                    <CreditCard size={15} className="text-neutral-400 group-hover:text-neutral-700 transition-colors shrink-0" />
+                    <span>Gói đăng ký</span>
+                  </button>
+
+                  <div className="my-1 border-t border-neutral-100" />
+
+                  <button 
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+                      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+                      localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+                      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+                      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKENS_MAP);
+                      localStorage.removeItem("horizon_redis_profile");
+                      localStorage.removeItem("horizon_current_user");
+                      localStorage.removeItem("horizon_access_token");
+                      localStorage.removeItem("horizon_refresh_token");
+                      setLoggedInUser(null);
+                      window.location.hash = "register";
+                      onNavigate("auth");
+                    }}
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50/80 rounded-xl transition-all duration-150 cursor-pointer text-left"
+                  >
+                    <LogOut size={15} className="text-rose-600 shrink-0" />
+                    <span>Đăng xuất tài khoản</span>
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
