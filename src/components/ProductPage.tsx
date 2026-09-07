@@ -1332,7 +1332,7 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-3.5 p-3.5 relative z-10">
+              <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex flex-col gap-3.5 p-3.5 relative z-10">
                 {/* 1. Categories (GraphQL searchCategories) */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
