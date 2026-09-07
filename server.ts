@@ -577,6 +577,36 @@ async function startServer() {
     }
   });
 
+  const CategoryType = new GraphQLObjectType({
+    name: "Category",
+    fields: {
+      name: { type: GraphQLString },
+      skuInfo: { type: SkuInfoType },
+      productCount: { type: GraphQLInt }
+    }
+  });
+
+  const CategorySearchResponseType = new GraphQLObjectType({
+    name: "CategorySearchResponse",
+    fields: {
+      contents: { type: new GraphQLList(CategoryType) },
+      paging: { type: PagingType }
+    }
+  });
+
+  const CategorySearchInputType = new GraphQLInputObjectType({
+    name: "CategorySearchInput",
+    fields: {
+      keyword: { type: GraphQLString },
+      skus: { type: new GraphQLList(GraphQLString) },
+      names: { type: new GraphQLList(GraphQLString) },
+      page: { type: GraphQLInt },
+      size: { type: GraphQLInt },
+      sortBy: { type: GraphQLString },
+      sortDirection: { type: GraphQLString }
+    }
+  });
+
   const ProductSearchInputType = new GraphQLInputObjectType({
     name: "ProductSearchInput",
     fields: {
@@ -584,6 +614,19 @@ async function startServer() {
       categorySku: { type: GraphQLString },
       categorySkus: { type: new GraphQLList(GraphQLString) },
       skus: { type: new GraphQLList(GraphQLString) },
+      statuses: { type: new GraphQLList(GraphQLString) },
+      createdBy: { type: GraphQLString },
+      minSoldQuantity: { type: GraphQLInt },
+      maxSoldQuantity: { type: GraphQLInt },
+      minRevenue: { type: GraphQLFloat },
+      maxRevenue: { type: GraphQLFloat },
+      minOrders: { type: GraphQLInt },
+      maxOrders: { type: GraphQLInt },
+      minView: { type: GraphQLInt },
+      minRating: { type: GraphQLFloat },
+      minReviews: { type: GraphQLInt },
+      createdFrom: { type: GraphQLString },
+      createdTo: { type: GraphQLString },
       page: { type: GraphQLInt },
       size: { type: GraphQLInt },
       sortBy: { type: GraphQLString },
@@ -595,9 +638,13 @@ async function startServer() {
     name: "AttributesSearchInput",
     fields: {
       productSku: { type: GraphQLString },
+      productSkus: { type: new GraphQLList(GraphQLString) },
+      skus: { type: new GraphQLList(GraphQLString) },
       keyword: { type: GraphQLString },
       minPrice: { type: GraphQLFloat },
       maxPrice: { type: GraphQLFloat },
+      minSalePrice: { type: GraphQLFloat },
+      maxSalePrice: { type: GraphQLFloat },
       page: { type: GraphQLInt },
       size: { type: GraphQLInt }
     }
@@ -1183,6 +1230,32 @@ async function startServer() {
             return normalizeGatewayListResponse(response);
           } catch (error: any) {
             throw new Error(error?.message || "Unable to search attributes");
+          }
+        }
+      },
+      searchCategories: {
+        type: CategorySearchResponseType,
+        args: {
+          filter: { type: new GraphQLNonNull(CategorySearchInputType) }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const response = await callApiGateway("/api/merchandise/categories/search", {
+              method: "POST",
+              body: args.filter,
+              token: context?.token
+            }, context);
+            return normalizeGatewayListResponse(response);
+          } catch (error: any) {
+            return {
+              contents: [],
+              paging: {
+                pageNumber: args.filter?.page || 1,
+                pageSize: args.filter?.size || 20,
+                totalElements: 0,
+                totalPages: 0
+              }
+            };
           }
         }
       },

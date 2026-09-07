@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence, LayoutGroup, type Variants } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
   type Product,
 } from "../lib/productCatalog";
 import { getProductColorOptions, type ProductColorOption } from "../lib/productColorSwatches";
-import { searchAttributesForProductSku, searchProductsForCatalog } from "../services/merchandiseService";
+import { searchAttributesForProductSku, searchProductsForCatalog, searchCategoriesForCatalog, type CategoryItem } from "../services/merchandiseService";
 import { createOrder, type CreateOrderInput } from "../services/orderService";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 import { createAuthAction, savePendingAction } from "../lib/authAction";
@@ -35,9 +35,13 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   DatabaseIcon,
+  DollarSignIcon,
+  EyeIcon,
   FilterIcon,
+  FlameIcon,
   GiftIcon,
   Grid2X2Icon,
+  LayersIcon,
   NetworkIcon,
   RefreshCcwIcon,
   SearchIcon,
@@ -47,6 +51,7 @@ import {
   SlidersHorizontalIcon,
   SparklesIcon,
   StarIcon,
+  TagIcon,
   TrendingDownIcon,
   TrendingUpIcon,
   XIcon,
@@ -746,17 +751,59 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
     };
   }, [activeHashSku, selectedProduct]);
 
-  // Advanced search options and attributes states
-  const [selectedPricingModel, setSelectedPricingModel] = useState<"all" | "hourly" | "usage">("all");
-  const [selectedGPU, setSelectedGPU] = useState(false);
-  const [selectedSLA, setSelectedSLA] = useState(false);
-  const [selectedLatency, setSelectedLatency] = useState(false);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // GraphQL Gateway Filters & Endpoint-aligned states
+  const [apiCategories, setApiCategories] = useState<CategoryItem[]>([]);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(false);
+  const [selectedPriceRange, setSelectedPriceRange] = useState<"all" | "under-2m" | "2m-5m" | "5m-10m" | "above-10m" | "custom">("all");
+  const [customMinPrice, setCustomMinPrice] = useState<string>("");
+  const [customMaxPrice, setCustomMaxPrice] = useState<string>("");
+  const [appliedCustomMinPrice, setAppliedCustomMinPrice] = useState<number | null>(null);
+  const [appliedCustomMaxPrice, setAppliedCustomMaxPrice] = useState<number | null>(null);
+  const [selectedRating, setSelectedRating] = useState<number | "under_3" | null>(null);
+  const [selectedMinSold, setSelectedMinSold] = useState<number | null>(null);
+  const [selectedMinView, setSelectedMinView] = useState<number | null>(null);
+  const [onlyDiscounted, setOnlyDiscounted] = useState<boolean>(false);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
+
+  // Category list scroll detection for dynamic top & bottom fade mask
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const minPriceInputRef = useRef<HTMLInputElement>(null);
+  const maxPriceInputRef = useRef<HTMLInputElement>(null);
+  const [canScrollCategoryTop, setCanScrollCategoryTop] = useState(false);
+  const [canScrollCategoryBottom, setCanScrollCategoryBottom] = useState(false);
+
+  const handleCategoryScroll = useCallback(() => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    setCanScrollCategoryTop(scrollTop > 4);
+    setCanScrollCategoryBottom(scrollTop + clientHeight < scrollHeight - 4);
+  }, []);
+
+  // Load categories from GraphQL Gateway searchCategories endpoint
+  useEffect(() => {
+    let cancelled = false;
+    setIsCategoriesLoading(true);
+    searchCategoriesForCatalog({ page: 1, size: 20 })
+      .then(({ categories }) => {
+        if (!cancelled && categories.length > 0) {
+          setApiCategories(categories);
+        }
+      })
+      .catch((err) => {
+        console.warn("Lỗi khi tải danh mục từ GraphQL Gateway:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setIsCategoriesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // CellphoneS-style custom states for premium catalog experience
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"banchay" | "giathap" | "giacao" | "khuyenmai" | "xemnhieu">("banchay");
   const [comparedProductIds, setComparedProductIds] = useState<string[]>([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
@@ -795,7 +842,7 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
         if (cancelled) return;
         setCatalogProducts((current) => {
           if (catalogPage === 1) {
-            return products.length > 0 ? products : MAIN_GRID_PRODUCTS;
+            return products;
           }
 
           const seen = new Set(current.map((product) => getProductHashSku(product).toLowerCase()));
@@ -815,7 +862,7 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
         if (!cancelled) {
           console.warn("Không thể tải sản phẩm merchandise qua GraphQL.", error);
           if (catalogPage === 1) {
-            setCatalogProducts(MAIN_GRID_PRODUCTS);
+            setCatalogProducts([]);
           }
           setHasMoreCatalogProducts(false);
           hasMoreRef.current = false;
@@ -952,88 +999,226 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
     return () => clearInterval(bannerTimer);
   }, []);
 
-  const getCategoryCount = (cat: string) => {
-    if (cat === "all") return catalogProducts.length;
-    return catalogProducts.filter((p) => p.category === cat).length;
+  const parseNumericPrice = (product: Product): number => {
+    const details = getProductVNDDetails(product);
+    const cleaned = (details.present || "").replace(/\./g, "").replace(/\D/g, "");
+    const parsed = parseInt(cleaned, 10);
+    return isNaN(parsed) ? 0 : parsed;
   };
 
-  // Filter products dynamically based on search query, categories, and advanced attributes/specs
+  const getReadableCategoryLabel = (raw: string): string => {
+    const clean = raw.trim().toLowerCase();
+    if (clean === "all") return "Tất cả sản phẩm";
+    if (clean === "ai") return "AI & Trí tuệ nhân tạo";
+    if (clean === "compute") return "Máy chủ & GPU Compute";
+    if (clean === "storage") return "Lưu trữ dữ liệu Cloud";
+    if (clean === "network") return "Mạng & Edge CDN";
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  };
+
+  const categoryItems = useMemo(() => {
+    if (apiCategories.length > 0) {
+      return [
+        { id: "all", label: "Tất cả sản phẩm", icon: Grid2X2Icon, sku: "" },
+        ...apiCategories.map((c) => {
+          const lower = c.name.toLowerCase();
+          let Icon = LayersIcon;
+          if (lower.includes("ai") || lower.includes("model") || lower.includes("trí tuệ")) Icon = BrainCircuitIcon;
+          else if (lower.includes("gpu") || lower.includes("server") || lower.includes("compute") || lower.includes("máy chủ")) Icon = ServerIcon;
+          else if (lower.includes("storage") || lower.includes("s3") || lower.includes("data") || lower.includes("lưu trữ")) Icon = DatabaseIcon;
+          else if (lower.includes("cdn") || lower.includes("network") || lower.includes("edge") || lower.includes("mạng")) Icon = NetworkIcon;
+          return {
+            id: c.sku || c.name,
+            label: getReadableCategoryLabel(c.name),
+            sku: c.sku,
+            productCount: c.productCount,
+            icon: Icon,
+          };
+        }),
+      ];
+    }
+
+    const uniqueCategoryMap = new Map<string, { label: string; count: number }>();
+    catalogProducts.forEach((p) => {
+      const name = p.categoryName || p.category;
+      if (name && name !== "all") {
+        const existing = uniqueCategoryMap.get(name);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          uniqueCategoryMap.set(name, { label: name, count: 1 });
+        }
+      }
+    });
+
+    if (uniqueCategoryMap.size > 0) {
+      return [
+        { id: "all", label: "Tất cả sản phẩm", icon: Grid2X2Icon, sku: "" },
+        ...Array.from(uniqueCategoryMap.entries()).map(([key, val]) => {
+          const lower = val.label.toLowerCase();
+          let Icon = LayersIcon;
+          if (lower.includes("ai") || lower.includes("model") || lower.includes("trí tuệ")) Icon = BrainCircuitIcon;
+          else if (lower.includes("gpu") || lower.includes("server") || lower.includes("compute") || lower.includes("máy chủ")) Icon = ServerIcon;
+          else if (lower.includes("storage") || lower.includes("s3") || lower.includes("data") || lower.includes("lưu trữ")) Icon = DatabaseIcon;
+          else if (lower.includes("cdn") || lower.includes("network") || lower.includes("edge") || lower.includes("mạng")) Icon = NetworkIcon;
+          return {
+            id: key,
+            label: getReadableCategoryLabel(val.label),
+            sku: key,
+            productCount: val.count,
+            icon: Icon,
+          };
+        }),
+      ];
+    }
+
+    return [{ id: "all", label: "Tất cả sản phẩm", icon: Grid2X2Icon, sku: "" }];
+  }, [apiCategories, catalogProducts]);
+
+  useEffect(() => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    setCanScrollCategoryTop(el.scrollTop > 4);
+    setCanScrollCategoryBottom(el.scrollHeight > el.clientHeight + 4);
+  }, [categoryItems]);
+
+  const getCategoryCount = (catId: string, sku?: string) => {
+    if (catId === "all") return catalogProducts.length;
+    if (sku) {
+      const matchSku = catalogProducts.filter((p) => p.sku === sku || p.categoryName?.toLowerCase() === sku.toLowerCase());
+      if (matchSku.length > 0) return matchSku.length;
+    }
+    return catalogProducts.filter(
+      (p) =>
+        p.category === catId ||
+        p.categoryName?.toLowerCase() === catId.toLowerCase() ||
+        p.sku === catId
+    ).length;
+  };
+
+  // Filter products dynamically based on GraphQL Gateway endpoint criteria
   const filteredProducts = catalogProducts.filter((product) => {
-        // 1. Category filter
-        const matchesCategory = activeCategory === "all" || product.category === activeCategory;
+    // 1. Category filter (Endpoint: categorySku / categorySkus / category)
+    const matchesCategory =
+      activeCategory === "all" ||
+      product.category === activeCategory ||
+      product.categoryName?.toLowerCase() === activeCategory.toLowerCase() ||
+      product.sku === activeCategory;
 
-        // 1.1 Brand filter
-        const matchesBrand = !selectedBrand || getProductBrand(product.id) === selectedBrand;
+    // 2. Price range filter (Endpoint: minPrice / maxPrice)
+    const priceNum = parseNumericPrice(product);
+    let matchesPrice = true;
+    if (selectedPriceRange === "under-2m") {
+      matchesPrice = priceNum > 0 && priceNum <= 2000000;
+    } else if (selectedPriceRange === "2m-5m") {
+      matchesPrice = priceNum >= 2000000 && priceNum <= 5000000;
+    } else if (selectedPriceRange === "5m-10m") {
+      matchesPrice = priceNum >= 5000000 && priceNum <= 10000000;
+    } else if (selectedPriceRange === "above-10m") {
+      matchesPrice = priceNum >= 10000000;
+    } else if (selectedPriceRange === "custom") {
+      const minP = appliedCustomMinPrice !== null ? appliedCustomMinPrice : 0;
+      const maxP = appliedCustomMaxPrice !== null ? appliedCustomMaxPrice : Infinity;
+      matchesPrice = priceNum >= minP && priceNum <= maxP;
+    }
 
-        // 2. Keyword search is handled by the merchandise API request.
-        const matchesSearch = true;
+    // 3. Rating filter (Endpoint: minRating - preserved per user instruction)
+    const productRating = product.rating ?? 5.0;
+    const matchesRating =
+      selectedRating === null ||
+      (selectedRating === "under_3" ? productRating < 3.0 : productRating >= selectedRating);
 
-        // 3. Pricing model filter (Hourly vs Usage-based)
-        const isHourly = product.price.toLowerCase().includes("hr") || product.id.includes("compute") || product.id.includes("tpu");
-        const matchesPricingModel =
-          selectedPricingModel === "all" ||
-          (selectedPricingModel === "hourly" && isHourly) ||
-          (selectedPricingModel === "usage" && !isHourly);
+    // 5. Min sold quantity (Endpoint: minSoldQuantity)
+    const soldQty = product.totalSoldQuantity ?? 0;
+    const matchesSold = selectedMinSold === null || soldQty >= selectedMinSold;
 
-        // 4. Attribute filters
-        const matchesGPU = !selectedGPU || product.specs.some(s => s.label.toLowerCase().includes("gpu") || s.value.toLowerCase().includes("gpu") || s.label.toLowerCase().includes("flops") || product.name.toLowerCase().includes("tpu") || product.name.toLowerCase().includes("compute"));
-        const matchesSLA = !selectedSLA || product.specs.some(s => s.label.toLowerCase().includes("sla") || s.value.toLowerCase().includes("sla") || s.value.toLowerCase().includes("99."));
-        const matchesLatency = !selectedLatency || product.specs.some(s => s.label.toLowerCase().includes("latency") || s.label.toLowerCase().includes("time") || s.value.toLowerCase().includes("ms") || product.longDesc.toLowerCase().includes("latency") || product.longDesc.toLowerCase().includes("instantaneous"));
+    // 6. Min view count (Endpoint: minView)
+    const viewCount = product.viewCount ?? 0;
+    const matchesView = selectedMinView === null || viewCount >= selectedMinView;
 
-        // 5. Service Tags filter
-        const matchesTags = selectedTags.length === 0 || (product.tag && selectedTags.includes(product.tag));
+    // 7. Discounted only filter
+    const hasDiscount = Boolean(
+      product.discount || (product.oldPrice && product.price !== product.oldPrice)
+    );
+    const matchesDiscount = !onlyDiscounted || hasDiscount;
 
-        return matchesCategory && matchesBrand && matchesSearch && matchesPricingModel && matchesGPU && matchesSLA && matchesLatency && matchesTags;
-      });
+    return (
+      matchesCategory &&
+      matchesPrice &&
+      matchesRating &&
+      matchesSold &&
+      matchesView &&
+      matchesDiscount
+    );
+  });
 
   const sortedFilteredProducts = [...filteredProducts].sort((a, b) => {
-        const priceA = parseInt(getProductVNDDetails(a).present.replace(/\./g, "").replace("đ", ""), 10) || 0;
-        const priceB = parseInt(getProductVNDDetails(b).present.replace(/\./g, "").replace("đ", ""), 10) || 0;
+    const priceA = parseNumericPrice(a);
+    const priceB = parseNumericPrice(b);
 
-        const discountPctA = parseInt(getProductVNDDetails(a).discount.replace(/\D/g, ""), 10) || 0;
-        const discountPctB = parseInt(getProductVNDDetails(b).discount.replace(/\D/g, ""), 10) || 0;
+    const discountPctA = parseInt(getProductVNDDetails(a).discount.replace(/\D/g, ""), 10) || 0;
+    const discountPctB = parseInt(getProductVNDDetails(b).discount.replace(/\D/g, ""), 10) || 0;
 
-        if (sortBy === "giathap") {
-          return priceA - priceB;
-        }
-        if (sortBy === "giacao") {
-          return priceB - priceA;
-        }
-        if (sortBy === "khuyenmai") {
-          return discountPctB - discountPctA; // sort by highest discount %
-        }
-        if (sortBy === "xemnhieu") {
-          return b.name.length - a.name.length;
-        }
-        // banchay (default): mock popularity ordering
-        const order = ["nexus-ai", "tensor-tpu", "aero-compute", "glacier-storage", "mesh-network"];
-        const idxA = order.indexOf(a.id);
-        const idxB = order.indexOf(b.id);
-        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-        if (idxA !== -1) return -1;
-        if (idxB !== -1) return 1;
-        return 0;
-      });
+    if (sortBy === "giathap") {
+      return priceA - priceB;
+    }
+    if (sortBy === "giacao") {
+      return priceB - priceA;
+    }
+    if (sortBy === "khuyenmai") {
+      return discountPctB - discountPctA;
+    }
+    if (sortBy === "xemnhieu") {
+      const viewsA = a.viewCount ?? 100;
+      const viewsB = b.viewCount ?? 100;
+      return viewsB - viewsA;
+    }
+    // banchay (default): totalSoldQuantity desc
+    const soldA = a.totalSoldQuantity ?? 10;
+    const soldB = b.totalSoldQuantity ?? 10;
+    if (soldB !== soldA) return soldB - soldA;
+    return 0;
+  });
 
   const [voucher1Collected, setVoucher1Collected] = useState(false);
   const [voucher2Collected, setVoucher2Collected] = useState(false);
 
-  const handleReset = () => {
-    setActiveCategory("all");
-    setSelectedPricingModel("all");
-    setSelectedGPU(false);
-    setSelectedSLA(false);
-    setSelectedLatency(false);
-    setSelectedTags([]);
+  const handleSelectPriceRange = (rangeId: string) => {
+    if (rangeId === "custom") {
+      setSelectedPriceRange("custom");
+    } else {
+      setSelectedPriceRange(rangeId as any);
+      setAppliedCustomMinPrice(null);
+      setAppliedCustomMaxPrice(null);
+    }
   };
 
-  const categoryItems = [
-    { id: "all", label: "Tất cả", icon: Grid2X2Icon },
-    { id: "ai", label: "AI Models", icon: BrainCircuitIcon },
-    { id: "compute", label: "GPU VM", icon: ServerIcon },
-    { id: "storage", label: "S3 Storage", icon: DatabaseIcon },
-    { id: "network", label: "Edge CDN", icon: NetworkIcon },
-  ];
+  const handleApplyCustomPrice = () => {
+    const minRaw = (minPriceInputRef.current?.value ?? "").replace(/\D/g, "");
+    const maxRaw = (maxPriceInputRef.current?.value ?? "").replace(/\D/g, "");
+    const minVal = minRaw ? parseInt(minRaw, 10) : null;
+    const maxVal = maxRaw ? parseInt(maxRaw, 10) : null;
+    const fmt = (d: string) => d ? d.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
+    setCustomMinPrice(fmt(minRaw));
+    setCustomMaxPrice(fmt(maxRaw));
+    setAppliedCustomMinPrice(minVal);
+    setAppliedCustomMaxPrice(maxVal);
+  };
+
+  const handleReset = () => {
+    setActiveCategory("all");
+    setSelectedPriceRange("all");
+    setCustomMinPrice("");
+    setCustomMaxPrice("");
+    setAppliedCustomMinPrice(null);
+    setAppliedCustomMaxPrice(null);
+    setSelectedRating(null);
+    setSelectedMinSold(null);
+    setSelectedMinView(null);
+    setOnlyDiscounted(false);
+    if (minPriceInputRef.current) minPriceInputRef.current.value = "";
+    if (maxPriceInputRef.current) maxPriceInputRef.current.value = "";
+  };
 
   const sortItems = [
     { id: "banchay", label: "Bán chạy", icon: TrendingUpIcon },
@@ -1043,14 +1228,16 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
     { id: "xemnhieu", label: "Xem nhiều", icon: SparklesIcon },
   ];
 
-  const isAnyFilterActive =
-    activeCategory !== "all" ||
-    selectedBrand !== null ||
-    selectedPricingModel !== "all" ||
-    selectedGPU ||
-    selectedSLA ||
-    selectedLatency ||
-    selectedTags.length > 0;
+  const activeFilterCount = [
+    activeCategory !== "all",
+    selectedPriceRange !== "all" && (selectedPriceRange !== "custom" || appliedCustomMinPrice !== null || appliedCustomMaxPrice !== null),
+    selectedRating !== null,
+    selectedMinSold !== null,
+    selectedMinView !== null,
+    onlyDiscounted,
+  ].filter(Boolean).length;
+
+  const isAnyFilterActive = activeFilterCount > 0;
 
   return (
     <div className="min-h-screen bg-background px-4 pb-24 pt-16 md:pt-[72px] text-foreground sm:px-6 relative z-0">
@@ -1110,227 +1297,459 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
         </section>
 
         <div className="grid gap-3.5 lg:grid-cols-[290px_minmax(0,1fr)]">
-          {/* 2. Left Sidebar Filter Dock with Bevel Styling for all inner components (+15% width: 290px) */}
-          <aside className="flex flex-col gap-3.5 lg:sticky lg:top-[max(1.25rem,calc(50vh-365px))] lg:self-start max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
-            <div className="overflow-hidden bg-gradient-to-b from-white/90 via-white/80 to-white/65 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl shadow-[0_6px_24px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] rounded-xl">
-              <div className="py-2.5 px-3.5 border-b border-slate-200/60 bg-white/40 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                  <FilterIcon className="size-4 text-primary" />
-                  Bộ lọc
+          {/* 2. Left Sidebar Filter Dock (GraphQL Gateway Endpoint Compliant with Bevel Lighting) */}
+          <aside className="flex flex-col gap-3.5 lg:sticky lg:top-[max(1.25rem,calc(50vh-365px))] lg:self-start">
+            <div className="relative overflow-hidden flex flex-col max-h-[calc(100vh-2.5rem)] bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 backdrop-blur-2xl shadow-[0_8px_30px_-6px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] rounded-2xl transition-all">
+              {/* Ambient light layer */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
+                <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-gradient-to-tr from-amber-500/[0.08] via-orange-400/[0.048] to-transparent blur-2xl" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(255,77,36,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,140,0,0.03)_0%,transparent_70%)]" />
+              </div>
+              {/* Header */}
+              <div className="py-3 px-3.5 border-b border-slate-200/60 bg-gradient-to-b from-white/80 via-white/50 to-transparent flex items-center justify-between shrink-0 relative z-10">
+                <div className="flex items-center gap-2.5">
+                  <div className="size-7.5 rounded-xl bg-gradient-to-b from-slate-800 via-slate-900 to-black border-t border-t-white/30 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] flex items-center justify-center">
+                    <SlidersHorizontalIcon className="size-3.5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold tracking-tight text-slate-800 block">
+                      Bộ lọc tìm kiếm
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {filteredProducts.length} / {catalogProducts.length} sản phẩm
+                    </span>
+                  </div>
                 </div>
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-gradient-to-b from-rose-50 to-rose-100/70 border-t border-t-white border-b border-b-rose-300 border-x border-x-rose-200 text-rose-600 shadow-[0_1px_3px_rgba(225,29,72,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+                  >
+                    Đặt lại ({activeFilterCount})
+                  </button>
+                )}
               </div>
 
-              <div className="flex flex-col gap-2.5 py-3 px-3">
-                {/* Categories */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-3.5 p-3.5 relative z-10">
+                {/* 1. Categories (GraphQL searchCategories) */}
                 <div className="flex flex-col gap-1.5">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Danh mục</div>
-                  <div className="flex flex-col gap-1">
-                    {categoryItems.map((category) => {
-                      const Icon = category.icon;
-                      const isActive = activeCategory === category.id;
-                      return (
-                        <button
-                          key={category.id}
-                          type="button"
-                          className={`flex items-center justify-between h-7.5 text-xs py-1 px-2.5 rounded-lg font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
-                            isActive
-                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.18)]"
-                              : "bg-white/40 hover:bg-white/80 text-slate-700 border border-slate-200/50 hover:border-slate-300 shadow-2xs"
-                          }`}
-                          onClick={() => setActiveCategory(category.id)}
-                        >
-                          <span className="inline-flex items-center gap-2">
-                            <Icon className="size-3.5" />
-                            {category.label}
-                          </span>
-                          <span
-                            className={`text-[10px] h-4 px-1.5 rounded-full inline-flex items-center justify-center font-bold ${
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase flex items-center gap-1.5">
+                      <LayersIcon className="size-3 text-slate-500" />
+                      Danh mục
+                    </span>
+                    {isCategoriesLoading && <Loader2Icon className="size-3 animate-spin text-slate-400" />}
+                  </div>
+                  <div className="relative overflow-hidden rounded-xl">
+                    {/* Top gentle fade mask when scrolled down */}
+                    <AnimatePresence>
+                      {canScrollCategoryTop && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                          className="pointer-events-none absolute inset-x-0 top-0 h-7 bg-gradient-to-b from-white/95 via-white/55 to-transparent rounded-t-xl z-10"
+                        />
+                      )}
+                    </AnimatePresence>
+
+                    <div
+                      ref={categoryScrollRef}
+                      onScroll={handleCategoryScroll}
+                      className="flex flex-col gap-1.5 max-h-[176px] overflow-y-auto overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pr-0.5 pb-2 pt-0.5"
+                    >
+                      {categoryItems.map((category: any) => {
+                        const Icon = category.icon || LayersIcon;
+                        const isActive = activeCategory === category.id || (category.sku && activeCategory === category.sku);
+                        const count = category.productCount !== undefined
+                          ? category.productCount
+                          : getCategoryCount(category.id, category.sku);
+
+                        return (
+                          <button
+                            key={category.id}
+                            type="button"
+                            onClick={() => setActiveCategory(category.id)}
+                            className={`group flex items-center justify-between h-[38px] text-[13px] px-3 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] shrink-0 ${
                               isActive
-                                ? "bg-white/20 text-white border border-white/10"
-                                : "bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-700 shadow-2xs"
+                                ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
+                                : "bg-gradient-to-b from-white/90 via-white/70 to-white/45 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_1.5px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] text-slate-700 hover:from-white hover:to-white/75 hover:border-slate-300 hover:shadow-xs"
                             }`}
                           >
-                            {getCategoryCount(category.id)}
-                          </span>
-                        </button>
-                      );
-                    })}
+                            <span className="inline-flex items-center gap-2.5 truncate">
+                              <Icon className={`size-4 shrink-0 transition-transform duration-150 ${isActive ? "scale-105" : "text-slate-500 group-hover:text-slate-700"}`} />
+                              <span className="truncate">{category.label}</span>
+                            </span>
+                            <span
+                              className={`text-[11px] h-5 min-w-[22px] px-2 rounded-full inline-flex items-center justify-center font-bold shrink-0 transition-colors ${
+                                isActive
+                                  ? "bg-white/20 text-white border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]"
+                                  : "bg-gradient-to-b from-white to-slate-100/90 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200/60 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)]"
+                              }`}
+                            >
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Bottom gentle fade mask when more items below */}
+                    <AnimatePresence>
+                      {canScrollCategoryBottom && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                          className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-white/95 via-white/55 to-transparent rounded-b-xl z-10"
+                        />
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 
                 <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
 
-                {/* Brands */}
+                {/* 2. Price Range (GraphQL minPrice / maxPrice) */}
                 <div className="flex flex-col gap-1.5">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Hãng hạ tầng</div>
+                  <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase flex items-center gap-1.5">
+                    <DollarSignIcon className="size-3 text-slate-500" />
+                    Khoảng giá (VNĐ)
+                  </span>
                   <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      type="button"
-                      className={`h-7 text-xs px-2 rounded-lg font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 ${
-                        selectedBrand === null
-                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.18)]"
-                          : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
-                      }`}
-                      onClick={() => setSelectedBrand(null)}
-                    >
-                      Tất cả
-                    </button>
-                    {BRANDS.map((brand) => (
-                      <button
-                        key={brand.name}
-                        type="button"
-                        className={`h-7 text-xs px-2 rounded-lg font-medium truncate transition-all duration-150 cursor-pointer select-none active:scale-95 ${
-                          selectedBrand === brand.name
-                            ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.18)]"
-                            : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
-                        }`}
-                        onClick={() => setSelectedBrand(brand.name)}
-                      >
-                        {brand.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    {[
+                      { id: "all", label: "Tất cả mức giá" },
+                      { id: "under-2m", label: "Dưới 2 triệu" },
+                      { id: "2m-5m", label: "2 - 5 triệu" },
+                      { id: "5m-10m", label: "5 - 10 triệu" },
+                      { id: "above-10m", label: "Trên 10 triệu" },
+                    { id: "custom", label: "Tự nhập giá" },
+                    ].map((item) => {
+                      const isCustom = item.id === "custom";
+                      const isCustomActive = selectedPriceRange === "custom";
+                      const isActive = selectedPriceRange === item.id;
 
-                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
+                      if (isCustom && isCustomActive) {
+                        return (
+                          <button
+                            key="custom-apply"
+                            type="button"
+                            onClick={handleApplyCustomPrice}
+                            className="h-7.5 text-[11px] px-2 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 truncate flex items-center justify-center gap-1.5 bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
+                          >
+                            <SearchIcon className="size-3 shrink-0 text-white" />
+                            <span>Tìm kiếm</span>
+                          </button>
+                        );
+                      }
 
-                {/* Advanced Filters */}
-                <div className="flex flex-col gap-2">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <SlidersHorizontalIcon className="size-3.5 text-primary" />
-                    Bộ lọc nâng cao
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="text-[10px] font-semibold text-slate-500">Hình thức thanh toán</div>
-                    <div className="grid grid-cols-3 gap-1">
-                      {[
-                        { id: "all", label: "Tất cả" },
-                        { id: "hourly", label: "Theo giờ" },
-                        { id: "usage", label: "Lưu lượng" },
-                      ].map((item) => (
+                      return (
                         <button
                           key={item.id}
                           type="button"
-                          className={`h-6.5 text-[11px] px-1 rounded-md font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 ${
-                            selectedPricingModel === item.id
-                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-2xs"
-                              : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
+                          onClick={() => handleSelectPriceRange(item.id)}
+                          className={`h-7.5 text-[11px] px-2 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 truncate flex items-center justify-center ${
+                            isActive
+                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
+                              : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
                           }`}
-                          onClick={() => setSelectedPricingModel(item.id as any)}
                         >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="text-[10px] font-semibold text-slate-500 mt-1">Tính năng & Tiêu chuẩn</div>
-                    {[
-                      { key: "gpu", active: selectedGPU, label: "GPU Boost", setter: setSelectedGPU, icon: ServerIcon },
-                      { key: "sla", active: selectedSLA, label: "SLA 99.99%+", setter: setSelectedSLA, icon: ShieldCheckIcon },
-                      { key: "latency", active: selectedLatency, label: "Độ trễ thấp", setter: setSelectedLatency, icon: ZapIcon },
-                    ].map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          className={`flex items-center gap-1.5 h-6.5 text-[11px] px-2 rounded-md font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 ${
-                            item.active
-                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-2xs"
-                              : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
-                          }`}
-                          onClick={() => item.setter(!item.active)}
-                        >
-                          <Icon className="size-3" />
                           {item.label}
                         </button>
                       );
                     })}
+                  </div>
 
-                    <div className="text-[10px] font-semibold text-slate-500 mt-1">Nhãn nổi bật</div>
-                    <div className="flex flex-wrap gap-1">
-                      {["New", "Popular", "Updated"].map((tag) => (
+                  <AnimatePresence initial={false}>
+                    {selectedPriceRange === "custom" && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-1.5">
+                          <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-gradient-to-b from-slate-100/80 to-slate-50/60 border-t border-t-slate-300/60 border-b border-b-white border-x border-x-slate-200/60 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.05)]">
+                            <div className="relative flex-1">
+                              <input
+                                type="text"
+                                ref={minPriceInputRef}
+                                inputMode="numeric"
+                                placeholder="Từ ₫"
+                                defaultValue=""
+                                onKeyDown={(e) => { if (e.key === "Enter") handleApplyCustomPrice(); }}
+                                onKeyUp={(e) => {
+                                  const el = e.currentTarget;
+                                  window.clearTimeout((el as any).__fmt);
+                                  const snap = el.value;
+                                  (el as any).__fmt = window.setTimeout(() => {
+                                    if (!el.isConnected) return;
+                                    const digits = snap.replace(/\D/g, "");
+                                    const fmt = digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
+                                    el.value = fmt;
+                                  }, 80);
+                                }}
+                                className="w-full h-6.5 text-[11px] px-2 rounded-lg bg-white/95 border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-slate-400 shadow-2xs"
+                              />
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-medium">-</span>
+                            <div className="relative flex-1">
+                              <input
+                                type="text"
+                                ref={maxPriceInputRef}
+                                inputMode="numeric"
+                                placeholder="Đến ₫"
+                                defaultValue=""
+                                onKeyDown={(e) => { if (e.key === "Enter") handleApplyCustomPrice(); }}
+                                onKeyUp={(e) => {
+                                  const el = e.currentTarget;
+                                  window.clearTimeout((el as any).__fmt);
+                                  const snap = el.value;
+                                  (el as any).__fmt = window.setTimeout(() => {
+                                    if (!el.isConnected) return;
+                                    const digits = snap.replace(/\D/g, "");
+                                    const fmt = digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
+                                    el.value = fmt;
+                                  }, 80);
+                                }}
+                                className="w-full h-6.5 text-[11px] px-2 rounded-lg bg-white/95 border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-slate-400 shadow-2xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
+
+                {/* 3. Rating Filter */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase flex items-center gap-1.5">
+                    <StarIcon className="size-3 text-slate-500" />
+                    Đánh giá chất lượng
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { value: null, label: "Tất cả", hasStar: false },
+                      { value: 4.5, label: "Từ 4.5", hasStar: true },
+                      { value: 4.0, label: "Từ 4.0", hasStar: true },
+                      { value: "under_3", label: "Dưới 3", hasStar: true },
+                    ].map((rating) => {
+                      const isActive = selectedRating === rating.value;
+                      return (
                         <button
-                          key={tag}
+                          key={String(rating.value)}
                           type="button"
-                          className={`h-6.5 text-[11px] px-2 rounded-md font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 ${
-                            selectedTags.includes(tag)
-                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-2xs"
-                              : "bg-gradient-to-b from-white/90 to-white/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 text-slate-700 shadow-2xs hover:from-white"
+                          onClick={() => setSelectedRating(rating.value as any)}
+                          className={`h-7.5 text-[11px] px-2 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 flex items-center justify-center gap-1 ${
+                            isActive
+                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
+                              : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
                           }`}
-                          onClick={() => {
-                            setSelectedTags(
-                              selectedTags.includes(tag)
-                                ? selectedTags.filter((item) => item !== tag)
-                                : [...selectedTags, tag]
-                            );
-                          }}
                         >
-                          {tag === "Popular" ? "Hot" : tag}
+                          <span>{rating.label}</span>
+                          {rating.hasStar && (
+                            <StarIcon className="size-3 fill-current shrink-0" />
+                          )}
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
+
+                {/* 5. Performance & Deals (GraphQL minSoldQuantity, minView) */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase flex items-center gap-1.5">
+                    <FlameIcon className="size-3 text-slate-500" />
+                    Độ phổ biến & Ưu đãi
+                  </span>
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMinSold(selectedMinSold === null ? 50 : null)}
+                      className={`flex items-center justify-between h-8 text-xs px-2.5 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
+                        selectedMinSold !== null
+                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
+                          : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <TrendingUpIcon className="size-3.5 text-emerald-500" />
+                        <span>Bán chạy (&gt; 50 đơn)</span>
+                      </span>
+                      {selectedMinSold !== null && <CheckIcon className="size-3.5 text-white" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMinView(selectedMinView === null ? 100 : null)}
+                      className={`flex items-center justify-between h-8 text-xs px-2.5 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
+                        selectedMinView !== null
+                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
+                          : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <EyeIcon className="size-3.5 text-sky-500" />
+                        <span>Lượt xem cao (&gt; 100)</span>
+                      </span>
+                      {selectedMinView !== null && <CheckIcon className="size-3.5 text-white" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setOnlyDiscounted(!onlyDiscounted)}
+                      className={`flex items-center justify-between h-8 text-xs px-2.5 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
+                        onlyDiscounted
+                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
+                          : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <GiftIcon className="size-3.5 text-rose-500" />
+                        <span>Đang có ưu đãi / Sale</span>
+                      </span>
+                      {onlyDiscounted && <CheckIcon className="size-3.5 text-white" />}
+                    </button>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white/40 border-t border-slate-200/60 py-2.5 px-3 flex items-center justify-between">
+              {/* Footer */}
+              <div className="py-3 px-3.5 bg-gradient-to-b from-white/60 to-white/80 border-t border-slate-200/60 flex items-center justify-between shrink-0 relative z-10">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 h-7 text-xs px-2.5 rounded-lg bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-2xs text-slate-800 font-semibold hover:from-white active:scale-95 cursor-pointer"
                   onClick={handleReset}
+                  className="inline-flex items-center gap-1.5 h-7.5 text-xs px-3 rounded-xl bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_2px_5px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] text-slate-800 font-semibold hover:from-white active:scale-95 cursor-pointer transition-all"
                 >
-                  <RefreshCcwIcon className="size-3" />
-                  Đặt lại
+                  <RefreshCcwIcon className="size-3 text-slate-500" />
+                  Xóa tất cả lọc
                 </button>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">
-                  {sortedFilteredProducts.length} sản phẩm
+                <span className="text-[11px] font-bold text-slate-800 bg-gradient-to-b from-white/95 to-slate-100/80 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 px-2.5 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.04)]">
+                  {filteredProducts.length} kết quả
                 </span>
               </div>
             </div>
           </aside>
 
           <section className="flex min-w-0 flex-col gap-3.5">
-            <div className="bg-gradient-to-b from-white/90 via-white/80 to-white/65 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-xl shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] rounded-xl p-1 w-full">
-              <div className="grid w-full grid-cols-2 overflow-hidden sm:grid-cols-5 gap-1">
-                {sortItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = sortBy === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setSortBy(item.id as any)}
-                      className={`relative h-7.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors duration-200 cursor-pointer select-none ${
-                        isActive
-                          ? "text-white"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
-                      }`}
-                    >
-                      {isActive && (
-                        <motion.div
-                          layoutId="activeSortTabIndicator"
-                          className="absolute inset-0 bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] rounded-lg"
-                          transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                        />
-                      )}
-                      <Icon className="size-3.5 relative z-10" />
-                      <span className="relative z-10">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="grid w-full grid-cols-2 overflow-hidden sm:grid-cols-5 gap-1 bg-gradient-to-b from-neutral-200/50 via-neutral-100/60 to-neutral-200/40 p-1 rounded-xl border-t border-t-neutral-300/40 border-b border-b-white border-x border-x-neutral-200/50 shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-medium shrink-0 relative">
+              {sortItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = sortBy === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSortBy(item.id as any)}
+                    className={`relative h-7.5 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer select-none ${
+                      isActive
+                        ? "text-neutral-900 font-bold"
+                        : "text-neutral-500 hover:text-neutral-900"
+                    }`}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeSortTabIndicator"
+                        className="absolute inset-0 bg-gradient-to-b from-white via-white to-neutral-50 border-t border-t-white border-b border-b-neutral-300/60 shadow-[0_1.5px_4px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] rounded-lg"
+                        transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                      />
+                    )}
+                    <Icon className="size-3.5 relative z-10 shrink-0" />
+                    <span className="relative z-10 truncate">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {isAnyFilterActive && (
-              <div className="flex flex-wrap gap-1.5">
-                {activeCategory !== "all" && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">{activeCategory}</span>}
-                {selectedBrand && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">{selectedBrand}</span>}
-                {selectedPricingModel !== "all" && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">{selectedPricingModel === "hourly" ? "Theo giờ" : "Lưu lượng"}</span>}
-                {selectedGPU && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">GPU Boost</span>}
-                {selectedSLA && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">SLA 99.99%+</span>}
-                {selectedLatency && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">Độ trễ thấp</span>}
-                {selectedTags.map((tag) => <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs">{tag}</span>)}
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-xs text-slate-500 font-medium mr-0.5">Bộ lọc:</span>
+                {activeCategory !== "all" && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory("all")}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs hover:border-slate-300 cursor-pointer"
+                  >
+                    <span>{categoryItems.find((c: any) => c.id === activeCategory)?.label || activeCategory}</span>
+                    <XIcon className="size-3 text-slate-400 hover:text-slate-700" />
+                  </button>
+                )}
+                {(selectedPriceRange !== "all" && (selectedPriceRange !== "custom" || appliedCustomMinPrice !== null || appliedCustomMaxPrice !== null)) && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPriceRange("all")}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs hover:border-slate-300 cursor-pointer"
+                  >
+                    <span>
+                      {selectedPriceRange === "under-2m" ? "< 2 triệu" :
+                       selectedPriceRange === "2m-5m" ? "2 - 5 triệu" :
+                       selectedPriceRange === "5m-10m" ? "5 - 10 triệu" :
+                       selectedPriceRange === "above-10m" ? "> 10 triệu" :
+                       (customMinPrice || customMaxPrice) ? `${customMinPrice || "0"}₫ - ${customMaxPrice || "..."}₫` : "Tự nhập giá"}
+                    </span>
+                    <XIcon className="size-3 text-slate-400 hover:text-slate-700" />
+                  </button>
+                )}
+                {selectedRating !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRating(null)}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs hover:border-slate-300 cursor-pointer"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {selectedRating === "under_3" ? "Dưới 3" : `Từ ${selectedRating}`}
+                      <StarIcon className="size-3 fill-current shrink-0" />
+                    </span>
+                    <XIcon className="size-3 text-slate-400 hover:text-slate-700" />
+                  </button>
+                )}
+                {selectedMinSold !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMinSold(null)}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs hover:border-slate-300 cursor-pointer"
+                  >
+                    <span>Bán chạy (&gt;50)</span>
+                    <XIcon className="size-3 text-slate-400 hover:text-slate-700" />
+                  </button>
+                )}
+                {selectedMinView !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMinView(null)}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs hover:border-slate-300 cursor-pointer"
+                  >
+                    <span>Xem nhiều (&gt;100)</span>
+                    <XIcon className="size-3 text-slate-400 hover:text-slate-700" />
+                  </button>
+                )}
+                {onlyDiscounted && (
+                  <button
+                    type="button"
+                    onClick={() => setOnlyDiscounted(false)}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-b from-white/90 to-white/70 border border-slate-200/60 text-slate-800 shadow-2xs hover:border-slate-300 cursor-pointer"
+                  >
+                    <span>Đang giảm giá</span>
+                    <XIcon className="size-3 text-slate-400 hover:text-slate-700" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 hover:bg-rose-100 cursor-pointer transition-colors"
+                >
+                  Xóa tất cả
+                </button>
               </div>
             )}
 

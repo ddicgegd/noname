@@ -2003,67 +2003,67 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             <div className="flex flex-col justify-between h-full flex-1 py-0.5 min-w-0 pr-1">
                               {/* 1. Ngân hàng thụ hưởng */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Ngân hàng:</span>
+                                <span className="text-[11px] text-neutral-500 font-medium shrink-0">Ngân hàng:</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyText(currentBank.name, "bankName")}
-                                  className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[10.5px] sm:text-[11px] max-w-[210px] truncate text-right ml-1 transition-colors"
+                                  className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11px] max-w-[210px] truncate text-right ml-1 transition-colors group"
                                   title="Sao chép tên ngân hàng"
                                 >
-                                  <span className="truncate">{currentBank.shortName}</span>
-                                  {copiedField === "bankName" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                  <span className="truncate group-hover:underline">{currentBank.shortName}</span>
+                                  {copiedField === "bankName" ? <Check className="size-3.5 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 group-hover:text-neutral-700 shrink-0" />}
                                 </button>
                               </div>
 
                               {/* 2. Số tài khoản */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
+                                <span className="text-[11px] text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyText(currentBank.accountNo, "acc")}
-                                  className="flex items-center gap-1 font-mono font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11.5px] ml-1 transition-colors"
+                                  className="flex items-center gap-1.5 font-mono font-bold text-neutral-900 bg-neutral-100/80 hover:bg-orange-50 hover:text-orange-600 cursor-pointer text-[12px] px-1.5 py-0.5 rounded-md ml-1 transition-all border border-neutral-200/60"
                                   title="Sao chép số tài khoản"
                                 >
                                   <span className="tracking-wider">{currentBank.accountNo}</span>
-                                  {copiedField === "acc" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                  {copiedField === "acc" ? <Check className="size-3.5 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
                                 </button>
                               </div>
 
                               {/* 3. Chủ tài khoản */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Chủ tài khoản:</span>
+                                <span className="text-[11px] text-neutral-500 font-medium shrink-0">Chủ tài khoản:</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyText(currentBank.accountName, "accName")}
-                                  className="flex items-center gap-1 font-bold text-neutral-800 hover:text-orange-600 cursor-pointer text-[10.5px] max-w-[200px] truncate text-right ml-1 transition-colors"
+                                  className="flex items-center gap-1 font-bold text-neutral-800 hover:text-orange-600 cursor-pointer text-[11px] max-w-[200px] truncate text-right ml-1 transition-colors uppercase group"
                                   title="Sao chép tên chủ tài khoản"
                                 >
-                                  <span className="truncate">{currentBank.accountName}</span>
-                                  {copiedField === "accName" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                  <span className="truncate group-hover:underline">{currentBank.accountName}</span>
+                                  {copiedField === "accName" ? <Check className="size-3.5 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 group-hover:text-neutral-700 shrink-0" />}
                                 </button>
                               </div>
 
                               {/* 4. Số tiền */}
                               <div className="flex items-center justify-between py-0.5">
-                                <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Số tiền:</span>
+                                <span className="text-[11px] text-neutral-500 font-medium shrink-0">Số tiền:</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyText(total.toString(), "amount")}
-                                  className="flex items-center gap-1 font-extrabold text-orange-600 hover:text-orange-700 cursor-pointer text-[11.5px] ml-1 transition-colors"
+                                  className="flex items-center gap-1.5 font-extrabold text-orange-600 bg-orange-50/70 hover:bg-orange-100/80 hover:text-orange-700 cursor-pointer text-[12px] px-1.5 py-0.5 rounded-md ml-1 transition-all border border-orange-200/50"
                                   title="Sao chép số tiền"
                                 >
                                   <span>{formatVND(total)}</span>
-                                  {copiedField === "amount" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                  {copiedField === "amount" ? <Check className="size-3.5 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-orange-500 shrink-0" />}
                                 </button>
                               </div>
 
-                              {/* 5. Option nhập email nhận thông báo giao dịch (Giữ kích thước khung h-8, tăng font chữ bên trong lên 15%: text-[12.5px]) */}
-                              <div className="pt-1 mt-0.5 border-t border-neutral-200/70">
+                              {/* 5. Khung nhập email nhận thông báo giao dịch (Kích thước khung h-8, font chữ text-[12.5px]) */}
+                              <div className="pt-1.5 mt-0.5 border-t border-neutral-200/70">
                                 <div className="relative flex items-center">
                                   <Mail className="size-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
                                   <input
                                     type="email"
-                                    placeholder="Email nhận thông báo giao dịch..."
+                                    placeholder="Email nhận thông báo giao dịch & hóa đơn..."
                                     value={transactionEmail}
                                     onChange={(e) => setTransactionEmail(e.target.value)}
                                     className={`w-full h-8 pl-8 pr-8 text-[12.5px] rounded-lg border transition-all placeholder:text-[12px] placeholder:text-neutral-400 outline-none ${
@@ -2103,67 +2103,67 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                           >
                             {/* 1. Ngân hàng thụ hưởng */}
                             <div className="flex items-center justify-between py-0.5">
-                              <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Ngân hàng:</span>
+                              <span className="text-[11px] text-neutral-500 font-medium shrink-0">Ngân hàng:</span>
                               <button
                                 type="button"
                                 onClick={() => handleCopyText(currentBank.name, "bankName")}
-                                className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11px] sm:text-[11.5px] max-w-[360px] truncate text-right ml-1 transition-colors"
+                                className="flex items-center gap-1 font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11.5px] max-w-[360px] truncate text-right ml-1 transition-colors group"
                                 title="Sao chép tên ngân hàng"
                               >
-                                <span className="truncate">{currentBank.shortName} - {currentBank.name}</span>
-                                {copiedField === "bankName" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                <span className="truncate group-hover:underline">{currentBank.shortName} - {currentBank.name}</span>
+                                {copiedField === "bankName" ? <Check className="size-3.5 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 group-hover:text-neutral-700 shrink-0" />}
                               </button>
                             </div>
 
                             {/* 2. Số tài khoản */}
                             <div className="flex items-center justify-between py-0.5">
-                              <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
+                              <span className="text-[11px] text-neutral-500 font-medium shrink-0">Số tài khoản:</span>
                               <button
                                 type="button"
                                 onClick={() => handleCopyText(currentBank.accountNo, "acc")}
-                                className="flex items-center gap-1 font-mono font-bold text-neutral-900 hover:text-orange-600 cursor-pointer text-[11.5px] ml-1 transition-colors"
+                                className="flex items-center gap-1.5 font-mono font-bold text-neutral-900 bg-neutral-100/80 hover:bg-orange-50 hover:text-orange-600 cursor-pointer text-[12px] px-1.5 py-0.5 rounded-md ml-1 transition-all border border-neutral-200/60"
                                 title="Sao chép số tài khoản"
                               >
                                 <span className="tracking-wider">{currentBank.accountNo}</span>
-                                {copiedField === "acc" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                {copiedField === "acc" ? <Check className="size-3.5 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
                               </button>
                             </div>
 
                             {/* 3. Chủ tài khoản */}
                             <div className="flex items-center justify-between py-0.5">
-                              <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Chủ tài khoản:</span>
+                              <span className="text-[11px] text-neutral-500 font-medium shrink-0">Chủ tài khoản:</span>
                               <button
                                 type="button"
                                 onClick={() => handleCopyText(currentBank.accountName, "accName")}
-                                className="flex items-center gap-1 font-bold text-neutral-800 hover:text-orange-600 cursor-pointer text-[10.5px] max-w-[340px] truncate text-right ml-1 transition-colors"
+                                className="flex items-center gap-1 font-bold text-neutral-800 hover:text-orange-600 cursor-pointer text-[11px] max-w-[340px] truncate text-right ml-1 transition-colors uppercase group"
                                 title="Sao chép tên chủ tài khoản"
                               >
-                                <span className="truncate">{currentBank.accountName}</span>
-                                {copiedField === "accName" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                <span className="truncate group-hover:underline">{currentBank.accountName}</span>
+                                {copiedField === "accName" ? <Check className="size-3.5 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 group-hover:text-neutral-700 shrink-0" />}
                               </button>
                             </div>
 
                             {/* 4. Số tiền */}
                             <div className="flex items-center justify-between py-0.5">
-                              <span className="text-[10.5px] text-neutral-500 font-medium shrink-0">Số tiền:</span>
+                              <span className="text-[11px] text-neutral-500 font-medium shrink-0">Số tiền:</span>
                               <button
                                 type="button"
                                 onClick={() => handleCopyText(total.toString(), "amount")}
-                                className="flex items-center gap-1 font-extrabold text-orange-600 hover:text-orange-700 cursor-pointer text-[11.5px] ml-1 transition-colors"
+                                className="flex items-center gap-1.5 font-extrabold text-orange-600 bg-orange-50/70 hover:bg-orange-100/80 hover:text-orange-700 cursor-pointer text-[12px] px-1.5 py-0.5 rounded-md ml-1 transition-all border border-orange-200/50"
                                 title="Sao chép số tiền"
                               >
                                 <span>{formatVND(total)}</span>
-                                {copiedField === "amount" ? <Check className="size-3 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-neutral-400 shrink-0" />}
+                                {copiedField === "amount" ? <Check className="size-3.5 text-emerald-600 shrink-0" /> : <Copy className="size-3 text-orange-500 shrink-0" />}
                               </button>
                             </div>
 
-                            {/* 5. Option nhập email nhận thông báo giao dịch (Giữ kích thước khung h-8, tăng font chữ bên trong lên 15%: text-[12.5px]) */}
-                            <div className="pt-1 mt-0.5 border-t border-neutral-200/70">
+                            {/* 5. Khung nhập email nhận thông báo giao dịch (Kích thước khung h-8, font chữ text-[12.5px]) */}
+                            <div className="pt-1.5 mt-0.5 border-t border-neutral-200/70">
                               <div className="relative flex items-center">
                                 <Mail className="size-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
                                 <input
                                   type="email"
-                                  placeholder="Email nhận thông báo giao dịch..."
+                                  placeholder="Email nhận thông báo giao dịch & hóa đơn..."
                                   value={transactionEmail}
                                   onChange={(e) => setTransactionEmail(e.target.value)}
                                   className={`w-full h-8 pl-8 pr-8 text-[12.5px] rounded-lg border transition-all placeholder:text-[12px] placeholder:text-neutral-400 outline-none ${

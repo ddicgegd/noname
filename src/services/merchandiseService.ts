@@ -6,10 +6,39 @@ export interface ProductSearchFilter {
   categorySku?: string;
   categorySkus?: string[];
   skus?: string[];
+  statuses?: string[];
+  createdBy?: string;
+  minSoldQuantity?: number;
+  maxSoldQuantity?: number;
+  minRevenue?: number;
+  maxRevenue?: number;
+  minOrders?: number;
+  maxOrders?: number;
+  minView?: number;
+  minRating?: number;
+  minReviews?: number;
+  createdFrom?: string;
+  createdTo?: string;
   page?: number;
   size?: number;
   sortBy?: string;
   sortDirection?: "ASC" | "DESC";
+}
+
+export interface CategorySearchFilter {
+  keyword?: string;
+  skus?: string[];
+  names?: string[];
+  page?: number;
+  size?: number;
+  sortBy?: string;
+  sortDirection?: "ASC" | "DESC";
+}
+
+export interface CategoryItem {
+  name: string;
+  sku: string;
+  productCount?: number;
 }
 
 export interface AttributesSearchFilter {
@@ -250,3 +279,51 @@ export async function searchAttributesForProductSku(productSku: string): Promise
   const contents = data?.searchAttributes?.contents;
   return Array.isArray(contents) ? contents.map(normalizeAttribute) : [];
 }
+
+export async function searchCategoriesForCatalog(filter: CategorySearchFilter = {}): Promise<{ categories: CategoryItem[]; totalElements: number }> {
+  const query = `
+    query SearchCategoriesForCatalog($filter: CategorySearchInput!) {
+      searchCategories(filter: $filter) {
+        contents {
+          name
+          skuInfo {
+            sku
+          }
+          productCount
+        }
+        paging {
+          pageNumber
+          pageSize
+          totalElements
+          totalPages
+        }
+      }
+    }
+  `;
+
+  try {
+    const data = await localGraphqlRequest<any>(query, {
+      filter: {
+        page: filter.page || 1,
+        size: filter.size || 20,
+        ...filter,
+      }
+    });
+    const contents = data?.searchCategories?.contents;
+    const categories: CategoryItem[] = Array.isArray(contents)
+      ? contents.map((c: any) => ({
+          name: c.name || "Danh mục",
+          sku: c.skuInfo?.sku || c.sku || "",
+          productCount: typeof c.productCount === "number" ? c.productCount : undefined
+        }))
+      : [];
+    return {
+      categories,
+      totalElements: data?.searchCategories?.paging?.totalElements || categories.length
+    };
+  } catch (error) {
+    console.warn("Không thể tải danh mục từ GraphQL Gateway:", error);
+    return { categories: [], totalElements: 0 };
+  }
+}
+
