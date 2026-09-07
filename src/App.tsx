@@ -85,7 +85,10 @@ export default function App() {
       case "product": return "/p";
       case "order": return "/o";
       case "auth-report": return "/auth-report";
-      case "profile": return "/profile";
+      case "profile": {
+        const hash = window.location.hash;
+        return hash ? `/profile${hash}` : "/profile";
+      }
       case "auth": {
         const hash = window.location.hash.toLowerCase();
         if (hash === "#register") return "/auth#register";
@@ -204,6 +207,9 @@ export default function App() {
       } else {
         targetPath = "/auth#login";
       }
+    } else if (page === "profile") {
+      const hash = window.location.hash;
+      targetPath = hash ? `/profile${hash}` : "/profile";
     }
     if (window.location.pathname + window.location.hash !== targetPath) {
       window.history.pushState({}, "", targetPath);

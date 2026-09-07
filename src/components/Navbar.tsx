@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, PackageOpen, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame } from "lucide-react";
+import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, PackageOpen, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame, ShieldCheck } from "lucide-react";
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -461,7 +461,6 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
 
   const navLinks = [
     { label: "Sản phẩm", href: "/p" },
-    { label: "Báo cáo Xác thực", href: "auth-report" },
   ];
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, label: string, href: string) => {
@@ -1878,6 +1877,10 @@ const resolveProductMetadata = (skuOrName: string) => {
                   <button 
                     onClick={() => {
                       setShowAccountMenu(false);
+                      if (typeof window !== "undefined") {
+                        window.history.pushState(null, "", "/profile");
+                        window.dispatchEvent(new CustomEvent("close-accounts-center"));
+                      }
                       onNavigate("profile");
                     }}
                     className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-[#FF4D24] hover:bg-orange-50/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
@@ -1891,15 +1894,38 @@ const resolveProductMetadata = (skuOrName: string) => {
                       setShowAccountMenu(false);
                       onNavigate("order");
                     }}
-                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
+                    className={`group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer text-left ${
+                      currentPage === "order"
+                        ? "text-[#FF4D24] bg-orange-50/70"
+                        : "text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70"
+                    }`}
                   >
-                    <ShoppingBag size={15} className="text-neutral-400 group-hover:text-neutral-700 transition-colors shrink-0" />
-                    <span>Đơn mua của tôi</span>
+                    <ShoppingBag size={15} className={`transition-colors shrink-0 ${currentPage === "order" ? "text-[#FF4D24]" : "text-neutral-400 group-hover:text-neutral-700"}`} />
+                    <span className={currentPage === "order" ? "font-bold text-[#FF4D24]" : ""}>Đơn mua của tôi</span>
                   </button>
 
                   <button 
                     onClick={() => {
                       setShowAccountMenu(false);
+                      onNavigate("auth-report");
+                    }}
+                    className={`group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer text-left ${
+                      currentPage === "auth-report"
+                        ? "text-[#FF4D24] bg-orange-50/70"
+                        : "text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70"
+                    }`}
+                  >
+                    <ShieldCheck size={15} className={`transition-colors shrink-0 ${currentPage === "auth-report" ? "text-[#FF4D24]" : "text-neutral-400 group-hover:text-neutral-700"}`} />
+                    <span className={currentPage === "auth-report" ? "font-bold text-[#FF4D24]" : ""}>Báo cáo Xác thực</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      if (typeof window !== "undefined") {
+                        window.location.hash = "profile";
+                        window.dispatchEvent(new CustomEvent("open-accounts-center", { detail: { tab: "profile" } }));
+                      }
                       onNavigate("profile");
                     }}
                     className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
@@ -1911,6 +1937,10 @@ const resolveProductMetadata = (skuOrName: string) => {
                   <button 
                     onClick={() => {
                       setShowAccountMenu(false);
+                      if (typeof window !== "undefined") {
+                        window.location.hash = "payments";
+                        window.dispatchEvent(new CustomEvent("open-accounts-center", { detail: { tab: "payments" } }));
+                      }
                       onNavigate("profile");
                     }}
                     className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
