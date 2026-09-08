@@ -188,7 +188,10 @@ export async function getBookmarkDetails(mainSku: string): Promise<BookmarkData 
 
   if (!response.ok) {
     if (response.status === 404) {
-      setCachedBookmark(mainSku, null);
+      const cached = getCachedBookmark(mainSku);
+      if (cached && cached.totalItems > 0) {
+        return cached;
+      }
       return null;
     }
     const errBody = await response.json().catch(() => ({}));
@@ -217,12 +220,39 @@ export async function getAllBookmarks(): Promise<BookmarkData[]> {
       headers: getBookmarkHeaders(),
     });
 
-    if (!response.ok) return [];
-    const json = await response.json();
-    return json?.data || [];
-  } catch (_) {
-    return [];
+    if (response.ok) {
+      const json = await response.json();
+      const serverList: BookmarkData[] = Array.isArray(json?.data) ? json.data : [];
+      if (serverList.length > 0) {
+        serverList.forEach((bm) => setCachedBookmark(bm.mainSku, bm));
+        return serverList;
+      }
+    }
+  } catch (err) {
+    console.warn("Lỗi fetch bookmarks từ API:", err);
   }
+
+  // Fallback cache hydration if offline or initial load
+  if (typeof window !== "undefined") {
+    try {
+      const localList: BookmarkData[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX)) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw) as BookmarkData;
+            if (parsed && parsed.mainSku && (parsed.totalItems > 0 || parsed.items?.length > 0)) {
+              localList.push(parsed);
+            }
+          }
+        }
+      }
+      if (localList.length > 0) return localList;
+    } catch (_) {}
+  }
+
+  return [];
 }
 
 /**
@@ -245,6 +275,19 @@ export async function removeBookmarkItem(
   }
 
   const result = await response.json();
+  const cached = getCachedBookmark(mainSku);
+  if (cached) {
+    cached.items = (cached.items || []).filter((it) => it.sku !== sku);
+    cached.totalItems = cached.items.reduce((s, it) => s + (it.quantity || 1), 0);
+    cached.totalSalePrice = cached.items.reduce((s, it) => s + (it.salePrice || 0) * (it.quantity || 1), 0);
+    cached.totalPrice = cached.items.reduce((s, it) => s + (it.unitPrice || it.salePrice || 0) * (it.quantity || 1), 0);
+    cached.totalDiscount = Math.max(0, cached.totalPrice - cached.totalSalePrice);
+    if (cached.items.length === 0) {
+      setCachedBookmark(mainSku, null);
+    } else {
+      setCachedBookmark(mainSku, cached);
+    }
+  }
   dispatchBookmarkUpdated();
   return result;
 }
@@ -268,6 +311,7 @@ export async function clearBookmark(
   }
 
   const result = await response.json();
+  setCachedBookmark(mainSku, null);
   dispatchBookmarkUpdated();
   return result;
 }

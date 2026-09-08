@@ -7,7 +7,7 @@ import {
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
   Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
-  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark
+  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark, ShoppingCart
 } from "lucide-react";
 import { apiRequest, unifiedFetch, getUnifiedAccessToken } from "../lib/api";
 import { STORAGE_KEYS } from "../lib/storageKeys";
@@ -29,9 +29,12 @@ import {
   getAllBookmarks,
   clearBookmark,
   removeBookmarkItem,
+  persistStagedBookmark,
   BookmarkData,
   subscribeBookmarkUpdates,
 } from "../services/bookmarkService";
+import { addToCart } from "../services/cartService";
+import { Bevel, BevelButton, BevelDivider } from "./ui/bevel";
 
 interface OrderItem {
   id: string;
@@ -82,6 +85,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [isAccountsCenterOpen, setIsAccountsCenterOpen] = useState<boolean>(false);
   const [activeModalTab, setActiveModalTab] = useState<"profile" | "security" | "addresses" | "payments" | "sessions" | "bookmarks">("profile");
   const [userBookmarks, setUserBookmarks] = useState<BookmarkData[]>([]);
+  const [isBookmarksLoading, setIsBookmarksLoading] = useState<boolean>(false);
+  const [bookmarkActionLoading, setBookmarkActionLoading] = useState<string>("");
 
   // Listen to open-accounts-center event from Navbar
   useEffect(() => {
@@ -109,12 +114,17 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     };
   }, []);
 
-  // Load bookmarks
-  const loadUserBookmarks = async () => {
+  // Load bookmarks with real API
+  const loadUserBookmarks = async (showLoading = false) => {
+    if (showLoading) setIsBookmarksLoading(true);
     try {
       const list = await getAllBookmarks();
       setUserBookmarks(list);
-    } catch (_) {}
+    } catch (err: any) {
+      console.warn("Lỗi tải bookmarks từ API:", err);
+    } finally {
+      if (showLoading) setIsBookmarksLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -124,6 +134,91 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     });
     return () => unsub();
   }, []);
+
+  // Re-fetch fresh bookmarks whenever user navigates to the bookmarks tab
+  useEffect(() => {
+    if (activeModalTab === "bookmarks") {
+      loadUserBookmarks(true);
+    }
+  }, [activeModalTab]);
+
+  // Real Bookmark API Actions
+  const handleRemoveBookmarkItem = async (mainSku: string, itemSku: string, itemName?: string) => {
+    setBookmarkActionLoading(`${mainSku}::${itemSku}`);
+    try {
+      await removeBookmarkItem(mainSku, itemSku);
+      await loadUserBookmarks(false);
+      setSuccessMsg(`Đã xóa "${itemName || itemSku}" khỏi gói phụ kiện`);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Lỗi xóa phụ kiện khỏi gói");
+    } finally {
+      setBookmarkActionLoading("");
+    }
+  };
+
+  const handleClearBookmarkPackage = async (mainSku: string) => {
+    setBookmarkActionLoading(mainSku);
+    try {
+      await clearBookmark(mainSku);
+      await loadUserBookmarks(false);
+      setSuccessMsg(`Đã xóa toàn bộ gói phụ kiện`);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Lỗi xóa gói phụ kiện");
+    } finally {
+      setBookmarkActionLoading("");
+    }
+  };
+
+  const handleExtendBookmarkPackage = async (mainSku: string) => {
+    setBookmarkActionLoading(`extend::${mainSku}`);
+    try {
+      await persistStagedBookmark(mainSku);
+      await loadUserBookmarks(false);
+      setSuccessMsg(`Đã gia hạn gói phụ kiện lưu 7 ngày`);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Lỗi gia hạn gói phụ kiện");
+    } finally {
+      setBookmarkActionLoading("");
+    }
+  };
+
+  const handleCheckoutBookmarkPackage = async (bookmark: BookmarkData) => {
+    setBookmarkActionLoading(`checkout::${bookmark.mainSku}`);
+    try {
+      const cartItems: { sku: string; quantity: number }[] = [];
+      if (bookmark.mainSku && bookmark.mainSku.toLowerCase() !== "bookmarks") {
+        cartItems.push({ sku: bookmark.mainSku, quantity: 1 });
+      }
+      if (bookmark.items && bookmark.items.length > 0) {
+        for (const it of bookmark.items) {
+          cartItems.push({ sku: it.sku, quantity: it.quantity || 1 });
+        }
+      }
+      if (cartItems.length > 0) {
+        await addToCart(cartItems);
+        setSuccessMsg(`Đã chuyển sản phẩm & ${bookmark.totalItems || bookmark.items.length} phụ kiện vào giỏ hàng!`);
+      }
+      setIsAccountsCenterOpen(false);
+      onNavigate("cart");
+    } catch (err: any) {
+      setErrorMsg(err.message || "Lỗi thêm phụ kiện vào giỏ hàng");
+    } finally {
+      setBookmarkActionLoading("");
+    }
+  };
+
+  const getFriendlyMainSkuName = (sku: string): string => {
+    if (!sku || sku.toLowerCase() === "bookmarks") return "Gói phụ kiện đã lưu";
+    const map: Record<string, string> = {
+      "OPPO-FIND-X8-PRO-BLK": "OPPO Find X8 Pro (Đen)",
+      "AW-ULTRA-2": "Apple Watch Ultra 2 (Titan)",
+      "MACBOOK-PRO-M3-MAX": "MacBook Pro M3 Max",
+      "IPHONE-16-PRO-MAX-DESERT": "iPhone 16 Pro Max (Titan)",
+      "SONY-WH1000XM6-BLK": "Sony WH-1000XM6 (Đen)",
+    };
+    if (map[sku]) return map[sku];
+    return sku.replace(/[-_]+/g, " ");
+  };
 
   // Error / Success Messages
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -1836,16 +1931,30 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       </button>
                     </div>
                   ) : (
-                    <button 
-                      onClick={() => {
-                        if (isAddingCard) setIsAddingCard(false);
-                        else setIsAccountsCenterOpen(false);
-                      }}
-                      className="w-9 h-9 rounded-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center text-slate-500 hover:text-black transition-all cursor-pointer shrink-0 active:scale-95"
-                      title={isAddingCard ? "Đóng form" : "Đóng"}
-                    >
-                      <X className="w-4.5 h-4.5" />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {activeModalTab === "bookmarks" && (
+                        <BevelButton
+                          size="icon"
+                          variant="button"
+                          onClick={() => loadUserBookmarks(true)}
+                          disabled={isBookmarksLoading}
+                          title="Làm mới từ máy chủ"
+                          className="w-9 h-9 rounded-full shrink-0"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${isBookmarksLoading ? "animate-spin text-[#FF4D24]" : "text-slate-500"}`} />
+                        </BevelButton>
+                      )}
+                      <button 
+                        onClick={() => {
+                          if (isAddingCard) setIsAddingCard(false);
+                          else setIsAccountsCenterOpen(false);
+                        }}
+                        className="w-9 h-9 rounded-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center text-slate-500 hover:text-black transition-all cursor-pointer shrink-0 active:scale-95"
+                        title={isAddingCard ? "Đóng form" : "Đóng"}
+                      >
+                        <X className="w-4.5 h-4.5" />
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -2899,142 +3008,232 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 {/* 6. TAB: BOOKMARKS (Phụ kiện mua cùng đã lưu) */}
                 {activeModalTab === "bookmarks" && (
                   <div className="space-y-4">
-                    {userBookmarks.length === 0 ? (
-                      <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-orange-50 to-orange-100/70 border border-orange-200/60 text-[#FF4D24] flex items-center justify-center shadow-xs">
-                          <Bookmark className="w-7 h-7 stroke-[1.75]" />
+                    {/* Loading Skeleton */}
+                    {isBookmarksLoading && userBookmarks.length === 0 && (
+                      <div className="space-y-3 py-2">
+                        {[1, 2].map((k) => (
+                          <div key={k} className="p-5 rounded-2xl bg-white/70 border border-slate-200/60 animate-pulse space-y-3">
+                            <div className="h-5 bg-slate-200/70 rounded-md w-1/3" />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="h-16 bg-slate-100 rounded-xl" />
+                              <div className="h-16 bg-slate-100 rounded-xl" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Empty State */}
+                    {!isBookmarksLoading && userBookmarks.length === 0 && (
+                      <Bevel variant="card" className="py-12 px-5 text-center flex flex-col items-center justify-center gap-3.5 rounded-2xl">
+                        <div className="size-16 rounded-2xl bg-gradient-to-b from-[#FF4D24]/15 via-[#FF4D24]/8 to-transparent border-t border-t-white border-b border-b-slate-300/40 border-x border-x-[#FF4D24]/20 text-[#FF4D24] flex items-center justify-center shadow-[0_4px_16px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]">
+                          <Bookmark className="size-8 stroke-[1.75]" />
                         </div>
-                        <div>
+                        <div className="max-w-md">
                           <h4 className="text-sm font-bold text-slate-800">Chưa có gói phụ kiện nào được lưu</h4>
-                          <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                            Khi bạn bấm "+ Thêm" phụ kiện kèm theo tại trang sản phẩm, chúng sẽ được lưu trữ 1 giờ hoặc 7 ngày để thanh toán sau.
+                          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                            Khi bạn chọn phụ kiện tại mục <strong className="text-slate-700">"Phụ kiện mua cùng"</strong> ở trang sản phẩm, hệ thống sẽ lưu an toàn trong 1 giờ hoặc 7 ngày để bạn có thể thanh toán combo bất cứ lúc nào.
                           </p>
                         </div>
-                        <button
-                          type="button"
+                        <BevelButton
+                          variant="primary"
+                          size="md"
                           onClick={() => {
                             setIsAccountsCenterOpen(false);
                             onNavigate("product");
                           }}
-                          className="mt-2 px-4 py-2 bg-[#FF4D24] hover:bg-[#FF4D24]/90 text-white text-xs font-bold rounded-xl shadow-[0_4px_12px_rgba(255,77,36,0.3)] transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                          className="mt-1 px-5 h-10 text-xs font-bold gap-2"
                         >
-                          <ShoppingBag className="w-3.5 h-3.5" />
+                          <ShoppingBag className="size-4" />
                           <span>Khám phá sản phẩm ngay</span>
-                        </button>
-                      </div>
-                    ) : (
+                        </BevelButton>
+                      </Bevel>
+                    )}
+
+                    {/* Bookmarks List */}
+                    {userBookmarks.length > 0 && (
                       <div className="space-y-4">
                         {userBookmarks.map((bookmark) => {
                           const is7Days = (bookmark.ttlSecondsRemaining || 0) > 3600;
                           const hoursLeft = Math.max(1, Math.floor((bookmark.ttlSecondsRemaining || 0) / 3600));
                           const daysLeft = Math.floor(hoursLeft / 24);
+                          const isPackageLoading = bookmarkActionLoading === bookmark.mainSku || bookmarkActionLoading === `checkout::${bookmark.mainSku}`;
+                          const isExtending = bookmarkActionLoading === `extend::${bookmark.mainSku}`;
+                          const isGenericSku = !bookmark.mainSku || bookmark.mainSku.toLowerCase() === "bookmarks";
 
                           return (
-                            <div
+                            <Bevel
                               key={bookmark.mainSku}
-                              className="p-4 sm:p-5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] space-y-3.5 text-left"
+                              variant="card"
+                              className="p-4 sm:p-5 rounded-2xl space-y-4 text-left relative overflow-hidden"
                             >
-                              {/* Order Card Header */}
-                              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/60">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-[10px] font-mono font-black text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                    {bookmark.mainSku}
+                              {/* Card Header */}
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-200/70">
+                                <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                                  <span className="size-8 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/70 border-t border-t-white border-b border-b-orange-200 border-x border-x-orange-100 text-[#FF4D24] flex items-center justify-center shrink-0 shadow-2xs">
+                                    <Package className="size-4" />
                                   </span>
-                                  <span className="text-xs font-bold text-slate-800">
-                                    Gói phụ kiện mua kèm ({bookmark.totalItems} món)
-                                  </span>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                       <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
+                                        {!isGenericSku ? (
+                                          <>Phụ kiện mua cùng: <span className="text-[#FF4D24]">{getFriendlyMainSkuName(bookmark.mainSku)}</span></>
+                                        ) : (
+                                          "Gói phụ kiện đã lưu"
+                                        )}
+                                      </h3>
+                                      {!isGenericSku && (
+                                        <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/80">
+                                          {bookmark.mainSku}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                      Bao gồm <strong className="text-slate-700 font-semibold">{bookmark.totalItems || bookmark.items.length} món phụ kiện</strong> mua kèm.
+                                    </p>
+                                  </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                {/* Badges & Actions */}
+                                <div className="flex items-center gap-2 shrink-0 self-start sm:self-center flex-wrap">
+                                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs border ${
                                     is7Days
-                                      ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                      : "bg-amber-50 text-amber-600 border border-amber-200"
+                                      ? "bg-emerald-50/90 text-emerald-700 border-emerald-200"
+                                      : "bg-amber-50/90 text-amber-700 border-amber-200"
                                   }`}>
-                                    <Clock className="w-3 h-3" />
-                                    {is7Days ? `Còn ${daysLeft > 0 ? `${daysLeft} ngày` : `${hoursLeft} giờ`}` : `Lưu tạm (${hoursLeft}h)`}
+                                    {is7Days ? <ShieldCheck className="size-3.5 text-emerald-600" /> : <Clock className="size-3.5 text-amber-600 animate-pulse" />}
+                                    <span>{is7Days ? `Còn ${daysLeft > 0 ? `${daysLeft} ngày` : `${hoursLeft} giờ`}` : `Lưu tạm (${hoursLeft}h)`}</span>
                                   </span>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#FF4D24] border border-orange-200">
-                                    Chờ thanh toán
-                                  </span>
+
+                                  {!is7Days && (
+                                    <BevelButton
+                                      size="sm"
+                                      variant="button"
+                                      onClick={() => handleExtendBookmarkPackage(bookmark.mainSku)}
+                                      disabled={isExtending}
+                                      className="h-7 px-2.5 text-[10.5px] font-bold text-indigo-600 hover:text-indigo-700"
+                                    >
+                                      {isExtending ? <RefreshCw className="size-3 animate-spin mr-1" /> : <Sparkles className="size-3 text-indigo-500 mr-1" />}
+                                      <span>Gia hạn 7 ngày</span>
+                                    </BevelButton>
+                                  )}
                                 </div>
                               </div>
 
-                              {/* Order Card Items List */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                {bookmark.items.map((item) => (
-                                  <div
-                                    key={item.sku}
-                                    className="p-2.5 rounded-xl bg-white/80 border border-slate-200/70 shadow-2xs flex items-center gap-2.5"
-                                  >
-                                    <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-slate-200/50 bg-slate-100">
-                                      <img
-                                        src={item.imageUrl}
-                                        alt={item.productName}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          (e.currentTarget as HTMLImageElement).src = "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&auto=format&fit=crop";
-                                        }}
-                                      />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-xs font-semibold text-slate-800 truncate" title={item.productName}>
-                                        {item.productName}
-                                      </p>
-                                      <div className="flex items-center justify-between gap-1 mt-1">
-                                        <span className="text-[10px] text-slate-400 font-mono">
-                                          SL: <strong>{item.quantity}</strong>
-                                        </span>
-                                        <span className="text-xs font-black font-mono text-[#FF4D24]">
-                                          {Math.round(item.subTotal || item.salePrice * item.quantity).toLocaleString("vi-VN")}đ
-                                        </span>
+                              {/* Accessories Structured Table / List */}
+                              <div className="divide-y divide-slate-100 bg-white/70 rounded-xl border border-slate-200/70 overflow-hidden shadow-2xs">
+                                {bookmark.items.map((item, idx) => {
+                                  const isItemDeleting = bookmarkActionLoading === `${bookmark.mainSku}::${item.sku}`;
+
+                                  return (
+                                    <div
+                                      key={item.sku || idx}
+                                      className="p-3 sm:p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors"
+                                    >
+                                      {/* Thumbnail & Title */}
+                                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div className="size-12 sm:size-14 rounded-xl overflow-hidden shrink-0 border border-slate-200/80 bg-white shadow-2xs p-0.5">
+                                          <img
+                                            src={item.imageUrl}
+                                            alt={item.productName}
+                                            className="w-full h-full object-cover rounded-lg"
+                                            onError={(e) => {
+                                              (e.currentTarget as HTMLImageElement).src = "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&auto=format&fit=crop";
+                                            }}
+                                          />
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <p className="text-xs sm:text-sm font-bold text-slate-900 truncate" title={item.productName}>
+                                              {item.productName}
+                                            </p>
+                                            <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                                              {item.sku}
+                                            </span>
+                                          </div>
+
+                                          {item.attributesTitle && (
+                                            <p className="text-[11px] text-slate-500 truncate mt-0.5 font-medium">
+                                              {item.attributesTitle}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Price Breakdown & Delete Item Action */}
+                                      <div className="flex items-center gap-3 shrink-0 text-right">
+                                        <div className="flex flex-col items-end">
+                                          <span className="text-xs sm:text-sm font-black font-mono text-[#FF4D24]">
+                                            {Math.round(item.salePrice).toLocaleString("vi-VN")}đ
+                                          </span>
+                                          <span className="text-[10px] text-slate-400 font-mono">
+                                            Thành tiền: <strong className="text-slate-700 font-bold">{Math.round(item.subTotal || item.salePrice * item.quantity).toLocaleString("vi-VN")}đ</strong>
+                                          </span>
+                                        </div>
+
+                                        {/* Individual Item Deletion */}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveBookmarkItem(bookmark.mainSku, item.sku, item.productName)}
+                                          disabled={isItemDeleting}
+                                          title="Xóa phụ kiện này"
+                                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
+                                        >
+                                          {isItemDeleting ? <RefreshCw className="size-3.5 animate-spin text-rose-500" /> : <Trash2 className="size-3.5" />}
+                                        </button>
                                       </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
 
-                              {/* Order Card Footer */}
-                              <div className="flex items-center justify-between pt-3 border-t border-slate-200/60 flex-wrap gap-2">
-                                <div>
-                                  <span className="text-xs text-slate-500">Tổng cộng:</span>
-                                  <span className="text-sm font-black font-mono text-[#FF4D24] ml-1.5">
-                                    {Math.round(bookmark.totalSalePrice).toLocaleString("vi-VN")}đ
-                                  </span>
+                              {/* Card Footer: Financial Breakdown & Smooth Tactile Action Buttons */}
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200/70">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-baseline gap-1.5">
+                                    <span className="text-xs text-slate-500 font-medium">Tổng thanh toán:</span>
+                                    <span className="text-base sm:text-lg font-black font-mono text-[#FF4D24]">
+                                      {Math.round(bookmark.totalSalePrice).toLocaleString("vi-VN")}đ
+                                    </span>
+                                  </div>
                                 </div>
 
-                                <div className="flex items-center gap-2">
+                                {/* Action Buttons with layered tactile shadow & smooth curves */}
+                                <div className="flex items-center gap-2.5 self-end sm:self-center">
                                   <button
                                     type="button"
-                                    onClick={async () => {
-                                      try {
-                                        await clearBookmark(bookmark.mainSku);
-                                        loadUserBookmarks();
-                                        setSuccessMsg(`Đã xóa gói phụ kiện ${bookmark.mainSku}`);
-                                      } catch (err: any) {
-                                        setErrorMsg(err.message || "Lỗi xóa bookmark");
-                                      }
-                                    }}
-                                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                    onClick={() => handleClearBookmarkPackage(bookmark.mainSku)}
+                                    disabled={isPackageLoading}
+                                    className="h-9 px-4 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-white/95 hover:bg-rose-50/90 rounded-xl border border-rose-200/90 hover:border-rose-300 shadow-[0_2px_8px_-1px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_14px_-2px_rgba(244,63,94,0.22)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
                                   >
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                    {bookmarkActionLoading === bookmark.mainSku ? (
+                                      <RefreshCw className="size-3.5 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="size-3.5" />
+                                    )}
                                     <span>Xóa gói</span>
                                   </button>
 
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      setIsAccountsCenterOpen(false);
-                                      onNavigate("product");
-                                    }}
-                                    className="px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] shadow-[0_4px_12px_rgba(255,77,36,0.3)] hover:brightness-105 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                                    onClick={() => handleCheckoutBookmarkPackage(bookmark)}
+                                    disabled={isPackageLoading}
+                                    className="h-9 px-4.5 text-xs font-bold text-white rounded-xl bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/40 border-b border-b-[#9e270a] border-x border-x-[#FF4D24]/90 shadow-[0_6px_20px_-3px_rgba(255,77,36,0.42),0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.45)] hover:shadow-[0_8px_25px_-3px_rgba(255,77,36,0.52),0_3px_8px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.55)] hover:brightness-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                                   >
-                                    <span>Thanh toán ngay</span>
-                                    <ArrowRight className="w-3.5 h-3.5" />
+                                    {bookmarkActionLoading === `checkout::${bookmark.mainSku}` ? (
+                                      <RefreshCw className="size-3.5 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <ShoppingCart className="size-3.5" />
+                                        <span>Thêm vào giỏ & Mua ngay</span>
+                                        <ArrowRight className="size-3.5" />
+                                      </>
+                                    )}
                                   </button>
                                 </div>
                               </div>
-                            </div>
+                            </Bevel>
                           );
                         })}
                       </div>

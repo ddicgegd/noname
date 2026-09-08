@@ -5,6 +5,7 @@ import {
   Minus,
   Plus,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ShoppingBag,
   MapPin,
@@ -27,7 +28,6 @@ import {
   CheckCircle2,
   Trash2,
   Landmark,
-  ShieldCheck,
   Info,
   Wallet,
   Coins,
@@ -408,7 +408,7 @@ const MOCK_USER_LOANS: UserLoanContract[] = [
   },
 ];
 
-
+const ORDER_LOAN_TERMS = [3, 6, 9, 12, 18, 24, 36];
 
 function PaypalLottieAnimation({ triggerKey }: { triggerKey?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -949,12 +949,45 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   // Loan Subsystem State (Khoản vay cố định & Vay theo đơn hàng)
   const [loanMode, setLoanMode] = useState<"existing_loan" | "order_loan">("existing_loan");
   const [selectedLoanId, setSelectedLoanId] = useState<string>("loan-fineract-01");
-  const [orderLoanTerm, setOrderLoanTerm] = useState<number>(12);
+  const [orderLoanTerm, setOrderLoanTerm] = useState<number | null>(null);
   const [orderLoanInterestRate] = useState<number>(0.0065);
   const [isLoanModalOpen, setIsLoanModalOpen] = useState<boolean>(false);
   const [selectedCreditCardType, setSelectedCreditCardType] = useState<string>("VISA");
-  const [selectedBnplProvider, setSelectedBnplProvider] = useState<string>("kredivo");
   const [isInstallmentModalOpen, setIsInstallmentModalOpen] = useState<boolean>(false);
+  const loanTermScrollRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLoanLeft, setCanScrollLoanLeft] = useState<boolean>(false);
+  const [canScrollLoanRight, setCanScrollLoanRight] = useState<boolean>(true);
+
+  const checkLoanScroll = () => {
+    if (loanTermScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = loanTermScrollRef.current;
+      setCanScrollLoanLeft(scrollLeft > 6);
+      setCanScrollLoanRight(scrollLeft < scrollWidth - clientWidth - 6);
+    }
+  };
+
+  const handleScrollLoanTerms = (direction: "left" | "right") => {
+    if (loanTermScrollRef.current) {
+      const scrollAmount = 184;
+      loanTermScrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+      setTimeout(checkLoanScroll, 350);
+    }
+  };
+
+  useEffect(() => {
+    if (paymentType === "loan") {
+      const timer = setTimeout(checkLoanScroll, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [paymentType]);
+
+  useEffect(() => {
+    window.addEventListener("resize", checkLoanScroll);
+    return () => window.removeEventListener("resize", checkLoanScroll);
+  }, []);
 
   // Financial calculations
   const shippingFee = 35000;
@@ -1112,6 +1145,11 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
       if (loanMode === "existing_loan") {
         mappedBankCode = `LOAN_${activeLoanContract?.accountNo || "LN2026"}`;
       } else {
+        if (!orderLoanTerm) {
+          setIsPlacingOrder(false);
+          setOrderError("Vui lòng chọn kỳ hạn thanh toán cho gói vay trước khi đặt hàng.");
+          return;
+        }
         mappedBankCode = `ORDER_LOAN_${orderLoanTerm}M`;
       }
     } else if (paymentType === "paypal" || paymentType === "card") {
@@ -1700,7 +1738,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
           {/* ----------------------------------------------------------------------- */}
           {/* TẦNG 2: PHƯƠNG THỨC THANH TOÁN (+15% DOWNWARDS EXPANSION)              */}
           {/* ----------------------------------------------------------------------- */}
-          <div className="relative h-[402px] shrink-0 flex flex-col justify-between p-3.5 rounded-2xl border border-white/90 bg-gradient-to-b from-white via-white/90 to-white/75 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md overflow-hidden">
+          <div className="relative h-[402px] shrink-0 flex flex-col justify-between px-[15px] pt-3 pb-2 rounded-2xl border border-white/90 bg-gradient-to-b from-white via-white/90 to-white/75 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md overflow-hidden">
             {/* Multi-corner Ambient Luxury Glow Aura */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
               <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.08] to-transparent blur-2xl" />
@@ -1753,136 +1791,214 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
             </div>
 
             {/* Dynamic Bank & Payment Detail View */}
-            <div className="h-[306px] overflow-hidden">
+            <div className="h-[314px] overflow-hidden">
               {/* Option 1: Khoản vay tín dụng (1 Tag chính xét duyệt theo giá trị đơn hàng đầy đủ thông tin) */}
               {paymentType === "loan" && (() => {
                 const activeLoan = MOCK_USER_LOANS.find((l) => l.id === selectedLoanId) || MOCK_USER_LOANS[0];
-                const monthlyPrincipal = Math.round(total / orderLoanTerm);
+                const monthlyPrincipal = orderLoanTerm ? Math.round(total / orderLoanTerm) : 0;
                 const monthlyInterest = Math.round(total * orderLoanInterestRate);
-                const monthlyTotal = monthlyPrincipal + monthlyInterest;
+                const monthlyTotal = orderLoanTerm ? monthlyPrincipal + monthlyInterest : 0;
 
                 return (
-                  <div className="h-full p-2.5 sm:p-3 bg-neutral-50/90 rounded-xl border border-neutral-200/80 flex flex-col justify-between text-xs overflow-hidden">
-                    {/* 1 Tag chính to nổi bật: Thể hiện rõ xét duyệt theo số tiền đơn hàng */}
-                    <div className="bg-gradient-to-br from-sky-50/90 via-white to-sky-50/50 p-2.5 sm:p-3 rounded-xl border border-sky-200/90 shadow-2xs flex flex-col gap-1.5 shrink-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2.5 min-w-0">
-                          <div className="size-9 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-                            <Landmark className="size-4.5" />
+                  <div className="h-full flex flex-col justify-between text-xs">
+                    {/* 1. Phần trên: Xét duyệt khoản vay (tăng phạm vi lên h-[48%], chữ bên trong tăng 20%) */}
+                    <div className="h-[48%] relative overflow-hidden rounded-2xl border border-sky-200/70 bg-gradient-to-b from-white via-[#f4f9fe] to-[#e8f4fc] p-3 sm:p-3.5 flex flex-col justify-between shrink-0 shadow-[0_4px_16px_-4px_rgba(2,132,199,0.08),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md">
+                      {/* Ambient Mesh Lighting Aura xanh dương thanh thoát (-30% tổng thể) */}
+                      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                        {/* Orb ánh sáng xanh da trời góc trên phải */}
+                        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-gradient-to-br from-sky-400/18 via-cyan-400/10 to-transparent blur-xl" />
+                        {/* Orb ánh sáng chàm đại dương góc dưới trái */}
+                        <div className="absolute -bottom-8 -left-6 w-32 h-32 rounded-full bg-gradient-to-tr from-blue-600/10 via-sky-500/8 to-transparent blur-xl" />
+                        {/* Lớp mesh radial phản quang mềm mại */}
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_75%_55%_at_85%_15%,rgba(14,165,233,0.08)_0%,transparent_70%),radial-gradient(ellipse_75%_55%_at_15%_85%,rgba(2,132,199,0.06)_0%,transparent_70%)]" />
+                        {/* Viền sáng hairline phản chiếu trên đỉnh */}
+                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-95" />
+                      </div>
+
+                      {/* 1. Chỉ mục: * Xét duyệt khoản vay + Nút Hạn mức & Gói vay (Đưa lên hàng chỉ mục) */}
+                      <div className="flex items-center justify-between relative z-10">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center justify-center size-3.5 rounded-full bg-sky-500/12 text-sky-600 font-black text-[11px] leading-none select-none">
+                              *
+                            </span>
+                            <span className="text-xs sm:text-[12.5px] font-bold text-sky-900 tracking-wide uppercase truncate">
+                              Xét duyệt khoản vay
+                            </span>
                           </div>
-                          <div className="min-w-0 flex flex-col gap-0.5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[9.5px] sm:text-[10px] font-bold text-sky-800 uppercase tracking-wide bg-sky-100/80 px-1.5 py-0.5 rounded-md border border-sky-200/60">
-                                Xét duyệt khoản vay
-                              </span>
-                              <Badge className="text-[8px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 shadow-none">
-                                Duyệt tự động 100%
-                              </Badge>
-                            </div>
-                            <h4 className="text-xs sm:text-[13px] font-extrabold text-neutral-900 leading-snug">
-                              Với đơn hàng <span className="text-sky-700 font-black">{formatVND(total)}</span>, bạn có thể mở xét duyệt khoản vay
-                            </h4>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setIsLoanModalOpen(true)}
-                          className="flex items-center gap-1 text-[10.5px] sm:text-[11px] font-bold text-white bg-sky-700 hover:bg-sky-800 px-2.5 py-1.5 rounded-lg transition-all shadow-xs hover:shadow-sm active:scale-98 cursor-pointer shrink-0"
-                        >
-                          <Wallet className="size-3" />
-                          <span>Hạn mức & Gói vay</span>
-                          <ChevronRight className="size-3" />
-                        </button>
-                      </div>
-
-                      {/* Thông tin mô tả gói vay */}
-                      <p className="text-[10px] sm:text-[10.5px] text-neutral-500 leading-snug">
-                        Thẩm định tức thì qua Core Banking Fineract. Áp dụng trả chậm linh hoạt từ 6 - 24 tháng với lãi suất ưu đãi chỉ từ 0.65%/tháng.
-                      </p>
-                    </div>
-
-                    {/* Term Selector Cards (Đầy đủ thông tin gốc, lãi, góp mỗi tháng) */}
-                    <div className="flex-1 flex flex-col justify-between py-1 min-h-0 gap-1.5">
-                      <div className="flex items-center justify-between px-0.5 text-[11px] shrink-0">
-                        <span className="font-bold text-neutral-800">Chọn kỳ hạn thanh toán:</span>
-                        <span className="text-neutral-500 text-[10.5px]">
-                          Góp ước tính: <strong className="text-sky-700 font-extrabold text-xs">{formatVND(monthlyTotal)}</strong>/tháng
-                        </span>
-                      </div>
-
-                      {/* 4 Clean Term Cards */}
-                      <div className="grid grid-cols-4 gap-1.5 flex-1 min-h-0 items-stretch">
-                        {[6, 12, 18, 24].map((term) => {
-                          const isSelected = orderLoanTerm === term;
-                          const principal = Math.round(total / term);
-                          const interest = Math.round(total * orderLoanInterestRate);
-                          const monthlyPay = principal + interest;
-
-                          return (
-                            <button
-                              key={term}
-                              type="button"
-                              onClick={() => setOrderLoanTerm(term)}
-                              className={`rounded-xl border p-1.5 sm:p-2 flex flex-col justify-between text-left transition-all cursor-pointer relative ${
-                                isSelected
-                                  ? "border-sky-600 bg-sky-50/20 ring-1.5 ring-sky-500/20 shadow-xs"
-                                  : "border-neutral-200 bg-white hover:border-sky-300 hover:bg-sky-50/10"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <span className="font-bold text-neutral-900 text-xs sm:text-[12.5px]">
-                                  {term} tháng
-                                </span>
-                                <Badge className="text-[7.5px] px-1 py-0 font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-none">
-                                  0.65%
-                                </Badge>
-                              </div>
-
-                              <div className="my-auto py-0.5">
-                                <span className="text-[8.5px] text-neutral-400 block leading-tight">
-                                  Góp mỗi tháng:
-                                </span>
-                                <span className="font-black text-sky-800 text-[11px] sm:text-xs tracking-tight">
-                                  {formatVND(monthlyPay)}
-                                </span>
-                              </div>
-
-                              <div className="pt-0.5 border-t border-neutral-100 flex flex-col gap-0.2 text-[8px] text-neutral-500">
-                                <div className="flex justify-between">
-                                  <span>Gốc:</span>
-                                  <span className="font-medium text-neutral-700">{formatVND(principal)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Lãi:</span>
-                                  <span className="font-medium text-neutral-700">{formatVND(interest)}</span>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Thanh liên kết gói vay hoặc hướng dẫn thẩm định */}
-                      <div className="bg-white p-1.5 px-2 rounded-xl border border-neutral-200/80 flex items-center justify-between text-[10px] text-neutral-600 shrink-0">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <ShieldCheck className="size-3.5 text-emerald-600 shrink-0" />
-                          <span className="truncate">
-                            {activeLoan
-                              ? `Đang áp dụng: ${activeLoan.loanProductName} (${activeLoan.accountNo}) • Hạn mức còn ${formatVND(activeLoan.availableAmount)}`
-                              : "Thẩm định hồ sơ trực tuyến qua Core Banking Fineract"}
+                          <span className="text-[9.5px] sm:text-[10px] font-semibold text-sky-700 bg-white/80 border border-sky-200/70 px-2 py-0.5 rounded-full shadow-[0_1px_2px_rgba(2,132,199,0.06)] hidden sm:inline-flex items-center gap-1 shrink-0">
+                            <span className="size-1 rounded-full bg-sky-500 animate-pulse" />
+                            Thẩm định tức thì
                           </span>
                         </div>
+
                         <button
                           type="button"
                           onClick={() => setIsLoanModalOpen(true)}
-                          className="font-bold text-sky-700 hover:underline shrink-0 ml-1 cursor-pointer"
+                          className="h-7 px-2.5 sm:px-3 flex items-center gap-1.5 text-[11px] sm:text-[11.5px] font-semibold text-sky-800 hover:text-sky-950 bg-gradient-to-b from-white via-white to-sky-50/90 hover:from-white hover:to-sky-100/70 border border-sky-300/80 hover:border-sky-400 rounded-lg transition-all shadow-[0_1.5px_4px_rgba(2,132,199,0.10),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_2px_8px_rgba(2,132,199,0.18)] active:scale-98 cursor-pointer shrink-0 group"
                         >
-                          Đổi gói
+                          <Wallet className="size-3 text-sky-600 group-hover:scale-105 transition-transform" />
+                          <span>Hạn mức & Gói vay</span>
+                          <ChevronRight className="size-3 text-sky-400 group-hover:translate-x-0.5 transition-transform" />
                         </button>
                       </div>
+
+                      {/* 2. Nội dung: Icon ngân hàng + dòng chữ điều kiện xét duyệt hiển thị tự nhiên trên 2 dòng */}
+                      <div className="relative z-10 flex items-center gap-3 sm:gap-3.5">
+                        <div className="size-8.5 sm:size-9 rounded-xl bg-gradient-to-b from-sky-50 to-sky-100/80 border border-sky-200/90 text-sky-600 flex items-center justify-center shrink-0 shadow-[0_2px_6px_rgba(2,132,199,0.10)]">
+                          <Landmark className="size-4 sm:size-4.5 stroke-[1.8] text-sky-600" />
+                        </div>
+                        <h4 className="text-[13px] sm:text-[13.5px] font-medium text-neutral-800 leading-snug">
+                          Với đơn hàng <span className="font-bold text-[13.5px] sm:text-[14px] text-neutral-950 underline decoration-sky-400/50 underline-offset-2">{formatVND(total)}</span>, bạn đủ điều kiện mở hồ sơ xét duyệt gói vay trả chậm linh hoạt.
+                        </h4>
+                      </div>
+
+                      {/* 3. Dòng mô tả gói vay: 1 hàng duy nhất, tiếng Việt, bám sát cạnh đáy với dấu chấm tinh tế */}
+                      <div className="text-[10px] sm:text-[10.5px] text-sky-950/80 leading-tight relative z-10 flex items-center gap-1.5 px-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
+                        <span className="size-1 rounded-full bg-sky-500/80 shrink-0" />
+                        <span>Thẩm định trực tuyến tức thì</span>
+                        <span className="text-sky-400/80">•</span>
+                        <span>Áp dụng trả chậm linh hoạt <strong className="font-semibold text-sky-950">3 - 12 tháng</strong></span>
+                        <span className="text-sky-400/80">•</span>
+                        <span>Lãi suất ưu đãi chỉ từ <strong className="font-bold text-sky-700">0.65%/tháng</strong></span>
+                      </div>
                     </div>
-                  </div>
+
+                    {/* 2. Phần Chọn kỳ hạn thanh toán: Giảm 30% tổng thể và khoảng cách với phần card bên dưới */}
+                    <div className="h-[17px] sm:h-[18px] flex items-center justify-between px-1 text-[11px] shrink-0 mt-1 sm:mt-1.5 mb-0.5 sm:mb-1">
+                      <span className="font-bold text-neutral-800">Chọn kỳ hạn thanh toán:</span>
+                      <span className="text-neutral-500 text-[10.5px]">
+                        {orderLoanTerm ? (
+                          <>
+                            Góp ước tính: <strong className="text-sky-700 font-extrabold text-xs">{formatVND(monthlyTotal)}</strong>/tháng
+                          </>
+                        ) : (
+                          <span className="text-neutral-400">Chọn kỳ hạn bên dưới</span>
+                        )}
+                      </span>
+                    </div>
+
+                    {/* 3. Phần các card bên dưới: Chiếm toàn bộ không gian còn lại */}
+                    <div className="relative group flex-1 min-h-0 flex flex-col">
+                        {/* Left Navigation Overlay (Gradient Hint + Floating Button) */}
+                        {canScrollLoanLeft && (
+                          <>
+                            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white via-white/80 to-transparent z-10 rounded-l-xl transition-opacity duration-200" />
+                            <button
+                              type="button"
+                              onClick={() => handleScrollLoanTerms("left")}
+                              className="absolute left-1 top-1/2 -translate-y-1/2 z-20 size-7 sm:size-7.5 rounded-full bg-white/95 backdrop-blur-xs border border-neutral-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.12)] text-neutral-700 hover:text-sky-700 hover:border-sky-300 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100"
+                              title="Kỳ hạn trước"
+                              aria-label="Kỳ hạn trước"
+                            >
+                              <ChevronLeft className="size-3.5 stroke-[2.5]" />
+                            </button>
+                          </>
+                        )}
+
+                        {/* Right Navigation Overlay (Gradient Hint + Floating Button) */}
+                        {canScrollLoanRight && (
+                          <>
+                            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white via-white/80 to-transparent z-10 rounded-r-xl transition-opacity duration-200" />
+                            <button
+                              type="button"
+                              onClick={() => handleScrollLoanTerms("right")}
+                              className="absolute right-1 top-1/2 -translate-y-1/2 z-20 size-7 sm:size-7.5 rounded-full bg-white/95 backdrop-blur-xs border border-neutral-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.12)] text-neutral-700 hover:text-sky-700 hover:border-sky-300 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100"
+                              title="Kỳ hạn tiếp theo"
+                              aria-label="Kỳ hạn tiếp theo"
+                            >
+                              <ChevronRight className="size-3.5 stroke-[2.5]" />
+                            </button>
+                          </>
+                        )}
+
+                        {/* Horizontal Scrollable Carousel Cards with 6px margin gutter to prevent clipping */}
+                        <div
+                          ref={loanTermScrollRef}
+                          onScroll={checkLoanScroll}
+                          className="flex gap-2 sm:gap-2.5 flex-1 min-h-0 items-stretch overflow-x-auto hide-scrollbar scroll-smooth snap-x snap-mandatory px-1.5 pt-0.5 pb-0.5"
+                        >
+                          {ORDER_LOAN_TERMS.map((term) => {
+                            const isSelected = orderLoanTerm === term;
+                            const principal = Math.round(total / term);
+                            const interest = Math.round(total * orderLoanInterestRate);
+                            const monthlyPay = principal + interest;
+
+                            return (
+                              <button
+                                key={term}
+                                type="button"
+                                onClick={(e) => {
+                                  if (orderLoanTerm === term) {
+                                    setOrderLoanTerm(null);
+                                  } else {
+                                    setOrderLoanTerm(term);
+                                    e.currentTarget.scrollIntoView({
+                                      behavior: "smooth",
+                                      inline: "nearest",
+                                      block: "nearest",
+                                    });
+                                  }
+                                  setTimeout(checkLoanScroll, 350);
+                                }}
+                                className={`w-[170px] sm:w-[174px] shrink-0 snap-start rounded-xl border flex flex-col justify-between text-left transition-all duration-150 cursor-pointer bg-white relative overflow-hidden box-border ${
+                                  isSelected
+                                    ? "border-[1.5px] border-sky-600 ring-1 ring-inset ring-sky-600/30 shadow-xs z-15"
+                                    : "border-neutral-200/90 hover:border-neutral-300 shadow-2xs z-0"
+                                }`}
+                              >
+                                {/* Khu vực nội dung trên với đệm viền */}
+                                <div className="p-2.5 sm:p-3 pb-2 flex flex-col justify-between flex-1">
+                                  {/* 1. Header: Radio nhỏ gọn + Số tháng nhỏ gọn + Pill lãi suất */}
+                                  <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className={`size-3.5 rounded-full border flex items-center justify-center transition-colors shrink-0 ${
+                                        isSelected 
+                                          ? "border-sky-600 bg-sky-600 text-white shadow-2xs" 
+                                          : "border-neutral-300 bg-white"
+                                      }`}>
+                                        {isSelected && <Check className="size-2 text-white stroke-[2.5]" />}
+                                      </div>
+                                      <span className="font-bold text-[11px] sm:text-xs text-neutral-900">
+                                        {term} tháng
+                                      </span>
+                                    </div>
+                                    <span className="text-[8.5px] sm:text-[9px] font-medium text-neutral-500 bg-neutral-100/80 px-1.5 py-0.5 rounded-full border border-neutral-200/50">
+                                      0.65%/th
+                                    </span>
+                                  </div>
+
+                                  {/* 2. Hero Center: Số tiền góp mỗi tháng */}
+                                  <div className="my-auto py-1">
+                                    <span className="text-[9.5px] font-medium text-neutral-400 block leading-tight">
+                                      Góp mỗi tháng
+                                    </span>
+                                    <div className="flex items-baseline gap-1 mt-0.5">
+                                      <span className="text-sm sm:text-[15.5px] font-black tracking-tight text-neutral-900">
+                                        {formatVND(monthlyPay)}
+                                      </span>
+                                      <span className="text-[10px] font-normal text-neutral-400">/tháng</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* 3. Inset Footer Shelf: Tăng chiều ngang bao trọn toàn bộ khung card */}
+                                <div className="w-full border-t border-neutral-100/90 bg-neutral-50/80 px-2.5 sm:px-3 py-1.5 sm:py-2 flex flex-col gap-1 shrink-0">
+                                  <div className="flex items-center justify-between text-[9px] sm:text-[9.5px] leading-tight">
+                                    <span className="text-neutral-400">Tiền gốc</span>
+                                    <span className="font-semibold text-neutral-700">{formatVND(principal)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-[9px] sm:text-[9.5px] leading-tight">
+                                    <span className="text-neutral-400">Tiền lãi</span>
+                                    <span className="font-semibold text-neutral-700">{formatVND(interest)}</span>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
                 );
               })()}
 

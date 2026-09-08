@@ -32,14 +32,7 @@ export const SectionNoise: React.FC = () => {
         style={{ opacity: opacity }}
       />
 
-      {/* Hero Content Section with Grid & Radial Mask */}
-      <div className="font-semibold 2xl:h-[450px] sm:h-[450px] h-[400px] bg-gradient-to-t dark:to-neutral-950 dark:from-neutral-900 to-[#dadada] from-[#ebebeb] flex flex-col items-center justify-center text-foreground relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:35px_34px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
 
-        <h1 className="relative z-10 xl:text-4xl text-3xl px-8 font-bold text-center tracking-tight leading-[120%] text-neutral-900 dark:text-white drop-shadow-xs">
-          An Home Page with Noise Effect
-        </h1>
-      </div>
     </section>
   );
 };

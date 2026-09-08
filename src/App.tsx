@@ -10,7 +10,6 @@ import SpotlightSection from "./components/SpotlightSection";
 import FeatureOne from "./components/FeatureOne";
 import ShowcaseSection from "./components/ShowcaseSection";
 import PricingSection from "./components/PricingSection";
-import SectionNoise from "./components/SectionNoise";
 import { ScrollAnimation } from "./components/ui/scroll-animation";
 import ProductPage from "./components/ProductPage";
 import RegisterPage from "./components/RegisterPage";
@@ -405,11 +404,6 @@ export default function App() {
               <PricingSection />
             </ScrollAnimation>
 
-            <ScrollAnimation direction="up" duration={0.65} viewport={{ once: true, amount: 0.15 }}>
-              <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-16">
-                <SectionNoise />
-              </div>
-            </ScrollAnimation>
           </motion.div>
         ) : currentPage === "product" ? (
           <motion.div
