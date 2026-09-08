@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { motion, AnimatePresence, LayoutGroup, type Variants } from "motion/react";
+import { motion, AnimatePresence, LayoutGroup, useReducedMotion, type Variants } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
   type Product,
@@ -15,6 +15,17 @@ import { createOrder, type CreateOrderInput } from "../services/orderService";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 import { createAuthAction, savePendingAction } from "../lib/authAction";
 import { getCachedCart, subscribeToCartUpdates } from "../services/cartService";
+import {
+  stageBookmarkItems,
+  persistBookmarkItem,
+  persistStagedBookmark,
+  getBookmarkDetails,
+  removeBookmarkItem,
+  clearBookmark,
+  BookmarkData,
+  subscribeBookmarkUpdates,
+  getCachedBookmark,
+} from "@/services/bookmarkService";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +41,7 @@ import { useGenieCartFly } from "@/components/ui/genie-cart-fly";
 import { TimelineAnimation } from "@/components/ui/timeline-animation";
 import {
   BadgeCheckIcon,
+  BookmarkIcon,
   BrainCircuitIcon,
   CheckIcon,
   ChevronLeftIcon,
@@ -58,6 +70,8 @@ import {
   PlusIcon,
   ZapIcon,
   Loader2Icon,
+  Trash2Icon,
+  ClockIcon,
 } from "lucide-react";
 
 const PRODUCTS: Product[] = [
@@ -806,6 +820,8 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
   const [sortBy, setSortBy] = useState<"banchay" | "giathap" | "giacao" | "khuyenmai" | "xemnhieu">("banchay");
   const [comparedProductIds, setComparedProductIds] = useState<string[]>([]);
+  const [isCompareBookmarked, setIsCompareBookmarked] = useState<boolean>(false);
+  const [isCompareBookmarkAnimating, setIsCompareBookmarkAnimating] = useState<boolean>(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [catalogPage, setCatalogPage] = useState(1);
   const [hasMoreCatalogProducts, setHasMoreCatalogProducts] = useState(true);
@@ -928,6 +944,113 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3500);
+  };
+
+  interface StoredCompareBookmark {
+    groupKey: string;
+    productCount: number;
+    skus: string[];
+    expiresAt: number;
+  }
+
+  const LOCAL_STORAGE_7D_COMPARE_KEY = "horizon_7d_compare_bookmarks_v3";
+
+  const getStored7dBookmarks = (): StoredCompareBookmark[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_7D_COMPARE_KEY);
+      if (!raw) return [];
+      const list: StoredCompareBookmark[] = JSON.parse(raw);
+      const now = Date.now();
+      const valid = list.filter((item) => item.expiresAt > now);
+      if (valid.length !== list.length) {
+        localStorage.setItem(LOCAL_STORAGE_7D_COMPARE_KEY, JSON.stringify(valid));
+      }
+      return valid;
+    } catch (_) {
+      return [];
+    }
+  };
+
+  const isExactGroupBookmarked = (prods: Product[]): boolean => {
+    if (!prods || prods.length === 0) return false;
+    const currentSkus = prods.map((p) => p.sku || p.id).sort();
+    const currentKey = currentSkus.join("::");
+    const currentCount = prods.length;
+    const list = getStored7dBookmarks();
+
+    // Chỉ khi đúng chính xác 1, 2, hoặc 3 (n) product trùng khớp với bookmark 7d đã lưu thì mới tính là đã thêm
+    return list.some(
+      (entry) => entry.productCount === currentCount && entry.groupKey === currentKey
+    );
+  };
+
+  const saveExactGroupBookmark = (prods: Product[]) => {
+    if (typeof window === "undefined" || !prods || prods.length === 0) return;
+    try {
+      const currentSkus = prods.map((p) => p.sku || p.id).sort();
+      const currentKey = currentSkus.join("::");
+      const currentCount = prods.length;
+      const list = getStored7dBookmarks();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      const newEntry: StoredCompareBookmark = {
+        groupKey: currentKey,
+        productCount: currentCount,
+        skus: currentSkus,
+        expiresAt: Date.now() + sevenDaysMs,
+      };
+      const existingIdx = list.findIndex((e) => e.groupKey === currentKey);
+      if (existingIdx >= 0) {
+        list[existingIdx] = newEntry;
+      } else {
+        list.push(newEntry);
+      }
+      localStorage.setItem(LOCAL_STORAGE_7D_COMPARE_KEY, JSON.stringify(list));
+    } catch (_) {}
+  };
+
+  useEffect(() => {
+    if (comparedProducts.length === 0) {
+      setIsCompareBookmarked(false);
+      return;
+    }
+    const alreadySaved = isExactGroupBookmarked(comparedProducts);
+    setIsCompareBookmarked(alreadySaved);
+  }, [comparedProducts]);
+
+  const handleToggleCompareBookmark = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsCompareBookmarkAnimating(true);
+    setTimeout(() => setIsCompareBookmarkAnimating(false), 550);
+
+    const alreadySaved = isCompareBookmarked || isExactGroupBookmarked(comparedProducts);
+
+    if (alreadySaved) {
+      // Khi nhóm sản phẩm đúng chính xác đã có bookmark 7d thì không cho thêm, hoạt ảnh không bị ngược
+      showToast("Nhóm sản phẩm này đã được lưu vào Bookmark trong 7 ngày!", "info");
+      return;
+    }
+
+    // Lần đầu lưu đúng chính xác nhóm n sản phẩm này: Lưu vào bookmark 7 ngày
+    setIsCompareBookmarked(true);
+    saveExactGroupBookmark(comparedProducts);
+
+    try {
+      const firstProd = comparedProducts[0];
+      if (firstProd) {
+        const mainSku = firstProd.sku || firstProd.id;
+        const otherItems = comparedProducts.slice(1).map((p) => ({
+          sku: p.sku || p.id,
+          quantity: 1,
+        }));
+        const itemsToStage = otherItems.length > 0 ? otherItems : [{ sku: mainSku, quantity: 1 }];
+        await stageBookmarkItems(mainSku, itemsToStage);
+        await persistStagedBookmark(mainSku);
+      }
+    } catch (err: any) {
+      console.warn("Lỗi lưu bookmark 7 ngày:", err);
+    }
+    showToast("Đã lưu bookmark vào hệ thống trong 7 ngày!", "success");
   };
 
   const getProductBrand = (id: string): string => {
@@ -1880,8 +2003,8 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            aria-label={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
-                            title={compared ? "Bỏ khỏi so sánh" : "So sánh sản phẩm"}
+                            aria-label={compared ? "Bỏ chọn" : "Chọn sản phẩm"}
+                            title={compared ? "Bỏ chọn" : "Chọn sản phẩm"}
                             onClick={(event) => {
                               event.stopPropagation();
                               if (compared) {
@@ -1898,8 +2021,8 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
                                 : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] text-slate-800 hover:from-white hover:to-white/80"
                             }`}
                           >
-                            <SlidersHorizontalIcon className="size-3" />
-                            {compared ? "Đã so sánh" : "So sánh"}
+                            <CheckIcon className="size-3" />
+                            {compared ? "Đã chọn" : "Chọn"}
                           </button>
                         </div>
                       </CardFooter>
@@ -1986,47 +2109,85 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
       <AnimatePresence>
         {comparedProductIds.length > 0 && (
           <motion.div
-            initial={{ y: 150, opacity: 0, scale: 0.9 }}
+            initial={{ y: 120, opacity: 0, scale: 0.95 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 150, opacity: 0, scale: 0.9 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed bottom-8 left-0 right-0 z-50 mx-auto w-fit"
+            exit={{ y: 120, opacity: 0, scale: 0.95 }}
+            transition={{ type: "spring", damping: 26, stiffness: 240 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] sm:w-auto max-w-[620px]"
           >
-            <div className="flex items-center gap-5 rounded-full border border-white/20 bg-background/70 p-3 pr-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-3xl dark:border-white/10 dark:bg-black/60">
+            <div className="relative flex items-center justify-between gap-3 sm:gap-4 rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/85 dark:bg-zinc-900/85 p-2 sm:p-2.5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 select-none">
+              {/* Ambient backdrop clipping safely */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl overflow-hidden -z-10">
+                <div className="absolute inset-0 bg-gradient-to-r from-[#FF4D24]/[0.05] via-transparent to-transparent" />
+                <div className="absolute top-0 right-0 w-40 h-40 bg-[#FF4D24]/10 rounded-full blur-[40px]" />
+              </div>
 
-              <div className="flex items-center pl-2">
-                <div className="mr-5 flex -space-x-4">
-                  {comparedProducts.map((product, i) => (
+              {/* Left: Product Thumbnails & Title info */}
+              <div className="flex items-center gap-3 min-w-0 pl-1">
+                {/* Thumbnails row */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {comparedProducts.map((product) => (
                     <motion.div
                       key={product.id}
-                      initial={{ scale: 0, opacity: 0 }}
+                      initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="relative size-12 overflow-hidden rounded-full border-[3px] border-background bg-muted shadow-sm ring-1 ring-black/5 dark:border-zinc-900"
-                      style={{ zIndex: 10 - i }}
+                      className="relative size-11 sm:size-12 shrink-0 group select-none"
+                      title={product.name}
                     >
-                      <img src={getProductImage(product)} alt={product.name} className="size-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="size-full rounded-xl overflow-hidden border border-slate-200/90 dark:border-white/15 bg-white dark:bg-zinc-800 shadow-[0_2px_6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)]">
+                        <img src={getProductImage(product)} alt={product.name} className="size-full object-cover transition-transform duration-200 group-hover:scale-105" referrerPolicy="no-referrer" />
+                      </div>
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.15 }}
+                        whileTap={{ scale: 0.88 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setComparedProductIds(comparedProductIds.filter((id) => id !== product.id));
+                        }}
+                        className="btn-thumb-x absolute -top-1.5 -right-1.5 z-10 size-5 rounded-full bg-slate-900/85 hover:bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer shadow-md border border-white/90 dark:border-zinc-800"
+                        title={`Bỏ ${product.name}`}
+                      >
+                        <span className="thumb-spin-target pointer-events-none">
+                          <XIcon className="size-2.5 stroke-[2.5]" />
+                        </span>
+                      </motion.button>
                     </motion.div>
                   ))}
                   {Array.from({ length: Math.max(0, 3 - comparedProducts.length) }).map((_, i) => (
                     <div
                       key={`empty-${i}`}
-                      className="relative flex size-12 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted/50 text-muted-foreground dark:border-zinc-800"
-                      style={{ zIndex: 5 - i }}
+                      className="size-11 sm:size-12 rounded-xl border-2 border-dashed border-orange-500/25 dark:border-orange-500/20 bg-orange-500/[0.03] dark:bg-orange-500/[0.06] text-[#FF4D24]/50 flex items-center justify-center shrink-0"
+                      title="Còn trống (tối đa 3 sản phẩm)"
                     >
-                       <PlusIcon className="size-5 opacity-40" />
+                      <PlusIcon className="size-4 stroke-[2.2]" />
                     </div>
                   ))}
                 </div>
 
-                <div className="hidden flex-col sm:flex">
-                   <span className="text-base font-semibold leading-none">So sánh</span>
-                   <span className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">{comparedProductIds.length} / 3 Sản phẩm</span>
+                {/* Text Indicator */}
+                <div className="hidden sm:flex flex-col justify-center min-w-0 pr-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-sans font-bold text-xs sm:text-[13px] text-slate-900 dark:text-white uppercase tracking-tight">
+                      So sánh
+                    </span>
+                    <span className="text-[10px] font-black text-[#FF4D24] bg-[#FF4D24]/10 px-2 py-0.5 rounded-full border border-[#FF4D24]/20 font-mono leading-none">
+                      {comparedProductIds.length}/3
+                    </span>
+                  </div>
+                  <span className="text-[10.5px] font-medium text-slate-500 dark:text-zinc-400 truncate mt-0.5 max-w-[160px]">
+                    {comparedProductIds.length < 2 ? "Chọn thêm ít nhất 1 máy" : "Sẵn sàng so sánh thông số"}
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pl-3 border-l border-border/50">
-                <Button
-                  className="h-10 rounded-full px-5 text-sm"
+              {/* Right: Actions */}
+              <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-slate-200/80 dark:border-white/10 shrink-0">
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.96 }}
+                  className="h-10 px-4 sm:px-5 rounded-xl font-sans font-black text-xs uppercase tracking-wider text-white bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/50 border-b border-b-[#A8280A] border-x border-x-[#FF4D24]/80 shadow-[0_4px_14px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-all"
                   onClick={() => {
                     if (comparedProductIds.length < 2) {
                       showToast("Vui lòng chọn ít nhất 2 sản phẩm để so sánh.", "warning");
@@ -2035,18 +2196,79 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
                     }
                   }}
                 >
-                  <SlidersHorizontalIcon data-icon="inline-start" />
-                  So sánh ngay
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-10 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => setComparedProductIds([])}
-                  title="Xóa tất cả"
+                  <SlidersHorizontalIcon className="size-3.5 stroke-[2.4]" />
+                  <span>So sánh ngay</span>
+                </motion.button>
+
+                {/* Bookmark comparison list button - exact styling & micro-animation */}
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.88 }}
+                  whileHover={{ scale: 1.05 }}
+                  animate={isCompareBookmarkAnimating ? {
+                    scale: [1, 0.86, 1.2, 0.94, 1.05, 1],
+                    rotate: [0, -10, 10, -5, 2, 0],
+                  } : {}}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  onClick={handleToggleCompareBookmark}
+                  title={isCompareBookmarked ? "Đã lưu trong Bookmark 7 ngày" : "Lưu danh sách so sánh vào Bookmark 7 ngày"}
+                  aria-label={isCompareBookmarked ? "Đã lưu trong Bookmark 7 ngày" : "Lưu danh sách so sánh vào Bookmark 7 ngày"}
+                  className={`size-10 rounded-xl border transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0 relative shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] ${
+                    isCompareBookmarked
+                      ? "border-[#FF4D24] bg-orange-500/[0.12] text-[#FF4D24] dark:bg-orange-500/[0.2]"
+                      : "border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:border-primary"
+                  }`}
                 >
-                  <XIcon />
-                </Button>
+                  {/* Ripple ring burst effect on click */}
+                  {isCompareBookmarkAnimating && (
+                    <motion.span
+                      initial={{ scale: 0.8, opacity: 0.75 }}
+                      animate={{ scale: 1.85, opacity: 0 }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                      className="absolute inset-0 rounded-xl border-2 border-[#FF4D24] pointer-events-none"
+                    />
+                  )}
+
+                  <motion.div
+                    animate={isCompareBookmarkAnimating ? { scale: [1, 1.35, 1], rotate: [0, -12, 12, 0] } : {}}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    className="flex items-center justify-center pointer-events-none"
+                  >
+                    <BookmarkIcon
+                      className={`size-5 transition-all duration-200 ${
+                        isCompareBookmarked
+                          ? "stroke-[2] fill-[#FF4D24] text-[#FF4D24]"
+                          : "stroke-[2.2] text-primary hover:scale-105"
+                      }`}
+                    />
+                  </motion.div>
+
+                  {isCompareBookmarked && (
+                    <motion.span 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                      className="absolute -top-1.5 -right-1.5 size-4.5 rounded-full bg-white dark:bg-zinc-900 border border-[#FF4D24]/50 shadow-[0_2px_6px_rgba(255,77,36,0.22)] flex items-center justify-center pointer-events-none z-10"
+                    >
+                      <CheckIcon className="size-2.5 stroke-[3] text-[#FF4D24]" />
+                    </motion.span>
+                  )}
+                </motion.button>
+
+                {/* Right X clear button - Synchronized with bookmark & smooth CSS 90deg rotation on hover */}
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => setComparedProductIds([])}
+                  title="Xóa tất cả danh sách so sánh"
+                  aria-label="Xóa tất cả"
+                  className="btn-clear-dock size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:border-primary flex items-center justify-center cursor-pointer shrink-0 shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]"
+                >
+                  <span className="icon-spin-target pointer-events-none">
+                    <XIcon className="size-4 stroke-[2.4]" />
+                  </span>
+                </motion.button>
               </div>
             </div>
           </motion.div>
@@ -2131,22 +2353,77 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
         </DialogContent>
       </Dialog>
 
-      <AnimatePresence>
-        {toasts.map((toast) => (
-          <motion.div
-            key={toast.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-            className="fixed right-4 top-24 z-50 max-w-sm rounded-lg border bg-popover px-4 py-3 text-sm text-popover-foreground shadow-md"
-          >
-            <div className="flex items-center gap-2">
-              {toast.type === "success" ? <CheckIcon className="text-primary" /> : <SparklesIcon className="text-muted-foreground" />}
-              <span>{toast.message}</span>
-            </div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
+      {/* Refined Toast Notification Stack - Inspired by Navbar Glassmorphism */}
+      <div className="fixed top-20 right-4 sm:right-6 z-50 flex flex-col gap-2.5 pointer-events-none items-end max-w-sm">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: -16, scale: 0.94, filter: "blur(6px)" }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -10, scale: 0.94, filter: "blur(4px)" }}
+              transition={{ type: "spring", stiffness: 380, damping: 28 }}
+              className="pointer-events-auto relative flex items-center gap-3 rounded-full border border-white/50 dark:border-white/20 bg-gradient-to-b from-white/35 via-white/22 to-white/12 dark:from-zinc-900/40 dark:via-zinc-900/30 dark:to-zinc-900/20 py-2 pl-3.5 pr-4 shadow-[0_8px_32px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.6)] backdrop-blur-2xl backdrop-saturate-150 select-none overflow-hidden"
+            >
+              {/* Navbar-inspired Ambient Tint & Radial Blur Glow */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full overflow-hidden -z-10">
+                <div
+                  className={`absolute inset-0 bg-gradient-to-r ${
+                    toast.type === "warning"
+                      ? "from-amber-500/[0.12]"
+                      : toast.type === "info"
+                      ? "from-blue-500/[0.12]"
+                      : "from-[#FF4D24]/[0.12]"
+                  } via-transparent to-transparent`}
+                />
+                <div
+                  className={`absolute top-0 right-0 w-28 h-28 ${
+                    toast.type === "warning"
+                      ? "bg-amber-500/18"
+                      : toast.type === "info"
+                      ? "bg-blue-500/18"
+                      : "bg-[#FF4D24]/18"
+                  } rounded-full blur-[25px]`}
+                />
+              </div>
+
+              {/* Status Badge Icon */}
+              <div
+                className={`size-7 rounded-full flex items-center justify-center shrink-0 border ${
+                  toast.type === "warning"
+                    ? "bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                    : toast.type === "info"
+                    ? "bg-blue-500/15 border-blue-500/30 text-blue-600 dark:text-blue-400"
+                    : "bg-[#FF4D24]/15 border-[#FF4D24]/30 text-[#FF4D24]"
+                }`}
+              >
+                {toast.type === "warning" ? (
+                  <SlidersHorizontalIcon className="size-3.5 stroke-[2.4]" />
+                ) : toast.type === "info" ? (
+                  <BookmarkIcon className="size-3.5 stroke-[2.2]" />
+                ) : (
+                  <CheckIcon className="size-3.5 stroke-[3]" />
+                )}
+              </div>
+
+              {/* Message text with Navbar-level typography */}
+              <span className="font-sans font-semibold text-xs text-slate-800 dark:text-zinc-100 tracking-tight leading-none whitespace-nowrap">
+                {toast.message}
+              </span>
+
+              {/* Dismiss button */}
+              <button
+                type="button"
+                onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                className="size-5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/10 flex items-center justify-center transition-all cursor-pointer shrink-0 ml-0.5"
+                aria-label="Đóng"
+              >
+                <XIcon className="size-3 stroke-[2.2]" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       <AnimatePresence>
         {selectedProduct && (
@@ -2520,6 +2797,8 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
   const { triggerGenieFly } = useGenieCartFly();
   const heroImgRef = useRef<HTMLImageElement | null>(null);
   const cartBtnRef = useRef<HTMLButtonElement | null>(null);
+  const bookmarkBtnRef = useRef<HTMLButtonElement | null>(null);
+  const lastAddCartTimeRef = useRef<number>(0);
 
   const versionIds = versions.map((version) => version.id).join("|");
   useEffect(() => {
@@ -2666,7 +2945,180 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     }
   });
 
-  const [favoriteActive, setFavoriteActive] = useState(false);
+  const mainSku = product.sku || product.id || "OPPO-FIND-X8-PRO-BLK";
+  const cachedBookmark = getCachedBookmark(mainSku);
+  const [favoriteActive, setFavoriteActive] = useState(() => Boolean(cachedBookmark && cachedBookmark.totalItems > 0));
+  const [bookmarkCount, setBookmarkCount] = useState(() => cachedBookmark?.totalItems || 0);
+  const [bookmarkData, setBookmarkData] = useState<BookmarkData | null>(() => cachedBookmark);
+  const [isStaged, setIsStaged] = useState(() => Boolean(cachedBookmark && cachedBookmark.totalItems > 0 && (!cachedBookmark.ttlSecondsRemaining || cachedBookmark.ttlSecondsRemaining <= 3600)));
+  const [isPersisted, setIsPersisted] = useState(() => Boolean(cachedBookmark && cachedBookmark.totalItems > 0 && cachedBookmark.ttlSecondsRemaining && cachedBookmark.ttlSecondsRemaining > 3600));
+  const [showBookmarkPopup, setShowBookmarkPopup] = useState(false);
+  const bookmarkOpenTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const bookmarkCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isPlusAnimating, setIsPlusAnimating] = useState(false);
+  const plusAnimTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(() => {
+    if (cachedBookmark?.expiresAtEpochMs) {
+      return Math.max(0, Math.floor((cachedBookmark.expiresAtEpochMs - Date.now()) / 1000));
+    }
+    return cachedBookmark?.ttlSecondsRemaining || 0;
+  });
+
+  const formatCountdown = (seconds: number): string => {
+    if (seconds <= 0) return "00:00";
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (days > 0) {
+      return hours > 0 ? `${days} ngày ${hours} giờ` : `${days} ngày`;
+    }
+    if (hours > 0) {
+      const padH = String(hours).padStart(2, "0");
+      const padM = String(minutes).padStart(2, "0");
+      const padS = String(secs).padStart(2, "0");
+      return `${padH}:${padM}:${padS}`;
+    }
+    const padM = String(minutes).padStart(2, "0");
+    const padS = String(secs).padStart(2, "0");
+    return `${padM}:${padS}`;
+  };
+
+  // Real-time ticking countdown: Wall-clock time minus expiresAtEpochMs
+  useEffect(() => {
+    if (!bookmarkData || bookmarkData.totalItems === 0) {
+      setSecondsRemaining(0);
+      return;
+    }
+
+    let targetExpiryMs: number | null = null;
+    if (bookmarkData.expiresAtEpochMs && bookmarkData.expiresAtEpochMs > 0) {
+      targetExpiryMs = bookmarkData.expiresAtEpochMs;
+    } else if (bookmarkData.ttlSecondsRemaining && bookmarkData.ttlSecondsRemaining > 0) {
+      targetExpiryMs = Date.now() + bookmarkData.ttlSecondsRemaining * 1000;
+    }
+
+    if (!targetExpiryMs) {
+      setSecondsRemaining(0);
+      return;
+    }
+
+    const calcRemaining = () => {
+      const diffMs = targetExpiryMs! - Date.now();
+      const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+      setSecondsRemaining(diffSec);
+    };
+
+    calcRemaining();
+    const interval = setInterval(calcRemaining, 1000);
+    return () => clearInterval(interval);
+  }, [bookmarkData?.expiresAtEpochMs, bookmarkData?.ttlSecondsRemaining, bookmarkData?.totalItems]);
+
+  // Load existing bookmark details for this mainSku
+  useEffect(() => {
+    let isMounted = true;
+    const fetchBookmark = async () => {
+      try {
+        const details = await getBookmarkDetails(mainSku);
+        if (!isMounted) return;
+        if (details && details.totalItems > 0) {
+          setBookmarkData(details);
+          setBookmarkCount(details.totalItems);
+          setFavoriteActive(true);
+          if (details.ttlSecondsRemaining && details.ttlSecondsRemaining > 3600) {
+            setIsPersisted(true);
+            setIsStaged(false);
+          } else {
+            setIsStaged(true);
+            setIsPersisted(false);
+          }
+        } else {
+          setBookmarkData(null);
+          setBookmarkCount(0);
+          setFavoriteActive(false);
+          setIsStaged(false);
+          setIsPersisted(false);
+        }
+      } catch (_) {}
+    };
+    fetchBookmark();
+
+    const unsub = subscribeBookmarkUpdates(() => {
+      fetchBookmark();
+    });
+    return () => {
+      isMounted = false;
+      unsub();
+      if (bookmarkOpenTimeoutRef.current) {
+        clearTimeout(bookmarkOpenTimeoutRef.current);
+      }
+      if (bookmarkCloseTimeoutRef.current) {
+        clearTimeout(bookmarkCloseTimeoutRef.current);
+      }
+      if (plusAnimTimeoutRef.current) {
+        clearTimeout(plusAnimTimeoutRef.current);
+      }
+    };
+  }, [mainSku]);
+
+  const handleToggleBookmark = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextState = !favoriteActive;
+    setFavoriteActive(nextState);
+    if (nextState) {
+      if (showToast) {
+        showToast("Đã lưu sản phẩm vào danh sách yêu thích!", "success");
+      }
+    } else {
+      if (showToast) {
+        showToast("Đã bỏ lưu sản phẩm khỏi danh sách yêu thích", "info");
+      }
+    }
+  };
+
+  const handleBookmarkBtnClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (plusAnimTimeoutRef.current) clearTimeout(plusAnimTimeoutRef.current);
+    setIsPlusAnimating(true);
+    plusAnimTimeoutRef.current = setTimeout(() => {
+      setIsPlusAnimating(false);
+    }, 550);
+
+    if (bookmarkOpenTimeoutRef.current) {
+      clearTimeout(bookmarkOpenTimeoutRef.current);
+      bookmarkOpenTimeoutRef.current = null;
+    }
+    if (bookmarkCloseTimeoutRef.current) {
+      clearTimeout(bookmarkCloseTimeoutRef.current);
+      bookmarkCloseTimeoutRef.current = null;
+    }
+    if (isStaged && !isPersisted) {
+      // User clicks the bookmark icon to persist staged items to 7 days
+      try {
+        await persistStagedBookmark(mainSku);
+        setIsPersisted(true);
+        setIsStaged(false);
+        const details = await getBookmarkDetails(mainSku);
+        if (details) setBookmarkData(details);
+        if (showToast) {
+          showToast("Đã lưu bookmark vào hệ thống trong 7 ngày!", "success");
+        }
+      } catch (err: any) {
+        if (showToast) {
+          showToast(err.message || "Lỗi lưu bookmark 7 ngày", "warning");
+        }
+      }
+    } else {
+      if (bookmarkCount > 0) {
+        setShowBookmarkPopup((prev) => !prev);
+      } else {
+        handleToggleBookmark(e);
+      }
+    }
+  };
+
   const [voucherCollected, setVoucherCollected] = useState(false);
 
   const handleClaimVoucher = (e: React.MouseEvent) => {
@@ -2702,12 +3154,27 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
   };
 
   const [accTab, setAccTab] = useState<"watch" | "cloud" >("watch");
-  const [addedAccs, setAddedAccs] = useState<string[]>([]);
+  const [addedAccs, setAddedAccs] = useState<string[]>(() => {
+    if (cachedBookmark?.items) {
+      return cachedBookmark.items.map(it => it.sku);
+    }
+    return [];
+  });
   const [accPage, setAccPage] = useState(0);
+
+  useEffect(() => {
+    if (bookmarkData && Array.isArray(bookmarkData.items)) {
+      const skus = bookmarkData.items.map(it => it.sku);
+      setAddedAccs(skus);
+    } else {
+      setAddedAccs([]);
+    }
+  }, [bookmarkData]);
 
   const watchAccessories = [
     {
       id: "w-acc-1",
+      sku: "ATTR-AWU2-BLACK-TRAIL",
       name: "Dây đeo Apple Watch 49/45/44/42mm Spigen Band Lite Fit",
       price: "513.000đ",
       oldPrice: "570.000đ",
@@ -2716,6 +3183,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "w-acc-2",
+      sku: "ATTR-AWU2-NATURAL-ALPINE",
       name: "Dây đeo Apple Watch (44/45/46M) Otterbox Symmetry Cactus",
       price: "714.000đ",
       oldPrice: "1.190.000đ",
@@ -2724,6 +3192,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "w-acc-3",
+      sku: "ATTR-AWU2-NATURAL-OCEAN",
       name: "Dây đeo Apple Watch Devia Deluxe Series Sport 6 Silicone Two-Tone",
       price: "162.000đ",
       oldPrice: "180.000đ",
@@ -2732,6 +3201,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "w-acc-4",
+      sku: "ATTR-SWHXM6-BLACK",
       name: "Dây đeo Apple Watch Devia Elegant Series Milanese Loop",
       price: "252.000đ",
       oldPrice: "280.000đ",
@@ -2740,6 +3210,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "w-acc-5",
+      sku: "ATTR-AIRPODMAX-BLUE",
       name: "Dây đeo Silicon Sport Breathable 41/40/38mm",
       price: "120.000đ",
       oldPrice: "150.000đ",
@@ -2748,6 +3219,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "w-acc-6",
+      sku: "ATTR-BOSEQCU-BLACK",
       name: "Dây đeo Da cao cấp Leather Link Apple Watch",
       price: "450.000đ",
       oldPrice: "500.000đ",
@@ -2756,6 +3228,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "w-acc-7",
+      sku: "ATTR-SENMOM4-BLACK",
       name: "Ốp bảo vệ Spigen Tough Armor Apple Watch",
       price: "320.000đ",
       oldPrice: "350.000đ",
@@ -2764,6 +3237,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "w-acc-8",
+      sku: "ATTR-JBLTOURM2-BLUE",
       name: "Đế sạc không dây 3-trong-1 Anker Magnetic Charging",
       price: "950.000đ",
       oldPrice: "1.100.000đ",
@@ -2775,6 +3249,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
   const cloudAccessories = [
     {
       id: "c-acc-1",
+      sku: "ATTR-MSPRO11-GRAPH-32-512",
       name: "Dịch vụ Auto-Backup & Snapshots 100GB SSD",
       price: "120.000đ",
       oldPrice: "150.000đ",
@@ -2783,6 +3258,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "c-acc-2",
+      sku: "ATTR-MIPAD7P-BLUE-12-512",
       name: "Địa chỉ IPv4 tĩnh Anycast Dedicated IP",
       price: "80.000đ",
       oldPrice: "100.000đ",
@@ -2791,6 +3267,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "c-acc-3",
+      sku: "ATTR-MIPAD7P-WHITE-5G-512",
       name: "Chứng chỉ bảo mật Wildcard SSL Cloud CA",
       price: "350.000đ",
       oldPrice: "400.000đ",
@@ -2799,6 +3276,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "c-acc-4",
+      sku: "ATTR-MIPAD7P-BLACK-8-256",
       name: "Băng thông CDN Express Core 1TB/tháng",
       price: "200.000đ",
       oldPrice: "250.000đ",
@@ -2807,6 +3285,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "c-acc-5",
+      sku: "ATTR-TABS10U-GRAPH-5G-512",
       name: "Premium DDoS Protection & Firewalls Core",
       price: "450.000đ",
       oldPrice: "600.000đ",
@@ -2815,6 +3294,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "c-acc-6",
+      sku: "ATTR-LENTABEXT2-GRAY-12-256",
       name: "Object Storage S3-Compatible 500GB SSD",
       price: "250.000đ",
       oldPrice: "300.000đ",
@@ -2823,6 +3303,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
     },
     {
       id: "c-acc-7",
+      sku: "ATTR-REDIS-CLUSTER-2GB",
       name: "Managed Redis Cache Cluster 2GB RAM",
       price: "180.000đ",
       oldPrice: "220.000đ",
@@ -3526,19 +4007,12 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                   </>
                 )}
 
-                {/* Top-Right 3D Ribbon: Trả góp 0% in Emerald Theme with Animated Logo */}
-                <div className="absolute -top-1.5 right-[-4px] h-[25px] bg-gradient-to-l from-emerald-600 via-emerald-500 to-teal-500 text-white text-[10.5px] font-black px-2.5 rounded-bl-lg rounded-tl-sm shadow-[-2px_2px_5px_rgba(5,150,105,0.25)] flex items-center justify-center z-30 select-none">
-                  <motion.span
-                    animate={{ scale: [1, 1.25, 1], rotate: [0, -10, 10, 0] }}
-                    transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-                    className="material-symbols-outlined text-[12.5px] leading-none mr-1 text-emerald-100 font-bold"
-                  >
-                    percent
-                  </motion.span>
+                {/* Top-Right 3D Ribbon: Trả góp 0% */}
+                <div className="absolute -top-1.5 right-[-4px] h-[25px] bg-[#E1EBFD] text-[#2F80ED] text-[10.5px] font-black px-2.5 rounded-bl-lg rounded-tl-sm shadow-[-2px_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center z-30 select-none">
                   Trả góp 0%
                 </div>
                 {/* 3D Fold Corner for Right Ribbon */}
-                <div className="absolute top-[19px] right-[-4px] w-[4px] h-[4px] bg-[#065F46] z-20" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />
+                <div className="absolute top-[19px] right-[-4px] w-[4px] h-[4px] bg-[#1d5fb5] z-20" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} />
 
                 {/* Row 1: Primary Price & Old Price with comfortable breathing room under ribbons */}
                 <div className="relative z-10 flex items-center justify-between gap-2 flex-wrap px-0.5 pt-2.5 sm:pt-3">
@@ -3872,10 +4346,11 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                       {(accTab === "watch" ? watchAccessories : cloudAccessories)
                         .slice(accPage * 3, (accPage + 1) * 3)
                         .map((item) => {
-                          const isAdded = addedAccs.includes(item.id);
+                          const isAdded = addedAccs.includes(item.id) || addedAccs.includes((item as any).sku) || (bookmarkData?.items?.some(it => it.sku === item.id || it.sku === (item as any).sku) ?? false);
                           return (
                           <div
                             key={item.id}
+                            data-acc-item={item.id}
                             className="relative flex h-[96px] items-center gap-2.5 overflow-visible rounded-xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-2 text-card-foreground shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 transition-all hover:border-primary/40 hover:shadow-md sm:h-[104px] sm:gap-3 sm:p-2.5"
                           >
                             {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
@@ -3890,6 +4365,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                               <img
                                 src={item.img}
                                 alt={item.name}
+                                data-acc-img={item.id}
                                 className="size-full object-cover transition-transform duration-500 hover:scale-105"
                                 referrerPolicy="no-referrer"
                                 onError={(e) => {
@@ -3922,11 +4398,115 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                               <BevelButton
                                 variant={isAdded ? "button" : "primary"}
                                 size="sm"
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   if (isAdded) return;
-                                  setAddedAccs([...addedAccs, item.id]);
-                                  if (onAddToCart) {
-                                    onAddToCart(item.name, item.price, e);
+                                  setAddedAccs((prev) => [...prev, item.id, (item as any).sku].filter(Boolean));
+
+                                  const cardEl = (e.currentTarget as HTMLElement).closest("[data-acc-item]");
+                                  const imgEl = (cardEl?.querySelector(`img[data-acc-img="${item.id}"]`) || cardEl?.querySelector("img")) as HTMLElement | null;
+
+                                  const parseCleanPrice = (p?: string) => {
+                                    if (!p) return 0;
+                                    const clean = p.replace(/[^\d]/g, "");
+                                    return Number(clean) || 0;
+                                  };
+                                  const accSalePrice = parseCleanPrice(item.price);
+                                  const accUnitPrice = parseCleanPrice(item.oldPrice || item.price);
+
+                                  const isInitialBookmark = !bookmarkData || bookmarkData.items.length === 0 || bookmarkCount === 0;
+                                  const itemsToStage: any[] = [];
+
+                                  if (isInitialBookmark) {
+                                    const mainVerTitle = versions.find(v => v.id === activeVersion)?.title || "";
+                                    const mainColTitle = colors.find(c => c.id === activeColor)?.title || "";
+                                    const mainAttrTitle = [mainVerTitle, mainColTitle].filter(Boolean).join(" - ") || "Tiêu chuẩn";
+                                    const mainAttrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || product.id || "ATTR-OPFX8P-BLACK-256";
+
+                                    itemsToStage.push({
+                                      sku: String(mainAttrSku),
+                                      quantity: 1,
+                                      productName: product.name,
+                                      imageUrl: images[activeImgIdx] || images[0] || "",
+                                      attributesTitle: mainAttrTitle,
+                                      unitPrice: currentOldPriceInt || currentPriceInt,
+                                      salePrice: currentPriceInt
+                                    });
+                                  } else if (bookmarkData?.items) {
+                                    // Giữ nguyên toàn bộ phụ kiện và sản phẩm đã thêm trước đó
+                                    for (const existing of bookmarkData.items) {
+                                      itemsToStage.push({
+                                        sku: existing.sku,
+                                        quantity: existing.quantity,
+                                        productName: existing.productName,
+                                        imageUrl: existing.imageUrl,
+                                        attributesTitle: existing.attributesTitle,
+                                        unitPrice: existing.unitPrice,
+                                        salePrice: existing.salePrice
+                                      });
+                                    }
+                                  }
+
+                                  // Thêm phụ kiện mới hoặc tăng số lượng
+                                  const accSku = (item as any).sku || item.id;
+                                  const existingIdx = itemsToStage.findIndex(it => it.sku === accSku);
+                                  if (existingIdx >= 0) {
+                                    itemsToStage[existingIdx].quantity += 1;
+                                  } else {
+                                    itemsToStage.push({
+                                      sku: accSku,
+                                      quantity: 1,
+                                      productName: item.name,
+                                      imageUrl: item.img,
+                                      attributesTitle: item.smember || "Phụ kiện mua cùng",
+                                      unitPrice: accUnitPrice,
+                                      salePrice: accSalePrice
+                                    });
+                                  }
+
+                                  // Khi khởi tạo bookmark lần đầu: khởi động bộ đếm 1 giờ (3600s). Khi bấm thêm tiếp: KHÔNG reset timer!
+                                  if (isInitialBookmark) {
+                                    setSecondsRemaining(3600);
+                                  }
+
+                                  try {
+                                    const res = await stageBookmarkItems(mainSku, itemsToStage);
+                                    if (res?.data) {
+                                      setBookmarkData(res.data);
+                                      setBookmarkCount(res.data.totalItems);
+                                    }
+                                    setIsStaged(true);
+                                    setIsPersisted(false);
+                                  } catch (err) {
+                                    console.error("Lỗi lưu tạm bookmark:", err);
+                                  }
+
+                                  triggerGenieFly({
+                                    sourceEl: imgEl,
+                                    imageSrc: item.img,
+                                    targetEl: bookmarkBtnRef.current,
+                                    duration: 480,
+                                    borderRadius: 12,
+                                    onComplete: async () => {
+                                      setFavoriteActive(true);
+                                      setIsStaged(true);
+                                      setIsPersisted(false);
+                                      try {
+                                        const details = await getBookmarkDetails(mainSku);
+                                        if (details) {
+                                          setBookmarkData(details);
+                                          setBookmarkCount(details.totalItems);
+                                        }
+                                      } catch (_) {}
+                                    },
+                                  });
+
+                                  if (showToast) {
+                                    showToast(
+                                      isInitialBookmark
+                                        ? `Đã thêm sản phẩm & "${item.name}" vào bookmark (lưu tạm 1 giờ)!`
+                                        : `Đã thêm "${item.name}" vào bookmark!`,
+                                      "success"
+                                    );
                                   }
                                 }}
                                 disabled={isAdded}
@@ -4125,7 +4705,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
         </div>
 
         {/* Floating bottom actions bar with 3D discount ribbon & enhanced frosted glass */}
-        <div className="absolute bottom-5 left-1/2 z-30 flex h-[72px] w-[calc(100%-3rem)] max-w-[850px] -translate-x-1/2 items-center justify-between overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 sm:w-[85%] select-none">
+        <div className="absolute bottom-5 left-1/2 z-30 flex h-[72px] w-[calc(100%-3.5rem)] sm:w-[79%] max-w-[790px] -translate-x-1/2 items-center justify-between overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 select-none">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/[0.04] via-transparent to-transparent" />
           {formattedDiscount && (
             <>
@@ -4160,7 +4740,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                     animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                     exit={{ opacity: 0, y: -3, filter: "blur(4px)" }}
                     transition={{ duration: 0.18, ease: "easeOut" }}
-                    className="font-sans font-bold text-[12.5px] sm:text-[13.5px] text-foreground truncate max-w-[180px] sm:max-w-[280px] md:max-w-[360px] leading-tight block"
+                    className="font-sans font-bold text-[12.5px] sm:text-[13.5px] text-foreground truncate max-w-[170px] sm:max-w-[260px] md:max-w-[335px] leading-tight block"
                   >
                     {fullProductTitle}
                   </motion.span>
@@ -4237,6 +4817,12 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
               ref={cartBtnRef}
               type="button"
               onClick={(e) => {
+                const now = Date.now();
+                if (now - lastAddCartTimeRef.current < 600) {
+                  return;
+                }
+                lastAddCartTimeRef.current = now;
+
                 const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
                 const attrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || `ATTR-${product.id.toUpperCase()}`;
                 
@@ -4261,6 +4847,320 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                 </span>
               )}
             </button>
+
+            {/* Bookmark action button with + toggle and hover mini-popup */}
+            <div
+              className="relative"
+              onMouseEnter={() => {
+                if (bookmarkCloseTimeoutRef.current) {
+                  clearTimeout(bookmarkCloseTimeoutRef.current);
+                  bookmarkCloseTimeoutRef.current = null;
+                }
+                if (bookmarkOpenTimeoutRef.current) {
+                  clearTimeout(bookmarkOpenTimeoutRef.current);
+                }
+                // Deliberate hover dwell check (175ms): midpoint between immediate (0ms) and previous (350ms)
+                bookmarkOpenTimeoutRef.current = setTimeout(() => {
+                  if (bookmarkCount > 0) {
+                    setShowBookmarkPopup(true);
+                  }
+                }, 175);
+              }}
+              onMouseLeave={() => {
+                if (bookmarkOpenTimeoutRef.current) {
+                  clearTimeout(bookmarkOpenTimeoutRef.current);
+                  bookmarkOpenTimeoutRef.current = null;
+                }
+                if (bookmarkCloseTimeoutRef.current) {
+                  clearTimeout(bookmarkCloseTimeoutRef.current);
+                }
+                bookmarkCloseTimeoutRef.current = setTimeout(() => {
+                  setShowBookmarkPopup(false);
+                }, 300);
+              }}
+            >
+              <motion.button
+                ref={bookmarkBtnRef}
+                type="button"
+                whileTap={{ scale: 0.88 }}
+                animate={isPlusAnimating ? {
+                  scale: [1, 0.86, 1.2, 0.94, 1.05, 1],
+                  rotate: [0, -10, 10, -5, 2, 0],
+                } : {}}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                onClick={handleBookmarkBtnClick}
+                aria-label={
+                  isStaged && !isPersisted
+                    ? `Bấm để lưu bookmark 7 ngày (còn ${formatCountdown(secondsRemaining)})`
+                    : favoriteActive
+                    ? "Phụ kiện đã lưu"
+                    : "Lưu vào danh sách yêu thích"
+                }
+                className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative"
+              >
+                {/* Ripple ring burst effect on click */}
+                {isPlusAnimating && (
+                  <motion.span
+                    initial={{ scale: 0.8, opacity: 0.75 }}
+                    animate={{ scale: 1.85, opacity: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="absolute inset-0 rounded-xl border-2 border-[#FF4D24] pointer-events-none"
+                  />
+                )}
+
+                {bookmarkCount > 0 || isStaged ? (
+                  <motion.div
+                    animate={isPlusAnimating ? { rotate: [0, 90, 180], scale: [1, 1.3, 1] } : {}}
+                    transition={{ duration: 0.45, ease: "easeOut" }}
+                    className="flex items-center justify-center pointer-events-none"
+                  >
+                    <PlusIcon className="size-5 stroke-[2.5] text-[#FF4D24] transition-all duration-200 hover:scale-105" />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    animate={isPlusAnimating ? { scale: [1, 1.25, 1] } : {}}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className="flex items-center justify-center pointer-events-none"
+                  >
+                    <BookmarkIcon className="size-5 stroke-[2.2] text-primary transition-all duration-200 hover:scale-105" />
+                  </motion.div>
+                )}
+                {(bookmarkCount > 0 || isStaged) && (
+                  <motion.span 
+                    animate={isPlusAnimating ? { scale: [1, 1.4, 1] } : {}}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-white dark:bg-zinc-900 border border-[#FF4D24]/40 shadow-[0_2px_6px_rgba(255,77,36,0.22)] flex items-center justify-center pointer-events-none z-10 transition-transform duration-200"
+                  >
+                    <BookmarkIcon className="size-2.5 stroke-[1.8] fill-[#FF4D24] text-[#FF4D24]" />
+                  </motion.span>
+                )}
+              </motion.button>
+
+              {/* Bookmark Hover Mini-Popup (cart-like circular reveal) */}
+              <AnimatePresence>
+                {showBookmarkPopup && bookmarkCount > 0 && bookmarkData && (
+                  <motion.div
+                    layout="position"
+                    initial={{ opacity: 0, clipPath: "circle(0% at calc(100% - 20px) calc(100% + 18px))", filter: "blur(8px)" }}
+                    animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 20px) calc(100% + 18px))", filter: "blur(0px)" }}
+                    exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 20px) calc(100% + 18px))", filter: "blur(8px)" }}
+                    transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
+                    onMouseEnter={() => {
+                      if (bookmarkOpenTimeoutRef.current) {
+                        clearTimeout(bookmarkOpenTimeoutRef.current);
+                        bookmarkOpenTimeoutRef.current = null;
+                      }
+                      if (bookmarkCloseTimeoutRef.current) {
+                        clearTimeout(bookmarkCloseTimeoutRef.current);
+                        bookmarkCloseTimeoutRef.current = null;
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      if (bookmarkCloseTimeoutRef.current) {
+                        clearTimeout(bookmarkCloseTimeoutRef.current);
+                      }
+                      bookmarkCloseTimeoutRef.current = setTimeout(() => {
+                        setShowBookmarkPopup(false);
+                      }, 300);
+                    }}
+                    className="absolute right-0 bottom-[calc(100%+18px)] before:absolute before:-bottom-[18px] before:left-0 before:right-0 before:h-[18px] before:content-[''] w-[360px] sm:w-[400px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 dark:border-white/15 bg-white/88 dark:bg-zinc-900/88 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_16px_40px_-10px_rgba(0,0,0,0.12),0_4px_16px_-2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,1)] p-3.5 sm:p-4 z-50 origin-bottom-right overflow-hidden text-slate-900 dark:text-white"
+                  >
+                    {/* Ambient Glow & Subtle Warm Tint */}
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl overflow-hidden -z-10">
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#FF4D24]/[0.05] via-orange-500/[0.02] to-transparent" />
+                      <div className="absolute top-0 right-0 w-44 h-44 bg-[#FF4D24]/[0.10] rounded-full blur-[40px]" />
+                      <div className="absolute bottom-0 left-0 w-36 h-36 bg-[#FF4D24]/[0.06] rounded-full blur-[35px]" />
+                    </div>
+
+                    {/* 1. Header */}
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-white/10">
+                      <div className="flex items-center gap-2">
+                        <div className="size-6.5 rounded-lg bg-[#FF4D24]/10 text-[#FF4D24] flex items-center justify-center font-bold shrink-0">
+                          <BookmarkIcon className="size-3.5 stroke-[2.5]" />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-sans font-black text-xs tracking-tight text-slate-900 dark:text-white uppercase">
+                            Phụ kiện đã lưu
+                          </h3>
+                          <span className="text-[10px] font-extrabold text-[#FF4D24] bg-[#FF4D24]/10 px-1.5 py-0.2 rounded-full">
+                            {bookmarkData.totalItems}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <div className={`px-2 py-0.5 rounded-md border flex items-center gap-1.5 text-[10px] font-medium transition-colors ${
+                          isPersisted 
+                            ? "bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
+                            : "bg-orange-500/[0.06] dark:bg-orange-500/[0.12] border-orange-500/20 text-[#FF4D24] dark:text-orange-400"
+                        }`}>
+                          <span className={`size-1.5 rounded-full shrink-0 ${
+                            isPersisted ? "bg-emerald-500" : "bg-[#FF4D24] animate-pulse"
+                          }`} />
+                          <span className="font-mono font-semibold tracking-tight">
+                            {isPersisted 
+                              ? (bookmarkData?.formattedRemainingTime ? `Hạn: ${bookmarkData.formattedRemainingTime}` : "Hạn lưu: 7 ngày") 
+                              : secondsRemaining > 0 
+                              ? `Lưu tạm: ${formatCountdown(secondsRemaining)}` 
+                              : "Lưu tạm: Hết hạn"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowBookmarkPopup(false)}
+                          className="size-6 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                        >
+                          <XIcon className="size-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. Items List with Mouse Wheel Support, Increased Height & Scroll Affordance */}
+                    <div className="relative">
+                      <div 
+                        onWheel={(e) => e.stopPropagation()}
+                        className="flex flex-col gap-1.5 max-h-[300px] overflow-y-auto pr-1 pb-1 overscroll-contain [overscroll-behavior:contain] [touch-action:pan-y] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent_100%)]"
+                      >
+                        {bookmarkData.items.map((item) => (
+                          <div
+                            key={item.sku}
+                            className="p-2 rounded-xl border-t border-t-white/90 border-b border-b-slate-300/60 border-x border-x-white/60 dark:border-white/10 bg-gradient-to-b from-white/95 via-white/85 to-white/75 dark:from-zinc-800/90 dark:to-zinc-800/60 shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between gap-2.5 group transition-all hover:border-slate-300 dark:hover:border-white/20"
+                          >
+                            {/* Left: Fixed Thumbnail & Aligned Info */}
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className="size-11 rounded-lg overflow-hidden shrink-0 border border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-zinc-700/60 shadow-2xs">
+                                <img 
+                                  src={item.imageUrl} 
+                                  alt={item.productName} 
+                                  className="size-full object-cover" 
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src = "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&auto=format&fit=crop";
+                                  }}
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1 flex flex-col justify-center">
+                                <h4 className="text-xs font-semibold text-slate-800 dark:text-zinc-100 truncate leading-tight">
+                                  {item.productName}
+                                </h4>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  {item.attributesTitle && (
+                                    <span className="text-[10px] text-slate-400 dark:text-zinc-400 truncate max-w-[130px]">
+                                      {item.attributesTitle}
+                                    </span>
+                                  )}
+                                  <span className="text-[9.5px] font-mono font-bold text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-700 px-1.5 py-0.2 rounded shrink-0">
+                                    x{item.quantity}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right: Tabular Mono Price & Delete Action strictly aligned */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-mono font-bold text-xs text-[#FF4D24] tabular-nums text-right min-w-[70px]">
+                                {(Math.round(item.subTotal || item.salePrice * item.quantity)).toLocaleString("vi-VN")}đ
+                              </span>
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    await removeBookmarkItem(mainSku, item.sku);
+                                    const updated = await getBookmarkDetails(mainSku);
+                                    if (updated && updated.totalItems > 0) {
+                                      setBookmarkData(updated);
+                                      setBookmarkCount(updated.totalItems);
+                                    } else {
+                                      setBookmarkData(null);
+                                      setBookmarkCount(0);
+                                      setShowBookmarkPopup(false);
+                                    }
+                                  } catch (_) {}
+                                }}
+                                className="size-6 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-500 flex items-center justify-center transition-colors cursor-pointer"
+                                title="Xóa phụ kiện này"
+                              >
+                                <Trash2Icon className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Hiệu ứng bóng sáng/fade đáy thể hiện còn item bên dưới */}
+                      {bookmarkData.items.length > 2 && (
+                        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white/90 dark:from-zinc-900/90 to-transparent flex items-end justify-center pb-0.5 z-10">
+                          <div className="w-10 h-0.5 rounded-full bg-[#FF4D24]/30 blur-[0.5px] animate-pulse" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3. Compact Footer */}
+                    <div className="pt-2 mt-1.5 border-t border-slate-100 dark:border-white/10 flex items-center justify-between gap-2">
+                      <div className="flex items-baseline gap-1.5 min-w-0">
+                        <span className="text-[9.5px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider">Tổng:</span>
+                        <span className="text-sm font-black font-mono text-[#FF4D24] tabular-nums leading-none">
+                          {Math.round(bookmarkData.totalSalePrice).toLocaleString("vi-VN")}đ
+                        </span>
+                      </div>
+
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setShowBookmarkPopup(false);
+                          onClose();
+                          if (onNavigate) {
+                            onNavigate("landing");
+                          }
+                        }}
+                        className="px-3 py-1 rounded-lg font-bold text-[11px] text-white bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/50 border-b border-b-[#A8280A] border-x border-x-[#FF4D24]/80 shadow-[0_4px_12px_rgba(255,77,36,0.3),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
+                      >
+                        <span>Thanh toán</span>
+                        <ChevronRightIcon className="size-3" />
+                      </motion.button>
+                    </div>
+
+                    {/* 4. Chú thích căn giữa tinh tế, không icon sao, không nút lưu ngay */}
+                    <div 
+                      onClick={async (e) => {
+                        if (isStaged && !isPersisted) {
+                          e.stopPropagation();
+                          await handleBookmarkBtnClick(e);
+                        }
+                      }}
+                      className={`mt-1.5 -mx-3.5 sm:-mx-4 -mb-3.5 sm:-mb-4 px-3 py-1.5 bg-orange-500/[0.04] dark:bg-orange-500/[0.08] border-t border-orange-500/10 flex items-center justify-center text-center transition-colors ${
+                        isStaged && !isPersisted ? "cursor-pointer hover:bg-orange-500/[0.08]" : ""
+                      }`}
+                      title={isStaged && !isPersisted ? "Chạm để giữ bookmark trong 7 ngày" : undefined}
+                    >
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-snug">
+                        {isStaged && !isPersisted ? (
+                          <>
+                            Lưu tạm còn{" "}
+                            <span className="font-mono font-bold text-[#FF4D24]">
+                              {secondsRemaining > 0 ? formatCountdown(secondsRemaining) : "00:00"}
+                            </span>
+                            . Bấm icon{" "}
+                            <span className="inline-flex items-center justify-center size-3.5 rounded bg-[#FF4D24]/12 text-[#FF4D24] mx-0.5 align-middle">
+                              <PlusIcon className="size-2 stroke-[2.5]" />
+                            </span>{" "}
+                            để giữ lại 7 ngày nhé
+                          </>
+                        ) : (
+                          <>
+                            Đã lưu an toàn trong{" "}
+                            <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                              {bookmarkData?.formattedRemainingTime || "7 ngày"}
+                            </strong>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
         </div>

@@ -341,3 +341,33 @@ html, body {
     @apply font-sans;
   }
 }
+
+/* Compare dock clear button & thumbnail remove hover rotation */
+.btn-clear-dock .icon-spin-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-clear-dock:hover .icon-spin-target {
+  transform: rotate(90deg) scale(1.15);
+}
+
+.btn-clear-dock:active .icon-spin-target {
+  transform: rotate(90deg) scale(0.9);
+}
+
+.btn-thumb-x .thumb-spin-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-thumb-x:hover .thumb-spin-target {
+  transform: rotate(90deg) scale(1.15);
+}
+

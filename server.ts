@@ -1816,6 +1816,71 @@ async function startServer() {
     handler(req, res, next);
   });
 
+  // --- BOOKMARK SERVICE REST API (BOOKMARK_API_DOCS.md) ---
+  interface ServerBookmarkItemRecord {
+    sku: string;
+    quantity: number;
+    productName?: string;
+    imageUrl?: string;
+    attributesTitle?: string;
+    unitPrice?: number;
+    salePrice?: number;
+  }
+
+  interface ServerBookmarkRecord {
+    mainSku: string;
+    userKey: string;
+    expiresAt: number;
+    items: Map<string, ServerBookmarkItemRecord>;
+  }
+
+  // --- REAL BOOKMARK BACKEND PROXY (Proxies to Spring Boot http://localhost:8080/api/bookmarks) ---
+  app.all("/api/bookmarks*", async (req, res) => {
+    const backendBase = getBackendUrl().replace(/\/$/, "");
+    const targetUrl = `${backendBase}${req.originalUrl || req.url}`;
+    
+    try {
+      const headers: Record<string, string> = {
+        "content-type": req.headers["content-type"] || "application/json",
+      };
+      if (req.headers.authorization) {
+        headers["authorization"] = String(req.headers.authorization);
+      }
+      const guestId = req.headers["x-guest-id"] || req.headers["x-guest-id".toLowerCase()];
+      if (guestId) {
+        headers["x-guest-id"] = String(guestId);
+      }
+
+      let body: any = undefined;
+      if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+        if (typeof req.body === "object" && Object.keys(req.body).length > 0) {
+          body = JSON.stringify(req.body);
+        } else if (req.body) {
+          body = req.body;
+        }
+      }
+
+      const backendRes = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body,
+      });
+
+      const data = await backendRes.json().catch(() => null);
+      if (data && data.status && typeof data.status.code === "number" && !("success" in data)) {
+        data.success = data.status.code === 200;
+      }
+      res.status(backendRes.status).json(data);
+    } catch (err: any) {
+      console.error(`[BOOKMARK PROXY ERROR] Failed to connect to ${targetUrl}:`, err.message);
+      res.status(502).json({
+        success: false,
+        message: "Không thể kết nối đến máy chủ Backend Spring Boot (http://localhost:8080)",
+        error: err.message
+      });
+    }
+  });
+
   // CORS & Mixed-Content Bypass Proxy Endpoint
   app.all("/api/proxy", async (req, res) => {
     // Resolve target URL from either header or query parameter

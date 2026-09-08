@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, PackageOpen, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame, ShieldCheck } from "lucide-react";
+import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, PackageOpen, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame, ShieldCheck, Bookmark } from "lucide-react";
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -840,8 +840,8 @@ const resolveProductMetadata = (skuOrName: string) => {
   };
 
   return (
-    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.05)] z-50 flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-2 sm:pr-2.5 transition-all duration-300">
-      <div className={`flex items-center min-w-0 transition-all duration-300 ${isSearchExpanded ? 'gap-4 sm:gap-6 lg:gap-8' : 'gap-6 sm:gap-8 lg:gap-12'}`}>
+    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/45 bg-gradient-to-b from-white/30 via-white/20 to-white/10 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.4)] z-50 flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-2 sm:pr-2.5 transition-all duration-300">
+      <div className="flex items-center min-w-0 gap-6 sm:gap-8 lg:gap-10">
         {/* Brand Logo */}
         <a
         className="font-display text-headline-md tracking-tighter text-primary flex items-center gap-2 scale-95 active:scale-90 transition-transform cursor-pointer shrink-0 whitespace-nowrap"
@@ -879,7 +879,7 @@ const resolveProductMetadata = (skuOrName: string) => {
       </a>
 
       {/* Navigation Links for Desktop */}
-      <div className={`hidden md:flex items-center min-w-0 transition-all duration-300 ${isSearchExpanded ? 'gap-4 lg:gap-5' : 'gap-6'}`}>
+      <div className="hidden md:flex items-center min-w-0 gap-6">
         {navLinks.map((link) => {
           const isActive = 
             ((link.href === "product" || link.href === "/p") && currentPage === "product") ||
@@ -1902,6 +1902,21 @@ const resolveProductMetadata = (skuOrName: string) => {
                   >
                     <ShoppingBag size={15} className={`transition-colors shrink-0 ${currentPage === "order" ? "text-[#FF4D24]" : "text-neutral-400 group-hover:text-neutral-700"}`} />
                     <span className={currentPage === "order" ? "font-bold text-[#FF4D24]" : ""}>Đơn mua của tôi</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      if (typeof window !== "undefined") {
+                        window.location.hash = "bookmarks";
+                        window.dispatchEvent(new CustomEvent("open-accounts-center", { detail: { tab: "bookmarks" } }));
+                      }
+                      onNavigate("profile");
+                    }}
+                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-[#FF4D24] hover:bg-orange-50/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
+                  >
+                    <Bookmark size={15} className="text-neutral-400 group-hover:text-[#FF4D24] transition-colors shrink-0" />
+                    <span>Phụ kiện đã lưu</span>
                   </button>
 
                   <button 

@@ -7,7 +7,7 @@ import {
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
   Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
-  LocateFixed, Map, Search, CheckCircle2, Layers
+  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark
 } from "lucide-react";
 import { apiRequest, unifiedFetch, getUnifiedAccessToken } from "../lib/api";
 import { STORAGE_KEYS } from "../lib/storageKeys";
@@ -25,6 +25,13 @@ import {
   subscribeAddressApiLogs,
   clearAddressApiLogs
 } from "../services/addressService";
+import {
+  getAllBookmarks,
+  clearBookmark,
+  removeBookmarkItem,
+  BookmarkData,
+  subscribeBookmarkUpdates,
+} from "../services/bookmarkService";
 
 interface OrderItem {
   id: string;
@@ -73,7 +80,50 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
   // Accounts Center Modal Trigger State & Active Tab
   const [isAccountsCenterOpen, setIsAccountsCenterOpen] = useState<boolean>(false);
-  const [activeModalTab, setActiveModalTab] = useState<"profile" | "security" | "addresses" | "payments" | "sessions">("profile");
+  const [activeModalTab, setActiveModalTab] = useState<"profile" | "security" | "addresses" | "payments" | "sessions" | "bookmarks">("profile");
+  const [userBookmarks, setUserBookmarks] = useState<BookmarkData[]>([]);
+
+  // Listen to open-accounts-center event from Navbar
+  useEffect(() => {
+    const handleOpenAccountsCenter = (e: any) => {
+      const targetTab = e.detail?.tab;
+      if (targetTab) {
+        setActiveModalTab(targetTab);
+      }
+      setIsAccountsCenterOpen(true);
+    };
+    const handleCloseAccountsCenter = () => {
+      setIsAccountsCenterOpen(false);
+    };
+    window.addEventListener("open-accounts-center", handleOpenAccountsCenter);
+    window.addEventListener("close-accounts-center", handleCloseAccountsCenter);
+
+    if (typeof window !== "undefined" && window.location.hash === "#bookmarks") {
+      setActiveModalTab("bookmarks");
+      setIsAccountsCenterOpen(true);
+    }
+
+    return () => {
+      window.removeEventListener("open-accounts-center", handleOpenAccountsCenter);
+      window.removeEventListener("close-accounts-center", handleCloseAccountsCenter);
+    };
+  }, []);
+
+  // Load bookmarks
+  const loadUserBookmarks = async () => {
+    try {
+      const list = await getAllBookmarks();
+      setUserBookmarks(list);
+    } catch (_) {}
+  };
+
+  useEffect(() => {
+    loadUserBookmarks();
+    const unsub = subscribeBookmarkUpdates(() => {
+      loadUserBookmarks();
+    });
+    return () => unsub();
+  }, []);
 
   // Error / Success Messages
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -1184,8 +1234,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       
       <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-10 xl:px-12 flex-1 min-h-0 flex flex-col space-y-4 pb-2">
         
-        {/* Minimal Navigation Breadcrumb and top control actions (Optimized & Unified) */}
-        <div className="shrink-0 flex flex-col gap-3.5 border-b border-slate-100 pb-4 select-none">
+        {/* Minimal Navigation Breadcrumb and top control actions (Optimized & Unified with 3D Bevel) */}
+        <div className="shrink-0 flex flex-col gap-3.5 border-b border-slate-200/60 pb-4 select-none">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-400">
             <span className="hover:text-black cursor-pointer transition-colors" onClick={() => onNavigate("landing")}>Trang chủ</span>
             <span>/</span>
@@ -1196,13 +1246,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             {!isLoading && token && user ? (
               /* Unified User Info & Title when logged in */
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl shadow-sm shrink-0 select-none border-2 border-white ring-4 ring-indigo-50">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] shrink-0 select-none border-t border-t-white/80 border-b border-b-slate-400/60 border-x border-x-white/50 ring-4 ring-indigo-50/80">
                   {user.fullName ? user.fullName.charAt(0).toUpperCase() : "H"}
                 </div>
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-3">
                     <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">{user.fullName || "Hội viên Horizon"}</h1>
-                    <span className="text-xs font-bold font-mono text-[#FF4D24] bg-red-50 px-2 py-0.5 rounded-md uppercase border border-red-100">Live Portal</span>
+                    <span className="text-xs font-bold font-mono text-[#FF4D24] bg-gradient-to-b from-rose-50 to-red-100/60 px-2 py-0.5 rounded-md uppercase border-t border-t-white border-b border-b-red-200 border-x border-x-red-100 shadow-[0_1px_2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]">Live Portal</span>
                   </div>
                   <p className="text-xs text-slate-500 font-medium">
                     Tên đăng nhập: <span className="font-mono font-bold text-indigo-600">@{user.username || "username"}</span> • Email: <span className="font-semibold text-slate-600">{user.email || "N/A"}</span>
@@ -1226,14 +1276,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     setSuccessMsg("");
                     setIsAccountsCenterOpen(true);
                   }}
-                  className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm shadow-indigo-100/40 active:scale-95"
+                  className="px-4 py-2.5 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95"
                 >
                   <Sliders className="w-3.5 h-3.5" />
                   <span>Quản lý bảo mật</span>
                 </button>
                 <button 
                   onClick={handleLogout}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                  className="px-4 py-2.5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-rose-50 hover:to-rose-100/60 hover:text-red-600 border-t border-t-white border-b border-b-slate-300/70 hover:border-b-rose-300 border-x border-x-white/70 text-slate-600 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] active:scale-95"
                 >
                   <span>Đăng xuất</span>
                 </button>
@@ -1244,7 +1294,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
         {/* Loading screen */}
         {isLoading ? (
-          <div className="bg-white border border-slate-200/60 rounded-3xl p-16 text-center flex flex-col items-center justify-center gap-4 shadow-sm">
+          <div className="bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-3xl p-16 text-center flex flex-col items-center justify-center gap-4 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)]">
             <RefreshCw className="w-7 h-7 text-[#FF4D24] animate-spin" />
             <p className="text-xs text-slate-400 font-bold font-mono tracking-wider uppercase animate-pulse">
               Đang đồng bộ dữ liệu dịch vụ...
@@ -1252,8 +1302,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           </div>
         ) : !token || !user ? (
           /* Empty / Not logged-in dashboard */
-          <div className="max-w-md mx-auto bg-white border border-slate-200/80 rounded-3xl p-8 text-center space-y-6 shadow-sm">
-            <div className="w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center mx-auto text-red-500 shadow-inner">
+          <div className="max-w-md mx-auto bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-3xl p-8 text-center space-y-6 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)]">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-b from-rose-50 to-rose-100 border-t border-t-white border-b border-b-rose-200 border-x border-x-rose-100 flex items-center justify-center mx-auto text-red-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_2px_6px_rgba(225,29,72,0.1)]">
               <AlertCircle className="w-5 h-5 animate-pulse" />
             </div>
             <div className="space-y-1.5">
@@ -1264,7 +1314,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             </div>
             <button
               onClick={() => { window.location.hash = "login"; onNavigate("auth"); }}
-              className="w-full bg-[#FF4D24] hover:bg-black text-white text-xs font-bold py-3.5 rounded-2xl transition-all cursor-pointer border border-[#FF4D24] hover:border-black shadow-sm"
+              className="w-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] hover:brightness-105 active:scale-95 text-white text-xs font-bold py-3.5 rounded-2xl transition-all cursor-pointer border-t border-t-white/50 border-b border-b-[#A8280A] border-x border-x-[#FF4D24]/80 shadow-[0_4px_16px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)]"
             >
               Đăng ký / Đăng nhập ngay ↗
             </button>
@@ -1283,7 +1333,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     <ClipboardList className="w-4 h-4 text-[#FF4D24]" />
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Thông tin đơn hàng</h3>
                   </div>
-                  <span className="text-[11px] text-indigo-600 font-bold font-mono bg-indigo-50 border border-indigo-100/80 px-2.5 py-0.5 rounded-full">{orders.length} Đơn hàng</span>
+                  <span className="text-[11px] text-indigo-600 font-bold font-mono bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 shadow-[0_1px_2px_rgba(99,102,241,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] px-2.5 py-0.5 rounded-full">{orders.length} Đơn hàng</span>
                 </div>
 
                 <div className="flex-1 min-h-0 relative overflow-hidden rounded-2xl">
@@ -1305,7 +1355,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     }}
                   >
                     {orders.length === 0 ? (
-                      <div className="bg-white border border-slate-200/60 rounded-2xl p-8 text-center text-slate-400 text-xs">
+                      <div className="bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-xl rounded-2xl p-8 text-center text-slate-400 text-xs shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]">
                         Chưa có lịch sử giao dịch mua hàng nào.
                       </div>
                     ) : (
@@ -1315,21 +1365,21 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <div
                             key={item.id}
                             onClick={() => setSelectedOrderId(item.id)}
-                            className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                            className={`p-3.5 rounded-2xl text-left cursor-pointer transition-all duration-150 ${
                               isSelected 
-                                ? "bg-white border-indigo-600 shadow-[0_10px_25px_rgba(79,70,229,0.04)] ring-2 ring-indigo-600/10" 
-                                : "bg-white border-slate-200 hover:border-slate-300"
+                                ? "bg-gradient-to-b from-indigo-50/40 via-white to-indigo-50/20 border border-indigo-400/80 shadow-[0_4px_12px_-2px_rgba(79,70,229,0.08),0_1px_3px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)]" 
+                                : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white border-b-slate-300/60 hover:border-slate-300/80 hover:from-white hover:to-white/85 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)]"
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-2 mb-1.5 pb-1.5 border-b border-slate-50">
+                            <div className="flex items-start justify-between gap-2 mb-1.5 pb-1.5 border-b border-slate-100">
                               <div>
-                                <span className="text-[9.5px] font-bold text-slate-400 font-mono uppercase">MÃ ĐƠN: {item.id}</span>
+                                <span className={`text-[9.5px] font-bold font-mono uppercase ${isSelected ? "text-indigo-600" : "text-slate-400"}`}>MÃ ĐƠN: {item.id}</span>
                                 <p className="text-[10px] text-slate-400 mt-0.5">Ngày mua: {item.date}</p>
                               </div>
-                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${
+                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border-t border-t-white border-x shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] ${
                                 item.status === "delivered" 
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
-                                  : "bg-blue-50 text-blue-700 border border-blue-200"
+                                  ? "bg-gradient-to-b from-emerald-50 to-emerald-100/70 text-emerald-700 border-b border-b-emerald-300 border-x-emerald-200" 
+                                  : "bg-gradient-to-b from-blue-50 to-blue-100/70 text-blue-700 border-b border-b-blue-300 border-x-blue-200"
                               }`}>
                                 {item.statusText}
                               </span>
@@ -1339,7 +1389,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               {item.name}
                             </h4>
 
-                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-50/60">
+                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-100/80">
                               <span className="text-[11px] text-slate-500">Tổng thanh toán:</span>
                               <span className="text-xs font-black text-indigo-600 font-mono">{item.price}</span>
                             </div>
@@ -1368,7 +1418,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
                       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-                      className="flex-1 min-h-0 bg-white border border-slate-200/80 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col"
+                      className="flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-2xl p-5 space-y-4 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] flex flex-col"
                     >
                       
                       {/* Header info of selected Order */}
@@ -1404,7 +1454,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         >
                           
                           {/* Left line axis */}
-                          <div className="absolute left-[16px] top-2 bottom-2 w-0.5 bg-slate-100" />
+                          <div className="absolute left-[16px] top-2 bottom-2 w-0.5 bg-slate-200/80" />
 
                           {activeOrder.deliverySteps.map((step, idx) => {
                             return (
@@ -1417,12 +1467,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               >
                                 
                                 {/* Milestone Dot Indicator - Centered perfectly at x = 17px */}
-                                <div className={`absolute left-[-19px] -translate-x-1/2 top-1 w-2.5 h-2.5 rounded-full border-2 transition-all duration-300 ${
+                                <div className={`absolute left-[-19px] -translate-x-1/2 top-1 w-2.5 h-2.5 rounded-full border-2 transition-all duration-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] ${
                                   step.active 
-                                    ? "bg-[#FF4D24] border-white ring-4 ring-[#FF4D24]/20 scale-125" 
+                                    ? "bg-gradient-to-b from-[#FF5E3A] to-[#FF4D24] border-white ring-4 ring-[#FF4D24]/20 scale-125 shadow-[0_2px_6px_rgba(255,77,36,0.4)]" 
                                     : step.completed 
-                                      ? "bg-indigo-600 border-indigo-600" 
-                                      : "bg-slate-200 border-slate-200"
+                                      ? "bg-gradient-to-b from-indigo-500 to-indigo-600 border-indigo-300 shadow-[0_1px_3px_rgba(79,70,229,0.3)]" 
+                                      : "bg-slate-200 border-slate-300"
                                 }`} />
 
                                 <div className="space-y-0.5">
@@ -1450,7 +1500,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">Địa chỉ giao nhận hàng</span>
                         </div>
-                        <p className="text-xs font-semibold text-slate-700 leading-relaxed pl-4 bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                        <p className="text-xs font-semibold text-slate-700 leading-relaxed pl-4 bg-gradient-to-b from-white/95 via-slate-50/80 to-slate-100/60 p-2.5 rounded-xl border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)]">
                           {activeOrder.shippingAddress}
                         </p>
                       </div>
@@ -1462,7 +1512,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="flex-1 min-h-0 bg-white border border-slate-200/60 rounded-2xl p-12 text-center text-slate-400 text-xs flex items-center justify-center"
+                      className="flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-2xl p-12 text-center text-slate-400 text-xs flex items-center justify-center shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]"
                     >
                       Vui lòng chọn một đơn hàng ở danh sách bên trái để theo dõi hành trình chi tiết.
                     </motion.div>
@@ -1491,13 +1541,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               className="absolute inset-0 bg-slate-900/65 backdrop-blur-md"
             />
 
-            {/* Modal Dialog Box (Standard Accounts Center Frame max-w-6xl ~1152px, height 780px) */}
+            {/* Modal Dialog Box (Standard Accounts Center Frame max-w-6xl ~1152px, height 780px with 3D Optical Bevel) */}
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 15 }}
               transition={{ type: "spring", duration: 0.35 }}
-              className="relative w-full max-w-6xl bg-white/95 backdrop-blur-xl border border-slate-200/80 rounded-[28px] shadow-[0_32px_100px_-20px_rgba(15,23,42,0.3)] flex flex-col md:flex-row overflow-hidden max-h-[92vh] md:h-[750px] lg:h-[780px] z-10"
+              className="relative w-full max-w-6xl bg-gradient-to-b from-white/98 via-white/95 to-slate-50/90 backdrop-blur-2xl border-t border-t-white border-b border-b-slate-300/80 border-x border-x-white/80 rounded-[28px] shadow-[0_32px_100px_-20px_rgba(15,23,42,0.3),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col md:flex-row overflow-hidden max-h-[92vh] md:h-[750px] lg:h-[780px] z-10"
             >
               
               {/* LEFT COLUMN: Sidebar Navigation / Context Data View */}
@@ -1522,12 +1572,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
                         <span>Danh sách địa chỉ</span>
                       </button>
-                      <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded-full">
+                      <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 shadow-[0_1px_2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.95)] text-slate-700 rounded-full">
                         {addresses.length} đã lưu
                       </span>
                     </div>
 
-                    {/* Scrollable list of existing items (Space-optimized & Refined) */}
+                    {/* Scrollable list of existing items (Space-optimized & Refined with Bevel) */}
                     <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-0">
                       {activeModalTab === "addresses" && addresses.map(addr => {
                         const isOffice = addr.type === "office";
@@ -1536,25 +1586,25 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <div 
                             key={addr.sku}
                             onClick={() => handleOpenEditAddress(addr)}
-                            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative group ${
+                            className={`p-3 rounded-2xl text-left transition-all cursor-pointer relative group ${
                               isCurrentlyEditing
-                                ? "bg-indigo-50/60 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs"
+                                ? "bg-gradient-to-b from-white via-indigo-50/40 to-indigo-50/60 border-t border-t-white border-b border-b-indigo-400/70 border-x border-x-indigo-300/60 ring-2 ring-indigo-500/20 shadow-[0_4px_14px_-2px_rgba(79,70,229,0.12),inset_0_1px_0_rgba(255,255,255,1)]"
                                 : addr.isDefault 
-                                  ? "bg-white border-indigo-200/90 hover:border-indigo-300 shadow-2xs" 
-                                  : "bg-white hover:bg-slate-50 border-slate-200/80 hover:border-slate-300 shadow-2xs"
+                                  ? "bg-gradient-to-b from-white via-white/95 to-indigo-50/30 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:border-indigo-300" 
+                                  : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 hover:from-white shadow-[0_2px_6px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)]"
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2 mb-1.5">
                               <div className="flex items-center gap-2 min-w-0">
-                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                                  isOffice ? "bg-indigo-100/80 text-indigo-700" : "bg-violet-100/80 text-violet-700"
+                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border-t border-t-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] ${
+                                  isOffice ? "bg-gradient-to-b from-indigo-100 to-indigo-200/60 text-indigo-700" : "bg-gradient-to-b from-violet-100 to-violet-200/60 text-violet-700"
                                 }`}>
                                   {isOffice ? <Building2 className="w-3.5 h-3.5" /> : <Home className="w-3.5 h-3.5" />}
                                 </div>
                                 <span className="text-xs font-bold text-slate-900 truncate">{addr.recipientName}</span>
                               </div>
                               {addr.isDefault && (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] px-2 py-0.5 font-bold uppercase bg-indigo-600 text-white rounded-full shrink-0">
+                                <span className="inline-flex items-center gap-0.5 text-[9px] px-2 py-0.5 font-bold uppercase bg-gradient-to-b from-indigo-500 to-indigo-700 border-t border-t-indigo-300/60 text-white rounded-full shrink-0 shadow-[0_1px_3px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)]">
                                   <Check className="w-2.5 h-2.5 stroke-[2.5]" /> Mặc định
                                 </span>
                               )}
@@ -1576,14 +1626,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       {activeModalTab === "payments" && paymentMethods.map(card => (
                         <div 
                           key={card.id}
-                          className={`p-3 rounded-xl border text-left transition-all ${
+                          className={`p-3 rounded-xl text-left transition-all ${
                             card.isDefault 
-                              ? "bg-slate-900 text-white border-slate-800 shadow-xs" 
-                              : "bg-white border-slate-200"
+                              ? "bg-gradient-to-b from-slate-850 via-slate-900 to-black text-white border-t border-t-slate-700/80 border-b border-b-black border-x border-x-slate-800/60 shadow-[0_3px_10px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]" 
+                              : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]"
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black ${
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black border-t border-t-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] ${
                               card.type === "visa" 
                                 ? "bg-blue-600 text-white" 
                                 : card.type === "mastercard" 
@@ -1595,7 +1645,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               {card.type.toUpperCase()}
                             </span>
                             {card.isDefault && (
-                              <span className="text-[9px] px-1.5 py-0.2 font-bold uppercase bg-white/20 text-white rounded">
+                              <span className="text-[9px] px-1.5 py-0.2 font-bold uppercase bg-white/20 text-white border border-white/30 rounded shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">
                                 Mặc định
                               </span>
                             )}
@@ -1621,7 +1671,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="w-full bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/90 text-xs font-bold py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                        className="w-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 text-slate-700 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 text-xs font-bold py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-[0_2px_5px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] active:scale-95"
                       >
                         <X className="w-3.5 h-3.5 text-slate-400" />
                         <span>Hủy bỏ biểu mẫu</span>
@@ -1635,7 +1685,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       
                       {/* Top Branding */}
                       <div className="flex items-center gap-3 pb-4 border-b border-slate-200/70">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-purple-700 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-purple-700 text-white flex items-center justify-center shadow-[0_4px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] border-t border-t-white/30 shrink-0">
                           <Sliders className="w-5 h-5" />
                         </div>
                         <div>
@@ -1646,14 +1696,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                       {/* Profile Mini Card */}
                       {user && (
-                        <div className="p-3.5 bg-white border border-slate-200/90 rounded-2xl flex items-center gap-3.5 shadow-xs">
-                          <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-indigo-600 via-violet-700 to-[#FF4D24] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-sm">
+                        <div className="p-3.5 bg-gradient-to-b from-white via-white/90 to-white/75 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl flex items-center gap-3.5 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
+                          <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-indigo-600 via-violet-700 to-[#FF4D24] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-[0_2px_6px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.35)] border-t border-t-white/30">
                             {user.fullName ? user.fullName.charAt(0).toUpperCase() : "H"}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
                               <p className="text-xs font-black text-slate-900 truncate leading-tight">{user.fullName || "Hội viên Horizon"}</p>
-                              <span className="text-[9px] px-1.5 py-0.2 font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 rounded">LIVE</span>
+                              <span className="text-[9px] px-1.5 py-0.2 font-mono font-bold bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] rounded">LIVE</span>
                             </div>
                             <p className="text-[10.5px] font-mono text-slate-400 truncate mt-0.5">{user.email || "N/A"}</p>
                           </div>
@@ -1667,7 +1717,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           { id: "security", label: "Mật khẩu & Bảo mật", icon: ShieldCheck, desc: "Đổi mật khẩu, username" },
                           { id: "addresses", label: "Sổ địa chỉ nhận hàng", icon: MapPin, count: addresses.length, desc: "Địa chỉ giao nhận" },
                           { id: "payments", label: "Thẻ & Phương thức", icon: CreditCard, count: paymentMethods.length, desc: "Visa, Mastercard, Ví" },
-                          { id: "sessions", label: "Thiết bị & Phiên", icon: Laptop, desc: "Quản lý đăng nhập" }
+                          { id: "sessions", label: "Thiết bị & Phiên", icon: Laptop, desc: "Quản lý đăng nhập" },
+                          { id: "bookmarks", label: "Phụ kiện đã lưu", icon: Bookmark, count: userBookmarks.length, desc: "Gói phụ kiện mua kèm" }
                         ].map(tab => {
                           const Icon = tab.icon;
                           const isActive = activeModalTab === tab.id;
@@ -1682,10 +1733,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 setIsAddingAddress(false);
                                 setIsAddingCard(false);
                               }}
-                              className={`w-full px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                              className={`w-full px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border ${
                                 isActive
-                                  ? "bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 text-white shadow-md shadow-indigo-600/20"
-                                  : "text-slate-700 hover:bg-indigo-50/70 hover:text-indigo-950"
+                                  ? "bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 border-t-indigo-300/60 border-b-indigo-900/60 border-x-indigo-600 text-white shadow-[0_4px_14px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)]"
+                                  : "border-transparent text-slate-700 hover:bg-gradient-to-b hover:from-white/90 hover:to-white/50 hover:border-t-white hover:border-b-slate-200 hover:border-x-slate-100/80 hover:shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)]"
                               }`}
                             >
                               <div className="flex items-center gap-3">
@@ -1697,7 +1748,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               </div>
                               {tab.count !== undefined && (
                                 <span className={`text-[10.5px] px-2.5 py-0.5 rounded-full font-mono font-bold ${
-                                  isActive ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                                  isActive ? "bg-white/20 text-white border border-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]" : "bg-gradient-to-b from-white/95 to-slate-100 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)] text-slate-700"
                                 }`}>
                                   {tab.count}
                                 </span>
@@ -1713,8 +1764,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <button
                         type="button"
                         onClick={() => setIsAccountsCenterOpen(false)}
-                        className="w-full bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-xs font-bold py-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100/80 transition-all flex items-center justify-center gap-2 cursor-pointer border border-transparent hover:border-slate-200"
                       >
+                        <X className="w-4 h-4" />
                         <span>Đóng trung tâm tài khoản</span>
                       </button>
                     </div>
@@ -1738,6 +1790,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           {activeModalTab === "addresses" && "Quản lý sổ địa chỉ giao hàng"}
                           {activeModalTab === "payments" && "Phương thức thanh toán & Quản lý thẻ"}
                           {activeModalTab === "sessions" && "Thiết bị & Phiên hoạt động"}
+                          {activeModalTab === "bookmarks" && "Phụ kiện đã lưu (Bookmarks)"}
                         </>
                       )}
                     </h2>
@@ -1751,6 +1804,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           {activeModalTab === "addresses" && "Lưu trữ các địa chỉ nhận hàng cá nhân hoặc doanh nghiệp để đặt đơn tiện lợi hơn"}
                           {activeModalTab === "payments" && "Quản lý thẻ tín dụng, ghi nợ quốc tế và các ví điện tử thanh toán bảo mật"}
                           {activeModalTab === "sessions" && "Kiểm tra các phiên đăng nhập đang hoạt động và quản lý bảo mật thiết bị kết nối"}
+                          {activeModalTab === "bookmarks" && "Quản lý các gói phụ kiện mua kèm đã chọn tại trang sản phẩm chính, hỗ trợ lưu trữ 1 giờ và 7 ngày"}
                         </>
                       )}
                     </p>
@@ -1772,7 +1826,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           !newAddressForm.phone.trim() ||
                           !newAddressForm.address.trim()
                         }
-                        className="h-9 px-4.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-sm shadow-indigo-600/25 flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                        className="h-9 px-4.5 bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                       >
                         {actionLoading ? (
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -1787,7 +1841,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         if (isAddingCard) setIsAddingCard(false);
                         else setIsAccountsCenterOpen(false);
                       }}
-                      className="w-9 h-9 rounded-full bg-white hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-black transition-colors cursor-pointer shrink-0"
+                      className="w-9 h-9 rounded-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center text-slate-500 hover:text-black transition-all cursor-pointer shrink-0 active:scale-95"
                       title={isAddingCard ? "Đóng form" : "Đóng"}
                     >
                       <X className="w-4.5 h-4.5" />
@@ -1863,7 +1917,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           value={editFullName}
                           onChange={(e) => setEditFullName(e.target.value)}
                           placeholder="Nhập họ và tên..."
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-semibold"
+                          className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                         />
                       </div>
 
@@ -1874,7 +1928,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           value={editPhone}
                           onChange={(e) => setEditPhone(e.target.value)}
                           placeholder="0901234567"
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-semibold"
+                          className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                         />
                       </div>
 
@@ -1884,7 +1938,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           type="email"
                           disabled
                           value={user?.email || "N/A"}
-                          className="w-full bg-slate-100/70 border border-slate-200 text-xs px-4 py-3 rounded-2xl outline-none text-slate-500 font-mono cursor-not-allowed"
+                          className="w-full bg-slate-100/70 border border-slate-200 text-xs px-4 py-3 rounded-2xl outline-none text-slate-500 font-mono cursor-not-allowed shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                         />
                       </div>
 
@@ -1893,7 +1947,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         <select
                           value={editGender}
                           onChange={(e) => setEditGender(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-semibold cursor-pointer"
+                          className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-semibold cursor-pointer shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                         >
                           <option value="male">Nam</option>
                           <option value="female">Nữ</option>
@@ -1903,9 +1957,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                     </div>
 
-                    <div className="p-4 bg-indigo-50/40 border border-indigo-100/70 rounded-2xl flex items-center justify-between gap-4 text-left mt-3">
+                    <div className="p-4 bg-gradient-to-b from-indigo-50/70 via-indigo-50/40 to-indigo-100/30 border-t border-t-white border-b border-b-indigo-200/60 border-x border-x-indigo-100/60 rounded-2xl flex items-center justify-between gap-4 text-left mt-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_3px_rgba(99,102,241,0.04)]">
                       <div className="flex items-center gap-3.5">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-100/80 text-indigo-700 flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-indigo-100 to-indigo-200/80 border-t border-t-white text-indigo-700 flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                           <Sparkles className="w-5 h-5" />
                         </div>
                         <div>
@@ -1919,7 +1973,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <button
                         type="submit"
                         disabled={actionLoading}
-                        className="px-7 py-3 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 hover:opacity-95 text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-2 shadow-md shadow-indigo-600/20"
+                        className="px-7 py-3 bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 hover:brightness-105 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-2 shadow-[0_4px_14px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50"
                       >
                         {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Lưu thay đổi hồ sơ"}
                       </button>
@@ -1932,11 +1986,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   <div className="space-y-5 flex-1">
                     
                     {/* Username Update Section */}
-                    <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden shadow-xs">
+                    <div className="bg-gradient-to-b from-white via-white/95 to-slate-50/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl overflow-hidden shadow-[0_3px_10px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
                       <button
                         type="button"
                         onClick={() => setIsUsernameChangeExpanded(!isUsernameChangeExpanded)}
-                        className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-indigo-50/30 cursor-pointer"
+                        className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-indigo-50/30 cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-3.5">
                           <User className="w-5 h-5 text-indigo-600" />
@@ -1965,13 +2019,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   placeholder="Nhập username mới..."
                                   value={newUsername}
                                   onChange={(e) => setNewUsername(e.target.value)}
-                                  className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-medium"
+                                  className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-medium shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                                 />
                               </div>
                               <button
                                 type="submit"
                                 disabled={actionLoading}
-                                className="w-full bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 hover:opacity-95 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-sm shadow-indigo-600/20"
+                                className="w-full bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 hover:brightness-105 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50"
                               >
                                 {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Cập nhật tên đăng nhập"}
                               </button>
@@ -1982,11 +2036,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     </div>
 
                     {/* Password Reset Section */}
-                    <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden shadow-xs">
+                    <div className="bg-gradient-to-b from-white via-white/95 to-slate-50/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl overflow-hidden shadow-[0_3px_10px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
                       <button
                         type="button"
                         onClick={() => setIsPasswordResetExpanded(!isPasswordResetExpanded)}
-                        className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-indigo-50/30 cursor-pointer"
+                        className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-indigo-50/30 cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-3.5">
                           <Lock className="w-5 h-5 text-indigo-600" />
@@ -2017,7 +2071,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                       placeholder="Nhập tối thiểu 6 ký tự..."
                                       value={newPassword}
                                       onChange={(e) => setNewPassword(e.target.value)}
-                                      className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs pl-4 pr-10 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-medium"
+                                      className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs pl-4 pr-10 py-3 rounded-2xl outline-none transition-all text-[#111111] font-medium shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                                     />
                                     <button
                                       type="button"
@@ -2037,7 +2091,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     placeholder="Nhập lại mật khẩu..."
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 text-xs px-4 py-3 rounded-2xl outline-none focus:bg-white transition-all text-[#111111] font-medium"
+                                    className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-medium shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                                   />
                                 </div>
                               </div>
@@ -2045,7 +2099,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               <button
                                 type="submit"
                                 disabled={actionLoading}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-sm shadow-indigo-600/20 mt-1"
+                                className="w-full bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 hover:brightness-105 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] mt-1 active:scale-95 disabled:opacity-50"
                               >
                                 {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Xác nhận đổi mật khẩu"}
                               </button>
@@ -2056,9 +2110,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     </div>
 
                     {/* Security 2FA Information */}
-                    <div className="p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-left">
+                    <div className="p-4 sm:p-5 bg-gradient-to-b from-white/90 via-emerald-50/20 to-emerald-50/40 border-t border-t-white border-b border-b-emerald-200/70 border-x border-x-emerald-100/60 rounded-2xl flex items-center justify-between text-left shadow-[0_2px_8px_-2px_rgba(16,185,129,0.08),inset_0_1px_0_rgba(255,255,255,1)]">
                       <div className="flex items-center gap-3.5">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-emerald-100 to-emerald-200/70 border-t border-t-white text-emerald-700 flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                           <Shield className="w-5 h-5" />
                         </div>
                         <div>
@@ -2066,7 +2120,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <p className="text-[11px] text-slate-500">Mã hóa đối xứng qua Gateway BFF an toàn 100%.</p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 font-mono">
+                      <span className="text-[10px] font-extrabold text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100/80 px-3 py-1 rounded-full border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(16,185,129,0.06)]">
                         HOẠT ĐỘNG
                       </span>
                     </div>
@@ -2091,7 +2145,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <motion.div
                             initial={{ opacity: 0, y: -4 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-start gap-2.5 text-left text-xs shrink-0"
+                            className="p-2.5 bg-gradient-to-b from-rose-50 to-rose-100/70 border-t border-t-white border-b border-b-rose-300 border-x border-x-rose-200 text-rose-700 rounded-xl flex items-start gap-2.5 text-left text-xs shrink-0 shadow-[0_2px_6px_rgba(225,29,72,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]"
                           >
                             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                             <div className="space-y-0.5 min-w-0 flex-1">
@@ -2101,8 +2155,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           </motion.div>
                         )}
 
-                        {/* TOP SECTION: Expanded Input Dashboard */}
-                        <div className="bg-white/95 border border-slate-200/90 rounded-2xl p-3 sm:p-3.5 space-y-2.5 shadow-sm shrink-0 w-full">
+                        {/* TOP SECTION: Expanded Input Dashboard with 3D Bevel */}
+                        <div className="bg-gradient-to-b from-white/98 via-white/90 to-white/80 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl p-3 sm:p-3.5 space-y-2.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] shrink-0 w-full">
                           {/* Row 1: Recipient, Phone, Address Type, Default Switch */}
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center w-full">
                             
@@ -2121,7 +2175,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   setNewAddressForm({ ...newAddressForm, recipientName: e.target.value });
                                   if (errorMsg) setErrorMsg("");
                                 }}
-                                className="w-full h-9 px-3 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
+                                className="w-full h-9 px-3 bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-slate-400"
                               />
                             </div>
 
@@ -2140,20 +2194,20 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   setNewAddressForm({ ...newAddressForm, phone: e.target.value });
                                   if (errorMsg) setErrorMsg("");
                                 }}
-                                className="w-full h-9 px-3 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-mono font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
+                                className="w-full h-9 px-3 bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-mono font-medium text-slate-900 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-slate-400"
                               />
                             </div>
 
                             {/* Address Type: Modern Segmented Control */}
                             <div className="md:col-span-3">
                               <label className="text-[11px] font-bold text-slate-700 block mb-1">Loại địa chỉ</label>
-                              <div className="h-9 p-0.5 bg-slate-100 border border-slate-200/90 rounded-xl flex items-center gap-0.5">
+                              <div className="h-9 p-0.5 bg-gradient-to-b from-slate-100 to-slate-200/70 border border-slate-200/90 rounded-xl flex items-center gap-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
                                 <button
                                   type="button"
                                   onClick={() => setNewAddressForm({ ...newAddressForm, type: "office" })}
                                   className={`flex-1 h-full rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                                     newAddressForm.type === "office"
-                                      ? "bg-white text-indigo-700 shadow-2xs border border-slate-200/60 font-extrabold"
+                                      ? "bg-gradient-to-b from-white to-slate-50 text-indigo-700 border-t border-t-white border-b border-b-slate-200 border-x border-x-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] font-extrabold"
                                       : "text-slate-500 hover:text-slate-800"
                                   }`}
                                 >
@@ -2165,7 +2219,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   onClick={() => setNewAddressForm({ ...newAddressForm, type: "home" })}
                                   className={`flex-1 h-full rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                                     newAddressForm.type === "home"
-                                      ? "bg-white text-violet-700 shadow-2xs border border-slate-200/60 font-extrabold"
+                                      ? "bg-gradient-to-b from-white to-slate-50 text-violet-700 border-t border-t-white border-b border-b-slate-200 border-x border-x-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] font-extrabold"
                                       : "text-slate-500 hover:text-slate-800"
                                   }`}
                                 >
@@ -2185,15 +2239,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 onClick={() => setNewAddressForm({ ...newAddressForm, isDefault: !newAddressForm.isDefault })}
                                 className={`h-9 px-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer select-none ${
                                   newAddressForm.isDefault 
-                                    ? "bg-indigo-50/90 border-indigo-200 text-indigo-900 shadow-2xs" 
-                                    : "bg-slate-50/70 border-slate-200 text-slate-500 hover:bg-slate-100/60"
+                                    ? "bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 text-indigo-900 shadow-[0_1px_3px_rgba(99,102,241,0.1),inset_0_1px_0_rgba(255,255,255,0.9)]" 
+                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 text-slate-600 shadow-[0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
                                 }`}
                                 title="Bật/Tắt làm địa chỉ giao hàng mặc định"
                               >
                                 <span className="text-[11px] font-bold">
                                   {newAddressForm.isDefault ? "Mặc định" : "Thường"}
                                 </span>
-                                <div className={`w-7 h-4 rounded-full transition-colors relative p-0.5 flex items-center ${
+                                <div className={`w-7 h-4 rounded-full transition-colors relative p-0.5 flex items-center shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] ${
                                   newAddressForm.isDefault ? "bg-indigo-600 justify-end" : "bg-slate-300 justify-start"
                                 }`}>
                                   <div className="w-3 h-3 rounded-full bg-white shadow-xs" />
@@ -2224,14 +2278,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     setNewAddressForm({ ...newAddressForm, address: e.target.value });
                                     if (errorMsg) setErrorMsg("");
                                   }}
-                                  className="w-full h-9.5 pl-9 pr-9 bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs placeholder:text-slate-400"
+                                  className="w-full h-9.5 pl-9 pr-9 bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-slate-400"
                                 />
                                 {newAddressForm.address.trim() && (
                                   <button
                                     type="button"
                                     onClick={handleManualResolveAddress}
                                     disabled={isResolvingAddress}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed active:scale-95"
                                     title="Chủ động tải lại vị trí / Geocoding tọa độ"
                                   >
                                     <RefreshCw className={`w-3.5 h-3.5 ${isResolvingAddress ? "animate-spin text-indigo-600" : "text-slate-400 hover:text-indigo-600"}`} />
@@ -2242,7 +2296,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               {/* 35% Fixed Width Geocoding Status Chip (Click to Copy & Stretched Layout) */}
                               <div className="w-full sm:w-[35%] sm:basis-[35%] shrink-0">
                                 {isResolvingAddress ? (
-                                  <div className="w-full h-9.5 px-3 bg-indigo-50/90 border border-indigo-200/80 rounded-xl flex items-center justify-center gap-1.5 text-xs text-indigo-700 font-medium">
+                                  <div className="w-full h-9.5 px-3 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 rounded-xl flex items-center justify-center gap-1.5 text-xs text-indigo-700 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                                     <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
                                     <span className="truncate">Đang tìm tọa độ...</span>
                                   </div>
@@ -2258,11 +2312,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                         }, 1000);
                                       }
                                     }}
-                                    className="w-full h-9.5 px-3 bg-emerald-50/90 hover:bg-emerald-100/70 border border-emerald-200 rounded-xl flex items-center justify-between gap-1.5 text-xs transition-all cursor-pointer shadow-2xs group select-none"
+                                    className="w-full h-9.5 px-3 bg-gradient-to-b from-emerald-50 via-emerald-50/80 to-emerald-100/60 hover:from-emerald-100 border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 rounded-xl flex items-center justify-between gap-1.5 text-xs transition-all cursor-pointer shadow-[0_1px_3px_rgba(16,185,129,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] group select-none active:scale-[0.99]"
                                     title="Bấm vào để sao chép liên kết vị trí bản đồ"
                                   >
                                     <div className="flex items-center min-w-0 flex-1">
-                                      <span className="font-mono font-bold text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200/70 px-1.5 py-0.5 rounded text-[11px] truncate flex-1 text-center">
+                                      <span className="font-mono font-bold text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200/70 px-1.5 py-0.5 rounded text-[11px] truncate flex-1 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                                         {resolvedPreview.latitude.toFixed(4)}, {resolvedPreview.longitude.toFixed(4)}
                                       </span>
                                     </div>
@@ -2275,7 +2329,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                             e.stopPropagation();
                                             setNewAddressForm(prev => ({ ...prev, address: resolvedPreview.formattedAddress }));
                                           }}
-                                          className="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-1.5 py-0.5 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5"
+                                          className="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-1.5 py-0.5 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
                                           title="Áp dụng định dạng địa chỉ chuẩn hóa"
                                         >
                                           <Sparkles className="w-2.5 h-2.5" />
@@ -2285,12 +2339,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     )}
                                   </div>
                                 ) : resolvedPreview && !resolvedPreview.success ? (
-                                  <div className="w-full h-9.5 px-3 bg-amber-50/90 border border-amber-200 rounded-xl flex items-center justify-center gap-1.5 text-xs text-amber-800 font-medium">
+                                  <div className="w-full h-9.5 px-3 bg-gradient-to-b from-amber-50 to-amber-100/70 border-t border-t-white border-b border-b-amber-200 border-x border-x-amber-100 rounded-xl flex items-center justify-center gap-1.5 text-xs text-amber-800 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                                     <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                     <span className="truncate">Chưa tìm thấy tọa độ</span>
                                   </div>
                                 ) : (
-                                  <div className="w-full h-9.5 px-3 bg-white border border-dashed border-slate-200 rounded-xl flex items-center justify-center text-[11px] text-slate-400 font-medium">
+                                  <div className="w-full h-9.5 px-3 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border border-dashed border-slate-300/80 rounded-xl flex items-center justify-center text-[11px] text-slate-400 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                                     <span>Chờ nhập địa chỉ...</span>
                                   </div>
                                 )}
@@ -2299,8 +2353,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           </div>
                         </div>
 
-                        {/* BOTTOM SECTION: Full-Height Clean Interactive Map Viewport (MINIMAL EYE BLUR SAVER) */}
-                        <div className="flex-1 min-h-[360px] rounded-2xl border border-slate-200 bg-slate-100 overflow-hidden relative shadow-sm flex">
+                        {/* BOTTOM SECTION: Full-Height Clean Interactive Map Viewport (MINIMAL EYE BLUR SAVER with Bevel) */}
+                        <div className="flex-1 min-h-[360px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200 bg-slate-100 overflow-hidden relative shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex">
                           
                           {/* Map Viewport Area */}
                           <div className="w-full h-full relative bg-slate-100 flex items-center justify-center overflow-hidden flex-1">
@@ -2319,13 +2373,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   loading="lazy"
                                 />
 
-                                {/* Performance Saver Overlay: Single Minimal Eye Button */}
+                                {/* Performance Saver Overlay: Single Minimal Eye Button with 3D Bevel */}
                                 {!isMapActive && (
                                   <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-900/10 backdrop-blur-[2px] p-4">
                                     <button
                                       type="button"
                                       onClick={() => setIsMapActive(true)}
-                                      className="w-14 h-14 rounded-full bg-white/95 hover:bg-white text-indigo-600 shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer group"
+                                      className="w-14 h-14 rounded-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 text-indigo-600 shadow-[0_8px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,1)] hover:scale-110 active:scale-95 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 flex items-center justify-center transition-all cursor-pointer group"
                                       title="Bật hiển thị bản đồ tương tác"
                                     >
                                       <Eye className="w-6 h-6 group-hover:scale-110 transition-transform" />
@@ -2335,7 +2389,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                                 {/* Floating Location Action Bar when Map is Active (No Name, Recenter Icon + Google Maps Button) */}
                                 {isMapActive && (
-                                  <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 bg-white/95 backdrop-blur-md p-1 pl-2.5 rounded-xl border border-slate-200/90 shadow-md animate-in fade-in duration-200">
+                                  <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 bg-gradient-to-b from-white/95 via-white/90 to-white/80 backdrop-blur-md p-1 pl-2.5 rounded-xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_4px_14px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] animate-in fade-in duration-200">
                                     <div className="flex items-center gap-1.5 pr-1">
                                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                                       <span className="text-[11px] font-mono font-bold text-slate-700">
@@ -2349,7 +2403,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     <button
                                       type="button"
                                       onClick={() => setMapKey(prev => prev + 1)}
-                                      className="w-6.5 h-6.5 bg-indigo-50 hover:bg-indigo-100/90 text-indigo-700 rounded-lg border border-indigo-200/80 transition-all flex items-center justify-center cursor-pointer shrink-0 active:scale-95 shadow-2xs"
+                                      className="w-6.5 h-6.5 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 hover:from-indigo-100 text-indigo-700 rounded-lg border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 transition-all flex items-center justify-center cursor-pointer shrink-0 active:scale-95 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.06)]"
                                       title="Trỏ lại tâm vị trí"
                                     >
                                       <LocateFixed className="w-3.5 h-3.5 text-indigo-600" />
@@ -2360,7 +2414,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                       href={`https://www.google.com/maps/search/?api=1&query=${resolvedPreview.latitude},${resolvedPreview.longitude}`}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 text-[10.5px] font-bold rounded-lg border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                                      className="px-2 py-1 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white text-slate-700 text-[10.5px] font-bold rounded-lg border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] transition-all flex items-center gap-1 cursor-pointer shrink-0 active:scale-95"
                                       title="Mở vị trí này trên Google Maps"
                                     >
                                       <span>Google Maps</span>
@@ -2382,7 +2436,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               </div>
                             ) : (
                               <div className="flex flex-col items-center justify-center gap-3 p-6 text-center z-10 max-w-sm">
-                                <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
+                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 text-indigo-600 flex items-center justify-center shadow-[0_2px_6px_rgba(99,102,241,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]">
                                   <Map className="w-7 h-7" />
                                 </div>
                                 <div className="space-y-1">
@@ -2398,7 +2452,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     ) : (
                       /* DEFAULT VIEW: Header + 2-Column Grid of Addresses */
                       <>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mb-3.5">
                           <span className="text-xs font-bold text-slate-700">{addresses.length} địa chỉ nhận hàng đã lưu</span>
                           <button
                             type="button"
@@ -2415,7 +2469,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               setErrorMsg("");
                               setSuccessMsg("");
                             }}
-                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                            className="px-4 py-2 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95"
                           >
                             <Plus className="w-4 h-4" />
                             <span>Thêm địa chỉ mới</span>
@@ -2428,10 +2482,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             return (
                               <div
                                 key={addr.sku}
-                                className={`relative p-5 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between overflow-hidden group ${
+                                className={`relative p-5 rounded-2xl text-left transition-all duration-200 flex flex-col justify-between overflow-hidden group ${
                                   addr.isDefault 
-                                    ? "bg-indigo-50/30 border-indigo-200/90 shadow-sm ring-1 ring-indigo-500/10" 
-                                    : "bg-white hover:bg-slate-50/50 border-slate-200/90 hover:border-slate-300 shadow-2xs"
+                                    ? "bg-gradient-to-b from-white via-indigo-50/25 to-indigo-50/45 border-t border-t-white border-b border-b-indigo-300/80 border-x border-x-indigo-200/70 shadow-[0_4px_16px_-2px_rgba(79,70,229,0.08),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-indigo-500/15" 
+                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 hover:from-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)]"
                                 }`}
                               >
                                 {addr.isDefault && (
@@ -2442,10 +2496,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   {/* Header: Name, Type Badge & Default Status */}
                                   <div className="flex items-start justify-between gap-2.5">
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                      <div className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
+                                      <div className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center shrink-0 border-t border-t-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] transition-transform group-hover:scale-105 ${
                                         isOffice 
-                                          ? "bg-indigo-100/80 text-indigo-700 border border-indigo-200/50" 
-                                          : "bg-violet-100/80 text-violet-700 border border-violet-200/50"
+                                          ? "bg-gradient-to-b from-indigo-100 to-indigo-200/60 text-indigo-700 border-b border-b-indigo-300/60 border-x border-x-indigo-200/50" 
+                                          : "bg-gradient-to-b from-violet-100 to-violet-200/60 text-violet-700 border-b border-b-violet-300/60 border-x border-x-violet-200/50"
                                       }`}>
                                         {isOffice ? <Building2 className="w-4 h-4" /> : <Home className="w-4 h-4" />}
                                       </div>
@@ -2454,10 +2508,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                           <h4 className="text-sm font-bold text-slate-900 tracking-tight leading-tight truncate">
                                             {addr.recipientName}
                                           </h4>
-                                          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                                          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border-t border-t-white border-b border-x shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)] ${
                                             isOffice 
-                                              ? "bg-indigo-50 text-indigo-700 border-indigo-200/60" 
-                                              : "bg-violet-50 text-violet-700 border-violet-200/60"
+                                              ? "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-700 border-b-indigo-200 border-x-indigo-100" 
+                                              : "bg-gradient-to-b from-violet-50 to-violet-100/70 text-violet-700 border-b-violet-200 border-x-violet-100"
                                           }`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${isOffice ? "bg-indigo-500" : "bg-violet-500"}`} />
                                             {isOffice ? "Văn phòng" : "Nhà riêng"}
@@ -2467,7 +2521,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     </div>
 
                                     {addr.isDefault && (
-                                      <span className="inline-flex items-center gap-1 text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-indigo-600 text-white shadow-2xs shrink-0 tracking-wider">
+                                      <span className="inline-flex items-center gap-1 text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-gradient-to-b from-indigo-500 to-indigo-700 border-t border-t-indigo-300/60 text-white shadow-[0_2px_6px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)] shrink-0 tracking-wider">
                                         <Check className="w-3 h-3 stroke-[2.5]" /> Mặc định
                                       </span>
                                     )}
@@ -2475,13 +2529,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                                   {/* Contact & GPS Metadata */}
                                   <div className="flex items-center flex-wrap gap-2 text-xs">
-                                    <div className="inline-flex items-center gap-1.5 font-mono text-slate-700 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60 text-[11px] font-medium">
+                                    <div className="inline-flex items-center gap-1.5 font-mono text-slate-700 bg-gradient-to-b from-slate-50 to-slate-100/80 px-2.5 py-1 rounded-lg border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-100 text-[11px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)]">
                                       <Phone className="w-3 h-3 text-indigo-600 shrink-0" />
                                       <span>{addr.phoneNumber}</span>
                                     </div>
 
                                     {addr.latitude && addr.longitude && (
-                                      <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/60 font-medium">
+                                      <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100/70 px-2.5 py-1 rounded-lg border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(16,185,129,0.06)]">
                                         <Compass className="w-3 h-3 text-emerald-600 shrink-0" />
                                         <span>{addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
                                       </div>
@@ -2489,7 +2543,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   </div>
 
                                   {/* Detailed Address Box */}
-                                  <div className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed bg-slate-50/70 p-2.5 rounded-xl border border-slate-100/90">
+                                  <div className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed bg-gradient-to-b from-white/95 via-slate-50/80 to-slate-100/60 p-2.5 rounded-xl border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)]">
                                     <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                                     <span className="text-slate-700 font-medium leading-snug break-words flex-1">
                                       {addr.address}
@@ -2503,7 +2557,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     <button
                                       type="button"
                                       onClick={() => handleSetDefaultAddress(addr.sku)}
-                                      className="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer flex items-center gap-1 py-1"
+                                      className="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer flex items-center gap-1 py-1 active:scale-95"
                                     >
                                       <span>Đặt làm mặc định</span>
                                       <ArrowRight className="w-3 h-3" />
@@ -2519,7 +2573,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     <button
                                       type="button"
                                       onClick={() => handleOpenEditAddress(addr)}
-                                      className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                                      className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-gradient-to-b hover:from-white hover:to-indigo-50 rounded-lg transition-all cursor-pointer border hover:border-indigo-200/70 active:scale-95"
                                       title="Chỉnh sửa địa chỉ"
                                     >
                                       <Edit3 className="w-3.5 h-3.5" />
@@ -2528,7 +2582,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteAddress(addr.sku)}
-                                      className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                      className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-gradient-to-b hover:from-white hover:to-rose-50 rounded-lg transition-all cursor-pointer border hover:border-rose-200/70 active:scale-95"
                                       title="Xóa địa chỉ"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -2548,16 +2602,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 {activeModalTab === "payments" && (
                   <div className="space-y-5 flex-1">
                     {isAddingCard ? (
-                      /* FULL FORM VIEW WHEN ADDING PAYMENT CARD */
+                      /* FULL FORM VIEW WHEN ADDING PAYMENT CARD WITH 3D BEVEL */
                       <motion.form
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         onSubmit={handleAddPaymentMethod}
-                        className="p-6 bg-slate-50/70 border border-indigo-200/80 rounded-2xl space-y-4 text-left shadow-xs"
+                        className="p-6 bg-gradient-to-b from-white via-white/95 to-slate-50/70 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/70 rounded-2xl space-y-4 text-left shadow-[0_4px_16px_-4px_rgba(79,70,229,0.08),inset_0_1px_0_rgba(255,255,255,1)]"
                       >
-                        <div className="p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-xl flex items-center gap-3 text-left">
-                          <div className="w-8 h-8 rounded-lg bg-indigo-600/10 text-indigo-600 flex items-center justify-center shrink-0">
-                            <CreditCard className="w-4 h-4 text-indigo-600" />
+                        <div className="p-3.5 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 rounded-xl flex items-center gap-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white flex items-center justify-center shrink-0 border-t border-t-white/30 shadow-[0_2px_6px_rgba(79,70,229,0.3)]">
+                            <CreditCard className="w-4 h-4" />
                           </div>
                           <div>
                             <p className="text-xs font-bold text-indigo-950">Liên kết phương thức thanh toán mới</p>
@@ -2578,10 +2632,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 key={item.type}
                                 type="button"
                                 onClick={() => setNewCardForm({ ...newCardForm, type: item.type as any })}
-                                className={`py-2.5 px-3 text-xs font-bold rounded-xl border text-center cursor-pointer transition-all ${
+                                className={`py-2.5 px-3 text-xs font-bold rounded-xl text-center cursor-pointer transition-all active:scale-95 ${
                                   newCardForm.type === item.type
-                                    ? "bg-gradient-to-r from-indigo-600 to-violet-700 text-white border-transparent shadow-xs"
-                                    : "bg-white text-slate-700 border-slate-200 hover:bg-indigo-50/50"
+                                    ? "bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white shadow-[0_3px_10px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)]"
+                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 text-slate-700 hover:from-white shadow-[0_1.5px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]"
                                 }`}
                               >
                                 {item.label}
@@ -2601,7 +2655,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               placeholder={newCardForm.type === "momo" ? "090xxxxxxx" : "4111 2222 3333 4444"}
                               value={newCardForm.cardNumber}
                               onChange={(e) => setNewCardForm({ ...newCardForm, cardNumber: e.target.value })}
-                              className="w-full bg-white border border-slate-200 focus:border-indigo-600 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-slate-900"
+                              className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                             />
                           </div>
                           <div className="space-y-1.5">
@@ -2612,7 +2666,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               placeholder="NGO NGOC DINH"
                               value={newCardForm.holderName}
                               onChange={(e) => setNewCardForm({ ...newCardForm, holderName: e.target.value.toUpperCase() })}
-                              className="w-full bg-white border border-slate-200 focus:border-indigo-600 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold uppercase text-slate-900"
+                              className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold uppercase text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                             />
                           </div>
                         </div>
@@ -2627,7 +2681,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 placeholder="08/29"
                                 value={newCardForm.expiryDate}
                                 onChange={(e) => setNewCardForm({ ...newCardForm, expiryDate: e.target.value })}
-                                className="w-full bg-white border border-slate-200 focus:border-indigo-600 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-center text-slate-900"
+                                className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-center text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                               />
                             </div>
                             <div className="space-y-1.5">
@@ -2638,7 +2692,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 placeholder="•••"
                                 value={newCardForm.cvv}
                                 onChange={(e) => setNewCardForm({ ...newCardForm, cvv: e.target.value })}
-                                className="w-full bg-white border border-slate-200 focus:border-indigo-600 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-center text-slate-900"
+                                className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-center text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
                               />
                             </div>
                           </div>
@@ -2663,13 +2717,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 setErrorMsg("");
                                 setSuccessMsg("");
                               }}
-                              className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200/70 rounded-xl transition-all cursor-pointer"
+                              className="px-4 py-2.5 text-xs font-bold text-slate-600 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_1.5px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] rounded-xl transition-all cursor-pointer active:scale-95"
                             >
                               Hủy bỏ
                             </button>
                             <button
                               type="submit"
-                              className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-700 hover:opacity-95 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5"
+                              className="px-6 py-2.5 bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 hover:brightness-105 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center gap-1.5 active:scale-95"
                             >
                               <Check className="w-4 h-4" />
                               <span>Lưu phương thức</span>
@@ -2680,7 +2734,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     ) : (
                       /* DEFAULT VIEW: Header + 2-Column Grid of Payment Cards */
                       <>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mb-3.5">
                           <span className="text-xs font-bold text-slate-700">{paymentMethods.length} phương thức thanh toán</span>
                           <button
                             type="button"
@@ -2689,7 +2743,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               setErrorMsg("");
                               setSuccessMsg("");
                             }}
-                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                            className="px-4 py-2 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95"
                           >
                             <Plus className="w-4 h-4" />
                             <span>Thêm thẻ / Ví mới</span>
@@ -2700,15 +2754,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           {paymentMethods.map((card) => (
                             <div
                               key={card.id}
-                              className={`p-4 sm:p-5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                              className={`p-4 sm:p-5 rounded-2xl text-left transition-all flex flex-col justify-between ${
                                 card.isDefault 
-                                  ? "bg-slate-900 text-white border-slate-800 shadow-lg shadow-slate-900/15" 
-                                  : "bg-white border-slate-200 hover:border-slate-300"
+                                  ? "bg-gradient-to-b from-slate-850 via-slate-900 to-black text-white border-t border-t-slate-700/80 border-b border-b-black border-x border-x-slate-800/60 shadow-[0_8px_24px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]" 
+                                  : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] hover:from-white"
                               }`}
                             >
                               <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                  <div className={`px-2.5 py-1 rounded-lg font-black text-xs font-mono tracking-wider ${
+                                  <div className={`px-2.5 py-1 rounded-lg font-black text-xs font-mono tracking-wider border-t border-t-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] ${
                                     card.type === "visa" 
                                       ? "bg-blue-600 text-white" 
                                       : card.type === "mastercard" 
@@ -2720,7 +2774,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     {card.type.toUpperCase()}
                                   </div>
                                   {card.isDefault && (
-                                    <span className="text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-white/20 text-white border border-white/30">
+                                    <span className="text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-white/20 text-white border border-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
                                       Mặc định
                                     </span>
                                   )}
@@ -2745,7 +2799,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   <button
                                     type="button"
                                     onClick={() => handleSetDefaultPayment(card.id)}
-                                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+                                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer active:scale-95"
                                   >
                                     Đặt làm mặc định
                                   </button>
@@ -2758,10 +2812,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 <button
                                   type="button"
                                   onClick={() => handleDeletePayment(card.id)}
-                                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer active:scale-95 ${
                                     card.isDefault 
                                       ? "text-slate-400 hover:text-red-400 hover:bg-white/10" 
-                                      : "text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                      : "text-slate-400 hover:text-red-600 hover:bg-rose-50"
                                   }`}
                                   title="Xóa thẻ"
                                 >
@@ -2776,20 +2830,20 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   </div>
                 )}
 
-                {/* TAB 5: Active Sessions & Devices (2-Column Grid Layout) */}
+                {/* TAB 5: Active Sessions & Devices (2-Column Grid Layout with Bevel) */}
                 {activeModalTab === "sessions" && (
                   <div className="space-y-5 flex-1">
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Current device card */}
-                      <div className="p-4 sm:p-5 bg-emerald-50/40 border border-emerald-200/80 rounded-2xl flex items-start gap-3.5 text-left">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                      <div className="p-4 sm:p-5 bg-gradient-to-b from-white via-emerald-50/20 to-emerald-50/40 border-t border-t-white border-b border-b-emerald-200/80 border-x border-x-emerald-100/70 rounded-2xl flex items-start gap-3.5 text-left shadow-[0_4px_16px_-4px_rgba(16,185,129,0.08),inset_0_1px_0_rgba(255,255,255,1)]">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 border-t border-t-white/30 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-[0_2px_6px_rgba(16,185,129,0.25)]">
                           <Laptop className="w-5 h-5" />
                         </div>
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-xs font-black text-slate-900">Trình duyệt Web (Phiên hiện tại)</p>
-                            <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                            <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100 border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                               HOẠT ĐỘNG
                             </span>
@@ -2804,14 +2858,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       </div>
 
                       {/* Secondary Mobile App device session */}
-                      <div className="p-4 sm:p-5 bg-white border border-slate-200 rounded-2xl flex items-start gap-3.5 text-left">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                      <div className="p-4 sm:p-5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl flex items-start gap-3.5 text-left shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-slate-100 to-slate-200/80 border-t border-t-white text-slate-600 flex items-center justify-center shrink-0 mt-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                           <Smartphone className="w-5 h-5" />
                         </div>
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-xs font-black text-slate-900">Horizon Mobile App v2.4 (iOS)</p>
-                            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                            <span className="text-[9px] font-bold text-slate-600 bg-gradient-to-b from-slate-50 to-slate-100 border border-slate-200 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                               iPhone 15 Pro
                             </span>
                           </div>
@@ -2825,7 +2879,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       </div>
                     </div>
 
-                    {/* Terminate other sessions action */}
+                    {/* Terminate other sessions action with Bevel button */}
                     <div className="pt-2">
                       <button
                         type="button"
@@ -2833,12 +2887,158 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           setSuccessMsg("Đã đăng xuất tài khoản khỏi tất cả các thiết bị khác thành công!");
                           logAuditAction("TERMINATE_SESSIONS", "SUCCESS", "Đăng xuất các phiên thiết bị khác từ Portal");
                         }}
-                        className="w-full py-3 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer border border-slate-200 hover:border-red-200 shadow-xs"
+                        className="w-full py-3 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-rose-50 hover:to-rose-100/60 hover:text-red-600 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer border-t border-t-white border-b border-b-slate-300/70 hover:border-b-rose-300 border-x border-x-white/70 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] active:scale-95"
                       >
                         Đăng xuất khỏi tất cả các thiết bị khác
                       </button>
                     </div>
 
+                  </div>
+                )}
+
+                {/* 6. TAB: BOOKMARKS (Phụ kiện mua cùng đã lưu) */}
+                {activeModalTab === "bookmarks" && (
+                  <div className="space-y-4">
+                    {userBookmarks.length === 0 ? (
+                      <div className="py-12 text-center flex flex-col items-center justify-center gap-3">
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-orange-50 to-orange-100/70 border border-orange-200/60 text-[#FF4D24] flex items-center justify-center shadow-xs">
+                          <Bookmark className="w-7 h-7 stroke-[1.75]" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800">Chưa có gói phụ kiện nào được lưu</h4>
+                          <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                            Khi bạn bấm "+ Thêm" phụ kiện kèm theo tại trang sản phẩm, chúng sẽ được lưu trữ 1 giờ hoặc 7 ngày để thanh toán sau.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAccountsCenterOpen(false);
+                            onNavigate("product");
+                          }}
+                          className="mt-2 px-4 py-2 bg-[#FF4D24] hover:bg-[#FF4D24]/90 text-white text-xs font-bold rounded-xl shadow-[0_4px_12px_rgba(255,77,36,0.3)] transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          <span>Khám phá sản phẩm ngay</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {userBookmarks.map((bookmark) => {
+                          const is7Days = (bookmark.ttlSecondsRemaining || 0) > 3600;
+                          const hoursLeft = Math.max(1, Math.floor((bookmark.ttlSecondsRemaining || 0) / 3600));
+                          const daysLeft = Math.floor(hoursLeft / 24);
+
+                          return (
+                            <div
+                              key={bookmark.mainSku}
+                              className="p-4 sm:p-5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] space-y-3.5 text-left"
+                            >
+                              {/* Order Card Header */}
+                              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/60">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[10px] font-mono font-black text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                    {bookmark.mainSku}
+                                  </span>
+                                  <span className="text-xs font-bold text-slate-800">
+                                    Gói phụ kiện mua kèm ({bookmark.totalItems} món)
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                    is7Days
+                                      ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                      : "bg-amber-50 text-amber-600 border border-amber-200"
+                                  }`}>
+                                    <Clock className="w-3 h-3" />
+                                    {is7Days ? `Còn ${daysLeft > 0 ? `${daysLeft} ngày` : `${hoursLeft} giờ`}` : `Lưu tạm (${hoursLeft}h)`}
+                                  </span>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#FF4D24] border border-orange-200">
+                                    Chờ thanh toán
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Order Card Items List */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {bookmark.items.map((item) => (
+                                  <div
+                                    key={item.sku}
+                                    className="p-2.5 rounded-xl bg-white/80 border border-slate-200/70 shadow-2xs flex items-center gap-2.5"
+                                  >
+                                    <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-slate-200/50 bg-slate-100">
+                                      <img
+                                        src={item.imageUrl}
+                                        alt={item.productName}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).src = "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&auto=format&fit=crop";
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-semibold text-slate-800 truncate" title={item.productName}>
+                                        {item.productName}
+                                      </p>
+                                      <div className="flex items-center justify-between gap-1 mt-1">
+                                        <span className="text-[10px] text-slate-400 font-mono">
+                                          SL: <strong>{item.quantity}</strong>
+                                        </span>
+                                        <span className="text-xs font-black font-mono text-[#FF4D24]">
+                                          {Math.round(item.subTotal || item.salePrice * item.quantity).toLocaleString("vi-VN")}đ
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Order Card Footer */}
+                              <div className="flex items-center justify-between pt-3 border-t border-slate-200/60 flex-wrap gap-2">
+                                <div>
+                                  <span className="text-xs text-slate-500">Tổng cộng:</span>
+                                  <span className="text-sm font-black font-mono text-[#FF4D24] ml-1.5">
+                                    {Math.round(bookmark.totalSalePrice).toLocaleString("vi-VN")}đ
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        await clearBookmark(bookmark.mainSku);
+                                        loadUserBookmarks();
+                                        setSuccessMsg(`Đã xóa gói phụ kiện ${bookmark.mainSku}`);
+                                      } catch (err: any) {
+                                        setErrorMsg(err.message || "Lỗi xóa bookmark");
+                                      }
+                                    }}
+                                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Xóa gói</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsAccountsCenterOpen(false);
+                                      onNavigate("product");
+                                    }}
+                                    className="px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] shadow-[0_4px_12px_rgba(255,77,36,0.3)] hover:brightness-105 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                                  >
+                                    <span>Thanh toán ngay</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
 
