@@ -12,7 +12,7 @@ export default defineConfig(() => {
       },
     },
     server: {
-      port: process.env.DISABLE_HMR === 'true' ? 3000 : 3999,
+      port: 3000,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching on store files, data caches, and JSON files to prevent unwanted reloads

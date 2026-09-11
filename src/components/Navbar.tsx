@@ -37,6 +37,7 @@ interface NavbarProps {
   cartItems: CartItem[];
   onRemoveCartItem?: (id: string | string[]) => void;
   onAddToCart?: (itemName: string, itemPrice: string) => void;
+  isProductDetailOpen?: boolean;
 }
 
 interface MegaMenuCategory {
@@ -355,7 +356,7 @@ const AnimatedFlame = () => (
   </div>
 );
 
-export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCartItem, onAddToCart }: NavbarProps) {
+export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCartItem, onAddToCart, isProductDetailOpen }: NavbarProps) {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showCartMenu, setShowCartMenu] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
@@ -424,6 +425,136 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     megaMenuTimeoutRef.current = setTimeout(() => {
       setShowProductMegaMenu(false);
     }, 195); // 30% faster hide after mouse leave (from 280ms to 195ms)
+  };
+
+  // Helper to detect if URL has # on the product page
+  const getIsProductHashActive = () => {
+    if (typeof window === "undefined") return false;
+    const isProductPath = window.location.pathname.toLowerCase().replace(/\/$/, "") === "/p";
+    if (!isProductPath) return false;
+    const hash = window.location.hash;
+    const href = window.location.href;
+    // Check if hash exists or href contains /p#
+    return Boolean(hash || href.includes("/p#"));
+  };
+
+  // Sync URL hash for /p# and detail modal routes
+  const [isProductHashActive, setIsProductHashActive] = useState(getIsProductHashActive);
+
+  useEffect(() => {
+    // Intercept pushState and replaceState once so URL changes trigger reactive updates
+    if (typeof window !== "undefined" && !(window as any).__locationChangeIntercepted) {
+      (window as any).__locationChangeIntercepted = true;
+      const originalPushState = window.history.pushState;
+      window.history.pushState = function (...args) {
+        const result = originalPushState.apply(this, args);
+        window.dispatchEvent(new Event("locationchange"));
+        return result;
+      };
+      const originalReplaceState = window.history.replaceState;
+      window.history.replaceState = function (...args) {
+        const result = originalReplaceState.apply(this, args);
+        window.dispatchEvent(new Event("locationchange"));
+        return result;
+      };
+    }
+
+    const handleLocationSync = () => {
+      setIsProductHashActive(getIsProductHashActive());
+    };
+
+    window.addEventListener("hashchange", handleLocationSync);
+    window.addEventListener("popstate", handleLocationSync);
+    window.addEventListener("locationchange", handleLocationSync);
+    const timer = setInterval(handleLocationSync, 200);
+
+    return () => {
+      window.removeEventListener("hashchange", handleLocationSync);
+      window.removeEventListener("popstate", handleLocationSync);
+      window.removeEventListener("locationchange", handleLocationSync);
+      clearInterval(timer);
+    };
+  }, []);
+
+  // Detect auto-hide pages:
+  // 1. Order page (/o)
+  const isOrderRoute = typeof window !== "undefined" && ["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(window.location.pathname.toLowerCase().replace(/\/$/, ""));
+  const isOrderPage = currentPage === "order" || isOrderRoute;
+
+  // 2. Product page: DO NOT hide on http://localhost:3000/p without #
+  // ONLY hide when opening up # (either product modal is open or URL has #)
+  const isProductPage = currentPage === "product" || (typeof window !== "undefined" && window.location.pathname.toLowerCase().replace(/\/$/, "") === "/p");
+  const isProductModalActive = isProductPage && Boolean(isProductDetailOpen || isProductHashActive);
+
+  const isAutoHideMode = isOrderPage || isProductModalActive;
+
+  const navRef = useRef<HTMLElement | null>(null);
+  const isHoveringNavRef = useRef(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isOrderNavHovered, setIsOrderNavHovered] = useState(false);
+  const [isNavFocused, setIsNavFocused] = useState(false);
+
+  // Keep navbar visible if not in auto-hide mode, or if hovered/focused/dropdown active
+  const isNavVisible = !isAutoHideMode || isOrderNavHovered || isNavFocused || showAccountMenu || showCartMenu || isSearchExpanded || showProductMegaMenu;
+
+  useEffect(() => {
+    if (!isAutoHideMode) return;
+
+    const TOP_THRESHOLD = 72;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (e.clientY <= TOP_THRESHOLD) {
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+          hoverTimeoutRef.current = null;
+        }
+        setIsOrderNavHovered(true);
+      } else {
+        if (!isHoveringNavRef.current) {
+          if (!hoverTimeoutRef.current && isOrderNavHovered) {
+            hoverTimeoutRef.current = setTimeout(() => {
+              if (!isHoveringNavRef.current) {
+                setIsOrderNavHovered(false);
+              }
+              hoverTimeoutRef.current = null;
+            }, 420);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+    };
+  }, [isAutoHideMode, isOrderNavHovered]);
+
+  const handleNavMouseEnter = () => {
+    isHoveringNavRef.current = true;
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsOrderNavHovered(true);
+  };
+
+  const handleNavMouseLeave = (e: React.MouseEvent) => {
+    isHoveringNavRef.current = false;
+    if (isAutoHideMode && e.clientY > 72) {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+      hoverTimeoutRef.current = setTimeout(() => {
+        if (!isHoveringNavRef.current) {
+          setIsOrderNavHovered(false);
+        }
+        hoverTimeoutRef.current = null;
+      }, 420);
+    }
   };
 
   // Close dropdown on click outside & handle Escape key
@@ -840,7 +971,90 @@ const resolveProductMetadata = (skuOrName: string) => {
   };
 
   return (
-    <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/45 bg-gradient-to-b from-white/30 via-white/20 to-white/10 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.4)] z-50 flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-2 sm:pr-2.5 transition-all duration-300">
+    <>
+      {isAutoHideMode && !isNavVisible && (
+        <div
+          className="fixed top-0 left-0 right-0 h-16 z-[110]"
+          onMouseEnter={handleNavMouseEnter}
+          onTouchStart={handleNavMouseEnter}
+        />
+      )}
+      <motion.nav
+        ref={navRef}
+        initial={isAutoHideMode ? "orderHidden" : false}
+        animate={
+          isAutoHideMode
+            ? isNavVisible
+              ? "orderVisible"
+              : "orderHidden"
+            : "defaultVisible"
+        }
+        variants={{
+          orderHidden: {
+            opacity: 0,
+            y: -30,
+            scaleX: 0.62,
+            scaleY: 0.42,
+            x: "-50%",
+            transition: {
+              duration: 0.32,
+              ease: [0.25, 0.1, 0.25, 1],
+            },
+          },
+          orderVisible: {
+            opacity: 1,
+            y: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: "-50%",
+            transition: {
+              type: "spring",
+              stiffness: 185,
+              damping: 19,
+              mass: 0.85,
+            },
+          },
+          defaultVisible: {
+            opacity: 1,
+            y: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: "-50%",
+            transition: {
+              duration: 0.25,
+              ease: "easeOut",
+            },
+          },
+        }}
+        style={{
+          transformOrigin: "top center",
+          pointerEvents: (!isAutoHideMode || isNavVisible) ? "auto" : "none",
+        }}
+        onMouseEnter={handleNavMouseEnter}
+        onMouseLeave={handleNavMouseLeave}
+        onFocus={() => setIsNavFocused(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) {
+            setIsNavFocused(false);
+          }
+        }}
+        className="fixed top-6 left-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/45 bg-gradient-to-b from-white/30 via-white/20 to-white/10 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.4)] z-[120] flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-1.5"
+      >
+        <motion.div
+          animate={
+            isAutoHideMode
+              ? isNavVisible
+                ? { opacity: 1, y: 0 }
+                : { opacity: 0, y: -6 }
+              : { opacity: 1, y: 0 }
+          }
+          transition={{
+            duration: isNavVisible ? 0.28 : 0.18,
+            delay: isNavVisible ? 0.09 : 0,
+            ease: "easeOut",
+          }}
+          className="flex justify-between items-center w-full min-w-0"
+        >
       <div className="flex items-center min-w-0 gap-6 sm:gap-8 lg:gap-10">
         {/* Brand Logo */}
         <a
@@ -863,7 +1077,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             <animate attributeName="r" values="3.5;5;3.5" dur="2.5s" repeatCount="indefinite" />
             <animate attributeName="opacity" values="0.85;1;0.85" dur="2.5s" repeatCount="indefinite" />
           </circle>
-          <circle cx="12" cy="12" r="7.5" stroke="#FF4D24" strokeWidth="1.2" strokeDasharray="3 5" opacity="0.7">
+          <circle cx="12" cy="7.5" stroke="#FF4D24" strokeWidth="1.2" strokeDasharray="3 5" opacity="0.7">
             <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="7s" repeatCount="indefinite" />
           </circle>
           <circle cx="12" cy="12" r="10" stroke="#FF7C4A" strokeWidth="0.8" strokeDasharray="8 12" opacity="0.45">
@@ -1018,7 +1232,10 @@ const resolveProductMetadata = (skuOrName: string) => {
       </div>
 
       {/* Segmented Action Dock (Search, Cart, and Profile) with 3D Optical Bevel Component */}
-      <Bevel variant="dock" className="flex items-center p-1 gap-1 shrink-0">
+      <Bevel 
+        variant="dock" 
+        className="flex items-center p-1 gap-1 shrink-0"
+      >
         {/* 1. Expanding Search */}
         <div className="relative flex items-center" ref={searchContainerRef}>
           <motion.div
@@ -1029,9 +1246,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             className={`flex items-center overflow-hidden rounded-full ${
-              isSearchExpanded 
-                ? "shadow-[0_1px_4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)]" 
-                : ""
+              isSearchExpanded ? "shadow-[0_1px_4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)]" : ""
             }`}
             style={{ height: '44px', willChange: 'width, background-color' }}
           >
@@ -1070,7 +1285,7 @@ const resolveProductMetadata = (skuOrName: string) => {
               autoCorrect="off"
               autoCapitalize="off"
               autoComplete="off"
-              className={`w-full h-full bg-transparent border-none outline-none text-[15px] sm:text-[16px] text-slate-900 font-medium tracking-tight leading-none placeholder:text-slate-400 placeholder:font-normal placeholder:text-[14px] sm:placeholder:text-[15px] caret-[#FF4D24] selection:bg-[#FF4D24]/20 selection:text-[#FF4D24] pl-1 pr-2 transition-opacity duration-200 ${
+              className={`w-full h-full bg-transparent border-none outline-none text-[15px] sm:text-[16px] text-slate-900 placeholder:text-slate-400 font-medium tracking-tight leading-none placeholder:font-normal placeholder:text-[14px] sm:placeholder:text-[15px] caret-[#FF4D24] selection:bg-[#FF4D24]/20 selection:text-[#FF4D24] pl-1 pr-2 transition-opacity duration-200 ${
                 isSearchExpanded ? "opacity-100 delay-75" : "opacity-0 pointer-events-none"
               }`}
               value={searchQuery}
@@ -1270,7 +1485,7 @@ const resolveProductMetadata = (skuOrName: string) => {
           >
             <ShoppingCart size={22} className="stroke-[2.2]" />
             {totalCartCount > 0 && (
-              <span className="absolute top-0.5 right-0.5 min-w-[17px] h-[17px] px-1 bg-[#FF4D24] text-white text-[9.5px] font-black rounded-full border-none outline-none ring-0 flex items-center justify-center pointer-events-none shadow-2xs">
+              <span className="absolute top-0.5 right-0.5 min-w-[17px] h-[17px] px-1 bg-[#FF4D24] text-white text-[9.5px] font-black rounded-full border-none outline-none ring-0 flex items-center justify-center shadow-2xs pointer-events-none">
                 {totalCartCount > 99 ? "99+" : totalCartCount}
               </span>
             )}
@@ -1816,7 +2031,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             }`}
           >
             {/* Elegant Circle Avatar */}
-            <div className="w-8 h-8 rounded-full bg-slate-950/5 flex items-center justify-center text-[#111111]/80 overflow-hidden shrink-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden shrink-0 bg-slate-950/5 text-[#111111]/80 transition-colors">
               {loggedInUser ? (
                 loggedInUser.avatarUrl ? (
                   <img src={loggedInUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -1993,6 +2208,8 @@ const resolveProductMetadata = (skuOrName: string) => {
           </AnimatePresence>
         </div>
       </Bevel>
-    </nav>
+        </motion.div>
+    </motion.nav>
+    </>
   );
 }

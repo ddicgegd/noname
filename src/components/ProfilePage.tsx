@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   User, Lock, Mail, ChevronDown, ChevronUp, CheckCircle, 
@@ -7,7 +7,7 @@ import {
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
   Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
-  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark, ShoppingCart
+  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Calendar
 } from "lucide-react";
 import { apiRequest, unifiedFetch, getUnifiedAccessToken } from "../lib/api";
 import { STORAGE_KEYS } from "../lib/storageKeys";
@@ -32,9 +32,11 @@ import {
   persistStagedBookmark,
   BookmarkData,
   subscribeBookmarkUpdates,
+  sortBookmarksNewestFirst,
 } from "../services/bookmarkService";
 import { addToCart } from "../services/cartService";
 import { Bevel, BevelButton, BevelDivider } from "./ui/bevel";
+
 
 interface OrderItem {
   id: string;
@@ -43,6 +45,7 @@ interface OrderItem {
   date: string;
   status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
   statusText: string;
+  estimatedDelivery?: string;
   deliverySteps: {
     title: string;
     desc: string;
@@ -56,7 +59,7 @@ interface OrderItem {
 }
 
 interface ProfilePageProps {
-  onNavigate: (page: "landing" | "product" | "auth" | "auth-report" | "profile" | "terms") => void;
+  onNavigate: (page: "landing" | "product" | "order" | "cart" | "auth" | "auth-report" | "profile" | "terms") => void;
 }
 
 export interface PaymentMethodItem {
@@ -99,13 +102,20 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     };
     const handleCloseAccountsCenter = () => {
       setIsAccountsCenterOpen(false);
+      if (typeof window !== "undefined" && window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
     };
     window.addEventListener("open-accounts-center", handleOpenAccountsCenter);
     window.addEventListener("close-accounts-center", handleCloseAccountsCenter);
 
-    if (typeof window !== "undefined" && window.location.hash === "#bookmarks") {
-      setActiveModalTab("bookmarks");
-      setIsAccountsCenterOpen(true);
+    const validTabs = ["profile", "security", "addresses", "payments", "sessions", "bookmarks"];
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash.replace("#", "");
+      if (validTabs.includes(hash)) {
+        setActiveModalTab(hash as any);
+        setIsAccountsCenterOpen(true);
+      }
     }
 
     return () => {
@@ -114,12 +124,54 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     };
   }, []);
 
-  // Load bookmarks with real API
+  // Sync URL hash with Accounts Center modal state & remove hash when closed
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (!isAccountsCenterOpen) {
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    } else if (activeModalTab) {
+      window.history.replaceState(null, "", `${window.location.pathname}#${activeModalTab}${window.location.search}`);
+    }
+  }, [isAccountsCenterOpen, activeModalTab]);
+
+  // Handle Escape key and browser back button (hashchange)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isAccountsCenterOpen) {
+        setIsAccountsCenterOpen(false);
+      }
+    };
+
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace("#", "");
+      const validTabs = ["profile", "security", "addresses", "payments", "sessions", "bookmarks"];
+      if (validTabs.includes(hash)) {
+        setActiveModalTab(hash as any);
+        setIsAccountsCenterOpen(true);
+      } else if (!hash && isAccountsCenterOpen) {
+        setIsAccountsCenterOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("hashchange", handleHashChange);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, [isAccountsCenterOpen]);
+
+  // Load bookmarks with real API (sắp xếp các gói mới nhất lên trên)
   const loadUserBookmarks = async (showLoading = false) => {
     if (showLoading) setIsBookmarksLoading(true);
     try {
       const list = await getAllBookmarks();
-      setUserBookmarks(list);
+      setUserBookmarks(sortBookmarksNewestFirst(list));
     } catch (err: any) {
       console.warn("Lỗi tải bookmarks từ API:", err);
     } finally {
@@ -261,6 +313,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [apiResponseLogs, setApiResponseLogs] = useState<AddressApiResponseLog[]>([]);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
   const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
+
   const [isInspectorExpanded, setIsInspectorExpanded] = useState<boolean>(true);
   const [inspectorTab, setInspectorTab] = useState<"response" | "request">("response");
 
@@ -321,17 +374,71 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   // Orders list and active selected order for detail tracking view
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+  const activeOrder = orders.find(o => o.id === selectedOrderId);
+  const isOrderDelivered = activeOrder?.status === "delivered";
+
+  // Helper resolver for order color theme: emerald (xanh lá), amber (vàng), blue (xanh dương), orange (cam)
+  const getOrderColorTheme = (order?: OrderItem | null): "emerald" | "amber" | "blue" | "orange" => {
+    if (!order) return "emerald";
+    const st = (order.status || "").toLowerCase();
+    const text = (order.statusText || "").toLowerCase();
+
+    if (st === "delivered" || text.includes("giao thành công") || text.includes("kích hoạt thành công") || text.includes("hoàn tất")) {
+      return "emerald";
+    }
+    if (st === "processing" || text.includes("xử lý") || text.includes("bảo hành") || text.includes("kiểm thử")) {
+      return "amber";
+    }
+    if (st === "pending" || st === "verifying" || text.includes("xác nhận") || text.includes("xác thực") || text.includes("chờ duyệt") || text.includes("chờ xác")) {
+      return "blue";
+    }
+    if (st === "shipped" || text.includes("vận chuyển") || text.includes("đang giao")) {
+      return "orange";
+    }
+    return "orange";
+  };
+
+  const orderTheme = getOrderColorTheme(activeOrder);
+  const activeStepIndex = (activeOrder?.deliverySteps || []).findIndex(s => s.active);
+  const lastCompletedIndex = (activeOrder?.deliverySteps || []).map(s => s.completed).lastIndexOf(true);
+  const endpointIndex = activeStepIndex !== -1 ? activeStepIndex : (lastCompletedIndex !== -1 ? lastCompletedIndex : 0);
+
+  // Điểm 1: Khi đang ở endpoint status thì chỉ hiển thị duy nhất 1 status chờ sẵn (1 status xám)
+  const displayedSteps = !activeOrder ? [] : isOrderDelivered 
+    ? (activeOrder.deliverySteps || [])
+    : (activeOrder.deliverySteps || []).slice(0, Math.min(activeOrder.deliverySteps?.length || 0, endpointIndex + 2));
 
   // Scroll fades state for orders list container
   const [showTopFade, setShowTopFade] = useState<boolean>(false);
   const [showBottomFade, setShowBottomFade] = useState<boolean>(true);
 
   // Scroll fades state for shipping steps container
-  const [showStepsTopFade, setShowStepsTopFade] = useState<boolean>(true);
+  const [showStepsTopFade, setShowStepsTopFade] = useState<boolean>(false);
   const [showStepsBottomFade, setShowStepsBottomFade] = useState<boolean>(false);
-  const stepsContainerRef = useRef<HTMLDivElement>(null);
 
-  // Scroll handler to dynamically show/hide top and bottom fade indicators
+  const stepsContainerRef = useRef<HTMLDivElement>(null);
+  const endpointStepRef = useRef<HTMLDivElement>(null);
+
+  // Copied tracking feedback
+  const [copiedTracking, setCopiedTracking] = useState<boolean>(false);
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
+
+  const handleCopyTracking = (trackingNumber: string) => {
+    if (!trackingNumber) return;
+    navigator.clipboard?.writeText(trackingNumber);
+    setCopiedTracking(true);
+    setTimeout(() => setCopiedTracking(false), 2000);
+  };
+
+  const handleCopyOrderId = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!id) return;
+    navigator.clipboard?.writeText(id);
+    setCopiedOrderId(id);
+    setTimeout(() => setCopiedOrderId(null), 2000);
+  };
+
+  // Scroll handler to dynamically show/hide top and bottom fade indicators for orders list
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const scrollTop = target.scrollTop;
@@ -345,28 +452,50 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const handleStepsScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const scrollTop = target.scrollTop;
-    const maxScroll = target.scrollHeight - target.clientHeight;
+    const maxScroll = Math.max(0, target.scrollHeight - target.clientHeight);
     
-    setShowStepsTopFade(scrollTop > 5);
-    setShowStepsBottomFade(scrollTop < maxScroll - 5);
+    setShowStepsTopFade(maxScroll > 12 && scrollTop > 8);
+    setShowStepsBottomFade(maxScroll > 12 && scrollTop < maxScroll - 12);
   };
 
-  // Keep delivery steps container scrolled to the bottom on active order change
-  useEffect(() => {
-    // Delay slightly to allow rendering flow to complete
-    const timer = setTimeout(() => {
-      if (stepsContainerRef.current) {
-        const container = stepsContainerRef.current;
-        container.scrollTop = container.scrollHeight;
-        
-        // Compute correct initial fade states based on scroll heights
-        const maxScroll = container.scrollHeight - container.clientHeight;
-        setShowStepsTopFade(container.scrollTop > 5);
-        setShowStepsBottomFade(container.scrollTop < maxScroll - 5);
+  const scrollToEndpoint = useCallback(() => {
+    if (stepsContainerRef.current) {
+      const container = stepsContainerRef.current;
+      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+      if (maxScroll > 0) {
+        container.scrollTo({ top: maxScroll, behavior: "smooth" });
+        setShowStepsTopFade(maxScroll > 12);
+        setShowStepsBottomFade(false);
+      } else {
+        setShowStepsTopFade(false);
+        setShowStepsBottomFade(false);
       }
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [selectedOrderId, orders]);
+    }
+  }, []);
+
+  // Callback ref: Khi mốc endpoint được mount vào DOM
+  const setEndpointRef = useCallback((el: HTMLDivElement | null) => {
+    endpointStepRef.current = el;
+    if (el) {
+      requestAnimationFrame(() => {
+        scrollToEndpoint();
+      });
+    }
+  }, [scrollToEndpoint]);
+
+  // Luôn chuyển tới endpoint status và cập nhật dải ám mờ
+  useEffect(() => {
+    if (!selectedOrderId) return;
+    const rafId = requestAnimationFrame(scrollToEndpoint);
+    const t1 = setTimeout(scrollToEndpoint, 80);
+    const t2 = setTimeout(scrollToEndpoint, 260);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [selectedOrderId, activeOrder?.id, scrollToEndpoint]);
 
   // On mount, load token, validate user, and seed/load order data
   useEffect(() => {
@@ -402,8 +531,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         activeOrders = JSON.parse(storedOrders);
       }
       
-      if (activeOrders.length <= 2 || !activeOrders.some(o => o.id === "HZ-7711-R")) {
-        // Seed initial beautiful mock orders matching Horizon Mobile & Web products
+      const SEED_VERSION_KEY = "horizon_orders_seed_v5";
+      const needsReSeed = localStorage.getItem(SEED_VERSION_KEY) !== "true" ||
+        activeOrders.length < 7 ||
+        !activeOrders.some(o => o.id === "HZ-8831-C" && o.estimatedDelivery);
+
+      if (needsReSeed) {
+        // Seed rich, fully synchronized mock orders matching Horizon Mobile & Web products
         activeOrders = [
           {
             id: "HZ-7711-R",
@@ -412,6 +546,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             date: "14/07/2026",
             status: "processing",
             statusText: "Đang xử lý bảo hành",
+            estimatedDelivery: "15/07/2026",
             carrier: "Viettel Post (Hỗ trợ đổi trả)",
             trackingNumber: "VT-RETURN-7711",
             shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
@@ -420,11 +555,31 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               { title: "Duyệt yêu cầu hỗ trợ", desc: "Kỹ thuật viên Horizon xác nhận hỗ trợ đổi mới 1-đổi-1", time: "14/07/2026 09:30", completed: true, active: false },
               { title: "Thu hồi thiết bị cũ", desc: "Nhân viên vận chuyển đã thu lại thiết bị lỗi tận nơi", time: "14/07/2026 13:00", completed: true, active: false },
               { title: "Đang trung chuyển thiết bị cũ", desc: "Thiết bị lỗi đang trên đường về trung tâm kiểm thử Hà Nội", time: "14/07/2026 16:30", completed: true, active: false },
-              { title: "Tiếp nhận và kiểm thử lỗi", desc: "Kỹ thuật viên phòng LAB xác nhận lỗi IC nguồn cổng WAN", time: "Hôm nay, 08:15", completed: true, active: false },
-              { title: "Xuất kho thiết bị thay thế mới", desc: "Sản phẩm Router Horizon Core Lite mới 100% nguyên seal đã được kích hoạt số serial mới", time: "Hôm nay, 10:00", completed: true, active: false },
-              { title: "Bàn giao đơn vị chuyển phát", desc: "Thiết bị mới đã chuyển giao cho bưu cục Viettel Post", time: "Hôm nay, 14:00", completed: true, active: false },
-              { title: "Đang vận chuyển hỏa tốc", desc: "Đơn hàng đang trên đường giao hỏa tốc đến địa chỉ của bạn", time: "Hôm nay, 15:45", completed: true, active: true },
-              { title: "Dự kiến bàn giao & Hoàn tất", desc: "Khách hàng nhận hàng và đồng kiểm cùng shipper", time: "Dự kiến: Chiều tối nay", completed: false, active: false }
+              { title: "Tiếp nhận và kiểm thử lỗi", desc: "Kỹ thuật viên phòng LAB xác nhận lỗi IC nguồn cổng WAN", time: "15/07/2026 08:15", completed: true, active: false },
+              { title: "Xuất kho thiết bị thay thế mới", desc: "Sản phẩm Router Horizon Core Lite mới 100% nguyên seal đã được kích hoạt số serial mới", time: "15/07/2026 10:00", completed: true, active: false },
+              { title: "Bàn giao đơn vị chuyển phát", desc: "Thiết bị mới đã chuyển giao cho bưu cục Viettel Post", time: "15/07/2026 14:00", completed: true, active: false },
+              { title: "Đang xử lý đổi mới thiết bị", desc: "Kỹ thuật viên hoàn tất niêm phong và theo dõi xử lý đổi mới", time: "15/07/2026 15:45", completed: true, active: true },
+              { title: "Dự kiến bàn giao & Hoàn tất", desc: "Khách hàng nhận hàng và đồng kiểm cùng shipper", time: "15/07/2026 18:00", completed: false, active: false }
+            ]
+          },
+          {
+            id: "HZ-5520-V",
+            name: "Khóa bảo mật phần cứng Horizon Security Key Token V2",
+            price: "850,000 VND",
+            date: "14/07/2026",
+            status: "pending",
+            statusText: "Cần xác nhận đơn hàng",
+            estimatedDelivery: "16/07/2026",
+            carrier: "Horizon Security & Verification Gateway",
+            trackingNumber: "HZ-AUTH-5520",
+            shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
+            deliverySteps: [
+              { title: "Khởi tạo đơn hàng trực tuyến", desc: "Hệ thống ghi nhận đơn hàng mua Khóa bảo mật Token V2", time: "14/07/2026 14:10", completed: true, active: false },
+              { title: "Cần xác thực danh tính & bảo mật", desc: "Vui lòng xác nhận mã OTP bảo mật hoặc căn cước trên ứng dụng di động", time: "14/07/2026 14:30", completed: true, active: true },
+              { title: "Xác nhận đối soát thanh toán", desc: "Bộ phận kế toán duyệt đối soát giao dịch thanh toán trực tuyến", time: "15/07/2026 09:00", completed: false, active: false },
+              { title: "Xuất kho niêm phong thiết bị", desc: "Kỹ thuật viên chuẩn bị phần cứng và cấu hình khóa bảo mật riêng", time: "15/07/2026 14:00", completed: false, active: false },
+              { title: "Bàn giao vận chuyển bảo mật", desc: "Đơn vị vận chuyển chuyên dụng nhận gói hàng nguyên niêm phong", time: "16/07/2026 10:00", completed: false, active: false },
+              { title: "Dự kiến giao & Kích hoạt thiết bị", desc: "Người nhận đồng kiểm niêm phong và ký biên bản giao nhận", time: "16/07/2026 16:30", completed: false, active: false }
             ]
           },
           {
@@ -434,15 +589,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             date: "12/07/2026",
             status: "shipped",
             statusText: "Đang vận chuyển",
+            estimatedDelivery: "14/07/2026",
             carrier: "Horizon Express (GHN)",
             trackingNumber: "HZEX91802931",
             shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
             deliverySteps: [
-              { title: "Đã tiếp nhận đơn hàng", desc: "Đơn hàng đã được xác nhận thành công trên hệ thống", time: "12/07/2026 14:30", completed: true, active: false },
+              { title: "Đã tiếp nhận đơn hàng", desc: "Đơn hàng đã được xác nhận thành công trên hệ thống ERP", time: "12/07/2026 14:30", completed: true, active: false },
               { title: "Đang đóng gói sản phẩm", desc: "Bộ phận kho đang kiểm tra kỹ thuật thiết bị Gateway Pro V2", time: "12/07/2026 18:20", completed: true, active: false },
               { title: "Đã bàn giao cho vận chuyển", desc: "Đơn hàng đã rời kho Tổng cục phân phối Horizon Hà Nội", time: "13/07/2026 09:15", completed: true, active: false },
-              { title: "Đang trung chuyển qua trạm", desc: "Thiết bị đang được chuyển phát nhanh vào trạm trung chuyển TP. Hồ Chí Minh", time: "Hôm nay, 04:22", completed: true, active: true },
-              { title: "Đang giao tới địa chỉ", desc: "Shipper sẽ liên hệ qua số điện thoại đăng ký trước khi giao", time: "Dự kiến: Ngày mai", completed: false, active: false }
+              { title: "Đang trung chuyển qua trạm", desc: "Thiết bị đang được chuyển phát nhanh vào trạm trung chuyển TP. Hồ Chí Minh", time: "14/07/2026 04:22", completed: true, active: true },
+              { title: "Đang giao tới địa chỉ", desc: "Shipper sẽ liên hệ qua số điện thoại đăng ký trước khi giao", time: "14/07/2026 17:00", completed: false, active: false }
             ]
           },
           {
@@ -452,6 +608,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             date: "10/07/2026",
             status: "delivered",
             statusText: "Đã kích hoạt thành công",
+            estimatedDelivery: "10/07/2026",
             carrier: "Kích hoạt tự động (Instant Email API)",
             trackingNumber: "LIC-JWT-921820",
             shippingAddress: "Gửi trực tiếp qua Email tài khoản đăng nhập",
@@ -469,13 +626,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             date: "08/07/2026",
             status: "delivered",
             statusText: "Đã giao hàng",
+            estimatedDelivery: "09/07/2026",
             carrier: "Viettel Post",
             trackingNumber: "VT77291032",
             shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
             deliverySteps: [
-              { title: "Đã tiếp nhận đơn hàng", desc: "Ghi nhận đơn hàng cáp sạc siêu dẫn", time: "08/07/2026 09:00", completed: true, active: false },
-              { title: "Đóng gói & Bàn giao", desc: "Đã hoàn tất kiểm tra dòng điện của cáp", time: "08/07/2026 11:30", completed: true, active: false },
-              { title: "Đã giao thành công", desc: "Người nhận ký xác nhận tại địa chỉ văn phòng", time: "09/07/2026 16:45", completed: true, active: true }
+              { title: "Đã tiếp nhận đơn hàng", desc: "Ghi nhận đơn hàng cáp sạc siêu dẫn trên hệ thống bán lẻ", time: "08/07/2026 09:00", completed: true, active: false },
+              { title: "Kiểm thử & Đóng gói sản phẩm", desc: "Đã hoàn tất đo thông mạch và đóng hộp kèm chứng nhận chống gãy gập", time: "08/07/2026 11:30", completed: true, active: false },
+              { title: "Bàn giao đơn vị vận chuyển", desc: "Bưu cục Viettel Post tiếp nhận kiện hàng và quét mã vận đơn", time: "08/07/2026 14:15", completed: true, active: false },
+              { title: "Đang giao tới địa chỉ", desc: "Bưu tá liên hệ người nhận và giao kiện hàng đến địa chỉ", time: "09/07/2026 14:00", completed: true, active: false },
+              { title: "Đã giao hàng & Ký nhận hoàn tất", desc: "Người nhận ký xác nhận đồng kiểm thành công tại địa chỉ văn phòng", time: "09/07/2026 16:45", completed: true, active: true }
             ]
           },
           {
@@ -485,13 +645,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             date: "05/07/2026",
             status: "delivered",
             statusText: "Đã giao hàng",
+            estimatedDelivery: "07/07/2026",
             carrier: "Horizon Express (GHN)",
             trackingNumber: "HZEX10294827",
             shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
             deliverySteps: [
-              { title: "Xác nhận đơn hàng", desc: "Thiết bị Core Router Max đã được duyệt", time: "05/07/2026 08:15", completed: true, active: false },
-              { title: "Đang vận chuyển", desc: "Hàng rời kho tổng Đà Nẵng", time: "06/07/2026 14:00", completed: true, active: false },
-              { title: "Đã giao hàng thành công", desc: "Thiết bị định tuyến đã hoàn thành lắp đặt kỹ thuật", time: "07/07/2026 11:30", completed: true, active: true }
+              { title: "Xác nhận đơn hàng", desc: "Hệ thống ERP xác thực đơn mua thiết bị Core Router Max", time: "05/07/2026 08:15", completed: true, active: false },
+              { title: "Xuất kho & Đóng gói chuyên dụng", desc: "Thiết bị hoàn tất kiểm thử cổng quang 10Gbps và đóng kiện chống sốc", time: "05/07/2026 11:00", completed: true, active: false },
+              { title: "Đang vận chuyển liên tỉnh", desc: "Kiện hàng rời kho tổng Đà Nẵng vận chuyển vào TP. Hồ Chí Minh", time: "06/07/2026 14:00", completed: true, active: false },
+              { title: "Đang chuyển phát nhanh nội thành", desc: "Shipper đã nhận hàng từ bưu cục trung tâm Quận 1", time: "07/07/2026 09:30", completed: true, active: false },
+              { title: "Đã giao hàng & Lắp đặt hoàn tất", desc: "Kỹ thuật viên bàn giao và khách hàng ký biên bản nghiệm thu", time: "07/07/2026 11:30", completed: true, active: true }
             ]
           },
           {
@@ -501,17 +664,34 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             date: "01/07/2026",
             status: "delivered",
             statusText: "Đã giao hàng",
+            estimatedDelivery: "03/07/2026",
             carrier: "Giao Hàng Tiết Kiệm",
             trackingNumber: "GHTK8829310",
             shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
             deliverySteps: [
-              { title: "Tiếp nhận đơn hàng", desc: "Giao dịch đã được ghi nhận trên cổng ERP", time: "01/07/2026 14:00", completed: true, active: false },
-              { title: "Đã giao thành công", desc: "Hàng đã trao tận tay khách hàng", time: "03/07/2026 10:15", completed: true, active: true }
+              { title: "Tiếp nhận đơn hàng trực tuyến", desc: "Giao dịch mua thiết bị Nano V1 đã được ghi nhận trên cổng ERP", time: "01/07/2026 14:00", completed: true, active: false },
+              { title: "Kiểm tra & Xuất kho sản phẩm", desc: "Bộ phận kỹ thuật nạp firmware tiêu chuẩn và dán tem bảo hành điện tử", time: "01/07/2026 16:30", completed: true, active: false },
+              { title: "Đã bàn giao cho GHTK", desc: "Đơn vị vận chuyển lấy hàng tại kho và vận chuyển ra trung tâm phân loại", time: "02/07/2026 08:45", completed: true, active: false },
+              { title: "Đang phát hàng tới người nhận", desc: "Shipper liên hệ người nhận trước khi giao tại địa chỉ đăng ký", time: "03/07/2026 08:30", completed: true, active: false },
+              { title: "Đã giao hàng & Bàn giao hoàn tất", desc: "Hàng đã trao tận tay khách hàng kèm phiếu bảo hành điện tử", time: "03/07/2026 10:15", completed: true, active: true }
             ]
           }
         ];
+        localStorage.setItem(SEED_VERSION_KEY, "true");
         localStorage.setItem(STORAGE_KEYS.USER_ORDERS, JSON.stringify(activeOrders));
       }
+
+      // Ensure all loaded orders have valid dd/mm/yyyy formatted estimatedDelivery
+      activeOrders = activeOrders.map(order => {
+        if (!order.estimatedDelivery || !/^\d{2}\/\d{2}\/\d{4}$/.test(order.estimatedDelivery)) {
+          if (order.id === "HZ-7711-R") return { ...order, estimatedDelivery: "15/07/2026" };
+          if (order.id === "HZ-5520-V") return { ...order, estimatedDelivery: "16/07/2026" };
+          if (order.id === "HZ-9981-A") return { ...order, estimatedDelivery: "14/07/2026" };
+          if (order.id === "HZ-8831-C") return { ...order, estimatedDelivery: "03/07/2026" };
+          return { ...order, estimatedDelivery: order.date || "15/07/2026" };
+        }
+        return order;
+      });
       setOrders(activeOrders);
       if (activeOrders.length > 0) {
         setSelectedOrderId(activeOrders[0].id);
@@ -1316,21 +1496,18 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     }
   };
 
-  // Helper to find currently selected tracking order
-  const activeOrder = orders.find(o => o.id === selectedOrderId);
-
   return (
-    <div className="relative pt-24 pb-4 h-screen w-full bg-[#FBFDFF] font-sans text-slate-800 flex flex-col justify-start overflow-hidden">
+    <div className="relative pt-20 pb-3 sm:pb-4 h-screen w-full bg-[#FBFDFF] font-sans text-slate-800 flex flex-col justify-start overflow-hidden">
       
       {/* Ambient background glowing lights (Đánh ánh sáng ám mạnh mẽ hơn) */}
       <div className="absolute top-[-5%] left-1/4 w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-indigo-400/35 via-purple-300/25 to-[#FF4D24]/20 blur-[140px] pointer-events-none select-none z-0 animate-pulse" style={{ animationDuration: '8s' }} />
       <div className="absolute top-[30%] right-[-10%] w-[500px] h-[500px] rounded-full bg-gradient-to-br from-indigo-400/30 to-purple-400/30 blur-[120px] pointer-events-none select-none z-0" />
       <div className="absolute bottom-[5%] left-[-10%] w-[550px] h-[550px] rounded-full bg-gradient-to-tr from-[#FF4D24]/15 via-indigo-400/30 to-blue-400/25 blur-[130px] pointer-events-none select-none z-0" />
       
-      <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-10 xl:px-12 flex-1 min-h-0 flex flex-col space-y-4 pb-2">
+      <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-10 xl:px-12 flex-1 min-h-0 flex flex-col space-y-2.5 pb-1">
         
         {/* Minimal Navigation Breadcrumb and top control actions (Optimized & Unified with 3D Bevel) */}
-        <div className="shrink-0 flex flex-col gap-3.5 border-b border-slate-200/60 pb-4 select-none">
+        <div className="shrink-0 flex flex-col gap-2.5 border-b border-slate-200/60 pb-2.5 select-none">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-400">
             <span className="hover:text-black cursor-pointer transition-colors" onClick={() => onNavigate("landing")}>Trang chủ</span>
             <span>/</span>
@@ -1419,10 +1596,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           <div className="flex-1 min-h-0 flex flex-col text-left">
             
             {/* Core Section: Split View for Orders and Delivery Tracker */}
-            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-stretch">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-5 xl:gap-6 items-stretch lg:grid-rows-1">
               
               {/* Left Side: Order list history (Thông tin đơn hàng) */}
-              <div className="lg:col-span-5 h-full flex flex-col space-y-3 min-h-0">
+              <div className="lg:col-span-5 h-full flex flex-col space-y-2.5 min-h-0">
                 <div className="shrink-0 flex items-center justify-between px-1">
                   <div className="flex items-center gap-2">
                     <ClipboardList className="w-4 h-4 text-[#FF4D24]" />
@@ -1435,17 +1612,17 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   {/* Scrollable Container with Smooth Translucent Masking */}
                   <div 
                     onScroll={handleScroll}
-                    className="hide-scrollbar space-y-3.5 h-full overflow-y-auto py-1 transition-all duration-300"
+                    className="hide-scrollbar space-y-3 h-full overflow-y-auto px-1 py-1.5 transition-all duration-300"
                     style={{
                       maskImage: `linear-gradient(to bottom, 
                         transparent 0%, 
-                        black ${showTopFade ? "15%" : "0%"}, 
-                        black ${showBottomFade ? "85%" : "100%"}, 
+                        black ${showTopFade ? "24px" : "0px"}, 
+                        black calc(100% - ${showBottomFade ? "24px" : "0px"}), 
                         transparent 100%)`,
                       WebkitMaskImage: `linear-gradient(to bottom, 
                         transparent 0%, 
-                        black ${showTopFade ? "15%" : "0%"}, 
-                        black ${showBottomFade ? "85%" : "100%"}, 
+                        black ${showTopFade ? "24px" : "0px"}, 
+                        black calc(100% - ${showBottomFade ? "24px" : "0px"}), 
                         transparent 100%)`
                     }}
                   >
@@ -1466,15 +1643,32 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white border-b-slate-300/60 hover:border-slate-300/80 hover:from-white hover:to-white/85 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)]"
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-2 mb-1.5 pb-1.5 border-b border-slate-100">
-                              <div>
-                                <span className={`text-[9.5px] font-bold font-mono uppercase ${isSelected ? "text-indigo-600" : "text-slate-400"}`}>MÃ ĐƠN: {item.id}</span>
-                                <p className="text-[10px] text-slate-400 mt-0.5">Ngày mua: {item.date}</p>
+                            <div className="flex items-center justify-between gap-1.5 mb-1 pb-1 border-b border-slate-100">
+                              <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                                <span className={`text-[9px] font-bold font-mono uppercase truncate ${isSelected ? "text-indigo-600" : "text-slate-400"}`}>
+                                  MÃ ĐƠN: {item.id}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleCopyOrderId(item.id, e)}
+                                  className="p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all active:scale-90 shrink-0"
+                                  title="Sao chép mã đơn hàng"
+                                >
+                                  {copiedOrderId === item.id ? (
+                                    <Check className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
+                                  ) : (
+                                    <Copy className="w-3 h-3 text-slate-400 hover:text-slate-600" />
+                                  )}
+                                </button>
                               </div>
-                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase border-t border-t-white border-x shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] ${
-                                item.status === "delivered" 
-                                  ? "bg-gradient-to-b from-emerald-50 to-emerald-100/70 text-emerald-700 border-b border-b-emerald-300 border-x-emerald-200" 
-                                  : "bg-gradient-to-b from-blue-50 to-blue-100/70 text-blue-700 border-b border-b-blue-300 border-x-blue-200"
+                              <span className={`px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-normal shrink-0 transition-all border ${
+                                getOrderColorTheme(item) === "emerald" 
+                                  ? "bg-gradient-to-b from-emerald-50/95 via-emerald-50/75 to-emerald-100/50 text-emerald-800 border-emerald-200/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_0_rgba(16,185,129,0.1),0_1px_2px_rgba(0,0,0,0.03)]" 
+                                  : getOrderColorTheme(item) === "amber" 
+                                  ? "bg-gradient-to-b from-amber-50/95 via-amber-50/75 to-amber-100/50 text-amber-800 border-amber-200/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_0_rgba(217,119,6,0.1),0_1px_2px_rgba(0,0,0,0.03)]" 
+                                  : getOrderColorTheme(item) === "blue"
+                                  ? "bg-gradient-to-b from-blue-50/95 via-blue-50/75 to-blue-100/50 text-blue-700 border-blue-200/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_0_rgba(59,130,246,0.1),0_1px_2px_rgba(0,0,0,0.03)]"
+                                  : "bg-gradient-to-b from-orange-50/95 via-orange-50/75 to-amber-100/50 text-orange-700 border-orange-200/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_0_rgba(255,77,36,0.1),0_1px_2px_rgba(0,0,0,0.03)]"
                               }`}>
                                 {item.statusText}
                               </span>
@@ -1484,9 +1678,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               {item.name}
                             </h4>
 
+                            {/* Ngày mua bên trái, [Tổng thanh toán] : [Giá] bên phải */}
                             <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-100/80">
-                              <span className="text-[11px] text-slate-500">Tổng thanh toán:</span>
-                              <span className="text-xs font-black text-indigo-600 font-mono">{item.price}</span>
+                              <span className="text-[10px] text-slate-400 font-medium">Ngày mua: {item.date}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] text-slate-500">Tổng thanh toán:</span>
+                                <span className="text-xs font-black text-indigo-600 font-mono">{item.price}</span>
+                              </div>
                             </div>
                           </div>
                         );
@@ -1497,11 +1695,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               </div>
 
               {/* Right Side: Live Delivery Tracking progress timeline (Quá trình vận chuyển) */}
-              <div className="lg:col-span-7 h-full flex flex-col space-y-3 min-h-0">
+              <div className="lg:col-span-7 h-full flex flex-col space-y-2 min-h-0">
                 <div className="shrink-0 flex items-center justify-between px-1">
                   <div className="flex items-center gap-2">
-                    <Truck className="w-4 h-4 text-indigo-600" />
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Hành trình giao hàng</h3>
+                    <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100/80 flex items-center justify-center shadow-xs">
+                      <Truck className="w-3.5 h-3.5 text-indigo-600" />
+                    </div>
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                      Hành trình giao hàng
+                    </h3>
                   </div>
                 </div>
 
@@ -1513,91 +1715,279 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
                       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-                      className="flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-2xl p-5 space-y-4 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] flex flex-col"
+                      onAnimationComplete={scrollToEndpoint}
+                      className="relative overflow-hidden flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-2xl p-3 sm:p-3.5 flex flex-col gap-2.5 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)]"
                     >
+                      {/* Multi-corner Ambient Luxury Glow Aura (hiệu ứng ám màu tương đồng OrderPage/ProductPage) */}
+                      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl z-0 select-none">
+                        <div className="absolute -top-10 -right-10 h-44 w-44 rounded-full bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.08] to-transparent blur-3xl" />
+                        <div className={`absolute -bottom-10 -left-10 h-44 w-44 rounded-full blur-3xl ${
+                          orderTheme === "emerald"
+                            ? "bg-gradient-to-tr from-emerald-500/[0.10] via-teal-500/[0.08] to-transparent"
+                            : orderTheme === "amber"
+                            ? "bg-gradient-to-tr from-amber-500/[0.12] via-orange-400/[0.08] to-transparent"
+                            : orderTheme === "blue"
+                            ? "bg-gradient-to-tr from-blue-500/[0.12] via-sky-400/[0.08] to-transparent"
+                            : "bg-gradient-to-tr from-amber-500/[0.10] via-[#FF4D24]/[0.08] to-transparent"
+                        }`} />
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(99,102,241,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,77,36,0.035)_0%,transparent_70%)]" />
+                      </div>
                       
-                      {/* Header info of selected Order */}
-                      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                        <div>
-                          <span className="text-[9.5px] font-bold text-slate-400 font-mono block">VẬN CHUYỂN BỞI</span>
-                          <p className="text-xs font-black text-slate-900">{activeOrder.carrier}</p>
+                      {/* Header info of selected Order: Hợp nhất hoàn toàn với nền khung lớn, icon và badge có hiệu ứng bevel làm mịn */}
+                      <div className="relative z-10 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1 pt-0.5 pb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-white via-slate-50 to-slate-100/80 border-t border-t-white border-b border-b-slate-200/60 border-x border-x-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-center shrink-0">
+                            <Building2 className="w-3.5 h-3.5 text-slate-700" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[8.5px] font-bold text-slate-400 font-mono uppercase tracking-wider block leading-none">VẬN CHUYỂN BỞI</span>
+                            <p className="text-xs font-black text-slate-900 truncate leading-tight mt-0.5">{activeOrder.carrier}</p>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[9.5px] font-bold text-slate-400 font-mono block sm:text-right">MÃ VẬN ĐƠN (TRACKING)</span>
-                          <p className="text-xs font-bold font-mono text-indigo-600 select-all sm:text-right">{activeOrder.trackingNumber}</p>
+
+                        {/* Ngày giao hàng dự kiến: Không có khung bao quanh (định dạng dd/mm/yyyy) */}
+                        <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center select-none py-0.5">
+                          <Calendar className={`w-3.5 h-3.5 ${
+                            orderTheme === "emerald" ? "text-emerald-600" :
+                            orderTheme === "amber" ? "text-amber-600" :
+                            orderTheme === "blue" ? "text-blue-600" : "text-[#FF4D24]"
+                          }`} />
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                              {activeOrder.status === "delivered" ? "Đã giao hàng:" : "Dự kiến giao:"}
+                            </span>
+                            <span className="font-bold text-slate-800 font-mono tracking-tight text-xs">
+                              {activeOrder.estimatedDelivery && /^\d{2}\/\d{2}\/\d{4}$/.test(activeOrder.estimatedDelivery)
+                                ? activeOrder.estimatedDelivery
+                                : activeOrder.date && /^\d{2}\/\d{2}\/\d{4}$/.test(activeOrder.date)
+                                  ? activeOrder.date
+                                  : "15/07/2026"}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Timeline Tracker Wrapper with Scroll & Smooth Fade Masks - Auto-fills available height */}
-                      <div className="flex-1 min-h-0 relative overflow-hidden">
+                      {/* Timeline Tracker Wrapper: Dùng mask-image để các phần tử hòa tan mềm mại vào nền mà không tạo ranh giới giả */}
+                      <div className="relative z-10 flex-1 min-h-0 relative overflow-hidden">
                         <div
                           ref={stepsContainerRef}
                           onScroll={handleStepsScroll}
-                          className="hide-scrollbar relative h-full overflow-y-auto py-1 pl-9 space-y-4 transition-all duration-300"
+                          className="hide-scrollbar relative h-full overflow-y-auto py-1 pl-14 pr-1 space-y-2.5 transition-all duration-300"
                           style={{
                             maskImage: `linear-gradient(to bottom, 
                               transparent 0%, 
-                              black ${showStepsTopFade ? "15%" : "0%"}, 
-                              black ${showStepsBottomFade ? "85%" : "100%"}, 
+                              black ${showStepsTopFade ? "36px" : "0px"}, 
+                              black calc(100% - ${showStepsBottomFade ? "36px" : "0px"}), 
                               transparent 100%)`,
                             WebkitMaskImage: `linear-gradient(to bottom, 
                               transparent 0%, 
-                              black ${showStepsTopFade ? "15%" : "0%"}, 
-                              black ${showStepsBottomFade ? "85%" : "100%"}, 
+                              black ${showStepsTopFade ? "36px" : "0px"}, 
+                              black calc(100% - ${showStepsBottomFade ? "36px" : "0px"}), 
                               transparent 100%)`
                           }}
                         >
-                          
-                          {/* Left line axis */}
-                          <div className="absolute left-[16px] top-2 bottom-2 w-0.5 bg-slate-200/80" />
+                          {displayedSteps.map((step, idx) => {
+                              const isLast = idx === displayedSteps.length - 1;
+                              const nextStep = !isLast ? displayedSteps[idx + 1] : null;
+                              
+                              // Mốc đang xử lý thực tế (nếu đơn hàng chưa hoàn tất)
+                              const isStepInProgress = step.active && !isOrderDelivered;
+                              
+                              // Xác định màu chủ đề theo step hoặc theo đơn hàng
+                              const stepText = (step.title + " " + step.desc).toLowerCase();
+                              const isStepVerification = isStepInProgress && (stepText.includes("xác nhận") || stepText.includes("xác thực") || stepText.includes("chờ duyệt") || stepText.includes("chờ xác"));
+                              const currentTheme = isStepVerification ? "blue" : orderTheme;
 
-                          {activeOrder.deliverySteps.map((step, idx) => {
-                            return (
-                              <motion.div
-                                key={idx}
-                                initial={{ opacity: 0, x: -8 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.2, delay: idx * 0.03, ease: "easeOut" }}
-                                className="relative text-left"
-                              >
-                                
-                                {/* Milestone Dot Indicator - Centered perfectly at x = 17px */}
-                                <div className={`absolute left-[-19px] -translate-x-1/2 top-1 w-2.5 h-2.5 rounded-full border-2 transition-all duration-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] ${
-                                  step.active 
-                                    ? "bg-gradient-to-b from-[#FF5E3A] to-[#FF4D24] border-white ring-4 ring-[#FF4D24]/20 scale-125 shadow-[0_2px_6px_rgba(255,77,36,0.4)]" 
-                                    : step.completed 
-                                      ? "bg-gradient-to-b from-indigo-500 to-indigo-600 border-indigo-300 shadow-[0_1px_3px_rgba(79,70,229,0.3)]" 
-                                      : "bg-slate-200 border-slate-300"
-                                }`} />
+                              // Đường hành trình đã qua nối tiếp tới mốc tiếp theo
+                              const isConnectingTraversed = step.completed && (nextStep?.completed || nextStep?.active);
 
-                                <div className="space-y-0.5">
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                                    <h4 className={`text-xs font-bold ${step.active ? "text-[#FF4D24] font-black" : step.completed ? "text-slate-900" : "text-slate-400"}`}>
-                                      {step.title}
-                                    </h4>
-                                    <span className="text-[10px] text-slate-400 font-mono font-medium shrink-0">
-                                      {step.time}
-                                    </span>
+                              return (
+                                <motion.div
+                                  key={idx}
+                                  ref={idx === endpointIndex ? setEndpointRef : undefined}
+                                  initial={{ opacity: 0, y: 6 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.2, delay: idx * 0.03, ease: "easeOut" }}
+                                  className="relative text-left"
+                                >
+                                  
+                                  {/* Thanh | nằm chính giữa và pha trộn ám màu sắc, không tạo điểm đậm */}
+                                  {!isLast && (isConnectingTraversed || isStepInProgress) && (
+                                    <div 
+                                      className={`absolute left-[-28px] -translate-x-1/2 top-1/2 w-[2px] transition-colors duration-300 z-0 ${
+                                        isConnectingTraversed 
+                                          ? orderTheme === "emerald"
+                                            ? "h-[calc(100%+0.625rem)] bg-gradient-to-b from-emerald-500/70 to-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
+                                            : orderTheme === "amber"
+                                            ? "h-[calc(100%+0.625rem)] bg-gradient-to-b from-amber-500/85 via-amber-500/70 to-orange-500/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]"
+                                            : orderTheme === "blue"
+                                            ? "h-[calc(100%+0.625rem)] bg-gradient-to-b from-blue-500/80 via-blue-600/70 to-indigo-500/60 shadow-[0_0_8px_rgba(59,130,246,0.25)]"
+                                            : "h-[calc(100%+0.625rem)] bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#FF4D24] shadow-[0_0_8px_rgba(255,77,36,0.25)]" 
+                                          : currentTheme === "amber"
+                                            ? "h-12 bg-gradient-to-b from-amber-500/80 via-orange-400/30 to-transparent"
+                                            : currentTheme === "blue"
+                                            ? "h-12 bg-gradient-to-b from-blue-500/80 via-indigo-500/30 to-transparent"
+                                            : "h-12 bg-gradient-to-b from-[#FF4D24]/80 via-[#FF4D24]/30 to-transparent"
+                                      }`}
+                                    />
+                                  )}
+
+                                  {/* Điểm mốc poind: Đậm vừa, hài hòa và không bị nhìn xuyên qua */}
+                                  <div className="absolute left-[-28px] -translate-x-1/2 top-1/2 -translate-y-1/2 z-10">
+                                    {isStepInProgress ? (
+                                      <div className="relative flex items-center justify-center">
+                                        {/* Quầng sáng mờ ambient lan tỏa chuẩn benchmark */}
+                                        <div className={`absolute w-9 h-9 rounded-full blur-xs pointer-events-none ${
+                                          currentTheme === "amber"
+                                            ? "bg-gradient-to-tr from-amber-500/25 via-orange-400/20 to-transparent"
+                                            : currentTheme === "blue"
+                                            ? "bg-gradient-to-tr from-blue-500/25 via-indigo-500/20 to-transparent"
+                                            : "bg-gradient-to-tr from-[#FF4D24]/20 via-amber-500/15 to-transparent"
+                                        }`} />
+                                        <div className={`relative w-5 h-5 rounded-full border border-white flex items-center justify-center ${
+                                          currentTheme === "amber"
+                                            ? "bg-gradient-to-tr from-amber-400 via-amber-500 to-orange-500 ring-3 ring-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.35)]"
+                                            : currentTheme === "blue"
+                                            ? "bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 ring-3 ring-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.35)]"
+                                            : "bg-gradient-to-tr from-[#FF6B4A] via-[#FF4D24] to-amber-500 ring-3 ring-[#FF4D24]/15 shadow-[0_0_10px_rgba(255,77,36,0.3)]"
+                                        }`}>
+                                          <div className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
+                                        </div>
+                                      </div>
+                                    ) : isOrderDelivered && isLast ? (
+                                      <div className="relative flex items-center justify-center">
+                                        {/* Quầng sáng mờ ambient lan tỏa cho điểm end hoàn thành */}
+                                        <div className="absolute w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-500/25 via-teal-400/20 to-transparent blur-xs pointer-events-none" />
+                                        <div className="relative w-5 h-5 rounded-full bg-gradient-to-b from-emerald-500 via-emerald-600 to-teal-600 border border-white ring-3 ring-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.35)] flex items-center justify-center">
+                                          <Check className="w-2.5 h-2.5 text-white stroke-[2.5]" />
+                                        </div>
+                                      </div>
+                                    ) : step.completed ? (
+                                      <div className={`w-5 h-5 rounded-full border border-white/90 flex items-center justify-center ${
+                                        orderTheme === "emerald"
+                                          ? "bg-gradient-to-b from-emerald-500/90 to-emerald-600/90 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
+                                          : orderTheme === "amber"
+                                          ? "bg-gradient-to-b from-amber-400/90 via-amber-500/90 to-orange-400/85 shadow-[0_0_8px_rgba(245,158,11,0.25)]"
+                                          : orderTheme === "blue"
+                                          ? "bg-gradient-to-b from-blue-500/90 to-indigo-600/90 shadow-[0_0_8px_rgba(59,130,246,0.25)]"
+                                          : "bg-gradient-to-b from-[#FF6B4A] via-[#FF4D24] to-amber-500/90 shadow-[0_0_8px_rgba(255,77,36,0.2)]"
+                                      }`}>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
+                                      </div>
+                                    ) : (
+                                      <div className="w-5 h-5 rounded-full border border-slate-300/80 bg-white/95 flex items-center justify-center shadow-2xs">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                      </div>
+                                    )}
                                   </div>
-                                  <p className={`text-[11px] leading-relaxed ${step.completed ? "text-slate-500" : "text-slate-400"}`}>
-                                    {step.desc}
-                                  </p>
-                                </div>
-                              </motion.div>
-                            );
-                          })}
+
+                                  {/* Tag status: Hiệu ứng Bevel quang học 3D được làm mịn tối đa */}
+                                  <div className={`rounded-xl p-2.5 sm:p-3 transition-all duration-200 border ${
+                                    isStepInProgress
+                                      ? currentTheme === "amber"
+                                        ? "bg-gradient-to-b from-amber-50/95 via-white/95 to-orange-50/45 border-t-white border-b-amber-300/80 border-x-amber-200/60 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(245,158,11,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(245,158,11,0.04)]"
+                                        : currentTheme === "blue"
+                                        ? "bg-gradient-to-b from-blue-50/95 via-white/95 to-indigo-50/40 border-t-white border-b-blue-200/80 border-x-blue-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(59,130,246,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(59,130,246,0.04)]"
+                                        : "bg-gradient-to-b from-orange-50/90 via-white/90 to-amber-50/50 border-t-white border-b-orange-200/80 border-x-orange-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,77,36,0.04)]"
+                                      : isOrderDelivered && isLast
+                                        ? "bg-gradient-to-b from-emerald-50/90 via-white/90 to-emerald-50/50 border-t-white border-b-emerald-200/80 border-x-emerald-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(16,185,129,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(16,185,129,0.04)]"
+                                        : step.completed
+                                          ? "bg-gradient-to-b from-white/80 via-white/60 to-white/40 hover:from-white/95 hover:via-white/75 hover:to-white/55 border-t-white border-b-slate-200/60 border-x-white/70 backdrop-blur-md shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)]"
+                                          : "bg-gradient-to-b from-white/45 via-white/30 to-white/20 border-t-white/70 border-b-slate-200/40 border-x-white/50 backdrop-blur-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_1px_rgba(0,0,0,0.015)] opacity-60 text-slate-400"
+                                  }`}>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <h4 className={`text-xs ${
+                                          isStepInProgress 
+                                            ? currentTheme === "amber"
+                                              ? "text-amber-900 font-black"
+                                              : currentTheme === "blue"
+                                              ? "text-blue-700 font-black"
+                                              : "text-[#FF4D24] font-black" 
+                                            : isOrderDelivered && isLast
+                                              ? "text-emerald-700 font-black"
+                                              : step.completed 
+                                                ? "text-slate-800 font-semibold" 
+                                                : "text-slate-400 font-medium"
+                                        }`}>
+                                          {step.title}
+                                        </h4>
+                                        {isOrderDelivered && isLast && (
+                                          <span className="inline-flex items-center gap-1 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-emerald-600 text-white tracking-wider shadow-2xs">
+                                            <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                                            Hoàn tất
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Chip thời gian với hiệu ứng bevel làm mịn nhẹ nhàng */}
+                                      {step.time !== "--:--" && (
+                                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold transition-all shrink-0 self-start sm:self-center border ${
+                                          isStepInProgress
+                                            ? currentTheme === "amber"
+                                              ? "bg-gradient-to-b from-amber-50 to-orange-50/80 border-t-white border-b-amber-300/70 border-x-amber-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-amber-900"
+                                              : currentTheme === "blue"
+                                              ? "bg-gradient-to-b from-blue-50 to-blue-100/70 border-t-white border-b-blue-200/70 border-x-blue-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-blue-700"
+                                              : "bg-gradient-to-b from-orange-50 to-orange-100/70 border-t-white border-b-orange-200/70 border-x-orange-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-[#FF4D24]"
+                                            : isOrderDelivered && isLast
+                                              ? "bg-gradient-to-b from-emerald-50 to-emerald-100/70 border-t-white border-b-emerald-200/70 border-x-emerald-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-emerald-700"
+                                              : step.completed
+                                                ? "bg-gradient-to-b from-white/90 to-slate-100/70 border-t-white border-b-slate-200/60 border-x-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)] text-slate-600"
+                                                : "bg-slate-100/40 border-slate-200/30 text-slate-400"
+                                        }`}>
+                                          <Clock className={`w-3 h-3 ${
+                                            isStepInProgress 
+                                              ? currentTheme === "amber"
+                                                ? "text-amber-700"
+                                                : currentTheme === "blue"
+                                                ? "text-blue-600"
+                                                : "text-[#FF4D24]" 
+                                              : isOrderDelivered && isLast
+                                                ? "text-emerald-600"
+                                                : step.completed 
+                                                  ? "text-slate-400" 
+                                                  : "text-slate-300"
+                                          }`} />
+                                          <span>{step.time}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <p className={`text-[11px] leading-relaxed ${
+                                      isStepInProgress 
+                                        ? "text-slate-700 font-medium" 
+                                        : step.completed 
+                                          ? "text-slate-500 font-normal" 
+                                          : "text-slate-400 font-light"
+                                    }`}>
+                                      {step.desc}
+                                    </p>
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
                         </div>
                       </div>
 
-                      {/* Shipping address details block */}
-                      <div className="shrink-0 pt-3 border-t border-slate-100 space-y-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-mono">Địa chỉ giao nhận hàng</span>
+                      {/* Shipping address details block: Thẻ địa chỉ với hiệu ứng Bevel làm mịn mượt mà */}
+                      <div className="relative z-10 shrink-0 px-1 pt-0.5 pb-0.5">
+                        <div className="bg-gradient-to-b from-white/85 via-white/70 to-slate-50/50 border-t border-t-white border-b border-b-slate-200/70 border-x border-x-white/70 backdrop-blur-md shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] p-2 sm:p-2.5 rounded-xl flex items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.06)] flex items-center justify-center shrink-0">
+                              <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                            </div>
+                            <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono shrink-0 whitespace-nowrap">
+                                Địa chỉ giao nhận hàng:
+                              </span>
+                              <p className="text-xs font-semibold text-slate-700 truncate min-w-0" title={activeOrder.shippingAddress}>
+                                {activeOrder.shippingAddress}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[9.5px] font-bold text-indigo-600 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.06)] px-2 py-0.5 rounded-md font-mono shrink-0">
+                            Đồng kiểm
+                          </span>
                         </div>
-                        <p className="text-xs font-semibold text-slate-700 leading-relaxed pl-4 bg-gradient-to-b from-white/95 via-slate-50/80 to-slate-100/60 p-2.5 rounded-xl border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)]">
-                          {activeOrder.shippingAddress}
-                        </p>
                       </div>
 
                     </motion.div>
@@ -1673,7 +2063,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     </div>
 
                     {/* Scrollable list of existing items (Space-optimized & Refined with Bevel) */}
-                    <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-0">
+                    <div className="flex-1 overflow-y-auto hide-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pr-1 space-y-2.5 min-h-0">
                       {activeModalTab === "addresses" && addresses.map(addr => {
                         const isOffice = addr.type === "office";
                         const isCurrentlyEditing = editingAddressSku === addr.sku;
@@ -1870,7 +2260,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               </div>
 
               {/* RIGHT COLUMN: Active Tab Content Panel (Optimized Edge-to-Edge Spacing) */}
-              <div className="flex-1 bg-gradient-to-br from-slate-50/95 via-slate-50/60 to-indigo-50/20 p-3.5 sm:p-4 lg:p-4.5 overflow-y-auto flex flex-col text-left relative min-h-0">
+              <div className="flex-1 bg-gradient-to-br from-slate-50/95 via-slate-50/60 to-indigo-50/20 p-3.5 sm:p-4 lg:p-4.5 overflow-y-auto hide-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex flex-col text-left relative min-h-0">
                 
                 {/* Panel Header */}
                 <div className="flex items-start justify-between gap-3 pb-2.5 mb-3 border-b border-slate-200/80 shrink-0">
@@ -3050,10 +3440,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       </Bevel>
                     )}
 
-                    {/* Bookmarks List */}
+                    {/* Bookmarks List (các bookmark mới nhất luôn xếp ở trên) */}
                     {userBookmarks.length > 0 && (
                       <div className="space-y-4">
-                        {userBookmarks.map((bookmark) => {
+                        {sortBookmarksNewestFirst(userBookmarks).map((bookmark) => {
                           const is7Days = (bookmark.ttlSecondsRemaining || 0) > 3600;
                           const hoursLeft = Math.max(1, Math.floor((bookmark.ttlSecondsRemaining || 0) / 3600));
                           const daysLeft = Math.floor(hoursLeft / 24);
@@ -3122,7 +3512,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                               {/* Accessories Structured Table / List */}
                               <div className="divide-y divide-slate-100 bg-white/70 rounded-xl border border-slate-200/70 overflow-hidden shadow-2xs">
-                                {bookmark.items.map((item, idx) => {
+                                {(bookmark.items || [])
+                                  .slice()
+                                  .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
+                                  .map((item, idx) => {
                                   const isItemDeleting = bookmarkActionLoading === `${bookmark.mainSku}::${item.sku}`;
 
                                   return (

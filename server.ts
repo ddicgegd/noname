@@ -1,4 +1,5 @@
 import express from "express";
+import http from "http";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
@@ -23,6 +24,7 @@ function getBackendUrl(): string {
 
 async function startServer() {
   const app = express();
+  const server = http.createServer(app);
   const PORT = Number(process.env.PORT || 3000);
 
   // Parse incoming JSON and urlencoded request bodies
@@ -1825,12 +1827,15 @@ async function startServer() {
     attributesTitle?: string;
     unitPrice?: number;
     salePrice?: number;
+    addedAt?: number;
   }
 
   interface ServerBookmarkRecord {
     mainSku: string;
     userKey: string;
     expiresAt: number;
+    createdAt?: number;
+    updatedAt?: number;
     items: Map<string, ServerBookmarkItemRecord>;
   }
 
@@ -1844,7 +1849,7 @@ async function startServer() {
   };
 
   const formatBookmarkRecord = (rec: ServerBookmarkRecord) => {
-    const itemsList = Array.from(rec.items.values());
+    const itemsList = Array.from(rec.items.values()).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
     const totalItems = itemsList.reduce((sum, it) => sum + it.quantity, 0);
     const totalPrice = itemsList.reduce((sum, it) => sum + (it.unitPrice || it.salePrice || 0) * it.quantity, 0);
     const totalSalePrice = itemsList.reduce((sum, it) => sum + (it.salePrice || 0) * it.quantity, 0);
@@ -1868,6 +1873,8 @@ async function startServer() {
       ttlSecondsRemaining,
       expiresAtEpochMs: rec.expiresAt,
       formattedRemainingTime,
+      createdAt: rec.createdAt || (rec.expiresAt - 3600000),
+      updatedAt: rec.updatedAt || rec.createdAt || Date.now(),
       items: itemsList.map(it => ({
         sku: it.sku,
         productName: it.productName || it.sku,
@@ -1878,7 +1885,8 @@ async function startServer() {
         quantity: it.quantity,
         subTotal: (it.salePrice || 0) * it.quantity,
         isAvailable: true,
-        stock: 99
+        stock: 99,
+        addedAt: it.addedAt || 0
       }))
     };
   };
@@ -1902,6 +1910,8 @@ async function startServer() {
             userBookmarks.push(formatBookmarkRecord(rec));
           }
         }
+        // Sắp xếp các bookmark mới nhất lên trên cùng
+        userBookmarks.sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
         return res.json({ success: true, data: userBookmarks });
       }
       return res.status(400).json({ success: false, message: "Missing mainSku" });
@@ -1910,18 +1920,25 @@ async function startServer() {
     if (action === "staging" && req.method === "POST") {
       const items = Array.isArray(req.body?.items) ? req.body.items : [];
       let rec = inMemoryBookmarks.get(storeKey);
+      const now = Date.now();
       if (!rec) {
         rec = {
           mainSku,
           userKey,
-          expiresAt: Date.now() + 3600 * 1000,
+          expiresAt: now + 3600 * 1000,
+          createdAt: now,
+          updatedAt: now,
           items: new Map()
         };
-      } else if (!rec.expiresAt || rec.expiresAt <= Date.now()) {
+      } else if (!rec.expiresAt || rec.expiresAt <= now) {
         // Fixed Window (Section 3.2): TTL is preserved and not reset during debounced auto-sync
-        rec.expiresAt = Date.now() + 3600 * 1000;
+        rec.expiresAt = now + 3600 * 1000;
+        rec.updatedAt = now;
+      } else {
+        rec.updatedAt = now;
       }
       for (const item of items) {
+        const existing = rec.items.get(item.sku);
         rec.items.set(item.sku, {
           sku: item.sku,
           quantity: item.quantity || 1,
@@ -1929,7 +1946,8 @@ async function startServer() {
           imageUrl: item.imageUrl || "",
           attributesTitle: item.attributesTitle || "",
           unitPrice: item.unitPrice,
-          salePrice: item.salePrice
+          salePrice: item.salePrice,
+          addedAt: item.addedAt || existing?.addedAt || now
         });
       }
       inMemoryBookmarks.set(storeKey, rec);
@@ -1937,16 +1955,20 @@ async function startServer() {
     }
 
     if (action === "persist" && req.method === "POST") {
+      const now = Date.now();
       let rec = inMemoryBookmarks.get(storeKey);
       if (!rec) {
         rec = {
           mainSku,
           userKey,
-          expiresAt: Date.now() + 7 * 86400 * 1000,
+          expiresAt: now + 7 * 86400 * 1000,
+          createdAt: now,
+          updatedAt: now,
           items: new Map()
         };
       } else {
-        rec.expiresAt = Date.now() + 7 * 86400 * 1000;
+        rec.expiresAt = now + 7 * 86400 * 1000;
+        rec.updatedAt = now;
       }
       inMemoryBookmarks.set(storeKey, rec);
       return res.json({ success: true, data: formatBookmarkRecord(rec) });
@@ -1955,20 +1977,26 @@ async function startServer() {
     if (action === "items") {
       if (req.method === "POST") {
         const { sku, quantity = 1 } = req.body || {};
+        const now = Date.now();
         let rec = inMemoryBookmarks.get(storeKey);
         if (!rec) {
           rec = {
             mainSku,
             userKey,
-            expiresAt: Date.now() + 7 * 86400 * 1000,
+            expiresAt: now + 7 * 86400 * 1000,
+            createdAt: now,
+            updatedAt: now,
             items: new Map()
           };
+        } else {
+          rec.updatedAt = now;
         }
         const existing = rec.items.get(sku);
         if (existing) {
           existing.quantity += quantity;
+          existing.addedAt = now;
         } else {
-          rec.items.set(sku, { sku, quantity });
+          rec.items.set(sku, { sku, quantity, addedAt: now });
         }
         inMemoryBookmarks.set(storeKey, rec);
         const data = formatBookmarkRecord(rec);
@@ -2071,6 +2099,7 @@ async function startServer() {
               data.data.push(formatBookmarkRecord(rec));
             }
           }
+          data.data.sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
         }
         // GET /api/bookmarks/:mainSku
         else if (mainSku && !action) {
@@ -2208,6 +2237,9 @@ async function startServer() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
+        hmr: {
+          server,
+        },
         watch: {
           ignored: [
             "**/.data/**",
@@ -2232,7 +2264,7 @@ async function startServer() {
     console.log("Serving compiled static production distribution.");
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`Full-stack server running and listening on http://localhost:${PORT}`);
   });
 }

@@ -64,6 +64,8 @@ import {
   subscribeToCartUpdates
 } from "@/services/cartService";
 import type { Cart as ApiCart } from "@/types/cart";
+import { fineractService } from "@/services/fineractService";
+import type { LoanProduct, LoanAccount } from "@/types/fineract";
 
 export interface OrderProduct {
   id: string;
@@ -343,72 +345,6 @@ const BANK_OPTIONS: BankOption[] = [
     logoUrl: "https://api.vietqr.io/img/ACB.png",
   },
 ];
-
-interface UserLoanContract {
-  id: string;
-  accountNo: string;
-  loanProductName: string;
-  totalLimit: number;
-  availableAmount: number;
-  interestRate: string;
-  termMonths: number;
-  status: "ACTIVE" | "APPROVED" | "PENDING";
-  statusText: string;
-  monthlyRepaymentEstimate: number;
-  expiryDate: string;
-  type: "fixed" | "product_based";
-  provider: string;
-}
-
-const MOCK_USER_LOANS: UserLoanContract[] = [
-  {
-    id: "loan-fineract-01",
-    accountNo: "LN-2026-8899",
-    loanProductName: "Hạn mức Vay Tiêu Dùng Tín Chấp Fineract",
-    totalLimit: 50000000,
-    availableAmount: 38500000,
-    interestRate: "0.65%/tháng",
-    termMonths: 12,
-    status: "ACTIVE",
-    statusText: "Khả dụng ngay",
-    monthlyRepaymentEstimate: 3450000,
-    expiryDate: "31/12/2026",
-    type: "fixed",
-    provider: "Fineract Core Banking",
-  },
-  {
-    id: "loan-fineract-02",
-    accountNo: "LN-2026-4421",
-    loanProductName: "Gói Vay Ưu Đãi Thiết Bị Flagship (Vay vừa mua)",
-    totalLimit: 30000000,
-    availableAmount: 30000000,
-    interestRate: "0% Lãi (3 tháng đầu)",
-    termMonths: 6,
-    status: "APPROVED",
-    statusText: "Đã phê duyệt",
-    monthlyRepaymentEstimate: 5000000,
-    expiryDate: "15/10/2026",
-    type: "fixed",
-    provider: "Fineract Credit Line",
-  },
-  {
-    id: "loan-fineract-03",
-    accountNo: "LN-2026-1102",
-    loanProductName: "Hạn Mức Tín Dụng Nhanh Microfinance",
-    totalLimit: 15000000,
-    availableAmount: 12000000,
-    interestRate: "0.8%/tháng",
-    termMonths: 6,
-    status: "ACTIVE",
-    statusText: "Khả dụng",
-    monthlyRepaymentEstimate: 2150000,
-    expiryDate: "30/11/2026",
-    type: "fixed",
-    provider: "Fineract Microfinance",
-  },
-];
-
-const ORDER_LOAN_TERMS = [3, 6, 9, 12, 18, 24, 36];
 
 function PaypalLottieAnimation({ triggerKey }: { triggerKey?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -946,17 +882,55 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
     }
   }, [paymentType, bankSubMethod, paypalSubMethod, selectedBank]);
 
-  // Loan Subsystem State (Khoản vay cố định & Vay theo đơn hàng)
-  const [loanMode, setLoanMode] = useState<"existing_loan" | "order_loan">("existing_loan");
-  const [selectedLoanId, setSelectedLoanId] = useState<string>("loan-fineract-01");
+  // Loan Subsystem State (Khoản vay cố định & Vay theo đơn hàng từ Fineract API)
+  const [loanMode, setLoanMode] = useState<"existing_loan" | "order_loan">("order_loan");
+  const [loanProducts, setLoanProducts] = useState<LoanProduct[]>([]);
+  const [userLoans, setUserLoans] = useState<LoanAccount[]>([]);
+  const [isLoadingLoans, setIsLoadingLoans] = useState<boolean>(false);
+  const [selectedLoanProductId, setSelectedLoanProductId] = useState<number | null>(null);
+  const [selectedLoanId, setSelectedLoanId] = useState<string>("");
   const [orderLoanTerm, setOrderLoanTerm] = useState<number | null>(null);
-  const [orderLoanInterestRate] = useState<number>(0.0065);
   const [isLoanModalOpen, setIsLoanModalOpen] = useState<boolean>(false);
+  const [isSubmittingLoanApp, setIsSubmittingLoanApp] = useState<boolean>(false);
+  const [appliedLoanContract, setAppliedLoanContract] = useState<LoanAccount | null>(null);
+  const [loanApplyError, setLoanApplyError] = useState<string | null>(null);
   const [selectedCreditCardType, setSelectedCreditCardType] = useState<string>("VISA");
   const [isInstallmentModalOpen, setIsInstallmentModalOpen] = useState<boolean>(false);
   const loanTermScrollRef = useRef<HTMLDivElement | null>(null);
+  const paymentContainerRef = useRef<HTMLDivElement | null>(null);
   const [canScrollLoanLeft, setCanScrollLoanLeft] = useState<boolean>(false);
   const [canScrollLoanRight, setCanScrollLoanRight] = useState<boolean>(true);
+
+  // Fetch real loan products and user loans from Fineract endpoints
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLoanData = async () => {
+      setIsLoadingLoans(true);
+      try {
+        const [products, loans] = await Promise.all([
+          fineractService.getLoanProducts().catch(() => []),
+          fineractService.getLoans().catch(() => []),
+        ]);
+        if (!isMounted) return;
+        setLoanProducts(products);
+        setUserLoans(loans);
+        if (products.length > 0) {
+          setSelectedLoanProductId((prev) => (prev !== null ? prev : products[0].id));
+        }
+        if (loans.length > 0) {
+          setSelectedLoanId((prev) => prev || String(loans[0].id));
+        }
+      } catch (err) {
+        console.error("Failed to load loan data from endpoint:", err);
+      } finally {
+        if (isMounted) setIsLoadingLoans(false);
+      }
+    };
+    fetchLoanData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const checkLoanScroll = () => {
     if (loanTermScrollRef.current) {
@@ -978,11 +952,14 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   };
 
   useEffect(() => {
+    if (paymentContainerRef.current) {
+      paymentContainerRef.current.scrollTop = 0;
+    }
     if (paymentType === "loan") {
       const timer = setTimeout(checkLoanScroll, 100);
       return () => clearTimeout(timer);
     }
-  }, [paymentType]);
+  }, [paymentType, orderLoanTerm, selectedLoanProductId]);
 
   useEffect(() => {
     window.addEventListener("resize", checkLoanScroll);
@@ -999,6 +976,95 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
   const appliedDiscount = selectedVoucher && subtotal >= selectedVoucher.minOrder ? selectedVoucher.discountAmount : 0;
   const total = Math.max(0, subtotal > 0 ? subtotal + shippingFee - appliedDiscount : 0);
   const isAllSelected = products.length > 0 && products.every((p) => p.selected);
+
+  // Active loan product and installment options derived from endpoint data
+  const eligibleLoanProducts = React.useMemo(() => {
+    if (loanProducts.length === 0) return [];
+    const matched = loanProducts.filter(
+      (p) => total >= (p.minPrincipal || 0) && total <= (p.maxPrincipal || Infinity)
+    );
+    return matched.length > 0 ? matched : loanProducts;
+  }, [loanProducts, total]);
+
+  const activeLoanProduct = React.useMemo(() => {
+    if (loanProducts.length === 0) return null;
+    if (selectedLoanProductId !== null) {
+      const found = loanProducts.find((p) => p.id === selectedLoanProductId);
+      if (found) return found;
+    }
+    return eligibleLoanProducts[0] || loanProducts[0];
+  }, [loanProducts, selectedLoanProductId, eligibleLoanProducts]);
+
+  const activeLoanRate = activeLoanProduct?.interestRatePerPeriod ?? 1.5;
+  const activeLoanRateFraction = activeLoanRate / 100;
+  const minTermMonths = activeLoanProduct?.minNumberOfRepayments ?? 3;
+  const maxTermMonths = activeLoanProduct?.maxNumberOfRepayments ?? activeLoanProduct?.numberOfRepayments ?? 12;
+
+  const availableLoanTerms = React.useMemo(() => {
+    const standardMultiples = [3, 6, 9, 12, 18, 24, 36, 48];
+    let list = standardMultiples.filter((t) => t >= minTermMonths && t <= maxTermMonths);
+    if (
+      activeLoanProduct?.numberOfRepayments &&
+      !list.includes(activeLoanProduct.numberOfRepayments) &&
+      activeLoanProduct.numberOfRepayments >= minTermMonths &&
+      activeLoanProduct.numberOfRepayments <= maxTermMonths
+    ) {
+      list.push(activeLoanProduct.numberOfRepayments);
+    }
+    list.sort((a, b) => a - b);
+    if (list.length === 0) {
+      list = [activeLoanProduct?.numberOfRepayments || 6];
+    }
+    return list;
+  }, [minTermMonths, maxTermMonths, activeLoanProduct]);
+  const handleDirectApplyLoan = async () => {
+    if (isSubmittingLoanApp) return;
+    const termToUse = orderLoanTerm || availableLoanTerms[0] || 6;
+    if (!orderLoanTerm) {
+      setOrderLoanTerm(termToUse);
+    }
+    setLoanApplyError(null);
+    setIsSubmittingLoanApp(true);
+    try {
+      const now = new Date();
+      const day = String(now.getUTCDate()).padStart(2, "0");
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const dateStr = `${day} ${monthNames[now.getUTCMonth()]} ${now.getUTCFullYear()}`;
+
+      const newLoan = await fineractService.createLoan({
+        clientId: 0,
+        productId: activeLoanProduct?.id || 1,
+        principal: total,
+        loanTermFrequency: termToUse,
+        loanTermFrequencyType: 2,
+        numberOfRepayments: termToUse,
+        repaymentEvery: 1,
+        repaymentFrequencyType: 2,
+        interestRatePerPeriod: activeLoanRate,
+        amortizationType: 1,
+        interestType: 0,
+        submittedOnDate: dateStr,
+        expectedDisbursementDate: dateStr,
+        dateFormat: "dd MMMM yyyy",
+        locale: "en",
+      });
+
+      if (newLoan) {
+        setAppliedLoanContract(newLoan);
+        setSelectedLoanId(String(newLoan.id));
+        setLoanMode("existing_loan");
+        setUserLoans((prev) => [newLoan, ...prev.filter((l) => l.id !== newLoan.id)]);
+      }
+    } catch (err: any) {
+      console.error("[OrderPage] Error applying for loan directly:", err);
+      setLoanApplyError(err?.message || "Không thể nộp đơn xin vay lúc này. Vui lòng thử lại sau.");
+    } finally {
+      setIsSubmittingLoanApp(false);
+    }
+  };
 
   // Handlers
   const handleToggleSelectAll = () => {
@@ -1141,9 +1207,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
     if (paymentType === "bank") {
       mappedBankCode = bankSubMethod === "card" ? currentBank?.shortName : "VNPAYQR";
     } else if (paymentType === "loan") {
-      const activeLoanContract = MOCK_USER_LOANS.find((l) => l.id === selectedLoanId);
+      const activeLoanContract = userLoans.find((l) => String(l.id) === selectedLoanId || l.accountNo === selectedLoanId);
       if (loanMode === "existing_loan") {
-        mappedBankCode = `LOAN_${activeLoanContract?.accountNo || "LN2026"}`;
+        mappedBankCode = `LOAN_${activeLoanContract?.accountNo || selectedLoanId || "LN2026"}`;
       } else {
         if (!orderLoanTerm) {
           setIsPlacingOrder(false);
@@ -1151,6 +1217,38 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
           return;
         }
         mappedBankCode = `ORDER_LOAN_${orderLoanTerm}M`;
+
+        // Tự động khởi tạo hồ sơ vay chính thức trên Apache Fineract Core Banking theo đúng số tiền đơn hàng
+        try {
+          const now = new Date();
+          const day = String(now.getUTCDate()).padStart(2, "0");
+          const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+          const dateStr = `${day} ${monthNames[now.getUTCMonth()]} ${now.getUTCFullYear()}`;
+
+          const createdLoan = await fineractService.createLoan({
+            clientId: 0,
+            productId: activeLoanProduct?.id || 1,
+            principal: total,
+            loanTermFrequency: orderLoanTerm,
+            loanTermFrequencyType: 2,
+            numberOfRepayments: orderLoanTerm,
+            repaymentEvery: 1,
+            repaymentFrequencyType: 2,
+            interestRatePerPeriod: activeLoanRate,
+            amortizationType: 1,
+            interestType: 0,
+            submittedOnDate: dateStr,
+            expectedDisbursementDate: dateStr,
+            dateFormat: "dd MMMM yyyy",
+            locale: "en",
+          });
+
+          if (createdLoan?.accountNo) {
+            mappedBankCode = `LOAN_${createdLoan.accountNo}`;
+          }
+        } catch (loanErr) {
+          console.warn("[OrderPage] Fineract loan auto-registration notice:", loanErr);
+        }
       }
     } else if (paymentType === "paypal" || paymentType === "card") {
       mappedBankCode = paypalSubMethod === "card" ? "CARD" : "PAYPAL";
@@ -1162,10 +1260,10 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
     if (!effectiveNotes) {
       if (paymentType === "loan") {
         if (loanMode === "existing_loan") {
-          const activeLoanContract = MOCK_USER_LOANS.find((l) => l.id === selectedLoanId);
-          effectiveNotes = `Thanh toán qua Khoản vay [${activeLoanContract?.loanProductName || "Gói vay Fineract"}] (Mã HĐ: ${activeLoanContract?.accountNo || "N/A"})`;
+          const activeLoanContract = userLoans.find((l) => String(l.id) === selectedLoanId || l.accountNo === selectedLoanId);
+          effectiveNotes = `Thanh toán qua Khoản vay [${activeLoanContract?.loanProductName || "Gói vay Fineract"}] (Mã HĐ: ${activeLoanContract?.accountNo || selectedLoanId || "N/A"})`;
         } else {
-          effectiveNotes = `Đăng ký Gói vay theo đơn hàng [${formatVND(total)}] - Kỳ hạn ${orderLoanTerm} tháng (Lãi suất ${orderLoanInterestRate * 100}%/tháng)`;
+          effectiveNotes = `Đăng ký Gói vay theo đơn hàng [${formatVND(total)}] - Gói: ${activeLoanProduct?.name || "Vay Trả Chậm"} - Kỳ hạn ${orderLoanTerm} tháng (Lãi suất ${activeLoanRate}%/tháng)`;
         }
       } else if (paymentType === "paypal" || paymentType === "card") {
         effectiveNotes = paypalSubMethod === "card" ? "Thanh toán qua Visa/Mastercard" : "Thanh toán qua ví PayPal";
@@ -1791,18 +1889,18 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
             </div>
 
             {/* Dynamic Bank & Payment Detail View */}
-            <div className="h-[314px] overflow-hidden">
-              {/* Option 1: Khoản vay tín dụng (1 Tag chính xét duyệt theo giá trị đơn hàng đầy đủ thông tin) */}
+            <div ref={paymentContainerRef} className="h-[314px] overflow-hidden">
+              {/* Option 1: Khoản vay tín dụng (1 Tag chính xét duyệt theo giá trị đơn hàng đầy đủ thông tin từ Fineract API) */}
               {paymentType === "loan" && (() => {
-                const activeLoan = MOCK_USER_LOANS.find((l) => l.id === selectedLoanId) || MOCK_USER_LOANS[0];
+                const activeLoan = userLoans.find((l) => String(l.id) === selectedLoanId || l.accountNo === selectedLoanId) || userLoans[0];
                 const monthlyPrincipal = orderLoanTerm ? Math.round(total / orderLoanTerm) : 0;
-                const monthlyInterest = Math.round(total * orderLoanInterestRate);
+                const monthlyInterest = orderLoanTerm ? Math.round(total * activeLoanRateFraction) : 0;
                 const monthlyTotal = orderLoanTerm ? monthlyPrincipal + monthlyInterest : 0;
 
                 return (
                   <div className="h-full flex flex-col justify-between text-xs">
-                    {/* 1. Phần trên: Xét duyệt khoản vay (tăng phạm vi lên h-[48%], chữ bên trong tăng 20%) */}
-                    <div className="h-[48%] relative overflow-hidden rounded-2xl border border-sky-200/70 bg-gradient-to-b from-white via-[#f4f9fe] to-[#e8f4fc] p-3 sm:p-3.5 flex flex-col justify-between shrink-0 shadow-[0_4px_16px_-4px_rgba(2,132,199,0.08),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md">
+                    {/* 1. Phần trên: Nộp đơn xin vay mới (chiếm ~47% không gian, phân bổ tự nhiên) */}
+                    <div className="h-[47%] shrink-0 relative overflow-hidden rounded-2xl border border-sky-200/70 bg-gradient-to-b from-white via-[#f4f9fe] to-[#e8f4fc] p-3 sm:p-3.5 flex flex-col justify-between shadow-[0_4px_16px_-4px_rgba(2,132,199,0.08),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-md">
                       {/* Ambient Mesh Lighting Aura xanh dương thanh thoát (-30% tổng thể) */}
                       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
                         {/* Orb ánh sáng xanh da trời góc trên phải */}
@@ -1815,57 +1913,122 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-95" />
                       </div>
 
-                      {/* 1. Chỉ mục: * Xét duyệt khoản vay + Nút Hạn mức & Gói vay (Đưa lên hàng chỉ mục) */}
-                      <div className="flex items-center justify-between relative z-10">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center justify-center size-3.5 rounded-full bg-sky-500/12 text-sky-600 font-black text-[11px] leading-none select-none">
-                              *
-                            </span>
-                            <span className="text-xs sm:text-[12.5px] font-bold text-sky-900 tracking-wide uppercase truncate">
-                              Xét duyệt khoản vay
-                            </span>
-                          </div>
-                          <span className="text-[9.5px] sm:text-[10px] font-semibold text-sky-700 bg-white/80 border border-sky-200/70 px-2 py-0.5 rounded-full shadow-[0_1px_2px_rgba(2,132,199,0.06)] hidden sm:inline-flex items-center gap-1 shrink-0">
-                            <span className="size-1 rounded-full bg-sky-500 animate-pulse" />
-                            Thẩm định tức thì
+                      {/* 1. Chỉ mục: Icon Landmark + Nộp đơn xin vay mới + Nút Gói vay + Nút Nộp đơn xin vay */}
+                      <div className="flex items-center justify-between relative z-10 gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Landmark className="size-4 text-sky-600 shrink-0" />
+                          <span className="text-xs sm:text-[13px] font-bold text-sky-950 tracking-tight uppercase whitespace-nowrap">
+                            Nộp đơn xin vay mới
                           </span>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setIsLoanModalOpen(true)}
-                          className="h-7 px-2.5 sm:px-3 flex items-center gap-1.5 text-[11px] sm:text-[11.5px] font-semibold text-sky-800 hover:text-sky-950 bg-gradient-to-b from-white via-white to-sky-50/90 hover:from-white hover:to-sky-100/70 border border-sky-300/80 hover:border-sky-400 rounded-lg transition-all shadow-[0_1.5px_4px_rgba(2,132,199,0.10),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_2px_8px_rgba(2,132,199,0.18)] active:scale-98 cursor-pointer shrink-0 group"
-                        >
-                          <Wallet className="size-3 text-sky-600 group-hover:scale-105 transition-transform" />
-                          <span>Hạn mức & Gói vay</span>
-                          <ChevronRight className="size-3 text-sky-400 group-hover:translate-x-0.5 transition-transform" />
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setIsLoanModalOpen(true)}
+                            className="h-6.5 sm:h-7 px-2 sm:px-2.5 flex items-center gap-1 text-[11px] font-medium text-sky-800 hover:text-sky-950 bg-white/90 hover:bg-sky-50 border border-sky-200/80 hover:border-sky-300 rounded-lg transition-all shadow-2xs active:scale-98 cursor-pointer"
+                            title="Xem hạn mức và danh mục gói vay"
+                          >
+                            <Wallet className="size-3 text-sky-600 shrink-0" />
+                            <span>Gói vay</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleDirectApplyLoan}
+                            disabled={isSubmittingLoanApp}
+                            className={`h-6.5 sm:h-7 px-2.5 sm:px-3 flex items-center gap-1.5 text-[11px] sm:text-[11.5px] font-semibold rounded-lg transition-all active:scale-98 cursor-pointer shrink-0 ${
+                              appliedLoanContract
+                                ? "bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs"
+                                : "text-white bg-gradient-to-b from-sky-600 via-sky-600 to-sky-700 hover:from-sky-500 hover:to-sky-600 border border-sky-700/80 shadow-[0_1.5px_4px_rgba(2,132,199,0.25)] hover:shadow-md"
+                            }`}
+                          >
+                            {isSubmittingLoanApp ? (
+                              <>
+                                <Loader2 className="size-3 animate-spin text-white" />
+                                <span>Đang nộp...</span>
+                              </>
+                            ) : appliedLoanContract ? (
+                              <>
+                                <CheckCircle2 className="size-3 text-emerald-600" />
+                                <span className="font-bold">Đã nộp: #{appliedLoanContract.accountNo}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="size-3 text-sky-200" />
+                                <span>Nộp đơn xin vay</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
 
-                      {/* 2. Nội dung: Icon ngân hàng + dòng chữ điều kiện xét duyệt hiển thị tự nhiên trên 2 dòng */}
-                      <div className="relative z-10 flex items-center gap-3 sm:gap-3.5">
-                        <div className="size-8.5 sm:size-9 rounded-xl bg-gradient-to-b from-sky-50 to-sky-100/80 border border-sky-200/90 text-sky-600 flex items-center justify-center shrink-0 shadow-[0_2px_6px_rgba(2,132,199,0.10)]">
-                          <Landmark className="size-4 sm:size-4.5 stroke-[1.8] text-sky-600" />
+                      {/* 2. Nội dung: Hiển thị trạng thái nộp hoặc chi tiết đơn vay */}
+                      {appliedLoanContract ? (
+                        <div className="relative z-10 bg-emerald-50/90 border border-emerald-300/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between shadow-2xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                            <div className="min-w-0">
+                              <span className="text-[11.5px] font-bold text-emerald-950 block truncate">
+                                Hồ sơ vay #{appliedLoanContract.accountNo} đã nộp thành công (Chờ duyệt)
+                              </span>
+                              <span className="text-[10px] text-emerald-700 block truncate">
+                                Hạn mức đề xuất: <strong>{formatVND(total)}</strong> • Kỳ hạn: <strong>{appliedLoanContract.numberOfRepayments || orderLoanTerm || 6} tháng</strong> • Lãi suất: <strong>{activeLoanRate}%/tháng</strong>
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-200/80 text-emerald-900 rounded border border-emerald-300 shrink-0 hidden sm:inline-block">
+                            Fineract Core
+                          </span>
                         </div>
-                        <h4 className="text-[13px] sm:text-[13.5px] font-medium text-neutral-800 leading-snug">
-                          Với đơn hàng <span className="font-bold text-[13.5px] sm:text-[14px] text-neutral-950 underline decoration-sky-400/50 underline-offset-2">{formatVND(total)}</span>, bạn đủ điều kiện mở hồ sơ xét duyệt gói vay trả chậm linh hoạt.
-                        </h4>
-                      </div>
+                      ) : loanApplyError ? (
+                        <div className="relative z-10 bg-rose-50/95 border border-rose-300/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-rose-800 text-[11px] shadow-2xs">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <AlertCircle className="size-3.5 text-rose-600 shrink-0" />
+                            <span className="truncate">{loanApplyError}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setLoanApplyError(null)}
+                            className="text-[10px] font-bold underline ml-2 text-rose-700 hover:text-rose-900 cursor-pointer shrink-0"
+                          >
+                            Đóng
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="relative z-10 flex items-center justify-between bg-white/80 border border-sky-100/90 rounded-xl px-2.5 py-1.5 shadow-2xs">
+                          <div className="min-w-0">
+                            <span className="text-[10px] text-sky-800 font-medium block">Số tiền đề xuất xin vay:</span>
+                            <span className="text-[13px] sm:text-[13.5px] font-extrabold text-neutral-900 block leading-tight">
+                              {formatVND(total)}
+                            </span>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] text-neutral-500 block">Kỳ hạn dự kiến:</span>
+                            <span className="text-[11.5px] font-bold text-sky-800 block">
+                              {orderLoanTerm ? `${orderLoanTerm} tháng` : `${availableLoanTerms[0] || 6} tháng (Gợi ý)`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* 3. Dòng mô tả gói vay: 1 hàng duy nhất, tiếng Việt, bám sát cạnh đáy với dấu chấm tinh tế */}
                       <div className="text-[10px] sm:text-[10.5px] text-sky-950/80 leading-tight relative z-10 flex items-center gap-1.5 px-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
                         <span className="size-1 rounded-full bg-sky-500/80 shrink-0" />
-                        <span>Thẩm định trực tuyến tức thì</span>
+                        <span className="font-semibold text-sky-900 truncate max-w-[170px] sm:max-w-[200px]">
+                          {activeLoanProduct?.name || "Vay Tiêu Dùng Cá Nhân"}
+                        </span>
                         <span className="text-sky-400/80">•</span>
-                        <span>Áp dụng trả chậm linh hoạt <strong className="font-semibold text-sky-950">3 - 12 tháng</strong></span>
+                        <span>Fineract Core Banking</span>
                         <span className="text-sky-400/80">•</span>
-                        <span>Lãi suất ưu đãi chỉ từ <strong className="font-bold text-sky-700">0.65%/tháng</strong></span>
+                        <span>Trả chậm <strong className="font-semibold text-sky-950">{minTermMonths === maxTermMonths ? `${minTermMonths} tháng` : `${minTermMonths} - ${maxTermMonths} tháng`}</strong></span>
+                        <span className="text-sky-400/80">•</span>
+                        <span>Lãi suất <strong className="font-bold text-sky-700">{activeLoanRate}%/tháng</strong></span>
                       </div>
                     </div>
 
-                    {/* 2. Phần Chọn kỳ hạn thanh toán: Giảm 30% tổng thể và khoảng cách với phần card bên dưới */}
-                    <div className="h-[17px] sm:h-[18px] flex items-center justify-between px-1 text-[11px] shrink-0 mt-1 sm:mt-1.5 mb-0.5 sm:mb-1">
+                    {/* 2. Phần Chọn kỳ hạn thanh toán: h-[18px] */}
+                    <div className="h-[18px] shrink-0 flex items-center justify-between px-1 text-[11px] my-1">
                       <span className="font-bold text-neutral-800">Chọn kỳ hạn thanh toán:</span>
                       <span className="text-neutral-500 text-[10.5px]">
                         {orderLoanTerm ? (
@@ -1878,7 +2041,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                       </span>
                     </div>
 
-                    {/* 3. Phần các card bên dưới: Chiếm toàn bộ không gian còn lại */}
+                    {/* 3. Phần các card bên dưới: Chiếm toàn bộ không gian còn lại (flex-1 min-h-0) */}
                     <div className="relative group flex-1 min-h-0 flex flex-col">
                         {/* Left Navigation Overlay (Gradient Hint + Floating Button) */}
                         {canScrollLoanLeft && (
@@ -1912,16 +2075,21 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                           </>
                         )}
 
-                        {/* Horizontal Scrollable Carousel Cards with 6px margin gutter to prevent clipping */}
+                        {/* Horizontal Scrollable Carousel Cards with bottom padding to prevent border & shadow clipping */}
                         <div
                           ref={loanTermScrollRef}
                           onScroll={checkLoanScroll}
-                          className="flex gap-2 sm:gap-2.5 flex-1 min-h-0 items-stretch overflow-x-auto hide-scrollbar scroll-smooth snap-x snap-mandatory px-1.5 pt-0.5 pb-0.5"
+                          className="flex gap-2 sm:gap-2.5 flex-1 min-h-0 items-stretch overflow-x-auto hide-scrollbar scroll-smooth snap-x snap-mandatory px-1.5 pt-0.5 pb-2"
                         >
-                          {ORDER_LOAN_TERMS.map((term) => {
+                          {isLoadingLoans ? (
+                            <div className="flex items-center justify-center w-full py-8 gap-2 text-sky-700 text-xs">
+                              <Loader2 className="size-4 animate-spin text-sky-600" />
+                              <span className="font-medium">Đang tải gói vay từ Core Banking...</span>
+                            </div>
+                          ) : availableLoanTerms.map((term) => {
                             const isSelected = orderLoanTerm === term;
                             const principal = Math.round(total / term);
-                            const interest = Math.round(total * orderLoanInterestRate);
+                            const interest = Math.round(total * activeLoanRateFraction);
                             const monthlyPay = principal + interest;
 
                             return (
@@ -1933,64 +2101,118 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                                     setOrderLoanTerm(null);
                                   } else {
                                     setOrderLoanTerm(term);
-                                    e.currentTarget.scrollIntoView({
-                                      behavior: "smooth",
-                                      inline: "nearest",
-                                      block: "nearest",
-                                    });
+                                    setLoanMode("order_loan");
+                                    if (loanTermScrollRef.current) {
+                                      const container = loanTermScrollRef.current;
+                                      const card = e.currentTarget;
+                                      const cardLeft = card.offsetLeft;
+                                      const cardRight = cardLeft + card.offsetWidth;
+                                      const scrollLeft = container.scrollLeft;
+                                      const clientWidth = container.clientWidth;
+                                      if (cardLeft < scrollLeft) {
+                                        container.scrollTo({ left: Math.max(0, cardLeft - 8), behavior: "smooth" });
+                                      } else if (cardRight > scrollLeft + clientWidth) {
+                                        container.scrollTo({ left: cardRight - clientWidth + 8, behavior: "smooth" });
+                                      }
+                                    }
                                   }
                                   setTimeout(checkLoanScroll, 350);
                                 }}
-                                className={`w-[170px] sm:w-[174px] shrink-0 snap-start rounded-xl border flex flex-col justify-between text-left transition-all duration-150 cursor-pointer bg-white relative overflow-hidden box-border ${
+                                className={`w-[170px] sm:w-[174px] shrink-0 snap-start rounded-xl border flex flex-col justify-between text-left transition-all duration-200 cursor-pointer relative overflow-hidden box-border group/term ${
                                   isSelected
-                                    ? "border-[1.5px] border-sky-600 ring-1 ring-inset ring-sky-600/30 shadow-xs z-15"
-                                    : "border-neutral-200/90 hover:border-neutral-300 shadow-2xs z-0"
+                                    ? "border-[1.5px] border-sky-600 ring-1 ring-inset ring-sky-500/30 bg-gradient-to-b from-sky-50/90 via-sky-50/40 to-white shadow-[0_4px_14px_rgba(2,132,199,0.16),0_1px_2px_rgba(0,0,0,0.04)] z-15"
+                                    : "border-sky-200/70 hover:border-sky-400/80 bg-gradient-to-b from-white via-sky-50/25 to-sky-50/45 hover:from-white hover:via-sky-50/50 hover:to-sky-100/50 shadow-[0_2px_8px_-2px_rgba(2,132,199,0.06),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_14px_rgba(2,132,199,0.12)] z-0"
                                 }`}
                               >
+                                {/* Ambient Color Bleed Layer (Hiệu ứng ám màu xanh sky/cyan hòa sắc) */}
+                                <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+                                  {/* Vùng ám màu góc trên phải */}
+                                  <div className={`absolute -top-6 -right-6 size-20 rounded-full transition-all duration-300 ${
+                                    isSelected 
+                                      ? "bg-gradient-to-br from-sky-400/28 via-cyan-400/18 to-transparent blur-md" 
+                                      : "bg-gradient-to-br from-sky-400/12 via-cyan-400/8 to-transparent blur-md group-hover/term:from-sky-400/22 group-hover/term:via-cyan-400/14"
+                                  }`} />
+                                  
+                                  {/* Vùng ám màu góc dưới trái */}
+                                  <div className={`absolute -bottom-6 -left-6 size-18 rounded-full transition-all duration-300 ${
+                                    isSelected 
+                                      ? "bg-gradient-to-tr from-blue-600/14 via-sky-500/12 to-transparent blur-md" 
+                                      : "bg-gradient-to-tr from-blue-500/6 via-sky-400/6 to-transparent blur-md group-hover/term:from-blue-500/12"
+                                  }`} />
+                                  
+                                  {/* Radial Mesh Highlight */}
+                                  <div className={`absolute inset-0 transition-opacity duration-300 ${
+                                    isSelected
+                                      ? "bg-[radial-gradient(ellipse_at_top_right,rgba(14,165,233,0.12)_0%,transparent_70%)] opacity-100"
+                                      : "bg-[radial-gradient(ellipse_at_top_right,rgba(14,165,233,0.06)_0%,transparent_70%)] opacity-80 group-hover/term:opacity-100"
+                                  }`} />
+
+                                  {/* Viền sáng hairline đỉnh phản chiếu kính */}
+                                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-90" />
+                                </div>
+
                                 {/* Khu vực nội dung trên với đệm viền */}
-                                <div className="p-2.5 sm:p-3 pb-2 flex flex-col justify-between flex-1">
+                                <div className="relative z-10 p-2.5 sm:p-3 pb-1.5 flex flex-col justify-between flex-1">
                                   {/* 1. Header: Radio nhỏ gọn + Số tháng nhỏ gọn + Pill lãi suất */}
                                   <div className="flex items-center justify-between w-full">
                                     <div className="flex items-center gap-1.5">
                                       <div className={`size-3.5 rounded-full border flex items-center justify-center transition-colors shrink-0 ${
                                         isSelected 
-                                          ? "border-sky-600 bg-sky-600 text-white shadow-2xs" 
-                                          : "border-neutral-300 bg-white"
+                                          ? "border-sky-600 bg-sky-600 text-white shadow-[0_0_8px_rgba(2,132,199,0.35)]" 
+                                          : "border-sky-300/80 bg-white/90 group-hover/term:border-sky-400"
                                       }`}>
                                         {isSelected && <Check className="size-2 text-white stroke-[2.5]" />}
                                       </div>
-                                      <span className="font-bold text-[11px] sm:text-xs text-neutral-900">
+                                      <span className={`font-bold text-[11px] sm:text-xs transition-colors ${
+                                        isSelected ? "text-sky-950" : "text-neutral-900 group-hover/term:text-sky-950"
+                                      }`}>
                                         {term} tháng
                                       </span>
                                     </div>
-                                    <span className="text-[8.5px] sm:text-[9px] font-medium text-neutral-500 bg-neutral-100/80 px-1.5 py-0.5 rounded-full border border-neutral-200/50">
-                                      0.65%/th
+                                    <span className={`text-[8.5px] sm:text-[9px] font-semibold px-1.5 py-0.5 rounded-full border transition-colors ${
+                                      isSelected
+                                        ? "text-sky-700 bg-sky-100/90 border-sky-300/80 shadow-2xs"
+                                        : "text-sky-700/80 bg-sky-50/80 border-sky-200/60"
+                                    }`}>
+                                      {activeLoanRate}%/th
                                     </span>
                                   </div>
 
                                   {/* 2. Hero Center: Số tiền góp mỗi tháng */}
                                   <div className="my-auto py-1">
-                                    <span className="text-[9.5px] font-medium text-neutral-400 block leading-tight">
+                                    <span className={`text-[9px] sm:text-[9.5px] font-medium block leading-tight transition-colors ${
+                                      isSelected ? "text-sky-700/80 font-semibold" : "text-neutral-500/90"
+                                    }`}>
                                       Góp mỗi tháng
                                     </span>
                                     <div className="flex items-baseline gap-1 mt-0.5">
-                                      <span className="text-sm sm:text-[15.5px] font-black tracking-tight text-neutral-900">
+                                      <span className={`text-[13.5px] sm:text-[14.5px] font-black tracking-tight transition-colors ${
+                                        isSelected ? "text-sky-950" : "text-neutral-900 group-hover/term:text-sky-950"
+                                      }`}>
                                         {formatVND(monthlyPay)}
                                       </span>
-                                      <span className="text-[10px] font-normal text-neutral-400">/tháng</span>
+                                      <span className={`text-[9.5px] font-normal ${
+                                        isSelected ? "text-sky-700/70" : "text-neutral-400"
+                                      }`}>
+                                        /tháng
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
 
-                                {/* 3. Inset Footer Shelf: Tăng chiều ngang bao trọn toàn bộ khung card */}
-                                <div className="w-full border-t border-neutral-100/90 bg-neutral-50/80 px-2.5 sm:px-3 py-1.5 sm:py-2 flex flex-col gap-1 shrink-0">
+                                {/* 3. Inset Footer Shelf: Tăng chiều ngang bao trọn toàn bộ khung card, bo góc đáy khớp viền */}
+                                <div className={`relative z-10 w-full border-t px-2.5 sm:px-3 py-1.5 flex flex-col gap-0.5 shrink-0 rounded-b-[11px] transition-colors ${
+                                  isSelected
+                                    ? "border-sky-200/80 bg-sky-100/50 backdrop-blur-xs"
+                                    : "border-sky-100/80 bg-sky-50/40 backdrop-blur-xs group-hover/term:bg-sky-50/70"
+                                }`}>
                                   <div className="flex items-center justify-between text-[9px] sm:text-[9.5px] leading-tight">
-                                    <span className="text-neutral-400">Tiền gốc</span>
-                                    <span className="font-semibold text-neutral-700">{formatVND(principal)}</span>
+                                    <span className={isSelected ? "text-sky-800/80" : "text-neutral-500"}>Tiền gốc</span>
+                                    <span className={`font-semibold ${isSelected ? "text-sky-950 font-bold" : "text-neutral-700"}`}>{formatVND(principal)}</span>
                                   </div>
                                   <div className="flex items-center justify-between text-[9px] sm:text-[9.5px] leading-tight">
-                                    <span className="text-neutral-400">Tiền lãi</span>
-                                    <span className="font-semibold text-neutral-700">{formatVND(interest)}</span>
+                                    <span className={isSelected ? "text-sky-800/80" : "text-neutral-500"}>Tiền lãi</span>
+                                    <span className={`font-semibold ${isSelected ? "text-sky-950 font-bold" : "text-neutral-700"}`}>{formatVND(interest)}</span>
                                   </div>
                                 </div>
                               </button>
@@ -2993,28 +3215,99 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                   <span className="font-black text-sky-800 text-sm">{formatVND(total)}</span>
                 </div>
 
-                {/* Loan Contracts List (Like Address / Voucher selector) */}
-                <div className="flex flex-col gap-2.5">
-                  <span className="text-xs font-bold text-neutral-800">
-                    Danh sách khoản vay khả dụng ({MOCK_USER_LOANS.length}):
-                  </span>
+                {/* Loan Products & Contracts List from Endpoint */}
+                <div className="flex flex-col gap-3">
+                  {/* 1. Hợp đồng vay đã kích hoạt — lên trên trước */}
+                  {userLoans.length > 0 && (
+                    <>
+                      <span className="text-xs font-bold text-neutral-800">
+                        Hợp đồng vay đã kích hoạt ({userLoans.length}):
+                      </span>
+                      {userLoans.map((loan) => {
+                        const isSelected = loanMode === "existing_loan" && (selectedLoanId === String(loan.id) || selectedLoanId === loan.accountNo);
+                        const availableAmount = Math.max(0, (loan.principal || 0) - (loan.summary?.principalPaid || 0));
 
-                  {MOCK_USER_LOANS.map((loan) => {
-                    const isSelected = selectedLoanId === loan.id;
-                    const isSufficient = loan.availableAmount >= total;
-                    const usagePercent = Math.round(((loan.totalLimit - loan.availableAmount) / loan.totalLimit) * 100);
+                        return (
+                          <div
+                            key={`user-loan-${loan.id}`}
+                            onClick={() => {
+                              setSelectedLoanId(String(loan.id));
+                              setLoanMode("existing_loan");
+                            }}
+                            className={`rounded-xl p-3 flex flex-col gap-2 transition-all cursor-pointer relative ${
+                              isSelected
+                                ? "border border-sky-600 bg-gradient-to-b from-sky-50 via-white to-sky-50/60 shadow-[0_2px_8px_rgba(2,132,199,0.15)] ring-1 ring-sky-500/20"
+                                : "border border-neutral-200/90 bg-gradient-to-b from-white to-neutral-50/80 hover:border-sky-300 shadow-2xs"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <div className={`mt-0.5 size-4.5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                                  isSelected 
+                                    ? "border border-sky-600 bg-gradient-to-b from-sky-600 to-sky-700 text-white shadow-2xs" 
+                                    : "border border-neutral-300 bg-white"
+                                }`}>
+                                  {isSelected && <Check className="size-2.5 text-white stroke-[3]" />}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-neutral-900 text-xs sm:text-[13px]">
+                                      {loan.loanProductName}
+                                    </span>
+                                    <Badge className="text-[8px] sm:text-[8.5px] px-1.5 py-0 font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                      {loan.status?.value || "Active"}
+                                    </Badge>
+                                  </div>
+                                  <span className="text-[10.5px] text-neutral-500 font-mono block">
+                                    Mã HĐ: <strong>{loan.accountNo}</strong> • Khách: {loan.clientName}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-neutral-200/60 text-[10.5px] text-neutral-600">
+                              <div>
+                                <span className="text-neutral-400 block text-[9.5px]">Hạn mức khả dụng:</span>
+                                <span className="font-bold text-sky-800">{formatVND(availableAmount)}</span>
+                              </div>
+                              <div>
+                                <span className="text-neutral-400 block text-[9.5px]">Lãi suất:</span>
+                                <span className="font-semibold text-neutral-800">{loan.interestRatePerPeriod}%/tháng</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {/* 2. Gói vay trả chậm Core Banking — xuống dưới */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-neutral-800">
+                      Gói vay trả chậm Core Banking ({loanProducts.length}):
+                    </span>
+                    <span className="text-[10.5px] text-sky-700 font-semibold bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200/60">
+                      Tự động duyệt theo đơn hàng
+                    </span>
+                  </div>
+
+                  {loanProducts.map((product) => {
+                    const isSelected = loanMode === "order_loan" && (selectedLoanProductId === product.id || (!selectedLoanProductId && activeLoanProduct?.id === product.id));
+                    const isEligible = total >= (product.minPrincipal || 0) && total <= (product.maxPrincipal || Infinity);
 
                     return (
                       <div
-                        key={loan.id}
-                        onClick={() => setSelectedLoanId(loan.id)}
+                        key={`product-${product.id}`}
+                        onClick={() => {
+                          setSelectedLoanProductId(product.id);
+                          setLoanMode("order_loan");
+                        }}
                         className={`rounded-xl p-3 flex flex-col gap-2 transition-all cursor-pointer relative ${
                           isSelected
                             ? "border border-sky-600 bg-gradient-to-b from-sky-50 via-white to-sky-50/60 shadow-[0_2px_8px_rgba(2,132,199,0.15)] ring-1 ring-sky-500/20"
                             : "border border-neutral-200/90 bg-gradient-to-b from-white to-neutral-50/80 hover:border-sky-300 shadow-2xs"
                         }`}
                       >
-                        {/* Header: Radio + Product Name + Status Badge */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2.5 min-w-0">
                             <div className={`mt-0.5 size-4.5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
@@ -3027,60 +3320,40 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-bold text-neutral-900 text-xs sm:text-[13px]">
-                                  {loan.loanProductName}
+                                  {product.name}
                                 </span>
-                                <Badge className="text-[8px] sm:text-[8.5px] px-1.5 py-0 font-bold bg-gradient-to-b from-emerald-50 to-emerald-100/60 text-emerald-700 border border-emerald-200 shadow-2xs">
-                                  {loan.statusText}
+                                <Badge className="text-[8px] sm:text-[8.5px] px-1.5 py-0 font-bold bg-sky-50 text-sky-700 border border-sky-200 shadow-2xs">
+                                  {product.shortName || "CORE-LN"}
                                 </Badge>
+                                {isEligible && (
+                                  <Badge className="text-[8px] sm:text-[8.5px] px-1.5 py-0 font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                    Đủ điều kiện
+                                  </Badge>
+                                )}
                               </div>
-                              <span className="text-[10.5px] text-neutral-500 font-mono block">
-                                Mã HĐ: <strong>{loan.accountNo}</strong> • Đối tác: {loan.provider}
+                              <span className="text-[10.5px] text-neutral-500 font-mono block mt-0.5">
+                                Hạn mức áp dụng: {formatVND(product.minPrincipal || 0)} - {formatVND(product.maxPrincipal || 0)}
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Limit progress bar */}
-                        <div className="flex flex-col gap-1 pt-1">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-neutral-500">
-                              Hạn mức khả dụng: <strong className="text-sky-700 font-extrabold">{formatVND(loan.availableAmount)}</strong>
-                            </span>
-                            <span className="text-neutral-400 text-[10px]">
-                              Tổng hạn mức: {formatVND(loan.totalLimit)}
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-neutral-200/60 rounded-full overflow-hidden shadow-inner">
-                            <div
-                              className="h-full bg-sky-600 rounded-full transition-all"
-                              style={{ width: `${Math.max(5, 100 - usagePercent)}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Specs grid */}
                         <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-neutral-200/60 text-[10.5px] text-neutral-600">
                           <div>
                             <span className="text-neutral-400 block text-[9.5px]">Lãi suất:</span>
-                            <span className="font-bold text-neutral-800">{loan.interestRate}</span>
+                            <span className="font-bold text-sky-800">{product.interestRatePerPeriod}%/tháng</span>
                           </div>
                           <div>
                             <span className="text-neutral-400 block text-[9.5px]">Kỳ hạn:</span>
-                            <span className="font-semibold text-neutral-800">{loan.termMonths} tháng</span>
+                            <span className="font-semibold text-neutral-800">
+                              {product.minNumberOfRepayments || 3} - {product.maxNumberOfRepayments || product.numberOfRepayments || 12} tháng
+                            </span>
                           </div>
                           <div>
-                            <span className="text-neutral-400 block text-[9.5px]">Hạn mức đến:</span>
-                            <span className="font-semibold text-neutral-800">{loan.expiryDate}</span>
+                            <span className="text-neutral-400 block text-[9.5px]">Hạch toán:</span>
+                            <span className="font-semibold text-neutral-800">Fineract Ledger</span>
                           </div>
                         </div>
-
-                        {/* Insufficient Warning if applicable */}
-                        {!isSufficient && (
-                          <div className="bg-amber-50 border border-amber-200/80 rounded-lg px-2 py-1 flex items-center gap-1.5 text-[10px] text-amber-800">
-                            <AlertCircle className="size-3 text-amber-600 shrink-0" />
-                            <span>Hạn mức khả dụng còn lại thấp hơn giá trị đơn hàng này.</span>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -3090,13 +3363,13 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                 <div className="bg-gradient-to-b from-neutral-50 to-neutral-100/60 p-2.5 rounded-xl border border-neutral-200/80 flex items-start gap-2 text-[10.5px] text-neutral-600 shadow-2xs">
                   <Info className="size-4 text-neutral-500 shrink-0 mt-0.5" />
                   <p className="leading-snug">
-                    Hệ thống tự động đồng bộ hạn mức từ các gói vay bạn vừa mua trên sàn hoặc đã kích hoạt qua Core Banking Fineract. Số tiền sẽ được trích trực tiếp khi đặt hàng thành công.
+                    Hệ thống tự động kết nối và đồng bộ trực tiếp với danh mục gói sản phẩm từ Apache Fineract Core Banking. Khi hoàn tất đơn hàng, hồ sơ sẽ được thẩm định trực tuyến tức thì.
                   </p>
                 </div>
               </div>
 
               {/* Modal Footer Actions */}
-              <div className="px-5 py-3 border-t border-neutral-200/80 bg-gradient-to-b from-white to-neutral-50/80 flex items-center justify-between shrink-0">
+              <div className="px-5 py-3 border-t border-neutral-200/80 bg-gradient-to-b from-white to-neutral-50/80 flex items-center justify-between gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsLoanModalOpen(false)}
@@ -3104,17 +3377,48 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct 
                 >
                   Đóng
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPaymentType("loan");
-                    setLoanMode("existing_loan");
-                    setIsLoanModalOpen(false);
-                  }}
-                  className="px-6 py-2 rounded-xl border border-sky-800 bg-gradient-to-b from-sky-600 via-sky-700 to-sky-800 text-white text-xs font-black transition-all cursor-pointer shadow-[0_2px_8px_rgba(3,105,161,0.25),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1.5px_0_rgba(3,105,161,0.6)] hover:shadow-md active:scale-95"
-                >
-                  Áp dụng khoản vay này
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentType("loan");
+                      setIsLoanModalOpen(false);
+                    }}
+                    className="px-4 py-2 rounded-xl border border-sky-300 bg-sky-50 text-sky-800 text-xs font-bold transition-all cursor-pointer shadow-2xs hover:bg-sky-100 active:scale-95"
+                  >
+                    Áp dụng lựa chọn này
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmittingLoanApp}
+                    onClick={async () => {
+                      setIsLoanModalOpen(false);
+                      await handleDirectApplyLoan();
+                    }}
+                    className={`px-5 py-2 rounded-xl border text-xs font-black transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 ${
+                      appliedLoanContract
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-800 shadow-2xs"
+                        : "border-sky-800 bg-gradient-to-b from-sky-600 via-sky-700 to-sky-800 text-white shadow-[0_2px_8px_rgba(3,105,161,0.25),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1.5px_0_rgba(3,105,161,0.6)] hover:shadow-md"
+                    }`}
+                  >
+                    {isSubmittingLoanApp ? (
+                      <>
+                        <Loader2 className="size-3 animate-spin" />
+                        <span>Đang nộp...</span>
+                      </>
+                    ) : appliedLoanContract ? (
+                      <>
+                        <CheckCircle2 className="size-3 text-emerald-600" />
+                        <span>Đã nộp: #{appliedLoanContract.accountNo}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="size-3 text-sky-200" />
+                        <span>Nộp đơn xin vay ({formatVND(total)})</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

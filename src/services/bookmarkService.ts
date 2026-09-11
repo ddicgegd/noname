@@ -18,6 +18,7 @@ export interface BookmarkItem {
   subTotal: number;
   isAvailable?: boolean;
   stock?: number;
+  addedAt?: number;
 }
 
 export interface BookmarkData {
@@ -29,6 +30,8 @@ export interface BookmarkData {
   ttlSecondsRemaining?: number;
   expiresAtEpochMs?: number;
   formattedRemainingTime?: string;
+  createdAt?: number;
+  updatedAt?: number;
   items: BookmarkItem[];
 }
 
@@ -41,6 +44,30 @@ export interface BookmarkApiResponse<T> {
 
 export const BOOKMARK_UPDATED_EVENT = "bookmark-updated";
 const LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX = "horizon_cached_bookmark_";
+
+export function getBookmarkTimestamp(bookmark: Partial<BookmarkData>): number {
+  if (bookmark.updatedAt) return bookmark.updatedAt;
+  if (bookmark.createdAt) return bookmark.createdAt;
+  if (bookmark.mainSku) {
+    const cached = getCachedBookmark(bookmark.mainSku);
+    if (cached?.updatedAt) return cached.updatedAt;
+    if (cached?.createdAt) return cached.createdAt;
+  }
+  if (bookmark.expiresAtEpochMs) return bookmark.expiresAtEpochMs;
+  return 0;
+}
+
+/**
+ * Sắp xếp danh sách bookmark: Các gói bookmark mới nhất (updatedAt / createdAt) luôn xếp ở trên cùng.
+ */
+export function sortBookmarksNewestFirst(list: BookmarkData[]): BookmarkData[] {
+  return [...list].sort((a, b) => {
+    const timeA = getBookmarkTimestamp(a);
+    const timeB = getBookmarkTimestamp(b);
+    if (timeB !== timeA) return timeB - timeA;
+    return (b.expiresAtEpochMs || 0) - (a.expiresAtEpochMs || 0);
+  });
+}
 
 export function getCachedBookmark(mainSku: string): BookmarkData | null {
   if (typeof window === "undefined") return null;
@@ -55,7 +82,16 @@ export function setCachedBookmark(mainSku: string, data: BookmarkData | null) {
   if (typeof window === "undefined") return;
   try {
     if (data) {
-      localStorage.setItem(`${LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX}${mainSku}`, JSON.stringify(data));
+      const existing = getCachedBookmark(mainSku);
+      const enhancedData: BookmarkData = {
+        ...data,
+        createdAt: data.createdAt || existing?.createdAt || Date.now(),
+        updatedAt: data.updatedAt || Date.now(),
+        items: Array.isArray(data.items)
+          ? [...data.items].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
+          : [],
+      };
+      localStorage.setItem(`${LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX}${mainSku}`, JSON.stringify(enhancedData));
     } else {
       localStorage.removeItem(`${LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX}${mainSku}`);
     }
@@ -225,7 +261,7 @@ export async function getAllBookmarks(): Promise<BookmarkData[]> {
       const serverList: BookmarkData[] = Array.isArray(json?.data) ? json.data : [];
       if (serverList.length > 0) {
         serverList.forEach((bm) => setCachedBookmark(bm.mainSku, bm));
-        return serverList;
+        return sortBookmarksNewestFirst(serverList);
       }
     }
   } catch (err) {
@@ -248,7 +284,7 @@ export async function getAllBookmarks(): Promise<BookmarkData[]> {
           }
         }
       }
-      if (localList.length > 0) return localList;
+      if (localList.length > 0) return sortBookmarksNewestFirst(localList);
     } catch (_) {}
   }
 

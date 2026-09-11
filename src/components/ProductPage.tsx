@@ -650,10 +650,12 @@ export default function ProductPage({ cartItems, onAddToCart, onNavigate, onBuyN
     const syncHashSku = () => setActiveHashSku(getCurrentHashSku());
     window.addEventListener("hashchange", syncHashSku);
     window.addEventListener("popstate", syncHashSku);
+    window.addEventListener("locationchange", syncHashSku);
 
     return () => {
       window.removeEventListener("hashchange", syncHashSku);
       window.removeEventListener("popstate", syncHashSku);
+      window.removeEventListener("locationchange", syncHashSku);
     };
   }, []);
 
@@ -3546,14 +3548,14 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden">
-      {/* Backdrop overlay */}
+      {/* Backdrop overlay - Soft lightened frosted backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         onClick={onClose}
-        className="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-md"
+        className="absolute inset-0 cursor-pointer bg-black/25 backdrop-blur-sm"
       />
 
       {/* Modal Body Container: 85vw x 85vh with 7.5% margins (15% total margin space) */}
@@ -3564,7 +3566,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 8 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 flex h-[85vh] w-[94vw] sm:w-[90vw] md:w-[85vw] max-w-[1600px] flex-col overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-b from-white/95 via-white/90 to-white/80 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/80 backdrop-blur-2xl text-foreground shadow-[0_24px_80px_rgba(0,0,0,0.35),0_0_0_1px_rgba(255,255,255,0.4),inset_0_1px_0_rgba(255,255,255,1)]"
+        className="relative z-10 flex h-[85vh] w-[94vw] sm:w-[90vw] md:w-[85vw] max-w-[1600px] flex-col overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-b from-white/95 via-white/90 to-white/80 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/80 backdrop-blur-2xl text-foreground shadow-[0_20px_50px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4),inset_0_1px_0_rgba(255,255,255,1)]"
       >
 
         {/* Modal Main Scrollable Content Wrapper */}
@@ -4430,27 +4432,30 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                                            imageUrl: existing.imageUrl,
                                            attributesTitle: existing.attributesTitle,
                                            unitPrice: existing.unitPrice,
-                                           salePrice: existing.salePrice
+                                           salePrice: existing.salePrice,
+                                           addedAt: (existing as any).addedAt || Date.now()
                                          });
                                        }
                                      }
                                    }
 
-                                   // Thêm phụ kiện mới hoặc tăng số lượng
+                                   // Thêm phụ kiện mới hoặc tăng số lượng (mục mới luôn đưa lên trên cùng)
                                    const accSku = (item as any).sku || item.id;
                                    const existingIdx = itemsToStage.findIndex(it => it.sku === accSku);
                                    if (existingIdx >= 0) {
                                      itemsToStage[existingIdx].quantity += 1;
+                                     (itemsToStage[existingIdx] as any).addedAt = Date.now();
                                    } else {
-                                     itemsToStage.push({
+                                     itemsToStage.unshift({
                                        sku: accSku,
                                        quantity: 1,
                                        productName: item.name,
                                        imageUrl: item.img,
                                        attributesTitle: item.smember || "Phụ kiện mua cùng",
                                        unitPrice: accUnitPrice,
-                                       salePrice: accSalePrice
-                                     });
+                                       salePrice: accSalePrice,
+                                       addedAt: Date.now()
+                                     } as any);
                                    }
 
                                    // Khi khởi tạo bookmark lần đầu: khởi động bộ đếm 1 giờ (3600s). Khi bấm thêm tiếp: KHÔNG reset timer!
@@ -5027,7 +5032,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                             onWheel={(e) => e.stopPropagation()}
                             className="flex flex-col gap-1.5 max-h-[300px] overflow-y-auto pr-1 pb-1 overscroll-contain [overscroll-behavior:contain] [touch-action:pan-y] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent_100%)]"
                           >
-                            {bookmarkData.items.map((item) => (
+                            {((bookmarkData.items || []).slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))).map((item) => (
                               <div
                                 key={item.sku}
                                 className="p-2 rounded-xl border-t border-t-white/90 border-b border-b-slate-300/60 border-x border-x-white/60 dark:border-white/10 bg-gradient-to-b from-white/95 via-white/85 to-white/75 dark:from-zinc-800/90 dark:to-zinc-800/60 shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between gap-2.5 group transition-all hover:border-slate-300 dark:hover:border-white/20"
@@ -5131,7 +5136,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onNaviga
                               } catch (_) {}
                               onClose();
                               if (onNavigate) {
-                                onNavigate("cart");
+                                onNavigate("order");
                               }
                             }}
                             className="px-3 py-1 rounded-lg font-bold text-[11px] text-white bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/50 border-b border-b-[#A8280A] border-x border-x-[#FF4D24]/80 shadow-[0_4px_12px_rgba(255,77,36,0.3),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"

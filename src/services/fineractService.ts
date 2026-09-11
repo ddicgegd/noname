@@ -312,10 +312,15 @@ export class FineractService implements IFineractService {
 
   public async getLoanProducts(): Promise<LoanProduct[]> {
     if (this.mode === "live") {
-      const res = await this.callProxy<any>("/loan-products", "GET");
-      if (Array.isArray(res)) return res;
-      if (Array.isArray(res?.pageItems)) return res.pageItems;
-      return [];
+      try {
+        const res = await this.callProxy<any>("/loan-products", "GET");
+        if (Array.isArray(res)) return res;
+        if (Array.isArray(res?.pageItems)) return res.pageItems;
+        return [];
+      } catch (err) {
+        console.warn("[FineractService] Live loan-products failed, falling back to mock store:", err);
+        return fineractMockStore.getLoanProducts();
+      }
     }
     await simulateLatency();
     return fineractMockStore.getLoanProducts();
@@ -323,25 +328,30 @@ export class FineractService implements IFineractService {
 
   public async getLoans(clientId?: number): Promise<LoanAccount[]> {
     if (this.mode === "live") {
-      const qs = typeof clientId === "number" ? `?clientId=${clientId}` : "";
-      const res = await this.callProxy<any>(`/loans${qs}`, "GET");
-      let list: any[] = [];
-      if (Array.isArray(res)) list = res;
-      else if (Array.isArray(res?.pageItems)) list = res.pageItems;
+      try {
+        const qs = typeof clientId === "number" ? `?clientId=${clientId}` : "";
+        const res = await this.callProxy<any>(`/loans${qs}`, "GET");
+        let list: any[] = [];
+        if (Array.isArray(res)) list = res;
+        else if (Array.isArray(res?.pageItems)) list = res.pageItems;
 
-      if (list.length > 0) {
-        const detailedLoans = await Promise.all(
-          list.map(async (l) => {
-            try {
-              return await this.getLoan(l.id);
-            } catch {
-              return l;
-            }
-          })
-        );
-        return detailedLoans;
+        if (list.length > 0) {
+          const detailedLoans = await Promise.all(
+            list.map(async (l) => {
+              try {
+                return await this.getLoan(l.id);
+              } catch {
+                return l;
+              }
+            })
+          );
+          return detailedLoans;
+        }
+        return [];
+      } catch (err) {
+        console.warn("[FineractService] Live getLoans failed, falling back to mock store:", err);
+        return fineractMockStore.getLoans(clientId);
       }
-      return [];
     }
     await simulateLatency();
     return fineractMockStore.getLoans(clientId);

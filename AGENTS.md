@@ -11,13 +11,21 @@
 - **NO SPONTANEOUS PLANS**: NEVER generate plans, execution outlines, step-by-step roadmaps, or speculative preparation phases unless the user explicitly requests one (e.g., via `/plan`, "create a plan", "lên kế hoạch").
 - **DEFAULT TO DIRECT ACTION**: Execute the requested task immediately and directly without unnecessary conversational overhead.
 
-### 1.2. MANDATORY POST-TASK SERVICE RESTART & HEALTH CHECK
-- **NO TASK IS COMPLETE WITHOUT RUNNING SERVER**: Running `npm run build` is ONLY a compile check. It is NOT the end of the task.
-- **EXACT RESTART SEQUENCE (MANDATORY)**:
+### 1.2. SEAMLESS HOT RELOAD & SERVICE HEALTH MANAGEMENT
+- **ZERO UNNECESSARY RESTARTS (CRITICAL FOR UX)**:
+  - **Frontend & Client Logic Changes (`src/**`)**: DO NOT kill or restart the dev server (`fuser -k 3000` is strictly forbidden for frontend edits). Vite Fast Refresh / HMR automatically reflects all UI, component, CSS, and algorithmic/client logic changes immediately without reloading the page and preserves user state.
+  - **Server Liveness Check**: Verify that the server is alive via `curl -s http://localhost:3000/api/health`. If healthy (`{"status":"ok",...}`), KEEP IT RUNNING and DO NOT restart.
+- **MANDATORY RESTART CONDITIONS (ONLY WHEN EXPLICITLY REQUIRED)**:
+  Restart the server ONLY when:
+  1. Backend server code is modified (e.g., `server.ts`).
+  2. Project dependencies or environment configurations are modified (`package.json`, `.env`).
+  3. The server process is dead or health check fails.
+- **EXACT RESTART SEQUENCE (WHEN REQUIRED)**:
   1. Kill old process on port 3000: `fuser -k 3000/tcp 2>/dev/null || true`
   2. Launch dev server in background via `run_command`: `npm run dev`
   3. Verify health endpoint: `curl -s http://localhost:3000/api/health`
-- **DEFINITION OF DONE**: The agent MUST NOT end the turn or claim completion until `http://localhost:3000/api/health` returns `{"status":"ok",...}`.
+- **DEFINITION OF DONE**:
+  The task is complete when code changes are applied and `http://localhost:3000/api/health` returns `{"status":"ok",...}` (without restarting if server was already running and changes were frontend-only).
 
 ### 1.3. STRICT SCOPE ADHERENCE & IMMEDIATE REMEDIATION
 - **EXACT SCOPE COMPLIANCE**: Delivering incorrect output, exceeding requested scope, or performing unsolicited modifications is a critical system violation.
@@ -37,8 +45,13 @@
 - Proactively identify and activate available project skills whenever applicable to the current task.
 
 ### 1.8. CONTEXT RESET & EXPLICIT TARGET CONFIRMATION
-- **CONTEXT INDEPENDENCE**: Nếu phiên prompt sau không có thông tin liên quan tới phiên trước thì bắt buộc phải quên/loại bỏ ngữ cảnh trước đó trước khi thực thi.
-- **EXPLICIT CONFIRMATION (NO GUESSING)**: Xác nhận cấu trúc và vị trí cần sửa rõ ràng qua prompt; TUYỆT ĐỐI CẤM việc tự đoán hoặc suy diễn vị trí/cấu trúc khi chưa có chỉ định rõ ràng.
+- **CONTEXT INDEPENDENCE**: If a subsequent prompt does not reference prior context, immediately disregard and clear prior session assumptions before execution.
+- **EXPLICIT TARGET CONFIRMATION (NO GUESSING)**: Target structures and modification points must be explicitly confirmed via prompt. Speculating or extrapolating code locations or structures without explicit user designation is STRICTLY PROHIBITED.
+
+### 1.9. "FIX IS REPAIR, NOT REDESIGN" — LOCALIZED DEFECT REMEDIATION
+- **LOCALIZED FIX ONLY**: When tasked with fixing or debugging, identify the exact defect location and repair ONLY that defect. "Fix" means localized remediation; NEVER alter existing layout structures, redesign components, or add/remove surrounding elements unless a major architectural flaw exists and the user explicitly requests a redesign.
+- **ABSOLUTE FIDELITY TO REFERENCE SAMPLES (NO SPECULATIVE EFFECTS)**: When the user provides an image, reference code, or design pattern, adhere strictly to its exact nature. NEVER invent unrequested effects, SVG blur/glow filters, solid replacements for dashed strokes, or speculative box shadows that break layout hierarchy.
+- **ZERO UI REGRESSION**: All fixes must preserve existing layout dimensions, container paddings, and display hierarchy. New styles or animations must never introduce boundary clipping (`overflow-hidden` truncation), edge bleeding, or occlusion of neighboring elements.
 
 ---
 
@@ -51,6 +64,7 @@
 5. **Mandatory `design-taste-frontend` Skill**:
    - For all frontend UI development, redesigns, landing pages, or styling tasks, ALWAYS activate and follow `.agents/skills/design-taste-frontend/SKILL.md`.
    - Apply Brief Inference (page kind, vibe, audience, brand assets) and enforce anti-slop aesthetics.
+6. **Defect-Targeted Fix Constraint**: Confine all UI repairs strictly to the minimal defect site. Preserve full hierarchy, padding, margin, and adjacent component layouts intact.
 
 ---
 

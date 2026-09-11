@@ -368,13 +368,14 @@ export default function App() {
       <SplashScreen />
 
       {/* 2. Synchronized Top Floating Glassmorphism Navbar */}
-      {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && !isProductDetailOpen && (
+      {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && (
         <Navbar 
           currentPage={currentPage}
           onNavigate={navigate}
           cartItems={cartItems}
           onRemoveCartItem={handleRemoveCartItem}
           onAddToCart={(name, price) => handleAddToCart(name, price)}
+          isProductDetailOpen={isProductDetailOpen}
         />
       )}
 
