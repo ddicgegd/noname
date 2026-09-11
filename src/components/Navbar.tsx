@@ -440,6 +440,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
 
   // Sync URL hash for /p# and detail modal routes
   const [isProductHashActive, setIsProductHashActive] = useState(getIsProductHashActive);
+  const [currentPath, setCurrentPath] = useState(() => typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : "");
 
   useEffect(() => {
     // Intercept pushState and replaceState once so URL changes trigger reactive updates
@@ -461,6 +462,9 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
 
     const handleLocationSync = () => {
       setIsProductHashActive(getIsProductHashActive());
+      if (typeof window !== "undefined") {
+        setCurrentPath(window.location.pathname.toLowerCase().replace(/\/$/, ""));
+      }
     };
 
     window.addEventListener("hashchange", handleLocationSync);
@@ -476,17 +480,23 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     };
   }, []);
 
+  const cleanPath = currentPath || (typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : "");
+
   // Detect auto-hide pages:
   // 1. Order page (/o)
-  const isOrderRoute = typeof window !== "undefined" && ["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(window.location.pathname.toLowerCase().replace(/\/$/, ""));
+  const isOrderRoute = ["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath);
   const isOrderPage = currentPage === "order" || isOrderRoute;
 
   // 2. Product page: DO NOT hide on http://localhost:3000/p without #
   // ONLY hide when opening up # (either product modal is open or URL has #)
-  const isProductPage = currentPage === "product" || (typeof window !== "undefined" && window.location.pathname.toLowerCase().replace(/\/$/, "") === "/p");
+  const isProductPage = currentPage === "product" || cleanPath === "/p";
   const isProductModalActive = isProductPage && Boolean(isProductDetailOpen || isProductHashActive);
 
-  const isAutoHideMode = isOrderPage || isProductModalActive;
+  // 3. Account / Profile page (/a, /a#, /profile): Auto-hide operates in /a and /a#
+  const isAccountRoute = ["/a", "/profile", "/account", "/accounts"].includes(cleanPath);
+  const isAccountPage = currentPage === "profile" || isAccountRoute;
+
+  const isAutoHideMode = isOrderPage || isProductModalActive || isAccountPage;
 
   const navRef = useRef<HTMLElement | null>(null);
   const isHoveringNavRef = useRef(false);
@@ -496,6 +506,14 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
 
   // Keep navbar visible if not in auto-hide mode, or if hovered/focused/dropdown active
   const isNavVisible = !isAutoHideMode || isOrderNavHovered || isNavFocused || showAccountMenu || showCartMenu || isSearchExpanded || showProductMegaMenu;
+
+  // Broadcast navbar visibility state for pages/components that react to it
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).__isNavbarVisible = isNavVisible;
+      window.dispatchEvent(new CustomEvent("navbar-visibility-change", { detail: { isVisible: isNavVisible } }));
+    }
+  }, [isNavVisible]);
 
   useEffect(() => {
     if (!isAutoHideMode) return;
@@ -2093,7 +2111,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                     onClick={() => {
                       setShowAccountMenu(false);
                       if (typeof window !== "undefined") {
-                        window.history.pushState(null, "", "/profile");
+                        window.history.pushState(null, "", "/a");
                         window.dispatchEvent(new CustomEvent("close-accounts-center"));
                       }
                       onNavigate("profile");

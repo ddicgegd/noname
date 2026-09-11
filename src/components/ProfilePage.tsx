@@ -7,7 +7,7 @@ import {
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
   Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
-  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Calendar
+  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark, ShoppingCart
 } from "lucide-react";
 import { apiRequest, unifiedFetch, getUnifiedAccessToken } from "../lib/api";
 import { STORAGE_KEYS } from "../lib/storageKeys";
@@ -36,6 +36,20 @@ import {
 } from "../services/bookmarkService";
 import { addToCart } from "../services/cartService";
 import { Bevel, BevelButton, BevelDivider } from "./ui/bevel";
+import { 
+  Sliders as LucideSliders,
+  User as LucideUser,
+  ShieldCheck as LucideShieldCheck,
+  MapPin as LucideMapPin,
+  CreditCard as LucideCreditCard,
+  Laptop as LucideLaptop,
+  Bookmark as LucideBookmark,
+  Pencil as LucidePencil,
+  Copy as LucideCopy,
+  Check as LucideCheck
+} from "lucide";
+import { MorphIcon } from "morphicons/react";
+import { HoverMorphIcon } from "./ui/HoverMorphIcon";
 
 
 interface OrderItem {
@@ -71,6 +85,49 @@ export interface PaymentMethodItem {
   isDefault: boolean;
 }
 
+const SECURITY_TAG_ICONS = [
+  LucideSliders,     // Mặc định: Quản lý bảo mật
+  LucideUser,        // Tag 1: Hồ sơ cá nhân
+  LucideShieldCheck, // Tag 2: Mật khẩu & Bảo mật
+  LucideMapPin,      // Tag 3: Sổ địa chỉ nhận hàng
+  LucideCreditCard,  // Tag 4: Thẻ & Phương thức
+  LucideLaptop,      // Tag 5: Thiết bị & Phiên
+  LucideBookmark     // Tag 6: Phụ kiện đã lưu
+];
+
+function SequentialTagMorphIcon({ isHovered }: { isHovered: boolean }) {
+  const [tagIndex, setTagIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isHovered) {
+      setTagIndex(0);
+      return;
+    }
+
+    // Khi vừa hover vào: morph ngay sang tag đầu tiên (Hồ sơ cá nhân)
+    setTagIndex(1);
+
+    // Sau đó tuần tự biến hình qua từng tag chức năng mỗi 800ms
+    const interval = setInterval(() => {
+      setTagIndex((prev) => {
+        const next = prev + 1;
+        return next < SECURITY_TAG_ICONS.length ? next : 1;
+      });
+    }, 800);
+
+    return () => clearInterval(interval);
+  }, [isHovered]);
+
+  return (
+    <MorphIcon
+      icon={SECURITY_TAG_ICONS[tagIndex]}
+      spring="snappy"
+      className="w-3.5 h-3.5 text-indigo-700 shrink-0 select-none"
+      size={14}
+    />
+  );
+}
+
 export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   // Authentication status
   const [token, setToken] = useState<string>("");
@@ -90,6 +147,27 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [userBookmarks, setUserBookmarks] = useState<BookmarkData[]>([]);
   const [isBookmarksLoading, setIsBookmarksLoading] = useState<boolean>(false);
   const [bookmarkActionLoading, setBookmarkActionLoading] = useState<string>("");
+  const [isSecurityBtnHovered, setIsSecurityBtnHovered] = useState<boolean>(false);
+  const [isAddressHovered, setIsAddressHovered] = useState<boolean>(false);
+  const [isNavbarVisible, setIsNavbarVisible] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && typeof (window as any).__isNavbarVisible === "boolean") {
+      return (window as any).__isNavbarVisible;
+    }
+    return false;
+  });
+
+  // Listen to navbar-visibility-change to toggle breadcrumb visibility
+  useEffect(() => {
+    const handleNavVisibility = (e: any) => {
+      if (typeof e.detail?.isVisible === "boolean") {
+        setIsNavbarVisible(e.detail.isVisible);
+      }
+    };
+    window.addEventListener("navbar-visibility-change", handleNavVisibility);
+    return () => {
+      window.removeEventListener("navbar-visibility-change", handleNavVisibility);
+    };
+  }, []);
 
   // Listen to open-accounts-center event from Navbar
   useEffect(() => {
@@ -100,10 +178,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       }
       setIsAccountsCenterOpen(true);
     };
+    const getBasePath = () => {
+      if (typeof window === "undefined") return "/a";
+      const p = window.location.pathname.toLowerCase().replace(/\/$/, "");
+      return ["/profile", "/account", "/accounts"].includes(p) ? "/a" : (p || "/a");
+    };
+
     const handleCloseAccountsCenter = () => {
       setIsAccountsCenterOpen(false);
       if (typeof window !== "undefined" && window.location.hash) {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        window.history.replaceState(null, "", getBasePath() + window.location.search);
       }
     };
     window.addEventListener("open-accounts-center", handleOpenAccountsCenter);
@@ -128,12 +212,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const base = window.location.pathname.toLowerCase().replace(/\/$/, "");
+    const safeBase = ["/profile", "/account", "/accounts"].includes(base) ? "/a" : (base || "/a");
+
     if (!isAccountsCenterOpen) {
       if (window.location.hash) {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        window.history.replaceState(null, "", safeBase + window.location.search);
       }
     } else if (activeModalTab) {
-      window.history.replaceState(null, "", `${window.location.pathname}#${activeModalTab}${window.location.search}`);
+      window.history.replaceState(null, "", `${safeBase}#${activeModalTab}${window.location.search}`);
     }
   }, [isAccountsCenterOpen, activeModalTab]);
 
@@ -1497,7 +1584,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   };
 
   return (
-    <div className="relative pt-20 pb-3 sm:pb-4 h-screen w-full bg-[#FBFDFF] font-sans text-slate-800 flex flex-col justify-start overflow-hidden">
+    <div className="relative pt-[68px] pb-3 sm:pb-4 h-screen w-full bg-[#FBFDFF] font-sans text-slate-800 flex flex-col justify-start overflow-hidden">
       
       {/* Ambient background glowing lights (Đánh ánh sáng ám mạnh mẽ hơn) */}
       <div className="absolute top-[-5%] left-1/4 w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-indigo-400/35 via-purple-300/25 to-[#FF4D24]/20 blur-[140px] pointer-events-none select-none z-0 animate-pulse" style={{ animationDuration: '8s' }} />
@@ -1508,11 +1595,24 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         
         {/* Minimal Navigation Breadcrumb and top control actions (Optimized & Unified with 3D Bevel) */}
         <div className="shrink-0 flex flex-col gap-2.5 border-b border-slate-200/60 pb-2.5 select-none">
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-400">
+          <motion.div 
+            animate={{ 
+              opacity: isNavbarVisible ? 0 : 1,
+              y: isNavbarVisible ? -6 : 0,
+            }}
+            transition={{ 
+              duration: 0.22,
+              ease: "easeOut" 
+            }}
+            style={{ 
+              pointerEvents: isNavbarVisible ? "none" : "auto" 
+            }}
+            className="flex items-center gap-2 text-sm font-bold text-slate-400 min-h-[20px]"
+          >
             <span className="hover:text-black cursor-pointer transition-colors" onClick={() => onNavigate("landing")}>Trang chủ</span>
             <span>/</span>
             <span className="text-[#FF4D24] font-semibold">Cổng tài khoản</span>
-          </div>
+          </motion.div>
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {!isLoading && token && user ? (
@@ -1548,9 +1648,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     setSuccessMsg("");
                     setIsAccountsCenterOpen(true);
                   }}
+                  onMouseEnter={() => setIsSecurityBtnHovered(true)}
+                  onMouseLeave={() => setIsSecurityBtnHovered(false)}
                   className="px-4 py-2.5 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95"
                 >
-                  <Sliders className="w-3.5 h-3.5" />
+                  <SequentialTagMorphIcon isHovered={isSecurityBtnHovered} />
                   <span>Quản lý bảo mật</span>
                 </button>
                 <button 
@@ -1654,11 +1756,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   className="p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all active:scale-90 shrink-0"
                                   title="Sao chép mã đơn hàng"
                                 >
-                                  {copiedOrderId === item.id ? (
-                                    <Check className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
-                                  ) : (
-                                    <Copy className="w-3 h-3 text-slate-400 hover:text-slate-600" />
-                                  )}
+                                  <MorphIcon
+                                    icon={copiedOrderId === item.id ? LucideCheck : LucideCopy}
+                                    spring="snappy"
+                                    className={`w-3 h-3 transition-colors ${
+                                      copiedOrderId === item.id ? "text-emerald-600" : "text-slate-400 hover:text-slate-600"
+                                    }`}
+                                    size={12}
+                                    strokeWidth={copiedOrderId === item.id ? 2.5 : 2}
+                                  />
                                 </button>
                               </div>
                               <span className={`px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-normal shrink-0 transition-all border ${
@@ -1747,11 +1853,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                         {/* Ngày giao hàng dự kiến: Không có khung bao quanh (định dạng dd/mm/yyyy) */}
                         <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center select-none py-0.5">
-                          <Calendar className={`w-3.5 h-3.5 ${
-                            orderTheme === "emerald" ? "text-emerald-600" :
-                            orderTheme === "amber" ? "text-amber-600" :
-                            orderTheme === "blue" ? "text-blue-600" : "text-[#FF4D24]"
-                          }`} />
                           <div className="flex items-center gap-1.5 text-xs">
                             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
                               {activeOrder.status === "delivered" ? "Đã giao hàng:" : "Dự kiến giao:"}
@@ -1970,23 +2071,47 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                       {/* Shipping address details block: Thẻ địa chỉ với hiệu ứng Bevel làm mịn mượt mà */}
                       <div className="relative z-10 shrink-0 px-1 pt-0.5 pb-0.5">
-                        <div className="bg-gradient-to-b from-white/85 via-white/70 to-slate-50/50 border-t border-t-white border-b border-b-slate-200/70 border-x border-x-white/70 backdrop-blur-md shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] p-2 sm:p-2.5 rounded-xl flex items-center justify-between gap-2.5">
-                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                            <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.06)] flex items-center justify-center shrink-0">
-                              <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                        <div 
+                          onMouseEnter={() => setIsAddressHovered(true)}
+                          onMouseLeave={() => setIsAddressHovered(false)}
+                          onClick={() => {
+                            setActiveModalTab("addresses");
+                            setIsAccountsCenterOpen(true);
+                          }}
+                          className="bg-gradient-to-b from-white/85 via-white/70 to-slate-50/50 hover:from-white hover:to-slate-50/70 border-t border-t-white border-b border-b-slate-200/70 hover:border-slate-300/80 border-x border-x-white/70 backdrop-blur-md shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-3 transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className={`w-[34px] h-[34px] rounded-[10px] bg-gradient-to-b border-t border-t-white flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                              orderTheme === "emerald"
+                                ? "from-emerald-50 via-emerald-50/80 to-emerald-100/60 border-b-emerald-200/80 border-x-emerald-100/80 text-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(16,185,129,0.08)]"
+                                : orderTheme === "amber"
+                                ? "from-amber-50 via-amber-50/80 to-orange-100/60 border-b-amber-200/80 border-x-amber-100/80 text-amber-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(245,158,11,0.08)]"
+                                : orderTheme === "blue"
+                                ? "from-blue-50 via-blue-50/80 to-indigo-100/60 border-b-blue-200/80 border-x-blue-100/80 text-blue-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(59,130,246,0.08)]"
+                                : "from-orange-50/90 via-orange-50/70 to-rose-100/50 border-b-orange-200/80 border-x-orange-100/80 text-[#FF4D24] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(255,77,36,0.08)]"
+                            }`}>
+                              <HoverMorphIcon 
+                                defaultIcon={LucideMapPin} 
+                                hoverIcon={LucidePencil} 
+                                isHovered={isAddressHovered} 
+                                className={`w-[17px] h-[17px] ${
+                                  orderTheme === "emerald" ? "text-emerald-600 group-hover:text-emerald-700" :
+                                  orderTheme === "amber" ? "text-amber-600 group-hover:text-amber-700" :
+                                  orderTheme === "blue" ? "text-blue-600 group-hover:text-blue-700" :
+                                  "text-[#FF4D24] group-hover:text-[#e03d15]"
+                                }`} 
+                                size={17} 
+                              />
                             </div>
                             <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono shrink-0 whitespace-nowrap">
+                              <span className="text-[10.6px] font-bold text-slate-400 uppercase tracking-wider font-mono shrink-0 whitespace-nowrap">
                                 Địa chỉ giao nhận hàng:
                               </span>
-                              <p className="text-xs font-semibold text-slate-700 truncate min-w-0" title={activeOrder.shippingAddress}>
+                              <p className="text-[12.7px] font-semibold text-slate-700 truncate min-w-0" title={activeOrder.shippingAddress}>
                                 {activeOrder.shippingAddress}
                               </p>
                             </div>
                           </div>
-                          <span className="text-[9.5px] font-bold text-indigo-600 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.06)] px-2 py-0.5 rounded-md font-mono shrink-0">
-                            Đồng kiểm
-                          </span>
                         </div>
                       </div>
 

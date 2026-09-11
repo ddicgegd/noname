@@ -68,7 +68,12 @@ export default function App() {
     if (["/p", "/product"].includes(cleanPath)) return "product";
     if (["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath)) return "order";
     if (["/auth-report", "/diagnostic"].includes(cleanPath)) return "auth-report";
-    if (["/profile", "/account", "/accounts"].includes(cleanPath)) return "profile";
+    if (["/a", "/profile", "/account", "/accounts"].includes(cleanPath)) {
+      if (cleanPath !== "/a" && typeof window !== "undefined") {
+        window.history.replaceState({}, "", "/a" + window.location.hash + window.location.search);
+      }
+      return "profile";
+    }
     if (["/verify-email", "/verify"].includes(cleanPath)) {
       window.history.replaceState({}, "", "/auth#login" + window.location.search);
       return "auth";
@@ -86,7 +91,7 @@ export default function App() {
       case "auth-report": return "/auth-report";
       case "profile": {
         const hash = window.location.hash;
-        return hash ? `/profile${hash}` : "/profile";
+        return hash ? `/a${hash}` : "/a";
       }
       case "auth": {
         const hash = window.location.hash.toLowerCase();
@@ -105,6 +110,11 @@ export default function App() {
       const hash = window.location.hash.toLowerCase();
       if (!["#login", "#register", "#verify"].includes(hash)) {
         window.history.replaceState({}, "", "/auth#login");
+      }
+    } else if (page === "profile") {
+      const cleanPath = window.location.pathname.toLowerCase().replace(/\/$/, "");
+      if (cleanPath !== "/a") {
+        window.history.replaceState({}, "", "/a" + window.location.hash + window.location.search);
       }
     }
     return page;
@@ -208,7 +218,7 @@ export default function App() {
       }
     } else if (page === "profile") {
       const hash = window.location.hash;
-      targetPath = hash ? `/profile${hash}` : "/profile";
+      targetPath = hash ? `/a${hash}` : "/a";
     }
     if (window.location.pathname + window.location.hash !== targetPath) {
       window.history.pushState({}, "", targetPath);
