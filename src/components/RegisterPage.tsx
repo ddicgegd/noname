@@ -1,6 +1,24 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Mail, Lock, User, ArrowRight, Eye, EyeOff, ShieldCheck, CheckCircle, CheckCircle2, XCircle, AlertCircle, Shield, Cpu, RefreshCw, Check, Loader2, Settings, Key, Terminal, Server, ChevronDown, ChevronUp } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, ArrowLeft, Eye, EyeOff, ShieldCheck, CheckCircle, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Info, Shield, Cpu, RefreshCw, Check, Loader2, Settings, Key, Terminal, Server, ChevronDown, ChevronUp, X, Coins } from "lucide-react";
+import { 
+  User as MorphUser,
+  AtSign as MorphAtSign,
+  CircleUser as MorphCircleUser,
+  IdCard as MorphIdCard,
+  Mail as MorphMail,
+  MailCheck as MorphMailCheck,
+  Lock as MorphLock,
+  Key as MorphKey,
+  KeyRound as MorphKeyRound,
+  ShieldCheck as MorphShieldCheck,
+  CheckCheck as MorphCheckCheck,
+  Eye as MorphEye,
+  EyeOff as MorphEyeOff
+} from "lucide";
+import { MorphIcon } from "morphicons/react";
+import { HoverMorphIcon } from "./ui/HoverMorphIcon";
+import { useToast } from "./ui/Toast";
 import { apiRequest, isProxyEnabled, getApiBaseUrl } from "../lib/api";
 import { extractBackendMessage, sanitizeErrorMessage } from "../lib/responseExtractor";
 import { STORAGE_KEYS } from "../lib/storageKeys";
@@ -21,6 +39,53 @@ interface RegisterPageProps {
   onNavigate: (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms") => void;
 }
 
+function DynamicButtonShimmer() {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
+      <motion.div
+        className="w-3/5 h-full bg-gradient-to-r from-transparent via-white/20 via-[#FF4D24]/30 to-transparent -skew-x-12"
+        initial={{ x: "-100%" }}
+        animate={{ x: "280%" }}
+        transition={{ repeat: Infinity, duration: 0.75, ease: "easeInOut" }}
+      />
+    </div>
+  );
+}
+
+function DynamicButtonLoader({ text }: { text: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2.5 text-white">
+      <div className="relative w-4 h-4 flex items-center justify-center shrink-0">
+        <div className="absolute inset-0 rounded-full bg-[#FF4D24]/40 blur-[3px] pointer-events-none" />
+        <Loader2 className="w-4 h-4 text-[#FF4D24] animate-spin shrink-0 relative z-10" />
+      </div>
+
+      <span className="flex items-center text-xs font-bold font-sans tracking-wide">
+        <span>{text}</span>
+        <span className="inline-flex items-center gap-0.5 ml-1">
+          {[0, 1, 2].map((dot) => (
+            <motion.span
+              key={dot}
+              className="w-1 h-1 rounded-full bg-[#FF4D24]"
+              animate={{
+                opacity: [0.35, 1, 0.35],
+                scale: [0.8, 1.25, 0.8],
+                y: [0, -2.5, 0]
+              }}
+              transition={{
+                duration: 0.5,
+                repeat: Infinity,
+                delay: dot * 0.1,
+                ease: "easeInOut"
+              }}
+            />
+          ))}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [isSignUp, setIsSignUp] = useState(() => window.location.hash.toLowerCase() === "#register");
 
@@ -38,6 +103,35 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [hoveredField, setHoveredField] = useState<string | null>(null);
+  const [isVerifyingManualToken, setIsVerifyingManualToken] = useState(false);
+  const { showToast } = useToast();
+  const setToastNotification = (data: { id?: string; type?: "error" | "success" | "info" | "warning"; title?: string; message: string } | null) => {
+    if (data && data.message) {
+      showToast(data.message, data.type || "info", data.title);
+    }
+  };
+
+  useEffect(() => {
+    if (errorMsg) {
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "error",
+        message: errorMsg,
+      });
+    }
+  }, [errorMsg]);
+
+  useEffect(() => {
+    if (successMsg) {
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "success",
+        message: successMsg,
+      });
+    }
+  }, [successMsg]);
 
   // Mouse position for spotlight effect on the card
   const cardRef = useRef<HTMLDivElement>(null);
@@ -63,7 +157,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [verifyOverlayTimeLeft, setVerifyOverlayTimeLeft] = useState(2);
 
   // --- ACCOUNT RECOVERY STATE VARIABLES ---
-  const [recoveryMode, setRecoveryMode] = useState<"NONE" | "SEND_LINK" | "MANUAL_TOKEN" | "RESET_PASSWORD">("NONE");
+  const [recoveryMode, setRecoveryMode] = useState<"NONE" | "SEND_LINK" | "MANUAL_TOKEN" | "RESET_PASSWORD">(() => {
+    if (typeof window === "undefined") return "NONE";
+    const hash = window.location.hash.toLowerCase();
+    if (hash === "#recovery-token" || hash === "#manual-token") return "MANUAL_TOKEN";
+    if (hash === "#reset-password") return "RESET_PASSWORD";
+    if (hash === "#recovery" || hash === "#forgot-password" || hash === "#forgot") return "SEND_LINK";
+    return "NONE";
+  });
   const [isPasswordResetExpanded, setIsPasswordResetExpanded] = useState(false);
   const [isUsernameChangeExpanded, setIsUsernameChangeExpanded] = useState(false);
   const [manualTokenInput, setManualTokenInput] = useState("");
@@ -118,6 +219,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       if (hash === "#register") {
         setIsSignUp(true);
         setIsVerifyingMode(false);
+        setRecoveryMode("NONE");
       } else if (hash === "#verify") {
         const params = new URLSearchParams(window.location.search);
         const hasToken = ["token", "code", "verify-email", "verify"].some((p) => params.has(p));
@@ -125,13 +227,28 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
           window.location.hash = "login";
           setIsSignUp(false);
           setIsVerifyingMode(false);
+          setRecoveryMode("NONE");
         } else {
           setIsSignUp(false);
           setIsVerifyingMode(true);
+          setRecoveryMode("NONE");
         }
+      } else if (hash === "#recovery" || hash === "#forgot-password" || hash === "#forgot") {
+        setIsSignUp(false);
+        setIsVerifyingMode(false);
+        setRecoveryMode("SEND_LINK");
+      } else if (hash === "#recovery-token" || hash === "#manual-token") {
+        setIsSignUp(false);
+        setIsVerifyingMode(false);
+        setRecoveryMode("MANUAL_TOKEN");
+      } else if (hash === "#reset-password") {
+        setIsSignUp(false);
+        setIsVerifyingMode(false);
+        setRecoveryMode("RESET_PASSWORD");
       } else {
         setIsSignUp(false);
         setIsVerifyingMode(false);
+        setRecoveryMode("NONE");
       }
     };
     window.addEventListener("hashchange", handleHashChange);
@@ -261,6 +378,81 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     }
   };
 
+  const handleManualTokenSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsVerifyingManualToken(true);
+    setErrorMsg("");
+    setToastNotification(null);
+    setFieldErrors(prev => ({ ...prev, manualToken: "" }));
+
+    try {
+      // Guarantee hold loading animation is visible for at least 500ms (0.5s)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const tokenClean = manualTokenInput.trim();
+      if (!tokenClean) {
+        setFieldErrors(prev => ({ ...prev, manualToken: "Vui lòng nhập mã Token khôi phục." }));
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          message: "Vui lòng nhập hoặc dán mã Token khôi phục.",
+        });
+        return;
+      }
+
+      let response: any = null;
+      let reqError: any = null;
+      try {
+        response = await apiValidateResetToken(tokenClean);
+      } catch (err: any) {
+        reqError = err;
+      }
+
+      if (reqError) {
+        console.error("Manual token validation failed:", reqError);
+        const cleanReason = sanitizeErrorMessage(reqError.message) || "Mã token không hợp lệ hoặc đã hết hạn.";
+        // Stay on current page and show top-right toast!
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          message: cleanReason,
+        });
+        return;
+      }
+
+      const extracted = extractBackendMessage(response);
+      if (response && response.data !== undefined && response.data !== null) {
+        // Token is valid! Navigate to reset-password form
+        setRecoveryUser(response.data);
+        if (response.data.roles !== undefined) {
+          localStorage.setItem(STORAGE_KEYS.RECOVERY_USER_ROLES, JSON.stringify(response.data.roles));
+        }
+        setRecoveryToken(tokenClean);
+        window.location.hash = "reset-password";
+        setRecoveryMode("RESET_PASSWORD");
+        setIsPasswordResetExpanded(true);
+      } else {
+        // Token invalid: Stay on current page and show top-right toast!
+        const errMsg = extracted.message || "Mã token không hợp lệ hoặc đã hết hạn.";
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          message: errMsg,
+        });
+      }
+    } catch (err: any) {
+      console.error("Unexpected error in token verification:", err);
+      const cleanReason = sanitizeErrorMessage(err.message) || "Mã token không hợp lệ hoặc đã hết hạn.";
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "error",
+        message: cleanReason,
+      });
+    } finally {
+      setIsVerifyingManualToken(false);
+    }
+  };
+
   const executeOverlayVerification = async (tokenClean: string) => {
     try {
       await new Promise((r) => setTimeout(r, 600));
@@ -364,14 +556,15 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       if (isRecovery) {
         // Account recovery flow
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState({}, document.title, "/a#reset-password");
+        window.location.hash = "reset-password";
         setRecoveryToken(tokenParam);
         setRecoveryMode("RESET_PASSWORD");
         setIsPasswordResetExpanded(true);
         validateRecoveryToken(tokenParam);
       } else {
         // Email verification flow - trigger overlay directly on top of login form
-        window.history.replaceState({}, document.title, "/auth#login");
+        window.history.replaceState({}, document.title, "/a#login");
         setVerificationTokenInput(tokenParam);
         setShowVerifyOverlay(true);
         setVerifyOverlayStatus("loading");
@@ -384,24 +577,76 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   // --- ACCOUNT RECOVERY HANDLERS ---
   const handleSendRecoveryEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recoveryEmail || !recoveryEmail.trim()) {
-      setErrorMsg("Vui lòng nhập địa chỉ email.");
-      return;
-    }
-
     setLoading(true);
     setErrorMsg("");
     setSuccessMsg("");
+    setToastNotification(null);
+    setFieldErrors(prev => ({ ...prev, recoveryEmail: "" }));
 
     try {
-      const response = await apiRecoverAccount(recoveryEmail.trim());
+      // Guaranteed hold loading animation for at least 500ms (0.5s)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const cleanEmail = recoveryEmail.trim();
+      if (!cleanEmail) {
+        setFieldErrors(prev => ({ ...prev, recoveryEmail: "Vui lòng nhập địa chỉ email đăng ký." }));
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          title: "Chưa nhập email",
+          message: "Vui lòng nhập địa chỉ email đăng ký.",
+        });
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        setFieldErrors(prev => ({ ...prev, recoveryEmail: "Địa chỉ email không đúng định dạng (ví dụ: name@domain.com)." }));
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          title: "Địa chỉ email không hợp lệ",
+          message: "Địa chỉ email không đúng định dạng (ví dụ: name@domain.com).",
+        });
+        return;
+      }
+
+      let response: any = null;
+      let reqErr: any = null;
+      try {
+        response = await apiRecoverAccount(cleanEmail);
+      } catch (err: any) {
+        reqErr = err;
+      }
+
+      if (reqErr) {
+        console.error("Account recovery request failed:", reqErr);
+        const cleanReason = sanitizeErrorMessage(reqErr.message);
+        setErrorMsg(cleanReason);
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          message: cleanReason,
+        });
+        return;
+      }
+
       const extracted = extractBackendMessage(response);
       setSuccessMsg(extracted.message);
       setCooldownTime(60);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "success",
+        message: extracted.message,
+      });
     } catch (err: any) {
-      console.error("Account recovery request failed:", err);
+      console.error("Unexpected error in send recovery email:", err);
       const cleanReason = sanitizeErrorMessage(err.message);
       setErrorMsg(cleanReason);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "error",
+        message: cleanReason,
+      });
     } finally {
       setLoading(false);
     }
@@ -409,24 +654,44 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recoveryNewPassword) {
-      setErrorMsg("Mật khẩu mới không được để trống.");
-      return;
-    }
-    if (recoveryNewPassword.length < 6) {
-      setErrorMsg("Mật khẩu mới phải từ 6 ký tự trở lên.");
-      return;
-    }
-    if (recoveryNewPassword !== recoveryConfirmPassword) {
-      setErrorMsg("Mật khẩu xác nhận không khớp.");
-      return;
-    }
-
     setLoading(true);
     setErrorMsg("");
     setSuccessMsg("");
+    setToastNotification(null);
+    setFieldErrors(prev => ({ ...prev, newPassword: "", confirmPassword: "" }));
 
     try {
+      // Guaranteed hold loading animation for at least 500ms (0.5s)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      if (!recoveryNewPassword) {
+        setFieldErrors(prev => ({ ...prev, newPassword: "Mật khẩu mới không được để trống." }));
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          message: "Mật khẩu mới không được để trống.",
+        });
+        return;
+      }
+      if (recoveryNewPassword.length < 6) {
+        setFieldErrors(prev => ({ ...prev, newPassword: "Mật khẩu mới phải từ 6 ký tự trở lên." }));
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          message: "Mật khẩu mới phải từ 6 ký tự trở lên.",
+        });
+        return;
+      }
+      if (recoveryNewPassword !== recoveryConfirmPassword) {
+        setFieldErrors(prev => ({ ...prev, confirmPassword: "Mật khẩu xác nhận không khớp." }));
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          message: "Mật khẩu xác nhận không khớp.",
+        });
+        return;
+      }
+
       const response = await apiChangePassword({
         token: recoveryToken,
         newPassword: recoveryNewPassword,
@@ -435,6 +700,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       const extracted = extractBackendMessage(response);
       setSuccessMsg(extracted.message);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "success",
+        message: extracted.message,
+      });
       addAuditLog("VERIFY", { token: recoveryToken }, "SUCCESS", extracted.message, apiBaseUrl, getClientDeviceInfo());
 
       setRecoveryNewPassword("");
@@ -443,6 +713,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       console.error("Password reset failed:", err);
       const cleanReason = sanitizeErrorMessage(err.message);
       setErrorMsg(cleanReason);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "error",
+        message: cleanReason,
+      });
       addAuditLog("VERIFY", { token: recoveryToken }, "FAILED", `Đổi mật khẩu thất bại: ${cleanReason}`, apiBaseUrl, getClientDeviceInfo());
     } finally {
       setLoading(false);
@@ -451,16 +726,26 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
   const handleChangeUsername = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recoveryNewUsername || !recoveryNewUsername.trim()) {
-      setErrorMsg("Tên đăng nhập mới không được để trống.");
-      return;
-    }
-
     setLoading(true);
     setErrorMsg("");
     setSuccessMsg("");
+    setToastNotification(null);
+    setFieldErrors(prev => ({ ...prev, newUsername: "" }));
 
     try {
+      // Guaranteed hold loading animation for at least 500ms (0.5s)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      if (!recoveryNewUsername || !recoveryNewUsername.trim()) {
+        setFieldErrors(prev => ({ ...prev, newUsername: "Tên đăng nhập mới không được để trống." }));
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          message: "Tên đăng nhập mới không được để trống.",
+        });
+        return;
+      }
+
       const response = await apiChangeUsername({
         token: recoveryToken,
         newUsername: recoveryNewUsername.trim(),
@@ -468,6 +753,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       const extracted = extractBackendMessage(response);
       setSuccessMsg(extracted.message);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "success",
+        message: extracted.message,
+      });
       addAuditLog("VERIFY", { token: recoveryToken, newUsername: recoveryNewUsername.trim() }, "SUCCESS", extracted.message, apiBaseUrl, getClientDeviceInfo());
 
       if (recoveryUser) {
@@ -484,6 +774,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       console.error("Username change failed:", err);
       const cleanReason = sanitizeErrorMessage(err.message);
       setErrorMsg(cleanReason);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "error",
+        message: cleanReason,
+      });
       addAuditLog("VERIFY", { token: recoveryToken, newUsername: recoveryNewUsername.trim() }, "FAILED", `Đổi tên đăng nhập thất bại: ${cleanReason}`, apiBaseUrl, getClientDeviceInfo());
     } finally {
       setLoading(false);
@@ -853,7 +1148,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       const termsError = !agreeToTerms ? "Bạn phải đồng ý với Điều khoản và Chính sách dịch vụ." : "";
       if (Object.keys(errs).length > 0 || termsError) {
         setFieldErrors(errs);
-        if (termsError) setErrorMsg(termsError);
+        if (termsError) {
+          setErrorMsg(termsError);
+          setToastNotification({
+            id: Date.now().toString(),
+            type: "error",
+            message: termsError,
+          });
+        }
         return;
       }
     } else {
@@ -871,7 +1173,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     }
 
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     try {
       const devInfo = getClientDeviceInfo();
@@ -888,6 +1190,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
           const res = await registerUser(payload);
           const extractedMsg = extractBackendMessage(res);
           setSuccessMsg(extractedMsg.message);
+          setToastNotification({
+            id: Date.now().toString(),
+            type: "success",
+            message: extractedMsg.message,
+          });
 
           let token = "";
           if (res.data !== undefined && res.data !== null) {
@@ -904,12 +1211,15 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
           localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_PASSWORD, password);
 
           setLastRegEmail(payload.email);
+          if (token.length > 0) {
+            setManualTokenInput(token);
+          }
           setLoading(false);
-          window.location.hash = "verify";
+          window.location.hash = "recovery-token";
           setIsSignUp(false);
-          setIsVerifyingMode(true);
+          setIsVerifyingMode(false);
+          setRecoveryMode("MANUAL_TOKEN");
 
-          setVerificationTokenInput("");
           setPassword("");
           setConfirmPassword("");
 
@@ -1051,6 +1361,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
         if (Object.keys(rawFieldErrors).length === 0) {
           setErrorMsg(cleanReason);
+          setToastNotification({
+            id: Date.now().toString(),
+            type: "error",
+            message: cleanReason,
+          });
         }
         setLoading(false);
 
@@ -1061,12 +1376,18 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       }
     } catch (err: any) {
       setLoading(false);
-      setErrorMsg(err.message || "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.");
+      const msg = err.message || "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.";
+      setErrorMsg(msg);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "error",
+        message: msg,
+      });
     }
   };
 
   const handleSocialLogin = (platform: "Google" | "GitHub") => {
-    alert(`Đang khởi tạo liên kết bảo mật với tài khoản ${platform}...`);
+    showToast(`Đang khởi tạo liên kết bảo mật với tài khoản ${platform}...`, "info");
   };
 
   return (
@@ -1152,18 +1473,18 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-6"
+                className="space-y-4"
               >
                 <div>
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#FF4D24]/20 to-indigo-500/20 flex items-center justify-center border border-[#FF4D24]/10 shadow-inner">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
                       <Key className="w-4.5 h-4.5 text-[#FF4D24]" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-black text-[#111111] tracking-tight font-sans">
+                      <h2 className="text-base sm:text-lg font-black text-[#111111] tracking-tight font-sans">
                         Khôi phục tài khoản
                       </h2>
-                      <p className="text-[10px] text-slate-500 font-bold font-mono uppercase tracking-wider">
+                      <p className="text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider">
                         ACCOUNT RECOVERY PORTAL
                       </p>
                     </div>
@@ -1173,96 +1494,116 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   </p>
                 </div>
 
-                {/* Success / Error Messages */}
-                <AnimatePresence mode="wait">
-                  {errorMsg && Object.keys(fieldErrors).length === 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-semibold flex items-start gap-2"
-                    >
-                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{errorMsg}</span>
-                    </motion.div>
-                  )}
-
-                  {successMsg && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-start gap-2"
-                    >
-                      <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{successMsg}</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <form onSubmit={handleSendRecoveryEmail} className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-1.5">
+                <form onSubmit={handleSendRecoveryEmail} noValidate className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-1.5 text-left">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="recovery-email-input">
                       Địa chỉ Email đăng ký
                     </label>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <div 
+                      className="relative"
+                      onMouseEnter={() => setHoveredField("recoveryEmail")}
+                      onMouseLeave={() => setHoveredField(null)}
+                    >
+                      <HoverMorphIcon
+                        defaultIcon={MorphMail}
+                        hoverIcon={MorphMailCheck}
+                        isHovered={focusedField === "recoveryEmail" || hoveredField === "recoveryEmail" || Boolean(recoveryEmail)}
+                        size={16}
+                        className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                          fieldErrors["recoveryEmail"] ? "text-red-500" : focusedField === "recoveryEmail" ? "text-[#FF4D24]" : "text-slate-400"
+                        }`}
+                      />
                       <input
                         id="recovery-email-input"
                         type="email"
-                        placeholder="your-email@example.com"
-                        required
+                        placeholder="Nhập địa chỉ email đăng ký của bạn"
                         value={recoveryEmail}
-                        onChange={(e) => setRecoveryEmail(e.target.value)}
-                        className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
+                        onChange={(e) => {
+                          setRecoveryEmail(e.target.value);
+                          if (fieldErrors["recoveryEmail"]) {
+                            setFieldErrors(prev => ({ ...prev, recoveryEmail: "" }));
+                          }
+                        }}
+                        onFocus={() => setFocusedField("recoveryEmail")}
+                        onBlur={() => setFocusedField(null)}
+                        className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
+                          fieldErrors["recoveryEmail"]
+                            ? "border-red-500 focus:ring-red-500/15"
+                            : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
+                        } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                       />
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading || cooldownTime > 0}
-                    className="w-full bg-slate-900 hover:bg-slate-950 disabled:bg-slate-400 text-white py-3 px-4 rounded-xl font-sans text-xs font-bold shadow-md shadow-black/5 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
-                  >
-                    {loading ? (
-                      <div className="w-4.5 h-4.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    ) : cooldownTime > 0 ? (
-                      <span>Gửi lại sau ({cooldownTime}s)</span>
-                    ) : (
-                      <>
-                        <span>Gửi liên kết khôi phục</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-
-                  <div className="text-center pt-1">
+                  <div className="flex items-center gap-2 mt-2">
                     <button
                       type="button"
                       onClick={() => {
-                        setRecoveryMode("MANUAL_TOKEN");
-                        setErrorMsg("");
-                        setSuccessMsg("");
-                      }}
-                      className="text-xs font-bold text-indigo-600 hover:text-[#FF4D24] transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto font-sans"
-                    >
-                      <Key className="w-3.5 h-3.5" />
-                      <span>Đã có mã khôi phục? Nhập thủ công</span>
-                    </button>
-                  </div>
-
-                  <div className="text-center pt-2 border-t border-slate-200/50">
-                    <button
-                      type="button"
-                      onClick={() => {
+                        window.location.hash = "login";
                         setRecoveryMode("NONE");
                         setErrorMsg("");
                         setSuccessMsg("");
                       }}
-                      className="text-xs font-bold text-slate-500 hover:text-[#FF4D24] transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto"
+                      title="Quay lại trang Đăng nhập"
+                      aria-label="Quay lại trang Đăng nhập"
+                      className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0"
                     >
-                      <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                      <span>Quay lại trang Đăng nhập</span>
+                      <ArrowLeft className="w-4 h-4 text-[#FF4D24] transition-transform duration-200 group-hover:-translate-x-0.5" />
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={loading || cooldownTime > 0}
+                      className={`relative flex-1 ${
+                        loading || cooldownTime > 0
+                          ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
+                          : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                      } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
+                    >
+                      {loading && <DynamicButtonShimmer />}
+                      <span 
+                        className="flex items-center justify-center gap-2 transition-all duration-200" 
+                        style={{ 
+                          opacity: loading ? 0 : 1,
+                          transform: loading ? "translateY(-6px) scale(0.96)" : "translateY(0px) scale(1)",
+                          pointerEvents: loading ? "none" : "auto"
+                        }}
+                      >
+                        {cooldownTime > 0 ? (
+                          <span>Gửi lại sau ({cooldownTime}s)</span>
+                        ) : (
+                          <>
+                            <span>Gửi liên kết khôi phục</span>
+                            <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
+                          </>
+                        )}
+                      </span>
+                      <span 
+                        className="absolute inset-0 flex items-center justify-center text-white transition-all duration-200" 
+                        style={{ 
+                          opacity: loading ? 1 : 0,
+                          transform: loading ? "translateY(0px) scale(1)" : "translateY(6px) scale(0.96)",
+                          pointerEvents: loading ? "auto" : "none"
+                        }}
+                      >
+                        <DynamicButtonLoader text="Đang gửi liên kết" />
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60 text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.hash = "recovery-token";
+                        setRecoveryMode("MANUAL_TOKEN");
+                        setErrorMsg("");
+                        setSuccessMsg("");
+                      }}
+                      className="text-xs font-bold text-slate-700 hover:text-[#FF4D24] transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 mx-auto font-sans py-1"
+                    >
+                      <Coins className="w-3.5 h-3.5 text-[#FF4D24]" />
+                      <span>Đã có mã khôi phục? Nhập thủ công</span>
                     </button>
                   </div>
                 </form>
@@ -1274,18 +1615,18 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-6"
+                className="space-y-4"
               >
                 <div>
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#FF4D24]/20 to-indigo-500/20 flex items-center justify-center border border-[#FF4D24]/10 shadow-inner">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
                       <Key className="w-4.5 h-4.5 text-[#FF4D24]" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-black text-[#111111] tracking-tight font-sans">
+                      <h2 className="text-base sm:text-lg font-black text-[#111111] tracking-tight font-sans">
                         Nhập mã khôi phục
                       </h2>
-                      <p className="text-[10px] text-slate-500 font-bold font-mono uppercase tracking-wider">
+                      <p className="text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider">
                         MANUAL TOKEN ENTRY
                       </p>
                     </div>
@@ -1295,100 +1636,117 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   </p>
                 </div>
 
-                {/* Success / Error Messages */}
-                <AnimatePresence mode="wait">
-                  {errorMsg && Object.keys(fieldErrors).length === 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-semibold flex items-start gap-2"
-                    >
-                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{errorMsg}</span>
-                    </motion.div>
-                  )}
-
-                  {successMsg && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-start gap-2"
-                    >
-                      <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{successMsg}</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
                 <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!manualTokenInput.trim()) {
-                      setErrorMsg("Vui lòng nhập mã khôi phục.");
-                      return;
-                    }
-                    setRecoveryToken(manualTokenInput.trim());
-                    setRecoveryMode("RESET_PASSWORD");
-                    setIsPasswordResetExpanded(true);
-                    validateRecoveryToken(manualTokenInput.trim());
-                  }}
-                  className="flex flex-col gap-4"
+                  onSubmit={handleManualTokenSubmit}
+                  noValidate
+                  className="flex flex-col gap-3.5"
                 >
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1.5 text-left">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="manual-token-input">
                       Mã Token khôi phục
                     </label>
-                    <div className="relative">
-                      <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <div 
+                      className="relative"
+                      onMouseEnter={() => setHoveredField("manualToken")}
+                      onMouseLeave={() => setHoveredField(null)}
+                    >
+                      <HoverMorphIcon
+                        defaultIcon={MorphKey}
+                        hoverIcon={MorphKeyRound}
+                        isHovered={focusedField === "manualToken" || hoveredField === "manualToken" || Boolean(manualTokenInput)}
+                        size={16}
+                        className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                          fieldErrors["manualToken"] ? "text-red-500" : focusedField === "manualToken" ? "text-[#FF4D24]" : "text-slate-400"
+                        }`}
+                      />
                       <input
                         id="manual-token-input"
                         type="text"
-                        placeholder="Nhập mã token khôi phục (ví dụ: b8a7dcf3-...)"
-                        required
+                        placeholder="Nhập hoặc dán mã Token khôi phục"
                         value={manualTokenInput}
-                        onChange={(e) => setManualTokenInput(e.target.value)}
-                        className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
+                        onChange={(e) => {
+                          setManualTokenInput(e.target.value);
+                          if (fieldErrors["manualToken"]) {
+                            setFieldErrors(prev => ({ ...prev, manualToken: "" }));
+                          }
+                        }}
+                        onFocus={() => setFocusedField("manualToken")}
+                        onBlur={() => setFocusedField(null)}
+                        className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
+                          fieldErrors["manualToken"]
+                            ? "border-red-500 focus:ring-red-500/15"
+                            : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
+                        } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                       />
                     </div>
                   </div>
 
                   {cooldownTime > 0 && (
-                    <div className="text-center text-[10px] font-mono font-bold text-slate-400 bg-slate-50 py-2 rounded-xl border border-slate-200/50">
+                    <div className="text-center text-[10px] font-mono font-bold text-slate-500 bg-slate-50/80 py-1.5 rounded-xl border border-slate-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                       THỜI GIAN GỬI LẠI EMAIL: <span className="text-[#FF4D24] font-black">{cooldownTime}s</span>
                     </div>
                   )}
 
-                  <button
-                    type="submit"
-                    className="w-full bg-slate-900 hover:bg-slate-950 text-white py-3 px-4 rounded-xl font-sans text-xs font-bold shadow-md shadow-black/5 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
-                  >
-                    <span>Tiến hành xác thực</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-
-                  <div className="text-center pt-2 border-t border-slate-200/50 flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2 mt-2">
                     <button
                       type="button"
                       onClick={() => {
+                        window.location.hash = "recovery";
                         setRecoveryMode("SEND_LINK");
                         setErrorMsg("");
                         setSuccessMsg("");
                       }}
-                      className="text-xs font-bold text-slate-500 hover:text-[#FF4D24] transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto"
+                      title="Quay lại gửi liên kết khôi phục"
+                      aria-label="Quay lại gửi liên kết khôi phục"
+                      className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0"
                     >
-                      <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-                      <span>Quay lại gửi liên kết khôi phục</span>
+                      <ArrowLeft className="w-4 h-4 text-[#FF4D24] transition-transform duration-200 group-hover:-translate-x-0.5" />
                     </button>
+
+                    <button
+                      type="submit"
+                      disabled={isVerifyingManualToken || loading}
+                      className={`relative flex-1 ${
+                        isVerifyingManualToken || loading
+                          ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
+                          : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                      } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
+                    >
+                      {(isVerifyingManualToken || loading) && <DynamicButtonShimmer />}
+                      <span 
+                        className="flex items-center justify-center gap-2 transition-all duration-200" 
+                        style={{ 
+                          opacity: isVerifyingManualToken || loading ? 0 : 1,
+                          transform: isVerifyingManualToken || loading ? "translateY(-6px) scale(0.96)" : "translateY(0px) scale(1)",
+                          pointerEvents: isVerifyingManualToken || loading ? "none" : "auto"
+                        }}
+                      >
+                        <span>Tiến hành xác thực</span>
+                        <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
+                      </span>
+                      <span 
+                        className="absolute inset-0 flex items-center justify-center text-white transition-all duration-200" 
+                        style={{ 
+                          opacity: isVerifyingManualToken || loading ? 1 : 0,
+                          transform: isVerifyingManualToken || loading ? "translateY(0px) scale(1)" : "translateY(6px) scale(0.96)",
+                          pointerEvents: isVerifyingManualToken || loading ? "auto" : "none"
+                        }}
+                      >
+                        <DynamicButtonLoader text="Đang xác thực" />
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60 text-center">
                     <button
                       type="button"
                       onClick={() => {
+                        window.location.hash = "login";
                         setRecoveryMode("NONE");
                         setErrorMsg("");
                         setSuccessMsg("");
                       }}
-                      className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto"
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 mx-auto py-1"
                     >
                       <span>Trở về Đăng nhập</span>
                     </button>
@@ -1402,18 +1760,18 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-6"
+                className="space-y-4"
               >
                 <div>
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#FF4D24]/20 to-indigo-500/20 flex items-center justify-center border border-[#FF4D24]/10 shadow-inner">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
                       <Lock className="w-4.5 h-4.5 text-[#FF4D24]" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-black text-[#111111] tracking-tight font-sans">
+                      <h2 className="text-base sm:text-lg font-black text-[#111111] tracking-tight font-sans">
                         Thông tin tài khoản
                       </h2>
-                      <p className="text-[10px] text-slate-500 font-bold font-mono uppercase tracking-wider">
+                      <p className="text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider">
                         ACCOUNT SECURITY PORTAL
                       </p>
                     </div>
@@ -1424,16 +1782,16 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 </div>
 
                 {isValidatingToken ? (
-                  <div className="flex flex-col items-center justify-center py-10 gap-4">
-                    <Loader2 className="w-8 h-8 text-[#FF4D24] animate-spin" />
+                  <div className="flex flex-col items-center justify-center py-8 gap-3">
+                    <Loader2 className="w-7 h-7 text-[#FF4D24] animate-spin" />
                     <p className="text-xs text-slate-500 font-bold font-mono tracking-wider uppercase animate-pulse">
                       Đang xác thực liên kết khôi phục...
                     </p>
                   </div>
                 ) : tokenValidationError ? (
-                  <div className="space-y-4 py-4 text-center">
-                    <div className="w-12 h-12 bg-red-50 border border-red-200 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                      <AlertCircle className="w-6 h-6" />
+                  <div className="space-y-3.5 py-3 text-center">
+                    <div className="w-11 h-11 bg-red-50 border border-red-200/80 text-red-500 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+                      <AlertCircle className="w-5 h-5" />
                     </div>
                     <p className="text-xs text-slate-600 font-medium leading-relaxed px-2">
                       {tokenValidationError}
@@ -1442,25 +1800,27 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       <button
                         type="button"
                         onClick={() => {
+                          window.location.hash = "recovery-token";
                           setRecoveryMode("MANUAL_TOKEN");
                           setTokenValidationError("");
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
+                        className="inline-flex items-center gap-2 bg-gradient-to-b from-slate-50 to-slate-100 border border-t-white border-b-slate-300/80 border-x-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.05)] hover:scale-[1.01] active:scale-[0.99] transition-all"
                       >
-                        <Key className="w-3.5 h-3.5" />
+                        <Key className="w-3.5 h-3.5 text-[#FF4D24]" />
                         Nhập lại mã Token
                       </button>
                       <button
                         type="button"
                         onClick={() => {
+                          window.location.hash = "recovery";
                           setRecoveryMode("SEND_LINK");
                           setTokenValidationError("");
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-950 text-white text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
+                        className="inline-flex items-center gap-2 bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer border-t border-t-white/35 border-b border-b-black/80 border-x border-x-white/10 shadow-[0_3px_10px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                         Yêu cầu lại liên kết mới
@@ -1468,89 +1828,62 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     </div>
                   </div>
                 ) : recoveryUser ? (
-                  <div className="space-y-5">
+                  <div className="space-y-4">
                     {/* User Info Portal Card */}
-                    <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-4 space-y-3 shadow-inner">
-                      <div className="flex items-center gap-3 border-b border-slate-200/60 pb-3">
+                    <div className="bg-gradient-to-b from-slate-50/90 to-slate-100/40 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-200/70 rounded-2xl p-3.5 space-y-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.02)]">
+                      <div className="flex items-center gap-3 border-b border-slate-200/60 pb-2.5">
                         {recoveryUser.avatarUrl ? (
                           <img
                             src={recoveryUser.avatarUrl}
                             alt="Avatar"
-                            className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                            className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-sm"
                             referrerPolicy="no-referrer"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold font-mono text-sm border border-slate-300">
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-slate-100 to-slate-200 flex items-center justify-center text-slate-700 font-bold font-mono text-xs border border-t-white border-b-slate-300/80 border-x-slate-200 shadow-inner">
                             {recoveryUser.fullName ? recoveryUser.fullName.charAt(0) : (recoveryUser.username ? recoveryUser.username.charAt(0) : "U")}
                           </div>
                         )}
-                        <div className="text-left">
-                          <h3 className="text-xs font-black text-slate-900 font-sans leading-tight">
+                        <div className="text-left min-w-0">
+                          <h3 className="text-xs font-black text-slate-900 font-sans leading-tight truncate">
                             {recoveryUser.fullName || "Người dùng hệ thống"}
                           </h3>
-                          <span className="text-[10px] text-slate-400 font-bold font-mono tracking-wider">
+                          <span className="text-[10px] text-slate-400 font-bold font-mono tracking-wider truncate block">
                             Email: {recoveryUser.email || "Chưa thiết lập"}
                           </span>
                         </div>
-                        <div className="ml-auto flex flex-col items-end gap-1">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <div className="ml-auto flex flex-col items-end gap-1 shrink-0">
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                             Đã xác thực
                           </span>
                         </div>
                       </div>
 
                       {/* Detailed Contact List */}
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-                        <div className="text-left">
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                        <div className="text-left min-w-0">
                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">Địa chỉ Email</span>
-                          <span className="font-semibold text-slate-700 truncate block">{recoveryUser.email || "Chưa thiết lập"}</span>
+                          <span className="font-semibold text-slate-700 truncate block text-[11px]">{recoveryUser.email || "Chưa thiết lập"}</span>
                         </div>
-                        <div className="text-left">
+                        <div className="text-left min-w-0">
                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">Số điện thoại</span>
-                          <span className="font-semibold text-slate-700 block">{recoveryUser.numberPhone || "Chưa thiết lập"}</span>
+                          <span className="font-semibold text-slate-700 block text-[11px]">{recoveryUser.numberPhone || "Chưa thiết lập"}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Success / Error Messages inside Form */}
-                    <AnimatePresence mode="wait">
-                      {errorMsg && Object.keys(fieldErrors).length === 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-semibold flex items-start gap-2"
-                        >
-                          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                          <span>{errorMsg}</span>
-                        </motion.div>
-                      )}
-
-                      {successMsg && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-start gap-2"
-                        >
-                          <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                          <span>{successMsg}</span>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
                     {/* Available Actions */}
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {/* Action 1: Change username (Expandable style) */}
-                      <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden shadow-sm transition-all duration-300 hover:border-slate-300">
+                      <div className="border-t border-t-white border-b border-b-slate-200/90 border-x border-x-slate-200/80 rounded-2xl bg-gradient-to-b from-white to-slate-50/30 overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all duration-300">
                         {/* Header Trigger */}
                         <button
                           type="button"
                           onClick={() => setIsUsernameChangeExpanded(!isUsernameChangeExpanded)}
-                          className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50/50 transition-all cursor-pointer"
+                          className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-50/60 transition-colors cursor-pointer"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center border border-indigo-100 shadow-inner">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center shadow-inner">
                               <User className="w-4 h-4 text-indigo-600" />
                             </div>
                             <div>
@@ -1574,27 +1907,50 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.25, ease: "easeInOut" }}
+                              transition={{ duration: 0.2, ease: "easeInOut" }}
                               className="overflow-hidden"
                             >
                               <form
                                 onSubmit={handleChangeUsername}
-                                className="px-4 pb-5 pt-1 flex flex-col gap-4 border-t border-slate-100"
+                                noValidate
+                                className="px-3.5 pb-4 pt-1 flex flex-col gap-3.5 border-t border-slate-100"
                               >
-                                <div className="flex flex-col gap-1.5">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="new-username-input">
+                                <div className="flex flex-col gap-1.5 text-left">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="new-username-input">
                                     Tên đăng nhập mới (New Username)
                                   </label>
-                                  <div className="relative">
-                                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                                  <div 
+                                    className="relative"
+                                    onMouseEnter={() => setHoveredField("newUsername")}
+                                    onMouseLeave={() => setHoveredField(null)}
+                                  >
+                                    <HoverMorphIcon
+                                      defaultIcon={MorphUser}
+                                      hoverIcon={MorphAtSign}
+                                      isHovered={focusedField === "newUsername" || hoveredField === "newUsername" || Boolean(recoveryNewUsername)}
+                                      size={16}
+                                      className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                        fieldErrors["newUsername"] ? "text-red-500" : focusedField === "newUsername" ? "text-[#FF4D24]" : "text-slate-400"
+                                      }`}
+                                    />
                                     <input
                                       id="new-username-input"
                                       type="text"
                                       placeholder="Nhập tên đăng nhập mới (ví dụ: ann_new)"
-                                      required
                                       value={recoveryNewUsername}
-                                      onChange={(e) => setRecoveryNewUsername(e.target.value)}
-                                      className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
+                                      onChange={(e) => {
+                                        setRecoveryNewUsername(e.target.value);
+                                        if (fieldErrors["newUsername"]) {
+                                          setFieldErrors(prev => ({ ...prev, newUsername: "" }));
+                                        }
+                                      }}
+                                      onFocus={() => setFocusedField("newUsername")}
+                                      onBlur={() => setFocusedField(null)}
+                                      className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
+                                        fieldErrors["newUsername"]
+                                          ? "border-red-500 focus:ring-red-500/15"
+                                          : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
+                                      } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                                     />
                                   </div>
                                 </div>
@@ -1602,14 +1958,21 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                                 <button
                                   type="submit"
                                   disabled={loading}
-                                  className="w-full bg-slate-900 hover:bg-slate-950 disabled:bg-slate-400 text-white py-3 px-4 rounded-xl font-sans text-xs font-bold shadow-md shadow-black/5 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+                                  className={`relative w-full ${
+                                    loading
+                                      ? "bg-[#FF4D24]/10 border border-[#FF4D24]/30 text-[#FF4D24]"
+                                      : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                                  } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
                                 >
                                   {loading ? (
-                                    <div className="w-4.5 h-4.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                                    <div className="flex items-center gap-2 text-[#FF4D24]">
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span>Đang lưu tên đăng nhập...</span>
+                                    </div>
                                   ) : (
                                     <>
                                       <span>Xác nhận đổi tên đăng nhập</span>
-                                      <ArrowRight className="w-4 h-4" />
+                                      <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
                                     </>
                                   )}
                                 </button>
@@ -1620,15 +1983,15 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       </div>
 
                       {/* Action 2: Reset Password Form (Expandable Account Center style) */}
-                      <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden shadow-sm transition-all duration-300 hover:border-slate-300">
+                      <div className="border-t border-t-white border-b border-b-slate-200/90 border-x border-x-slate-200/80 rounded-2xl bg-gradient-to-b from-white to-slate-50/30 overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all duration-300">
                         {/* Header Trigger */}
                         <button
                           type="button"
                           onClick={() => setIsPasswordResetExpanded(!isPasswordResetExpanded)}
-                          className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50/50 transition-all cursor-pointer"
+                          className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-50/60 transition-colors cursor-pointer"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-[#FF4D24]/10 flex items-center justify-center border border-[#FF4D24]/20 shadow-inner">
+                            <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100/80 flex items-center justify-center shadow-inner">
                               <Lock className="w-4 h-4 text-[#FF4D24]" />
                             </div>
                             <div>
@@ -1652,67 +2015,145 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.25, ease: "easeInOut" }}
+                              transition={{ duration: 0.2, ease: "easeInOut" }}
                               className="overflow-hidden"
                             >
                               <form
                                 onSubmit={handleResetPassword}
-                                className="px-4 pb-5 pt-1 flex flex-col gap-4 border-t border-slate-100"
+                                noValidate
+                                className="px-3.5 pb-4 pt-1 flex flex-col gap-3.5 border-t border-slate-100"
                               >
-                                <div className="flex flex-col gap-1.5">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="new-password">
+                                <div className="flex flex-col gap-1.5 text-left">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="new-password">
                                     Mật khẩu mới
                                   </label>
-                                  <div className="relative">
-                                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                                  <div 
+                                    className="relative"
+                                    onMouseEnter={() => setHoveredField("newPassword")}
+                                    onMouseLeave={() => setHoveredField(null)}
+                                  >
+                                    <HoverMorphIcon
+                                      defaultIcon={MorphLock}
+                                      hoverIcon={MorphKeyRound}
+                                      isHovered={focusedField === "newPassword" || hoveredField === "newPassword" || Boolean(recoveryNewPassword)}
+                                      size={16}
+                                      className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                        fieldErrors["newPassword"] ? "text-red-500" : focusedField === "newPassword" ? "text-[#FF4D24]" : "text-slate-400"
+                                      }`}
+                                    />
                                     <input
                                       id="new-password"
                                       type={showPassword ? "text" : "password"}
                                       placeholder="Tối thiểu 6 ký tự"
-                                      required
                                       value={recoveryNewPassword}
-                                      onChange={(e) => setRecoveryNewPassword(e.target.value)}
-                                      className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
+                                      onChange={(e) => {
+                                        setRecoveryNewPassword(e.target.value);
+                                        if (fieldErrors["newPassword"]) {
+                                          setFieldErrors(prev => ({ ...prev, newPassword: "" }));
+                                        }
+                                      }}
+                                      onFocus={() => setFocusedField("newPassword")}
+                                      onBlur={() => setFocusedField(null)}
+                                      className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
+                                        fieldErrors["newPassword"]
+                                          ? "border-red-500 focus:ring-red-500/15"
+                                          : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
+                                      } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                                     />
                                     <button
                                       type="button"
                                       onClick={() => setShowPassword(!showPassword)}
-                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1 transition-colors"
                                     >
-                                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                      <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} size={16} />
                                     </button>
                                   </div>
+                                  <AnimatePresence>
+                                    {fieldErrors["newPassword"] && (
+                                      <motion.p
+                                        initial={{ opacity: 0, y: -4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -4 }}
+                                        className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1"
+                                      >
+                                        <AlertCircle className="w-3 h-3 inline shrink-0 text-red-500" />
+                                        <span>{fieldErrors["newPassword"]}</span>
+                                      </motion.p>
+                                    )}
+                                  </AnimatePresence>
                                 </div>
 
-                                <div className="flex flex-col gap-1.5">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="confirm-new-password">
+                                <div className="flex flex-col gap-1.5 text-left">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="confirm-new-password">
                                     Xác nhận mật khẩu mới
                                   </label>
-                                  <div className="relative">
-                                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                                  <div 
+                                    className="relative"
+                                    onMouseEnter={() => setHoveredField("confirmPassword")}
+                                    onMouseLeave={() => setHoveredField(null)}
+                                  >
+                                    <HoverMorphIcon
+                                      defaultIcon={MorphLock}
+                                      hoverIcon={MorphKeyRound}
+                                      isHovered={focusedField === "confirmPassword" || hoveredField === "confirmPassword" || Boolean(recoveryConfirmPassword)}
+                                      size={16}
+                                      className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                        fieldErrors["confirmPassword"] ? "text-red-500" : focusedField === "confirmPassword" ? "text-[#FF4D24]" : "text-slate-400"
+                                      }`}
+                                    />
                                     <input
                                       id="confirm-new-password"
                                       type={showPassword ? "text" : "password"}
                                       placeholder="Nhập lại mật khẩu mới"
-                                      required
                                       value={recoveryConfirmPassword}
-                                      onChange={(e) => setRecoveryConfirmPassword(e.target.value)}
-                                      className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111]"
+                                      onChange={(e) => {
+                                        setRecoveryConfirmPassword(e.target.value);
+                                        if (fieldErrors["confirmPassword"]) {
+                                          setFieldErrors(prev => ({ ...prev, confirmPassword: "" }));
+                                        }
+                                      }}
+                                      onFocus={() => setFocusedField("confirmPassword")}
+                                      onBlur={() => setFocusedField(null)}
+                                      className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
+                                        fieldErrors["confirmPassword"]
+                                          ? "border-red-500 focus:ring-red-500/15"
+                                          : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
+                                      } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                                     />
                                   </div>
+                                  <AnimatePresence>
+                                    {fieldErrors["confirmPassword"] && (
+                                      <motion.p
+                                        initial={{ opacity: 0, y: -4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -4 }}
+                                        className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1"
+                                      >
+                                        <AlertCircle className="w-3 h-3 inline shrink-0 text-red-500" />
+                                        <span>{fieldErrors["confirmPassword"]}</span>
+                                      </motion.p>
+                                    )}
+                                  </AnimatePresence>
                                 </div>
 
                                 <button
                                   type="submit"
                                   disabled={loading}
-                                  className="w-full bg-[#FF4D24] hover:bg-[#E03D16] disabled:bg-slate-400 text-white py-3 px-4 rounded-xl font-sans text-xs font-bold shadow-md shadow-black/5 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+                                  className={`relative w-full ${
+                                    loading
+                                      ? "bg-[#FF4D24]/10 border border-[#FF4D24]/30 text-[#FF4D24]"
+                                      : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                                  } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
                                 >
                                   {loading ? (
-                                    <div className="w-4.5 h-4.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                                    <div className="flex items-center gap-2 text-[#FF4D24]">
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span>Đang cập nhật mật khẩu...</span>
+                                    </div>
                                   ) : (
                                     <>
                                       <span>Xác nhận đổi mật khẩu</span>
-                                      <ArrowRight className="w-4 h-4" />
+                                      <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
                                     </>
                                   )}
                                 </button>
@@ -1723,17 +2164,18 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       </div>
                     </div>
 
-                    <div className="text-center pt-2 border-t border-slate-200/50">
+                    <div className="pt-2 border-t border-slate-200/60 text-center">
                       <button
                         type="button"
                         onClick={() => {
+                          window.location.hash = "login";
                           setRecoveryMode("NONE");
                           setRecoveryToken("");
                           setRecoveryUser(null);
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="text-xs font-bold text-slate-500 hover:text-[#FF4D24] transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto"
+                        className="text-xs font-semibold text-slate-500 hover:text-[#FF4D24] transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 mx-auto py-0.5"
                       >
                         <ArrowRight className="w-3.5 h-3.5 rotate-180" />
                         <span>Quay lại trang Đăng nhập</span>
@@ -1741,12 +2183,15 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4 py-4 text-center">
+                  <div className="space-y-3.5 py-4 text-center">
                     <p className="text-xs text-slate-500 font-medium">Không tìm thấy thông tin tài khoản khôi phục.</p>
                     <button
                       type="button"
-                      onClick={() => setRecoveryMode("SEND_LINK")}
-                      className="text-xs font-bold text-indigo-600 hover:text-[#FF4D24]"
+                      onClick={() => {
+                        window.location.hash = "recovery";
+                        setRecoveryMode("SEND_LINK");
+                      }}
+                      className="text-xs font-bold text-[#FF4D24] hover:underline"
                     >
                       Quay lại gửi liên kết
                     </button>
@@ -1942,14 +2387,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 className="space-y-6"
               >
                 {/* Tab Switcher: Sign In vs Sign Up */}
-                <div className="flex items-center p-1 bg-slate-200/60 rounded-xl mb-6 relative">
+                <div className="flex items-center p-1 bg-gradient-to-b from-slate-200/60 via-slate-200/40 to-slate-100/25 dark:from-zinc-900/60 dark:via-zinc-850/45 dark:to-zinc-800/35 rounded-xl mb-6 relative border border-t-slate-300/60 border-b-white/80 border-x-slate-200/50 dark:border-t-black/40 dark:border-b-white/10 dark:border-x-white/5 shadow-[inset_0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_3px_rgba(0,0,0,0.025),inset_0_-1px_1.5px_rgba(255,255,255,0.6),0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.3),inset_0_1px_3px_rgba(0,0,0,0.2),inset_0_-1px_0_rgba(255,255,255,0.05)]">
                   <div
-                    className="absolute rounded-lg bg-white shadow-sm pointer-events-none"
+                    className="absolute rounded-lg bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/[0.04] dark:border-white/10 pointer-events-none"
                     style={{
                       top: 4, bottom: 4,
                       left: isSignUp ? "50%" : 4,
                       right: isSignUp ? 4 : "50%",
-                      transition: "left 0.25s ease, right 0.25s ease",
+                      transition: "left 0.22s cubic-bezier(0.16, 1, 0.3, 1), right 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
                     }}
                   />
                   <button
@@ -1961,8 +2406,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       setSuccessMsg("");
                     }}
                     type="button"
-                    className={`flex-1 py-2 text-xs font-black rounded-lg relative z-10 cursor-pointer transition-colors duration-250 ${
-                      !isSignUp ? "text-slate-950" : "text-slate-500"
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg relative z-10 cursor-pointer transition-colors duration-200 ${
+                      !isSignUp ? "text-slate-950 dark:text-white" : "text-slate-500 hover:text-slate-700 dark:text-zinc-400"
                     }`}
                   >
                     Đăng nhập
@@ -1976,8 +2421,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       setSuccessMsg("");
                     }}
                     type="button"
-                    className={`flex-1 py-2 text-xs font-black rounded-lg relative z-10 cursor-pointer transition-colors duration-250 ${
-                      isSignUp ? "text-slate-950" : "text-slate-500"
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg relative z-10 cursor-pointer transition-colors duration-200 ${
+                      isSignUp ? "text-slate-950 dark:text-white" : "text-slate-500 hover:text-slate-700 dark:text-zinc-400"
                     }`}
                   >
                     Đăng ký
@@ -1996,19 +2441,6 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   </p>
                 </div>
 
-                {/* Success / Error Messages */}
-                {errorMsg && Object.keys(fieldErrors).length === 0 && (
-                  <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-semibold flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-                {successMsg && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{successMsg}</span>
-                  </div>
-                )}
 
                 {/* Primary Form */}
                 <form onSubmit={handleFormSubmit} noValidate className="flex flex-col gap-4">
@@ -2020,20 +2452,34 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-username">
                         Tên đăng nhập
                       </label>
-                      <div className="relative">
-                        <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <div 
+                        className="relative"
+                        onMouseEnter={() => setHoveredField("su-username")}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <HoverMorphIcon
+                          defaultIcon={MorphUser}
+                          hoverIcon={MorphAtSign}
+                          isHovered={focusedField === "su-username" || hoveredField === "su-username" || Boolean(username)}
+                          size={16}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                            focusedField === "su-username" ? "text-[#FF4D24]" : "text-slate-400"
+                          }`}
+                        />
                         <input
                           id="su-username"
                           type="text"
                           placeholder="Nhập tên đăng nhập"
                           value={username}
+                          onFocus={() => setFocusedField("su-username")}
+                          onBlur={() => setFocusedField(null)}
                           onChange={(e) => {
                             setUsername(e.target.value);
                             if (fieldErrors["username"] || fieldErrors["name"]) {
                               setFieldErrors(prev => ({ ...prev, username: "", name: "" }));
                             }
                           }}
-                          className={`w-full bg-white border ${fieldErrors["username"] || fieldErrors["name"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["username"] || fieldErrors["name"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                         />
                       </div>
                       {(fieldErrors["username"] || fieldErrors["name"]) && (
@@ -2048,18 +2494,32 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-fullname">
                         Họ và Tên đầy đủ
                       </label>
-                      <div className="relative">
-                        <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <div 
+                        className="relative"
+                        onMouseEnter={() => setHoveredField("su-fullname")}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <HoverMorphIcon
+                          defaultIcon={MorphCircleUser}
+                          hoverIcon={MorphIdCard}
+                          isHovered={focusedField === "su-fullname" || hoveredField === "su-fullname" || Boolean(fullName)}
+                          size={16}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                            focusedField === "su-fullname" ? "text-[#FF4D24]" : "text-slate-400"
+                          }`}
+                        />
                         <input
                           id="su-fullname"
                           type="text"
                           placeholder="Họ và tên đầy đủ"
                           value={fullName}
+                          onFocus={() => setFocusedField("su-fullname")}
+                          onBlur={() => setFocusedField(null)}
                           onChange={(e) => {
                             setFullName(e.target.value);
                             if (fieldErrors["fullName"]) setFieldErrors(prev => ({ ...prev, fullName: "" }));
                           }}
-                          className={`w-full bg-white border ${fieldErrors["fullName"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["fullName"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                         />
                       </div>
                       {fieldErrors["fullName"] && (
@@ -2074,18 +2534,32 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-email">
                         Địa chỉ Email
                       </label>
-                      <div className="relative">
-                        <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <div 
+                        className="relative"
+                        onMouseEnter={() => setHoveredField("su-email")}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <HoverMorphIcon
+                          defaultIcon={MorphMail}
+                          hoverIcon={MorphMailCheck}
+                          isHovered={focusedField === "su-email" || hoveredField === "su-email" || Boolean(email)}
+                          size={16}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                            focusedField === "su-email" ? "text-[#FF4D24]" : "text-slate-400"
+                          }`}
+                        />
                         <input
                           id="su-email"
                           type="email"
                           placeholder="Địa chỉ email"
                           value={email}
+                          onFocus={() => setFocusedField("su-email")}
+                          onBlur={() => setFocusedField(null)}
                           onChange={(e) => {
                             setEmail(e.target.value);
                             if (fieldErrors["email"]) setFieldErrors(prev => ({ ...prev, email: "" }));
                           }}
-                          className={`w-full bg-white border ${fieldErrors["email"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                         />
                       </div>
                       {fieldErrors["email"] && (
@@ -2100,21 +2574,35 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-password">
                         Mật khẩu
                       </label>
-                      <div className="relative">
-                        <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <div 
+                        className="relative"
+                        onMouseEnter={() => setHoveredField("su-password")}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <HoverMorphIcon
+                          defaultIcon={MorphLock}
+                          hoverIcon={MorphKeyRound}
+                          isHovered={focusedField === "su-password" || hoveredField === "su-password" || Boolean(password)}
+                          size={16}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                            focusedField === "su-password" ? "text-[#FF4D24]" : "text-slate-400"
+                          }`}
+                        />
                         <input
                           id="su-password"
                           type={showPassword ? "text" : "password"}
                           placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
                           value={password}
+                          onFocus={() => setFocusedField("su-password")}
+                          onBlur={() => setFocusedField(null)}
                           onChange={(e) => {
                             setPassword(e.target.value);
                             if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
                           }}
-                          className={`w-full bg-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                         />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
+                          <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
                         </button>
                       </div>
                       {fieldErrors["password"] && (
@@ -2129,18 +2617,32 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-confirm">
                         Xác nhận mật khẩu
                       </label>
-                      <div className="relative">
-                        <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <div 
+                        className="relative"
+                        onMouseEnter={() => setHoveredField("su-confirm")}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <HoverMorphIcon
+                          defaultIcon={MorphShieldCheck}
+                          hoverIcon={MorphCheckCheck}
+                          isHovered={focusedField === "su-confirm" || hoveredField === "su-confirm" || Boolean(confirmPassword)}
+                          size={16}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                            focusedField === "su-confirm" ? "text-[#FF4D24]" : "text-slate-400"
+                          }`}
+                        />
                         <input
                           id="su-confirm"
                           type={showPassword ? "text" : "password"}
                           placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
                           value={confirmPassword}
+                          onFocus={() => setFocusedField("su-confirm")}
+                          onBlur={() => setFocusedField(null)}
                           onChange={(e) => {
                             setConfirmPassword(e.target.value);
                             if (fieldErrors["confirmPassword"]) setFieldErrors(prev => ({ ...prev, confirmPassword: "" }));
                           }}
-                          className={`w-full bg-white border ${fieldErrors["confirmPassword"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["confirmPassword"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                         />
                       </div>
                       {fieldErrors["confirmPassword"] && (
@@ -2170,20 +2672,34 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="li-email">
                         Tên đăng nhập hoặc Email
                       </label>
-                      <div className="relative">
-                        <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <div 
+                        className="relative"
+                        onMouseEnter={() => setHoveredField("li-email")}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <HoverMorphIcon
+                          defaultIcon={MorphCircleUser}
+                          hoverIcon={MorphAtSign}
+                          isHovered={focusedField === "li-email" || hoveredField === "li-email" || Boolean(email)}
+                          size={16}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                            focusedField === "li-email" ? "text-[#FF4D24]" : "text-slate-400"
+                          }`}
+                        />
                         <input
                           id="li-email"
                           type="text"
                           placeholder="Email hoặc tên đăng nhập"
                           value={email}
+                          onFocus={() => setFocusedField("li-email")}
+                          onBlur={() => setFocusedField(null)}
                           onChange={(e) => {
                             setEmail(e.target.value);
                             if (fieldErrors["email"] || fieldErrors["usernameOrEmail"]) {
                               setFieldErrors(prev => ({ ...prev, email: "", usernameOrEmail: "" }));
                             }
                           }}
-                          className={`w-full bg-white border ${fieldErrors["email"] || fieldErrors["usernameOrEmail"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] || fieldErrors["usernameOrEmail"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                         />
                       </div>
                       {(fieldErrors["email"] || fieldErrors["usernameOrEmail"]) && (
@@ -2199,25 +2715,39 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="li-password">
                           Mật khẩu
                         </label>
-                        <button type="button" onClick={() => { setRecoveryMode("SEND_LINK"); setErrorMsg(""); setSuccessMsg(""); if (email && email.includes("@")) setRecoveryEmail(email); }} className="text-[10px] font-bold text-[#FF4D24] hover:underline cursor-pointer">
+                        <button type="button" onClick={() => { window.location.hash = "recovery"; setRecoveryMode("SEND_LINK"); setErrorMsg(""); setSuccessMsg(""); if (email && email.includes("@")) setRecoveryEmail(email); }} className="text-[10px] font-bold text-[#FF4D24] hover:underline cursor-pointer">
                           Quên thông tin tài khoản?
                         </button>
                       </div>
-                      <div className="relative">
-                        <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <div 
+                        className="relative"
+                        onMouseEnter={() => setHoveredField("li-password")}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <HoverMorphIcon
+                          defaultIcon={MorphLock}
+                          hoverIcon={MorphKeyRound}
+                          isHovered={focusedField === "li-password" || hoveredField === "li-password" || Boolean(password)}
+                          size={16}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                            focusedField === "li-password" ? "text-[#FF4D24]" : "text-slate-400"
+                          }`}
+                        />
                         <input
                           id="li-password"
                           type={showPassword ? "text" : "password"}
                           placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
                           value={password}
+                          onFocus={() => setFocusedField("li-password")}
+                          onBlur={() => setFocusedField(null)}
                           onChange={(e) => {
                             setPassword(e.target.value);
                             if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
                           }}
-                          className={`w-full bg-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
                         />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
+                          <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
                         </button>
                       </div>
                       {fieldErrors["password"] && (
@@ -2232,15 +2762,33 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className={`relative w-full border ${loading ? "bg-[#FF4D24]/10 border-[#FF4D24]/30 text-[#FF4D24]" : "bg-slate-900 hover:bg-slate-800 border-transparent text-white"} py-3.5 px-4 rounded-xl font-sans text-xs font-bold shadow-md shadow-black/10 transition-all duration-200 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
+                    className={`relative w-full ${
+                      loading
+                        ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
+                        : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                    } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
                   >
-                    <span className="flex items-center justify-center gap-2 transition-opacity duration-200" style={{ opacity: loading ? 0 : 1 }}>
+                    {loading && <DynamicButtonShimmer />}
+                    <span 
+                      className="flex items-center justify-center gap-2 transition-all duration-200" 
+                      style={{ 
+                        opacity: loading ? 0 : 1,
+                        transform: loading ? "translateY(-6px) scale(0.96)" : "translateY(0px) scale(1)",
+                        pointerEvents: loading ? "none" : "auto"
+                      }}
+                    >
                       <span>{isSignUp ? "Tạo tài khoản" : "Đăng nhập"}</span>
                       <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
                     </span>
-                    <span className="absolute inset-0 flex items-center justify-center gap-2.5 text-[#FF4D24] transition-opacity duration-200" style={{ opacity: loading ? 1 : 0 }}>
-                      <Loader2 className="w-4 h-4 text-[#FF4D24] animate-spin" />
-                      <span>{isSignUp ? "Đang khởi tạo tài khoản..." : "Đang đăng nhập..."}</span>
+                    <span 
+                      className="absolute inset-0 flex items-center justify-center text-white transition-all duration-200" 
+                      style={{ 
+                        opacity: loading ? 1 : 0,
+                        transform: loading ? "translateY(0px) scale(1)" : "translateY(6px) scale(0.96)",
+                        pointerEvents: loading ? "auto" : "none"
+                      }}
+                    >
+                      <DynamicButtonLoader text={isSignUp ? "Đang khởi tạo tài khoản" : "Đang đăng nhập"} />
                     </span>
                   </button>
                 </form>
@@ -2260,7 +2808,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 <div className="grid grid-cols-2 gap-3.5">
                   <button
                     onClick={() => handleSocialLogin("Google")}
-                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer"
+                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border-t border-t-white border-b border-b-slate-300/40 border-x border-x-white/70 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
@@ -2272,7 +2820,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   </button>
                   <button
                     onClick={() => handleSocialLogin("GitHub")}
-                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer"
+                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border-t border-t-white border-b border-b-slate-300/40 border-x border-x-white/70 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />

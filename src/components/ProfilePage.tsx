@@ -7,7 +7,7 @@ import {
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
   Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
-  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark, ShoppingCart
+  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Crown
 } from "lucide-react";
 import { apiRequest, unifiedFetch, getUnifiedAccessToken } from "../lib/api";
 import { STORAGE_KEYS } from "../lib/storageKeys";
@@ -35,6 +35,18 @@ import {
   sortBookmarksNewestFirst,
 } from "../services/bookmarkService";
 import { addToCart } from "../services/cartService";
+import {
+  getMyOrders,
+  getOrderDetail,
+  normalizeOrderDtoToUiItem,
+  normalizeSummaryToUiItem,
+  UiOrderItem,
+  saveCachedOrders,
+  getCachedOrders,
+  OrderStatus,
+  OrderItemDto
+} from "../services/orderService";
+import { getOrderStatusTheme } from "../lib/orderStatusTheme";
 import { Bevel, BevelButton, BevelDivider } from "./ui/bevel";
 import { 
   Sliders as LucideSliders,
@@ -52,25 +64,18 @@ import { MorphIcon } from "morphicons/react";
 import { HoverMorphIcon } from "./ui/HoverMorphIcon";
 
 
-interface OrderItem {
-  id: string;
-  name: string;
-  price: string;
-  date: string;
-  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
-  statusText: string;
-  estimatedDelivery?: string;
-  deliverySteps: {
-    title: string;
-    desc: string;
-    time: string;
-    completed: boolean;
-    active: boolean;
-  }[];
-  shippingAddress: string;
-  carrier: string;
-  trackingNumber: string;
-}
+export type OrderItem = UiOrderItem;
+
+export const STATUS_FILTER_OPTIONS = [
+  { id: "ALL", label: "Tất cả" },
+  { id: "PENDING", label: "Chờ thanh toán" },
+  { id: "PROCESSING", label: "Đang xử lý" },
+  { id: "SHIPPED", label: "Đang giao" },
+  { id: "DELIVERED", label: "Đã giao" },
+  { id: "CANCELLED", label: "Đã hủy" },
+] as const;
+
+export type StatusFilterType = (typeof STATUS_FILTER_OPTIONS)[number]["id"];
 
 interface ProfilePageProps {
   onNavigate: (page: "landing" | "product" | "order" | "cart" | "auth" | "auth-report" | "profile" | "terms") => void;
@@ -128,6 +133,51 @@ function SequentialTagMorphIcon({ isHovered }: { isHovered: boolean }) {
   );
 }
 
+function getMembershipRankInfo(user: any) {
+  const rawRank = (user?.rank || "").trim().toUpperCase();
+  const username = (user?.username || "").trim().toUpperCase();
+  const email = (user?.email || "").trim().toUpperCase();
+  const isAdmin = username.includes("ADMIN") || email.includes("ADMIN") || 
+    (Array.isArray(user?.roles) && user.roles.some((r: any) => String(r).toUpperCase().includes("ADMIN")));
+  
+  const rank = rawRank || (isAdmin ? "GOLD" : "MEMBER");
+
+  switch (rank) {
+    case "PLATINUM":
+    case "DIAMOND":
+      return {
+        label: "Hạng Bạch Kim",
+        badgeClass: "text-sky-700 bg-gradient-to-b from-sky-50 to-sky-100/80 border-t-white border-b-sky-300/80 border-x-sky-200/70 shadow-[0_1px_2px_rgba(14,165,233,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        iconColor: "text-sky-500",
+      };
+    case "GOLD":
+      return {
+        label: "Hạng Vàng",
+        badgeClass: "text-amber-800 bg-gradient-to-b from-amber-50 to-amber-100/80 border-t-white border-b-amber-300/80 border-x-amber-200/80 shadow-[0_1px_2px_rgba(245,158,11,0.14),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        iconColor: "text-amber-500",
+      };
+    case "SILVER":
+      return {
+        label: "Hạng Bạc",
+        badgeClass: "text-slate-700 bg-gradient-to-b from-slate-50 to-slate-100/80 border-t-white border-b-slate-300 border-x-slate-200 shadow-[0_1px_2px_rgba(100,116,139,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        iconColor: "text-slate-400",
+      };
+    case "BRONZE":
+      return {
+        label: "Hạng Đồng",
+        badgeClass: "text-orange-900 bg-gradient-to-b from-orange-50 to-amber-100/70 border-t-white border-b-orange-200 border-x-orange-100 shadow-[0_1px_2px_rgba(194,65,12,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        iconColor: "text-orange-500",
+      };
+    case "MEMBER":
+    default:
+      return {
+        label: "Hội viên Horizon",
+        badgeClass: "text-[#FF4D24] bg-gradient-to-b from-rose-50 to-red-100/60 border-t-white border-b-red-200 border-x-red-100 shadow-[0_1px_2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        iconColor: "text-[#FF4D24]",
+      };
+  }
+}
+
 export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   // Authentication status
   const [token, setToken] = useState<string>("");
@@ -149,25 +199,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [bookmarkActionLoading, setBookmarkActionLoading] = useState<string>("");
   const [isSecurityBtnHovered, setIsSecurityBtnHovered] = useState<boolean>(false);
   const [isAddressHovered, setIsAddressHovered] = useState<boolean>(false);
-  const [isNavbarVisible, setIsNavbarVisible] = useState<boolean>(() => {
-    if (typeof window !== "undefined" && typeof (window as any).__isNavbarVisible === "boolean") {
-      return (window as any).__isNavbarVisible;
-    }
-    return false;
-  });
 
-  // Listen to navbar-visibility-change to toggle breadcrumb visibility
-  useEffect(() => {
-    const handleNavVisibility = (e: any) => {
-      if (typeof e.detail?.isVisible === "boolean") {
-        setIsNavbarVisible(e.detail.isVisible);
-      }
-    };
-    window.addEventListener("navbar-visibility-change", handleNavVisibility);
-    return () => {
-      window.removeEventListener("navbar-visibility-change", handleNavVisibility);
-    };
-  }, []);
 
   // Listen to open-accounts-center event from Navbar
   useEffect(() => {
@@ -179,9 +211,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setIsAccountsCenterOpen(true);
     };
     const getBasePath = () => {
-      if (typeof window === "undefined") return "/a";
+      if (typeof window === "undefined") return "/m";
       const p = window.location.pathname.toLowerCase().replace(/\/$/, "");
-      return ["/profile", "/account", "/accounts"].includes(p) ? "/a" : (p || "/a");
+      return ["/profile", "/account", "/accounts", "/me"].includes(p) ? "/m" : (p || "/m");
     };
 
     const handleCloseAccountsCenter = () => {
@@ -213,7 +245,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     if (typeof window === "undefined") return;
 
     const base = window.location.pathname.toLowerCase().replace(/\/$/, "");
-    const safeBase = ["/profile", "/account", "/accounts"].includes(base) ? "/a" : (base || "/a");
+    const safeBase = ["/profile", "/account", "/accounts", "/me"].includes(base) ? "/m" : (base || "/m");
 
     if (!isAccountsCenterOpen) {
       if (window.location.hash) {
@@ -458,9 +490,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     isDefault: false
   });
 
-  // Orders list and active selected order for detail tracking view
+  // Orders list, status filter, and active selected order for detail tracking view
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilterType>("ALL");
+  const [isOrdersSyncing, setIsOrdersSyncing] = useState<boolean>(false);
   const activeOrder = orders.find(o => o.id === selectedOrderId);
   const isOrderDelivered = activeOrder?.status === "delivered";
 
@@ -494,6 +528,43 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const displayedSteps = !activeOrder ? [] : isOrderDelivered 
     ? (activeOrder.deliverySteps || [])
     : (activeOrder.deliverySteps || []).slice(0, Math.min(activeOrder.deliverySteps?.length || 0, endpointIndex + 2));
+
+  // Helper tính toán số lượng cho từng bộ lọc trạng thái
+  const getFilterCount = (filterId: string): number => {
+    if (filterId === "ALL") return orders.length;
+    if (filterId === "PENDING") return orders.filter(o => o.status === "pending" || o.statusText.includes("Chờ")).length;
+    if (filterId === "PROCESSING") return orders.filter(o => o.status === "processing" || o.statusText.includes("xử lý") || o.statusText.includes("chuẩn bị")).length;
+    if (filterId === "SHIPPED") return orders.filter(o => o.status === "shipped" || o.statusText.includes("vận chuyển") || o.statusText.includes("giao")).length;
+    if (filterId === "DELIVERED") return orders.filter(o => o.status === "delivered" || o.statusText.includes("thành công") || o.statusText.includes("Hoàn tất")).length;
+    if (filterId === "CANCELLED") return orders.filter(o => o.status === "cancelled" || o.statusText.includes("hủy") || o.statusText.includes("hoàn tiền")).length;
+    return 0;
+  };
+
+  const filteredOrders = orders.filter(item => {
+    if (statusFilter === "ALL") return true;
+    if (statusFilter === "PENDING") return item.status === "pending" || item.statusText.includes("Chờ");
+    if (statusFilter === "PROCESSING") return item.status === "processing" || item.statusText.includes("xử lý") || item.statusText.includes("chuẩn bị");
+    if (statusFilter === "SHIPPED") return item.status === "shipped" || item.statusText.includes("vận chuyển") || item.statusText.includes("giao");
+    if (statusFilter === "DELIVERED") return item.status === "delivered" || item.statusText.includes("thành công") || item.statusText.includes("Hoàn tất");
+    if (statusFilter === "CANCELLED") return item.status === "cancelled" || item.statusText.includes("hủy") || item.statusText.includes("hoàn tiền");
+    return true;
+  });
+
+  const activeTheme = getOrderStatusTheme(activeOrder?.statusText || activeOrder?.status);
+
+  // Scroll fades & keyboard navigation for filter pills bar
+  const [showFilterLeftFade, setShowFilterLeftFade] = useState<boolean>(false);
+  const [showFilterRightFade, setShowFilterRightFade] = useState<boolean>(true);
+  const filterPillsRef = useRef<HTMLDivElement>(null);
+
+  const handleFilterScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollLeft = target.scrollLeft;
+    const maxScroll = Math.max(0, target.scrollWidth - target.clientWidth);
+    setShowFilterLeftFade(scrollLeft > 4);
+    setShowFilterRightFade(scrollLeft < maxScroll - 4);
+  };
+
 
   // Scroll fades state for orders list container
   const [showTopFade, setShowTopFade] = useState<boolean>(false);
@@ -545,6 +616,74 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     setShowStepsBottomFade(maxScroll > 12 && scrollTop < maxScroll - 12);
   };
 
+  // Đồng bộ danh sách đơn hàng từ GraphQL Gateway
+  const syncOrdersFromGraphQL = useCallback(async (filter: StatusFilterType = "ALL") => {
+    setIsOrdersSyncing(true);
+    try {
+      const res = await getMyOrders({
+        status: filter !== "ALL" ? (filter as OrderStatus) : undefined,
+        page: 1,
+        size: 50,
+        sortBy: "auditInfo.createdAt",
+        sortDirection: "DESC",
+      });
+
+      if (res?.data?.contents && res.data.contents.length > 0) {
+        const serverOrders = res.data.contents.map(normalizeSummaryToUiItem);
+        setOrders(prevOrders => {
+          const merged = [...serverOrders];
+          prevOrders.forEach(localOrder => {
+            const idx = merged.findIndex(o => o.id === localOrder.id);
+            if (idx !== -1) {
+              merged[idx] = {
+                ...localOrder,
+                ...merged[idx],
+                shippingAddress: (localOrder.shippingAddress && localOrder.shippingAddress !== "Đang tải địa chỉ nhận hàng...") ? localOrder.shippingAddress : (merged[idx].shippingAddress || localOrder.shippingAddress),
+                deliverySteps: (localOrder.deliverySteps && localOrder.deliverySteps.length > 0) ? localOrder.deliverySteps : merged[idx].deliverySteps,
+                rawOrder: localOrder.rawOrder || merged[idx].rawOrder,
+                orderItemsList: localOrder.orderItemsList || merged[idx].orderItemsList
+              };
+            } else if (filter === "ALL") {
+              merged.push(localOrder);
+            }
+          });
+          saveCachedOrders(merged);
+          return merged;
+        });
+      }
+    } catch (err) {
+      console.warn("GraphQL sync orders error:", err);
+    } finally {
+      setIsOrdersSyncing(false);
+    }
+  }, []);
+
+  // Lấy chi tiết đơn hàng (orderItems, statusHistory, paymentMethod) từ GraphQL
+  const fetchOrderDetailFromGateway = useCallback(async (orderId: string) => {
+    if (!orderId) return;
+    try {
+      const detailDto = await getOrderDetail(orderId);
+      if (detailDto && detailDto.orderNumber) {
+        const detailedUiItem = normalizeOrderDtoToUiItem(detailDto);
+        setOrders(prev => {
+          const next = prev.map(o => o.id === orderId ? { ...o, ...detailedUiItem } : o);
+          saveCachedOrders(next);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.warn("GraphQL fetch order detail error:", err);
+    }
+  }, []);
+
+  const handleSelectOrder = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    const target = orders.find(o => o.id === orderId);
+    if (target && (!target.orderItemsList || target.orderItemsList.length === 0)) {
+      fetchOrderDetailFromGateway(orderId);
+    }
+  };
+
   const scrollToEndpoint = useCallback(() => {
     if (stepsContainerRef.current) {
       const container = stepsContainerRef.current;
@@ -588,6 +727,120 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   useEffect(() => {
     loadProfileAndOrders();
   }, []);
+
+  // Smart Interval Polling for active order tracking & background refresh
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        const hasActiveOrders = orders.some(o => o.status === "pending" || o.status === "processing" || o.status === "shipped");
+        if (hasActiveOrders) {
+          syncOrdersFromGraphQL(statusFilter);
+          if (selectedOrderId) {
+            fetchOrderDetailFromGateway(selectedOrderId);
+          }
+        }
+      }
+    }, 25000);
+
+    return () => clearInterval(pollInterval);
+  }, [orders, statusFilter, selectedOrderId, syncOrdersFromGraphQL, fetchOrderDetailFromGateway]);
+
+  // Auto scroll active filter pill into visible area when statusFilter changes
+  useEffect(() => {
+    if (!filterPillsRef.current) return;
+    const container = filterPillsRef.current;
+    const activeBtn = container.querySelector(`[data-filter-id="${statusFilter}"]`) as HTMLElement;
+    if (activeBtn) {
+      const btnLeft = activeBtn.offsetLeft;
+      const btnWidth = activeBtn.offsetWidth;
+      const containerScroll = container.scrollLeft;
+      const containerWidth = container.clientWidth;
+
+      if (btnLeft < containerScroll) {
+        container.scrollTo({ left: Math.max(0, btnLeft - 16), behavior: "smooth" });
+      } else if (btnLeft + btnWidth > containerScroll + containerWidth) {
+        container.scrollTo({ left: btnLeft + btnWidth - containerWidth + 16, behavior: "smooth" });
+      }
+    }
+  }, [statusFilter]);
+
+  const prevStatusFilterRef = useRef<StatusFilterType>(statusFilter);
+
+  // Tự động chọn (Select) thẻ đơn hàng đầu tiên:
+  // 1. Ngay khi load trang / mount component hoặc khi orders được nạp từ cache/API
+  // 2. Mỗi khi người dùng chuyển đổi tab lọc trạng thái (luôn chọn card đầu tiên của tab mới)
+  // 3. Khi đơn hàng đang chọn không còn tồn tại hoặc không khớp với tab hiện tại
+  useEffect(() => {
+    if (orders.length === 0) {
+      setSelectedOrderId("");
+      return;
+    }
+
+    const filterChanged = prevStatusFilterRef.current !== statusFilter;
+    prevStatusFilterRef.current = statusFilter;
+
+    const matchingOrders = orders.filter(item => {
+      if (statusFilter === "ALL") return true;
+      if (statusFilter === "PENDING") return item.status === "pending" || item.statusText.includes("Chờ");
+      if (statusFilter === "PROCESSING") return item.status === "processing" || item.statusText.includes("xử lý") || item.statusText.includes("chuẩn bị");
+      if (statusFilter === "SHIPPED") return item.status === "shipped" || item.statusText.includes("vận chuyển") || item.statusText.includes("giao");
+      if (statusFilter === "DELIVERED") return item.status === "delivered" || item.statusText.includes("thành công") || item.statusText.includes("Hoàn tất");
+      if (statusFilter === "CANCELLED") return item.status === "cancelled" || item.statusText.includes("hủy") || item.statusText.includes("hoàn tiền");
+      return true;
+    });
+
+    if (matchingOrders.length > 0) {
+      const isCurrentSelectedValid = matchingOrders.some(o => o.id === selectedOrderId);
+      
+      // Nếu vừa chuyển tab HOẶC chưa có đơn hàng nào được chọn HOẶC đơn hàng đang chọn không còn nằm trong danh sách bộ lọc
+      if (filterChanged || !selectedOrderId || !isCurrentSelectedValid) {
+        const firstOrder = matchingOrders[0];
+        setSelectedOrderId(firstOrder.id);
+        if (!firstOrder.orderItemsList || firstOrder.orderItemsList.length === 0) {
+          fetchOrderDetailFromGateway(firstOrder.id);
+        }
+      }
+    } else {
+      setSelectedOrderId("");
+    }
+  }, [statusFilter, orders, selectedOrderId, fetchOrderDetailFromGateway]);
+
+  // Keyboard navigation for Filter Pills: A / D hoặc Mũi tên Trái / Phải
+  // Chặn điều hướng khi đã ở mút cuối bên trái hoặc bên phải
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input, textarea or select
+      const activeElement = document.activeElement;
+      if (activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA" || activeElement.tagName === "SELECT")) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+        const currentIndex = STATUS_FILTER_OPTIONS.findIndex(opt => opt.id === statusFilter);
+        // Nếu không phải ở điểm đầu bên trái thì mới cho chuyển tab lùi lại
+        if (currentIndex > 0) {
+          e.preventDefault();
+          const nextFilter = STATUS_FILTER_OPTIONS[currentIndex - 1].id;
+          setStatusFilter(nextFilter);
+          syncOrdersFromGraphQL(nextFilter);
+        }
+      } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+        const currentIndex = STATUS_FILTER_OPTIONS.findIndex(opt => opt.id === statusFilter);
+        // Nếu không phải ở điểm cuối cùng bên phải thì mới cho chuyển tab tiến lên
+        if (currentIndex >= 0 && currentIndex < STATUS_FILTER_OPTIONS.length - 1) {
+          e.preventDefault();
+          const nextFilter = STATUS_FILTER_OPTIONS[currentIndex + 1].id;
+          setStatusFilter(nextFilter);
+          syncOrdersFromGraphQL(nextFilter);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [statusFilter, syncOrdersFromGraphQL]);
+
+
 
   const loadProfileAndOrders = async () => {
     setErrorMsg("");
@@ -783,6 +1036,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       if (activeOrders.length > 0) {
         setSelectedOrderId(activeOrders[0].id);
       }
+
+      // Kích hoạt đồng bộ GraphQL Order ngầm
+      syncOrdersFromGraphQL("ALL");
 
       // Cho phép hiển thị giao diện ngay lập tức thay vì bắt người dùng chờ API
       setIsLoading(false);
@@ -1591,28 +1847,75 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       <div className="absolute top-[30%] right-[-10%] w-[500px] h-[500px] rounded-full bg-gradient-to-br from-indigo-400/30 to-purple-400/30 blur-[120px] pointer-events-none select-none z-0" />
       <div className="absolute bottom-[5%] left-[-10%] w-[550px] h-[550px] rounded-full bg-gradient-to-tr from-[#FF4D24]/15 via-indigo-400/30 to-blue-400/25 blur-[130px] pointer-events-none select-none z-0" />
       
+      {/* Refined Toast Notification Stack - Synchronized Ambient Glassmorphism */}
+      <div className="fixed top-32 right-4 sm:right-6 z-[99999] pointer-events-none flex flex-col items-end gap-2.5 max-w-sm w-full">
+        <AnimatePresence>
+          {(errorMsg || successMsg) && (
+            <motion.div
+              key={errorMsg ? `profile-err-${errorMsg}` : `profile-succ-${successMsg}`}
+              initial={{ opacity: 0, x: 20, scale: 0.96 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 20, scale: 0.96 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="pointer-events-auto relative w-full flex items-center justify-between gap-3 overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 select-none text-left"
+            >
+              {/* Ambient tint overlay identical to /p bottom bar */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/[0.06] via-transparent to-transparent"
+              />
+
+              {/* Left Content: Badge Icon and Message */}
+              <div className="relative z-10 flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
+                  {(() => {
+                    const msg = (errorMsg || successMsg || "").toLowerCase();
+                    if (errorMsg) {
+                      return <AlertCircle className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />;
+                    }
+                    if (msg.includes("bookmark") || msg.includes("phụ kiện")) {
+                      return <Bookmark className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />;
+                    }
+                    if (msg.includes("địa chỉ") || msg.includes("tọa độ") || msg.includes("gps")) {
+                      return <MapPin className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />;
+                    }
+                    if (msg.includes("giỏ hàng")) {
+                      return <ShoppingCart className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />;
+                    }
+                    if (msg.includes("hồ sơ") || msg.includes("tài khoản")) {
+                      return <User className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />;
+                    }
+                    return <CheckCircle2 className="w-4 h-4 text-[#FF4D24] stroke-[2.4]" />;
+                  })()}
+                </div>
+                <span className="font-sans font-bold text-xs sm:text-[13px] text-[#111111] dark:text-white leading-snug">
+                  {errorMsg || successMsg}
+                </span>
+              </div>
+
+              {/* Dismiss button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg("");
+                  setSuccessMsg("");
+                }}
+                className="relative z-10 text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100/60 transition-colors cursor-pointer shrink-0 ml-1"
+                title="Đóng thông báo"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-10 xl:px-12 flex-1 min-h-0 flex flex-col space-y-2.5 pb-1">
         
-        {/* Minimal Navigation Breadcrumb and top control actions (Optimized & Unified with 3D Bevel) */}
+        {/* Top control actions (Optimized & Unified with 3D Bevel, maintaining exact layout height) */}
         <div className="shrink-0 flex flex-col gap-2.5 border-b border-slate-200/60 pb-2.5 select-none">
-          <motion.div 
-            animate={{ 
-              opacity: isNavbarVisible ? 0 : 1,
-              y: isNavbarVisible ? -6 : 0,
-            }}
-            transition={{ 
-              duration: 0.22,
-              ease: "easeOut" 
-            }}
-            style={{ 
-              pointerEvents: isNavbarVisible ? "none" : "auto" 
-            }}
-            className="flex items-center gap-2 text-sm font-bold text-slate-400 min-h-[20px]"
-          >
-            <span className="hover:text-black cursor-pointer transition-colors" onClick={() => onNavigate("landing")}>Trang chủ</span>
-            <span>/</span>
-            <span className="text-[#FF4D24] font-semibold">Cổng tài khoản</span>
-          </motion.div>
+          {/* Preserved spacer: prevents layout shift after breadcrumb removal */}
+          <div className="h-5 min-h-[20px] invisible pointer-events-none select-none" aria-hidden="true" />
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {!isLoading && token && user ? (
@@ -1621,14 +1924,19 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] shrink-0 select-none border-t border-t-white/80 border-b border-b-slate-400/60 border-x border-x-white/50 ring-4 ring-indigo-50/80">
                   {user.fullName ? user.fullName.charAt(0).toUpperCase() : "H"}
                 </div>
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">{user.fullName || "Hội viên Horizon"}</h1>
-                    <span className="text-xs font-bold font-mono text-[#FF4D24] bg-gradient-to-b from-rose-50 to-red-100/60 px-2 py-0.5 rounded-md uppercase border-t border-t-white border-b border-b-red-200 border-x border-x-red-100 shadow-[0_1px_2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]">Live Portal</span>
+                <div className="space-y-1.5">
+                  <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">{user.fullName || "Hội viên Horizon"}</h1>
+                  <div className="flex items-center">
+                    {(() => {
+                      const rankInfo = getMembershipRankInfo(user);
+                      return (
+                        <span className={`text-xs font-bold font-mono px-2.5 py-0.5 rounded-md uppercase border-t border-t-white border-b border-x inline-flex items-center gap-1.5 ${rankInfo.badgeClass}`}>
+                          <Crown className={`w-3.5 h-3.5 shrink-0 ${rankInfo.iconColor}`} />
+                          <span>{rankInfo.label}</span>
+                        </span>
+                      );
+                    })()}
                   </div>
-                  <p className="text-xs text-slate-500 font-medium">
-                    Tên đăng nhập: <span className="font-mono font-bold text-indigo-600">@{user.username || "username"}</span> • Email: <span className="font-semibold text-slate-600">{user.email || "N/A"}</span>
-                  </p>
                 </div>
               </div>
             ) : (
@@ -1706,15 +2014,86 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   <div className="flex items-center gap-2">
                     <ClipboardList className="w-4 h-4 text-[#FF4D24]" />
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Thông tin đơn hàng</h3>
+                    {isOrdersSyncing && (
+                      <RefreshCw className="w-3 h-3 text-[#FF4D24] animate-spin shrink-0" />
+                    )}
                   </div>
-                  <span className="text-[11px] text-indigo-600 font-bold font-mono bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 shadow-[0_1px_2px_rgba(99,102,241,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] px-2.5 py-0.5 rounded-full">{orders.length} Đơn hàng</span>
+                  <span className="text-[11px] text-[#FF4D24] font-bold font-mono bg-gradient-to-b from-orange-50 via-orange-50/80 to-orange-100/60 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100/80 shadow-[0_1px_2px_rgba(255,77,36,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] px-2.5 py-0.5 rounded-full">{orders.length} Đơn hàng</span>
+                </div>
+
+                {/* Status Filter Pills Bar with Concave Sunken Bevel Track & A/D keyboard navigation */}
+                <div className="shrink-0 relative">
+                  {/* Sunken Concave Bevel Track (Rãnh lõm quang học nguyên khối) */}
+                  <div className="bg-slate-200/55 dark:bg-zinc-800/60 p-[2px] rounded-full shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.09),0_1px_0_rgba(255,255,255,0.85)] border-t border-t-black/[0.06] border-b border-b-white/80 border-x border-x-transparent relative">
+                    <div
+                      ref={filterPillsRef}
+                      onScroll={handleFilterScroll}
+                      className="flex items-center gap-1 overflow-x-auto hide-scrollbar transition-all duration-300 relative z-10 py-1 px-1"
+                      style={{
+                        maskImage: `linear-gradient(to right, 
+                          transparent 0%, 
+                          black ${showFilterLeftFade ? "16px" : "0px"}, 
+                          black calc(100% - ${showFilterRightFade ? "16px" : "0px"}), 
+                          transparent 100%)`,
+                        WebkitMaskImage: `linear-gradient(to right, 
+                          transparent 0%, 
+                          black ${showFilterLeftFade ? "16px" : "0px"}, 
+                          black calc(100% - ${showFilterRightFade ? "16px" : "0px"}), 
+                          transparent 100%)`
+                      }}
+                    >
+                      {STATUS_FILTER_OPTIONS.map((opt) => {
+                        const isFilterActive = statusFilter === opt.id;
+                        const count = getFilterCount(opt.id);
+                        return (
+                          <motion.button
+                            key={opt.id}
+                            data-filter-id={opt.id}
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.96 }}
+                            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                            onClick={() => {
+                              setStatusFilter(opt.id);
+                              syncOrdersFromGraphQL(opt.id);
+                            }}
+                            className={`relative px-3 py-1.5 rounded-full text-[11px] font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none antialiased ${
+                              isFilterActive
+                                ? "text-white"
+                                : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                            }`}
+                          >
+                            {isFilterActive && (
+                              <motion.div
+                                layoutId="statusFilterPillActive"
+                                className="absolute inset-0 rounded-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E63E14] border-t border-t-white/80 border-b border-b-[#9E2407]/50 border-x border-x-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.15),0_1.5px_4px_rgba(255,77,36,0.35)] z-0"
+                                transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.55 }}
+                              />
+                            )}
+                            <span className={`relative z-10 tracking-tight font-extrabold antialiased leading-none ${
+                              isFilterActive ? "text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]" : "text-slate-600"
+                            }`}>
+                              {opt.label}
+                            </span>
+                            <span className={`relative z-10 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold leading-none transition-all duration-150 antialiased ${
+                              isFilterActive
+                                ? "bg-white/25 text-white border border-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+                                : "bg-black/5 text-slate-500"
+                            }`}>
+                              {count}
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex-1 min-h-0 relative overflow-hidden rounded-2xl">
                   {/* Scrollable Container with Smooth Translucent Masking */}
                   <div 
                     onScroll={handleScroll}
-                    className="hide-scrollbar space-y-3 h-full overflow-y-auto px-1 py-1.5 transition-all duration-300"
+                    className="hide-scrollbar h-full overflow-y-auto px-1 py-1 transition-all duration-300"
                     style={{
                       maskImage: `linear-gradient(to bottom, 
                         transparent 0%, 
@@ -1728,74 +2107,84 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         transparent 100%)`
                     }}
                   >
-                    {orders.length === 0 ? (
-                      <div className="bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-xl rounded-2xl p-8 text-center text-slate-400 text-xs shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]">
-                        Chưa có lịch sử giao dịch mua hàng nào.
-                      </div>
-                    ) : (
-                      orders.map((item) => {
-                        const isSelected = item.id === selectedOrderId;
-                        return (
-                          <div
-                            key={item.id}
-                            onClick={() => setSelectedOrderId(item.id)}
-                            className={`p-3.5 rounded-2xl text-left cursor-pointer transition-all duration-150 ${
-                              isSelected 
-                                ? "bg-gradient-to-b from-indigo-50/40 via-white to-indigo-50/20 border border-indigo-400/80 shadow-[0_4px_12px_-2px_rgba(79,70,229,0.08),0_1px_3px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)]" 
-                                : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white border-b-slate-300/60 hover:border-slate-300/80 hover:from-white hover:to-white/85 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)]"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-1.5 mb-1 pb-1 border-b border-slate-100">
-                              <div className="min-w-0 flex-1 flex items-center gap-1.5">
-                                <span className={`text-[9px] font-bold font-mono uppercase truncate ${isSelected ? "text-indigo-600" : "text-slate-400"}`}>
-                                  MÃ ĐƠN: {item.id}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleCopyOrderId(item.id, e)}
-                                  className="p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all active:scale-90 shrink-0"
-                                  title="Sao chép mã đơn hàng"
-                                >
-                                  <MorphIcon
-                                    icon={copiedOrderId === item.id ? LucideCheck : LucideCopy}
-                                    spring="snappy"
-                                    className={`w-3 h-3 transition-colors ${
-                                      copiedOrderId === item.id ? "text-emerald-600" : "text-slate-400 hover:text-slate-600"
-                                    }`}
-                                    size={12}
-                                    strokeWidth={copiedOrderId === item.id ? 2.5 : 2}
-                                  />
-                                </button>
-                              </div>
-                              <span className={`px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-normal shrink-0 transition-all border ${
-                                getOrderColorTheme(item) === "emerald" 
-                                  ? "bg-gradient-to-b from-emerald-50/95 via-emerald-50/75 to-emerald-100/50 text-emerald-800 border-emerald-200/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_0_rgba(16,185,129,0.1),0_1px_2px_rgba(0,0,0,0.03)]" 
-                                  : getOrderColorTheme(item) === "amber" 
-                                  ? "bg-gradient-to-b from-amber-50/95 via-amber-50/75 to-amber-100/50 text-amber-800 border-amber-200/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_0_rgba(217,119,6,0.1),0_1px_2px_rgba(0,0,0,0.03)]" 
-                                  : getOrderColorTheme(item) === "blue"
-                                  ? "bg-gradient-to-b from-blue-50/95 via-blue-50/75 to-blue-100/50 text-blue-700 border-blue-200/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_0_rgba(59,130,246,0.1),0_1px_2px_rgba(0,0,0,0.03)]"
-                                  : "bg-gradient-to-b from-orange-50/95 via-orange-50/75 to-amber-100/50 text-orange-700 border-orange-200/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_0_rgba(255,77,36,0.1),0_1px_2px_rgba(0,0,0,0.03)]"
-                              }`}>
-                                {item.statusText}
-                              </span>
-                            </div>
-
-                            <h4 className="text-xs font-bold text-slate-900 leading-snug line-clamp-2 min-h-[30px] mb-1.5">
-                              {item.name}
-                            </h4>
-
-                            {/* Ngày mua bên trái, [Tổng thanh toán] : [Giá] bên phải */}
-                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-100/80">
-                              <span className="text-[10px] text-slate-400 font-medium">Ngày mua: {item.date}</span>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[11px] text-slate-500">Tổng thanh toán:</span>
-                                <span className="text-xs font-black text-indigo-600 font-mono">{item.price}</span>
-                              </div>
-                            </div>
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={statusFilter}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        className="space-y-2.5"
+                      >
+                        {filteredOrders.length === 0 ? (
+                          <div className="bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-xl rounded-2xl p-8 text-center text-slate-400 text-xs shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]">
+                            Không tìm thấy đơn hàng nào phù hợp với bộ lọc.
                           </div>
-                        );
-                      })
-                    )}
+                        ) : (
+                          filteredOrders.map((item) => {
+                            const isSelected = item.id === selectedOrderId;
+                            const theme = getOrderStatusTheme(item.statusText || item.status);
+                            return (
+                              <div
+                                key={item.id}
+                                onClick={() => handleSelectOrder(item.id)}
+                                className={`p-3.5 rounded-2xl text-left cursor-pointer transition-all duration-150 relative ${
+                                  isSelected 
+                                    ? "bg-gradient-to-b from-orange-50/40 via-white to-white border border-[#FF4D24]/40 border-l-4 border-l-[#FF4D24] shadow-[0_4px_16px_-2px_rgba(255,77,36,0.12),0_1px_3px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)]" 
+                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white border-b-slate-300/60 hover:border-slate-300/80 hover:from-white hover:to-white/85 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)]"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-1.5 mb-1 pb-1 border-b border-slate-100">
+                                  <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                                    <span className={`text-[9px] font-bold font-mono uppercase truncate ${isSelected ? "text-[#FF4D24]" : "text-slate-400"}`}>
+                                      MÃ ĐƠN: {item.id}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleCopyOrderId(item.id, e)}
+                                      className="p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all active:scale-90 shrink-0"
+                                      title="Sao chép mã đơn hàng"
+                                    >
+                                      <MorphIcon
+                                        icon={copiedOrderId === item.id ? LucideCheck : LucideCopy}
+                                        spring="snappy"
+                                        className={`w-3 h-3 transition-colors ${
+                                          copiedOrderId === item.id ? "text-emerald-600" : "text-slate-400 hover:text-slate-600"
+                                        }`}
+                                        size={12}
+                                        strokeWidth={copiedOrderId === item.id ? 2.5 : 2}
+                                      />
+                                    </button>
+                                  </div>
+                                  <span className={`px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase tracking-normal shrink-0 transition-all border flex items-center gap-1.5 ${theme.badgeClass}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${theme.dotClass} ${theme.glowClass}`} />
+                                    <span>{item.statusText || theme.label}</span>
+                                  </span>
+                                </div>
+
+                                <h4 className="text-xs font-bold text-slate-900 leading-snug line-clamp-2 min-h-[30px] mb-1.5">
+                                  {item.name}
+                                </h4>
+
+                                {/* Ngày mua bên trái, [Tổng thanh toán] : [Giá] bên phải (Cắt ngắn giá bằng dấu ... nếu quá dài, không xuống dòng) */}
+                                <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-100/80 gap-2 min-w-0">
+                                  <span className="text-[10px] text-slate-400 font-medium shrink-0 whitespace-nowrap">Ngày mua: {item.date}</span>
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
+                                    <span className="text-[11px] text-slate-500 shrink-0 whitespace-nowrap">Tổng thanh toán:</span>
+                                    <span 
+                                      className="text-xs font-black text-[#FF4D24] font-mono truncate max-w-[110px] sm:max-w-[140px] inline-block text-right whitespace-nowrap shrink min-w-0" 
+                                      title={item.price}
+                                    >
+                                      {item.price}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </motion.div>
+                    </AnimatePresence>
                   </div>
                 </div>
               </div>
@@ -1841,17 +2230,24 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       
                       {/* Header info of selected Order: Hợp nhất hoàn toàn với nền khung lớn, icon và badge có hiệu ứng bevel làm mịn */}
                       <div className="relative z-10 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1 pt-0.5 pb-1">
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-white via-slate-50 to-slate-100/80 border-t border-t-white border-b border-b-slate-200/60 border-x border-x-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-center shrink-0">
                             <Building2 className="w-3.5 h-3.5 text-slate-700" />
                           </div>
                           <div className="min-w-0">
-                            <span className="text-[8.5px] font-bold text-slate-400 font-mono uppercase tracking-wider block leading-none">VẬN CHUYỂN BỞI</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[8.5px] font-bold text-slate-400 font-mono uppercase tracking-wider block leading-none">VẬN CHUYỂN BỞI</span>
+                              {activeOrder.rawOrder?.paymentMethod && (
+                                <span className="font-mono text-[8px] font-extrabold px-1.5 py-0.2 rounded-md bg-gradient-to-b from-slate-50 to-slate-100/80 border border-slate-200/80 text-slate-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] uppercase">
+                                  {activeOrder.rawOrder.paymentMethod}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs font-black text-slate-900 truncate leading-tight mt-0.5">{activeOrder.carrier}</p>
                           </div>
                         </div>
 
-                        {/* Ngày giao hàng dự kiến: Không có khung bao quanh (định dạng dd/mm/yyyy) */}
+                        {/* Ngày giao hàng dự kiến: Tinh giản, thẳng hàng và chuẩn visual */}
                         <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center select-none py-0.5">
                           <div className="flex items-center gap-1.5 text-xs">
                             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">
@@ -2473,60 +2869,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   )}
                 </div>
 
-                {/* Floating Toast Notification (Zero Layout Shift - Zero Jank) */}
-                <div className="absolute top-4 right-4 z-50 pointer-events-none flex flex-col items-end gap-2 max-w-sm w-full">
-                  <AnimatePresence>
-                    {errorMsg && (
-                      <motion.div
-                        key="modal-error-toast"
-                        initial={{ opacity: 0, y: -12, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -12, scale: 0.95 }}
-                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                        className="pointer-events-auto w-full p-3 bg-white/95 backdrop-blur-md border border-red-200/90 text-red-700 rounded-xl text-xs font-semibold flex items-center justify-between gap-3 text-left shadow-xl shadow-red-500/10 ring-1 ring-red-500/10"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-6 h-6 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                          </div>
-                          <span className="truncate">{errorMsg}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setErrorMsg("")}
-                          className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer shrink-0"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </motion.div>
-                    )}
 
-                    {successMsg && (
-                      <motion.div
-                        key="modal-success-toast"
-                        initial={{ opacity: 0, y: -12, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -12, scale: 0.95 }}
-                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                        className="pointer-events-auto w-full p-3 bg-white/95 backdrop-blur-md border border-emerald-200/90 text-emerald-800 rounded-xl text-xs font-semibold flex items-center justify-between gap-3 text-left shadow-xl shadow-emerald-500/10 ring-1 ring-emerald-500/10"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                          </div>
-                          <span className="truncate">{successMsg}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setSuccessMsg("")}
-                          className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer shrink-0"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
 
                 {/* TAB 1: Profile Information */}
                 {activeModalTab === "profile" && (

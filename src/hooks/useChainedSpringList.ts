@@ -84,48 +84,18 @@ export function useChainedSpringList<T>({
 
     if (finalDeltaX >= threshold) {
       setIsDismissing(true);
-      const exitDistance = 480;
-
-      const newOffsets: Record<number, number> = {};
-      const total = items.length;
-      for (let i = 0; i < total; i++) {
-        if (i === targetIdx) {
-          newOffsets[i] = exitDistance;
-        } else {
-          const dist = Math.abs(i - targetIdx);
-          if (dist <= maxChainedDepth) {
-            newOffsets[i] = 50 * Math.pow(tensionDecay, dist);
-          } else {
-            newOffsets[i] = 0;
-          }
-        }
+      const targetIdx = activeIdx;
+      setOffsets({});
+      setActiveIdx(null);
+      setIsDismissing(false);
+      if (onDismiss) {
+        onDismiss(items[targetIdx], targetIdx);
       }
-      setOffsets(newOffsets);
-
-      const t1 = setTimeout(() => {
-        setOffsets(prev => {
-          const next: Record<number, number> = {};
-          for (let i = 0; i < total; i++) {
-            if (i === targetIdx) next[i] = exitDistance;
-            else next[i] = 0;
-          }
-          return next;
-        });
-      }, 110);
-
-      const t2 = setTimeout(() => {
-        onDismiss && onDismiss(items[targetIdx], targetIdx);
-        setOffsets({});
-        setActiveIdx(null);
-        setIsDismissing(false);
-      }, 330);
-
-      timeoutsRef.current.push(t1, t2);
     } else {
       setOffsets({});
       setActiveIdx(null);
     }
-  }, [activeIdx, threshold, onDismiss, items, maxChainedDepth, tensionDecay]);
+  }, [activeIdx, threshold, onDismiss, items]);
 
   const dismissIndices = useCallback((indices: number[], onComplete?: () => void) => {
     if (indices.length === 0 || isDismissing) return;
@@ -133,7 +103,7 @@ export function useChainedSpringList<T>({
     setIsDismissing(true);
 
     const total = items.length;
-    const exitDistance = 480;
+    const exitDistance = 360;
 
     // 1. Tính toán vị trí tâm (Center Item)
     const center = (total - 1) / 2;
@@ -157,10 +127,11 @@ export function useChainedSpringList<T>({
     });
 
     const activeExitIndices = new Set<number>();
+    const tierStep = Math.min(staggerDelay, 45);
 
     // 3. Kích hoạt hiệu ứng lan truyền mượt mà từ tâm ra ngoài
     distanceTiers.forEach((tier, tierIdx) => {
-      const delay = tierIdx * staggerDelay;
+      const delay = tierIdx * tierStep;
 
       const timer = setTimeout(() => {
         tier.forEach(idx => activeExitIndices.add(idx));
@@ -179,7 +150,7 @@ export function useChainedSpringList<T>({
               });
 
               if (minDist <= maxChainedDepth) {
-                next[i] = 55 * Math.pow(tensionDecay, minDist);
+                next[i] = 32 * Math.pow(tensionDecay, minDist);
               } else {
                 next[i] = 0;
               }
@@ -192,18 +163,22 @@ export function useChainedSpringList<T>({
       timeoutsRef.current.push(timer);
     });
 
-    // 4. Thời gian hoàn tất
-    const totalDuration = (distanceTiers.length - 1) * staggerDelay + 340;
+    // 4. Đồng bộ hoàn tất: kích hoạt onComplete ngay (30ms đối với 1 item) để AnimatePresence nhận diện unmount và co giãn chiều cao đồng thời không độ trễ
+    const dismissLeadTime = indices.length === 1 ? 30 : 120;
+    const totalDuration = (distanceTiers.length - 1) * tierStep + dismissLeadTime;
 
-    const finalTimer = setTimeout(() => {
+    const completionTimer = setTimeout(() => {
       onComplete && onComplete();
+    }, dismissLeadTime);
+    timeoutsRef.current.push(completionTimer);
+
+    const cleanupTimer = setTimeout(() => {
       setOffsets({});
       setActiveIdx(null);
       setIsDismissing(false);
       clearTimeouts();
-    }, totalDuration);
-
-    timeoutsRef.current.push(finalTimer);
+    }, totalDuration + 180);
+    timeoutsRef.current.push(cleanupTimer);
   }, [isDismissing, items.length, maxChainedDepth, tensionDecay, staggerDelay]);
 
   const bindDrag = useCallback((index: number) => ({

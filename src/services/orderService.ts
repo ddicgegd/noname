@@ -4,6 +4,8 @@
  */
 
 import { getApiBaseUrl, getUnifiedAccessToken, unifiedFetch } from "../lib/api";
+import { STORAGE_KEYS } from "../lib/storageKeys";
+import { getOrderStatusTheme } from "../lib/orderStatusTheme";
 
 export type OrderStatus =
   | "PENDING"
@@ -117,7 +119,7 @@ export interface CreateOrderResponse {
 }
 
 export interface MyOrdersQueryParams {
-  status: OrderStatus | string;
+  status?: OrderStatus | string;
   page?: number;
   size?: number;
   sortBy?: string;
@@ -153,6 +155,31 @@ export interface MyOrdersResponse {
       totalPages: number;
     };
   };
+}
+
+export interface UiDeliveryStep {
+  title: string;
+  desc: string;
+  time: string;
+  completed: boolean;
+  active: boolean;
+}
+
+export interface UiOrderItem {
+  id: string;
+  name: string;
+  price: string;
+  date: string;
+  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+  statusText: string;
+  estimatedDelivery?: string;
+  deliverySteps: UiDeliveryStep[];
+  shippingAddress: string;
+  carrier: string;
+  trackingNumber: string;
+  totalAmountNumber?: number;
+  orderItemsList?: OrderItemDto[];
+  rawOrder?: OrderDto;
 }
 
 /**
@@ -218,7 +245,7 @@ export const CREATE_ORDER_MUTATION = `
  */
 export const GET_MY_ORDERS_LIST_QUERY = `
   query GetMyOrdersList(
-    $status: OrderStatus!
+    $status: OrderStatus
     $page: Int
     $size: Int
     $sortBy: String
@@ -262,7 +289,7 @@ export const GET_MY_ORDERS_LIST_QUERY = `
 `;
 
 /**
- * 3. GraphQL Query: GetMyOrderDetail (v1.3.0 Standard)
+ * 3. GraphQL Query: GetMyOrderDetail (v1.3.0 Standard with Full Items & Timeline)
  */
 export const GET_MY_ORDER_DETAIL_QUERY = `
   query GetMyOrderDetail($orderNumber: String!) {
@@ -273,9 +300,13 @@ export const GET_MY_ORDER_DETAIL_QUERY = `
       }
       data {
         orderNumber
+        orderSessionId
+        status
         currentStatus
+        currentStatusDescription
         shippingMethod
         paymentMethod
+        addressSku
         receiverName
         receiverPhone
         shippingAddress
@@ -283,12 +314,38 @@ export const GET_MY_ORDER_DETAIL_QUERY = `
         shippingFee
         productDiscountAmount
         shippingDiscountAmount
+        discountAmount
+        discountCodes
         totalAmount
         customerNotes
+        bankCode
+        language
         createdAt
+        customerInfo {
+          fullName
+          phone
+          shippingAddress
+        }
         statusHistory {
           status
           timestamp
+        }
+        orderItems {
+          attributesSku
+          productName
+          quantity
+          unitPrice
+          salePrice
+          costPrice
+          discountAmount
+          discountPercentage
+          subtotal
+          taxAmount
+          imageUrl
+          variantOptions {
+            name
+            value
+          }
         }
       }
     }
@@ -297,7 +354,6 @@ export const GET_MY_ORDER_DETAIL_QUERY = `
 
 /**
  * Khởi tạo đơn hàng mới - Thuần GraphQL Gateway (/graphql)
- * GraphQL Operation: mutation CreateOrder($input: CreateOrderInput!)
  */
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResponse> {
   const token = getUnifiedAccessToken();
@@ -377,6 +433,16 @@ export async function getMyOrders(params: MyOrdersQueryParams): Promise<MyOrders
 
   // 1. Thực thi qua GraphQL Gateway
   try {
+    const variables: Record<string, any> = {
+      page: params.page || 1,
+      size: params.size || 20,
+      sortBy: params.sortBy || "auditInfo.createdAt",
+      sortDirection: params.sortDirection || "DESC",
+    };
+    if (params.status && params.status !== "ALL") {
+      variables.status = params.status;
+    }
+
     const response = await unifiedFetch("/graphql", {
       method: "POST",
       headers: {
@@ -385,13 +451,7 @@ export async function getMyOrders(params: MyOrdersQueryParams): Promise<MyOrders
       },
       body: JSON.stringify({
         query: GET_MY_ORDERS_LIST_QUERY,
-        variables: {
-          status: params.status,
-          page: params.page || 1,
-          size: params.size || 20,
-          sortBy: params.sortBy || "auditInfo.createdAt",
-          sortDirection: params.sortDirection || "DESC",
-        },
+        variables,
       }),
     });
 
@@ -408,7 +468,7 @@ export async function getMyOrders(params: MyOrdersQueryParams): Promise<MyOrders
   // 2. Fallback sang REST API
   const baseUrl = getApiBaseUrl();
   const searchParams = new URLSearchParams();
-  if (params?.status) searchParams.append("status", params.status);
+  if (params?.status && params.status !== "ALL") searchParams.append("status", params.status);
   if (params?.page) searchParams.append("page", params.page.toString());
   if (params?.size) searchParams.append("size", params.size.toString());
   if (params?.sortBy) searchParams.append("sortBy", params.sortBy);
@@ -476,4 +536,182 @@ export async function getOrderDetail(orderNumber: string): Promise<OrderDto> {
 
   const result = await restRes.json();
   return result?.data || result;
+}
+
+// ---------------------------------------------------------------------------
+// NORMALIZER & CACHE HELPERS (Hybrid Cache-First + UI Adapter)
+// ---------------------------------------------------------------------------
+
+function formatVnd(amount: number): string {
+  return new Intl.NumberFormat("vi-VN").format(amount) + " VND";
+}
+
+function formatDateDisplay(isoString?: string): string {
+  if (!isoString) return new Date().toLocaleDateString("vi-VN");
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return isoString;
+  }
+}
+
+function mapStatusToUiStatus(currentStatus?: string): "pending" | "processing" | "shipped" | "delivered" | "cancelled" {
+  const norm = (currentStatus || "").toUpperCase();
+  if (norm.includes("WAIT") || norm.includes("PENDING")) return "pending";
+  if (norm.includes("SHIP") || norm.includes("DELIVERING")) return "shipped";
+  if (norm.includes("DELIVERED") || norm.includes("COMPLETE") || norm.includes("DONE")) return "delivered";
+  if (norm.includes("CANCEL") || norm.includes("REFUND")) return "cancelled";
+  return "processing";
+}
+
+/**
+ * Sinh danh sách các bước giao hàng (Delivery Steps) mặc định theo trạng thái đơn hàng
+ */
+export function generateDeliveryStepsForOrder(status: string, createdAt?: string): UiDeliveryStep[] {
+  const createdDate = formatDateDisplay(createdAt);
+  const norm = (status || "").toUpperCase();
+
+  const isDelivered = norm === "DELIVERED" || norm === "COMPLETED";
+  const isShipped = isDelivered || norm === "SHIPPED";
+  const isProcessing = isShipped || norm === "PROCESSING" || norm === "CONFIRMED";
+  const isCancelled = norm === "CANCELLED" || norm === "REFUNDED";
+
+  if (isCancelled) {
+    return [
+      { title: "Khởi tạo đơn hàng", desc: "Đơn hàng đã được đặt trực tuyến", time: `${createdDate} 10:00`, completed: true, active: false },
+      { title: "Đơn hàng đã hủy", desc: "Giao dịch đã hủy và hoàn tiền theo chính sách", time: `${createdDate} 11:30`, completed: true, active: true }
+    ];
+  }
+
+  return [
+    {
+      title: "Đã tiếp nhận đơn hàng",
+      desc: "Đơn hàng đã được hệ thống ERP xác nhận thành công",
+      time: `${createdDate} 09:00`,
+      completed: true,
+      active: norm === "PENDING" || norm === "WAITING_PAYMENT",
+    },
+    {
+      title: "Đang đóng gói & Kiểm thử",
+      desc: "Bộ phận kho đang kiểm tra linh kiện và đóng hộp nguyên seal",
+      time: `${createdDate} 11:30`,
+      completed: isProcessing,
+      active: norm === "PROCESSING" || norm === "CONFIRMED",
+    },
+    {
+      title: "Bàn giao đơn vị vận chuyển",
+      desc: "Kiện hàng đã xuất kho chuyển phát nhanh Horizon Express / Viettel Post",
+      time: `${createdDate} 14:00`,
+      completed: isShipped,
+      active: norm === "SHIPPED",
+    },
+    {
+      title: "Đang trung chuyển qua trạm",
+      desc: "Thiết bị đang được vận chuyển nhanh tới trạm phát hàng gần nhất",
+      time: `${createdDate} 17:30`,
+      completed: isShipped,
+      active: false,
+    },
+    {
+      title: "Giao hàng & Hoàn tất",
+      desc: "Người nhận đồng kiểm kiện hàng và ký nhận hoàn tất giao dịch",
+      time: `${createdDate} 19:00`,
+      completed: isDelivered,
+      active: isDelivered,
+    },
+  ];
+}
+
+/**
+ * Chuyển đổi DTO chi tiết (OrderDto) sang định dạng UI OrderItem
+ */
+export function normalizeOrderDtoToUiItem(dto: OrderDto): UiOrderItem {
+  const theme = getOrderStatusTheme(dto.currentStatus);
+  const firstItem = dto.orderItems?.[0];
+  const itemCount = dto.orderItems?.length || 1;
+  const name = firstItem
+    ? `${firstItem.productName || firstItem.attributesSku}${itemCount > 1 ? ` (+${itemCount - 1} sản phẩm khác)` : ""}`
+    : `Đơn hàng #${dto.orderNumber}`;
+
+  return {
+    id: dto.orderNumber,
+    name,
+    price: formatVnd(dto.totalAmount || 0),
+    date: formatDateDisplay(dto.createdAt),
+    status: mapStatusToUiStatus(dto.currentStatus),
+    statusText: dto.currentStatusDescription || theme.label,
+    estimatedDelivery: formatDateDisplay(dto.createdAt),
+    deliverySteps: dto.statusHistory && dto.statusHistory.length > 0
+      ? dto.statusHistory.map((sh, idx, arr) => ({
+          title: sh.status,
+          desc: `Ghi nhận trạng thái: ${sh.status}`,
+          time: formatDateDisplay(sh.timestamp),
+          completed: idx < arr.length - 1 || mapStatusToUiStatus(dto.currentStatus) === "delivered",
+          active: idx === arr.length - 1 && mapStatusToUiStatus(dto.currentStatus) !== "delivered",
+        }))
+      : generateDeliveryStepsForOrder(dto.currentStatus, dto.createdAt),
+    shippingAddress: dto.shippingAddress || "Địa chỉ mặc định khách hàng",
+    carrier: dto.shippingMethod === "PICKUP" ? "Nhận tại trạm dịch vụ Horizon" : "Horizon Express (Viettel Post)",
+    trackingNumber: `HZ-${dto.orderNumber.replace(/[^A-Z0-9]/gi, "").slice(-8) || "8820192"}`,
+    totalAmountNumber: dto.totalAmount,
+    orderItemsList: dto.orderItems,
+    rawOrder: dto,
+  };
+}
+
+/**
+ * Chuyển đổi DTO tóm tắt (OrderSummaryItem) sang định dạng UI OrderItem
+ */
+export function normalizeSummaryToUiItem(item: OrderSummaryItem): UiOrderItem {
+  const theme = getOrderStatusTheme(item.currentStatus);
+  const name = item.firstItemPreview?.productName
+    ? `${item.firstItemPreview.productName}${item.itemCount > 1 ? ` (+${item.itemCount - 1} món khác)` : ""}`
+    : `Đơn hàng #${item.orderNumber}`;
+
+  return {
+    id: item.orderNumber,
+    name,
+    price: formatVnd(item.totalAmount || 0),
+    date: formatDateDisplay(item.createdAt),
+    status: mapStatusToUiStatus(item.currentStatus),
+    statusText: theme.label,
+    estimatedDelivery: formatDateDisplay(item.createdAt),
+    deliverySteps: generateDeliveryStepsForOrder(item.currentStatus, item.createdAt),
+    shippingAddress: "Đang tải địa chỉ nhận hàng...",
+    carrier: "Horizon Express",
+    trackingNumber: `HZ-${item.orderNumber.replace(/[^A-Z0-9]/gi, "").slice(-8) || "TRACKING"}`,
+    totalAmountNumber: item.totalAmount,
+  };
+}
+
+/**
+ * Đọc danh sách đơn hàng đã lưu trong Local Cache
+ */
+export function getCachedOrders(): UiOrderItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.USER_ORDERS) || localStorage.getItem("horizon_user_orders");
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Lưu danh sách đơn hàng vào Local Cache
+ */
+export function saveCachedOrders(orders: UiOrderItem[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.USER_ORDERS, JSON.stringify(orders));
+    localStorage.setItem("horizon_user_orders", JSON.stringify(orders));
+  } catch (err) {
+    console.warn("Failed to cache orders:", err);
+  }
 }

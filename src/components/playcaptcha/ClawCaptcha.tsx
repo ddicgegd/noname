@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react'
 import { TOY_META, type ToyId } from './toys.ts'
 import { CLAW_ARM_L, CLAW_ARM_R, CLAW_BODY, CLAW_PIVOT } from './clawArt.ts'
@@ -58,20 +58,24 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a)
 // one handful of confetti when the catch is swallowed — fixed layout, themed
 // hues; dy is the APEX of each piece's toss (the keyframes handle the fall)
 const CONFETTI = [
-  { dx: -44, dy: -54, dr: -150, c: '#34c759', d: 0 },
-  { dx: -30, dy: -66, dr: 120, c: '#ffd60a', d: 0.05 },
-  { dx: -14, dy: -76, dr: -80, c: '#5cd679', d: 0.02 },
-  { dx: 2, dy: -80, dr: 60, c: '#5a93c9', d: 0.07 },
-  { dx: 16, dy: -74, dr: -130, c: '#ffb340', d: 0.03 },
-  { dx: 30, dy: -64, dr: 100, c: '#a8e6b8', d: 0.06 },
-  { dx: 44, dy: -52, dr: -110, c: '#34c759', d: 0.01 },
-  { dx: -54, dy: -36, dr: 90, c: '#e58ab0', d: 0.09 },
-  { dx: 54, dy: -34, dr: -70, c: '#5a93c9', d: 0.08 },
+  { dx: -52, dy: -60, dr: -160, c: '#FF7A45', d: 0 },
+  { dx: -38, dy: -78, dr: 140, c: '#FFA940', d: 0.04 },
+  { dx: -24, dy: -90, dr: -90, c: '#FFC069', d: 0.02 },
+  { dx: -8, dy: -96, dr: 75, c: '#FFFFFF', d: 0.06 },
+  { dx: 8, dy: -98, dr: -120, c: '#FF9C6E', d: 0.01 },
+  { dx: 22, dy: -92, dr: 110, c: '#FFE7BA', d: 0.05 },
+  { dx: 36, dy: -80, dr: -140, c: '#FFA940', d: 0.03 },
+  { dx: 50, dy: -65, dr: 130, c: '#FF7A45', d: 0.07 },
+  { dx: -60, dy: -42, dr: 100, c: '#FFFFFF', d: 0.08 },
+  { dx: 60, dy: -40, dr: -80, c: '#FFD591', d: 0.09 },
+  { dx: -18, dy: -68, dr: 180, c: '#FFF1B8', d: 0.05 },
+  { dx: 18, dy: -70, dr: -170, c: '#FFA940', d: 0.04 },
 ]
 
 // ---- easing + timeline (all timings in SECONDS; the loop is dt-based so the
 // feel is identical at 60 / 120 / 144 Hz) ----
 const easeInQuad = (p: number) => p * p
+const easeOutQuad = (p: number) => 1 - (1 - p) * (1 - p)
 const easeOutCubic = (p: number) => 1 - Math.pow(1 - p, 3)
 const easeInOutCubic = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2)
 const clamp01 = (p: number) => Math.min(1, Math.max(0, p))
@@ -210,7 +214,7 @@ type Soft = {
   landed: boolean
 }
 
-type Phase = 'idle' | 'seq' | 'carry' | 'toTray' | 'celebrate' | 'deny' | 'return' | 'done'
+type Phase = 'idle' | 'aim' | 'seq' | 'carry' | 'carryToTray' | 'toTray' | 'celebrate' | 'deny' | 'return' | 'done'
 
 export interface ClawCaptchaProps {
   /** Which toy the challenge asks for. A random toy each mount when omitted. */
@@ -247,6 +251,22 @@ export function ClawCaptcha({
   // fresh scatter every mount (remount with a key for a new pile)
   const pile = useMemo(() => scatterPile(target), [target])
 
+  const candidateAt = useCallback((x: number) => {
+    let best = -1
+    let bestScore = -Infinity
+    pile.forEach((q, i) => {
+      const d = Math.abs(q.x - x)
+      if (d < GRAB_RADIUS) {
+        const score = q.z * 100 - d
+        if (score > bestScore) {
+          bestScore = score
+          best = i
+        }
+      }
+    })
+    return best
+  }, [pile])
+
   const rigEl = useRef<SVGSVGElement>(null)
   const clawEl = useRef<SVGGElement>(null)
   const coilEl = useRef<SVGGElement>(null)
@@ -276,6 +296,12 @@ export function ClawCaptcha({
     close: 0,
     carried: -1,
     carry: { x: 0, y: 0 },
+    // 1-click auto-solve orchestration
+    chosenToy: -1, // -1 = candidateAt(s.x); >=0 = specifically selected toy
+    startX: GW / 2,
+    targetX: GW / 2,
+    autoMoveTime: 0,
+    autoMoveDur: 0.75,
     // scripted-sequence bookkeeping
     stage: '' as '' | 'antic' | 'down' | 'dwell1' | 'close' | 'dwell2' | 'load' | 'up' | 'open' | 'beat' | 'shine',
     st: 0, // seconds inside the current stage
@@ -284,8 +310,19 @@ export function ClawCaptcha({
     stretch: 0, // 0..~0.09 vertical stretch while falling fast (squash-and-stretch)
     xrot: 0, // extra rotation on the carried toy (pickup tilt / dangle lag / impact)
     swallow: 0, // 0..1 shrink+fade as a WRONG toy is dismissed off the lid
+    // parabolic catapult flight kinematics
+    arcStartX: 0,
+    arcStartY: 0,
+    arcTargetX: 0,
+    arcTargetY: 0,
+    arcHeight: 75,
+    flightTime: 0,
+    flightDur: 0.62,
+    flightDir: 1,
+    startRot: 0,
+    scale: 1,
     released: false, // the claw has let go this drop (one-shot)
-    mouthY: 353, // the hatch rim line in machine space — measured at release time
+    mouthY: 340, // the hatch rim line in machine space — measured at release time
   })
 
   const softRef = useRef<Soft[] | null>(null)
@@ -362,23 +399,6 @@ export function ClawCaptcha({
     /** where the carried toy's centre sits when gripped: head between the fingers */
     const gripY = (ey: number) => ey + GRIP_OFFSET + (s.carried >= 0 ? pile[s.carried].w : 80) / 2
 
-    /** the toy the claw would catch at horizontal position x (front row, nearest) */
-    const candidateAt = (x: number) => {
-      let best = -1
-      let bestScore = -Infinity
-      pile.forEach((q, i) => {
-        const d = Math.abs(q.x - x)
-        if (d < GRAB_RADIUS) {
-          const score = q.z * 100 - d
-          if (score > bestScore) {
-            bestScore = score
-            best = i
-          }
-        }
-      })
-      return best
-    }
-
     const render = () => {
       const sway = reduce ? 0 : s.sway + s.breeze
       const len = Math.max(2, s.y - RAIL_Y)
@@ -386,9 +406,9 @@ export function ClawCaptcha({
       if (trolleyEl.current) trolleyEl.current.style.transform = `translateX(${(s.x - 14).toFixed(2)}px)`
       // contact shadow on the pile floor: tracks the pendulum end, tightens and
       // darkens as the claw (or its cargo) gets closer to the ground
+      const rad = (sway * Math.PI) / 180
+      const ex = s.x + Math.sin(rad) * len
       if (shadowEl.current) {
-        const rad = (sway * Math.PI) / 180
-        const ex = s.x + Math.sin(rad) * len
         const bottomY = s.carried >= 0 ? s.carry.y + pile[s.carried].w / 2 : s.y + 58
         const t = clamp01(1 - (GH - bottomY) / 210)
         shadowEl.current.style.transform = `translateX(${(ex - 45).toFixed(2)}px) scaleX(${(1.25 - 0.5 * t).toFixed(3)})`
@@ -420,7 +440,7 @@ export function ClawCaptcha({
         // swallow drives shrink + fade together (wrong-toy dismissal only —
         // a correct catch is clipped at the hatch rim instead, never faded);
         // stretch elongates the toy with fall speed, classic squash-and-stretch
-        const sc = 1 - s.swallow * 0.78
+        const sc = (1 - s.swallow * 0.78) * (s.scale || 1)
         const sx = (sc * (1 - s.stretch * 0.55)).toFixed(3)
         const sy = (sc * (1 + s.stretch)).toFixed(3)
         carriedEl.current.style.transform = `translate(${s.carry.x - w / 2}px, ${s.carry.y - w / 2}px) rotate(${(sway + s.xrot).toFixed(2)}deg) scale(${sx}, ${sy})`
@@ -493,17 +513,75 @@ export function ClawCaptcha({
         b.sq += b.vsq * f
       }
 
-      if (ph === 'idle' || ph === 'carry') {
-        // smooth, unhurried drive: ease the steering input first so key taps and
-        // stick flicks ramp in, then integrate. Lower accel + more drag = a
-        // calmer top speed (~130 px/s) that's easy to place over a toy.
+      if (ph === 'aim') {
+        s.autoMoveTime += dt
+        const p = clamp01(s.autoMoveTime / s.autoMoveDur)
+        const eased = easeInOutCubic(p)
+        s.x = s.startX + (s.targetX - s.startX) * eased
+        const moveDir = s.targetX > s.startX ? 1 : -1
+        if (!reduce) {
+          s.sway = -moveDir * 6 * Math.sin(Math.PI * p)
+          if (stickEl.current) {
+            const tilt = p < 0.9 ? moveDir * 18 * Math.sin(Math.PI * p) : 0
+            stickEl.current.style.transform = `rotate(${tilt.toFixed(1)}deg)`
+          }
+        }
+        if (p >= 1) {
+          s.x = s.targetX
+          s.sway = 0
+          if (stickEl.current) stickEl.current.style.transform = ''
+          s.close = 0
+          s.stage = 'antic'
+          s.st = 0
+          a.setPhaseBoth('seq')
+        }
+      } else if (ph === 'carryToTray') {
+        s.autoMoveTime += dt
+        const p = clamp01(s.autoMoveTime / s.autoMoveDur)
+        const eased = easeInOutCubic(p)
+        s.x = s.startX + (s.targetX - s.startX) * eased
+        const moveDir = s.targetX > s.startX ? 1 : -1
+        if (!reduce) {
+          s.sway = -moveDir * 5 * Math.sin(Math.PI * p)
+          s.xrot += (s.sway * 0.5 - s.xrot) * (1 - Math.exp(-6 * dt))
+          if (stickEl.current) {
+            const tilt = p < 0.9 ? moveDir * 16 * Math.sin(Math.PI * p) : 0
+            stickEl.current.style.transform = `rotate(${tilt.toFixed(1)}deg)`
+          }
+        }
+        const { ex, ey } = pend()
+        s.carry.x = ex
+        s.carry.y = gripY(ey)
+
+        if (p > 0.45) {
+          a.setOverTray(true)
+          a.setTrayMode('open')
+        }
+
+        if (p >= 1) {
+          s.x = s.targetX
+          s.sway = 0
+          if (stickEl.current) stickEl.current.style.transform = ''
+          if (carriedEl.current) {
+            carriedEl.current.style.visibility = 'visible'
+            carriedEl.current.style.opacity = ''
+            carriedEl.current.style.clipPath = ''
+            carriedEl.current.style.filter = ''
+          }
+          s.stage = 'open'
+          s.st = 0
+          s.fallV = 0
+          s.swallow = 0
+          s.stretch = 0
+          s.released = false
+          a.setPhaseBoth('toTray')
+        }
+      } else if (ph === 'idle' || ph === 'carry') {
         s.drive += (dir.current - s.drive) * (1 - Math.exp(-13 * dt))
         s.vx += s.drive * 720 * dt
         s.vx *= Math.exp(-5.5 * dt)
         s.x = Math.min(CLAW_MAX, Math.max(CLAW_MIN, s.x + s.vx * dt))
         if (ph === 'carry') {
-          // the toy hangs FROM the claw, so it trails the sway a beat behind —
-          // a lagged follower on its rotation reads as real dangling weight
           s.xrot += (s.sway * 0.5 - s.xrot) * (1 - Math.exp(-6 * dt))
           const { ex, ey } = pend()
           s.carry.x = ex
@@ -516,17 +594,13 @@ export function ClawCaptcha({
         }
       } else if (ph === 'seq') {
         if (s.stage === 'antic') {
-          // a breath upward while the arms SPREAD wide, ready to engulf
           const p = stageP(T.antic, dt)
           s.y = HOME_Y - ANTIC_RISE * easeOutCubic(p)
-          s.close = -0.55 * easeOutCubic(p) // negative = arms spread open
+          s.close = -0.55 * easeOutCubic(p)
           if (p >= 1) {
-            // pay out exactly enough cable to wrap the head of whatever is
-            // under the claw — the grab happens AT the toy, never in mid-air
-            const cand = candidateAt(s.x)
+            const cand = s.chosenToy >= 0 ? s.chosenToy : candidateAt(s.x)
             if (cand >= 0) {
               const c = toyCenter(cand)
-              // ey ≈ s.y when straight: solve gripY(ey) = toy centre
               s.depthY = Math.min(GH - 46, Math.max(HOME_Y + 50, c.y - GRIP_OFFSET - pile[cand].w / 2))
             } else {
               s.depthY = DROP_Y
@@ -534,11 +608,9 @@ export function ClawCaptcha({
             nextStage('down')
           }
         } else if (s.stage === 'down') {
-          // cable pays out, accelerating like a released winch
           const p = stageP(T.down, dt)
           s.y = HOME_Y - ANTIC_RISE + (s.depthY - HOME_Y + ANTIC_RISE) * easeInQuad(p)
           if (s.y > 130 && !reduce) {
-            // the claw parts the pile as it dives in
             pile.forEach((q, i) => {
               const d = Math.abs(q.x - s.x)
               if (d < 56) {
@@ -551,8 +623,6 @@ export function ClawCaptcha({
           }
           if (p >= 1) nextStage('dwell1')
         } else if (s.stage === 'dwell1') {
-          // the winch stops but momentum carries the claw a few px past the
-          // mark and back — a sine bell, so it leaves and rejoins depthY cleanly
           const p = stageP(T.dwell1, dt)
           s.y = s.depthY + (reduce ? 0 : 3.5 * Math.sin(Math.PI * p))
           if (p >= 1) {
@@ -560,48 +630,41 @@ export function ClawCaptcha({
             nextStage('close')
           }
         } else if (s.stage === 'close') {
-          // from spread-wide (-0.55) all the way to gripped (1)
           const p = stageP(T.close, dt)
           s.close = -0.55 + 1.55 * easeOutCubic(p)
           if (p >= 1) {
-            const best = candidateAt(s.x)
+            const best = s.chosenToy >= 0 ? s.chosenToy : candidateAt(s.x)
             s.carried = best
             if (best >= 0) {
-              // the toy is picked up exactly where it stands, at full size AND
-              // at its resting tilt — xrot starts at the pile rotation and is
-              // springed upright during the lift, so nothing snaps
               s.carry = { ...toyCenter(best) }
               s.xrot = pile[best].rot + soft[best].rot
               const el = pileEls.current[best]
               if (el) el.style.visibility = 'hidden'
-              ripple(pile[best].x, 0.35, best) // neighbours sag into the gap
+              ripple(pile[best].x, 0.35, best)
               if (carriedEl.current) {
                 carriedEl.current.src = el?.src ?? carriedEl.current.src
                 carriedEl.current.style.width = `${pile[best].w}px`
                 carriedEl.current.style.visibility = 'visible'
-                carriedEl.current.style.opacity = '' // clear a prior fade-out
+                carriedEl.current.style.opacity = ''
               }
             } else {
-              ripple(s.x, 0.2) // empty pinch still stirs the pile
+              ripple(s.x, 0.2)
             }
             nextStage('dwell2')
           }
         } else if (s.stage === 'dwell2') {
-          // an empty claw lifts straight away; a loaded one takes the weight first
           if (stageP(T.dwell2, dt) >= 1) nextStage(s.carried >= 0 && !reduce ? 'load' : 'up')
           if (s.carried >= 0) {
-            s.xrot += -s.xrot * (1 - Math.exp(-3.5 * dt)) // grip rights the toy
+            s.xrot += -s.xrot * (1 - Math.exp(-3.5 * dt))
             const { ex, ey } = pend()
             s.carry.x = ex
             s.carry.y = gripY(ey)
           }
         } else if (s.stage === 'load') {
-          // the cable takes the load: a visible sag before the lift — the one
-          // beat that says the toy has WEIGHT. Sine bell, so it rejoins cleanly.
           const p = stageP(T.load, dt)
           const bell = Math.sin(Math.PI * p)
           s.y = s.depthY + 6 * bell
-          s.close = 1 + 0.12 * bell // the fingers bite harder as the weight comes on
+          s.close = 1 + 0.12 * bell
           s.xrot += -s.xrot * (1 - Math.exp(-3.5 * dt))
           const { ex, ey } = pend()
           s.carry.x = ex
@@ -614,7 +677,6 @@ export function ClawCaptcha({
           const p = stageP(T.up, dt)
           s.y = s.depthY + (HOME_Y - s.depthY) * easeInOutCubic(p)
           if (s.carried >= 0) {
-            // the toy hangs in the claw; its tilt keeps easing upright
             s.xrot += -s.xrot * (1 - Math.exp(-3.5 * dt))
             const { ex, ey } = pend()
             s.carry.x = ex
@@ -622,112 +684,155 @@ export function ClawCaptcha({
           }
           if (p >= 1) {
             if (s.carried >= 0) {
-              a.setPhaseBoth('carry')
+              const right = pile[s.carried]?.toy === target
+              const carriedW = pile[s.carried]?.w ?? 64
+
+              // CATAPULT LAUNCH: Claw whips up with a crisp recoil spring as it releases the prize
+              s.y = HOME_Y - 14
+              s.close = -0.7
+
+              // Measure exact drop tray mouth coordinates in game space
+              const m = machineEl.current?.getBoundingClientRect()
+              const tr = trayEl.current?.getBoundingClientRect()
+              let trayX = TRAY.cx
+              let mouthY = GH + 12
+              if (m && tr && m.width > 0) {
+                const scale = m.width / GW
+                trayX = (tr.left + tr.width / 2 - m.left) / scale
+                mouthY = (tr.top - m.top) / scale + 2
+              }
+              s.mouthY = mouthY
+
+              s.arcStartX = s.carry.x
+              s.arcStartY = s.carry.y
+              s.arcTargetX = trayX
+              // For target prize: plunge fully down past the hatch rim so the entire item sinks into the chute
+              // For wrong prize: land right on top of the closed hatch lid
+              s.arcTargetY = right ? mouthY + carriedW / 2 + 16 : mouthY - carriedW / 2 + 8
+              s.arcHeight = Math.max(70, Math.min(125, Math.abs(trayX - s.arcStartX) * 0.4 + 52))
+              s.flightTime = 0
+              s.flightDur = reduce ? 0.05 : 0.72
+              s.flightDir = s.arcTargetX >= s.arcStartX ? 1 : -1
+              s.startRot = s.xrot
+              s.scale = 1
+              s.stretch = 0
+              s.released = true
+
+              // Part doors if target prize, keep closed lid if wrong toy
+              a.setOverTray(true)
+              a.setTrayMode(right ? 'open' : 'hot')
               a.setMessage(null)
+
+              s.stage = 'open'
+              s.st = 0
+              a.setPhaseBoth('toTray')
             } else {
+              s.chosenToy = -1
               a.setPhaseBoth('idle')
-              a.setMessage('Came up empty. Try again.')
+              a.setMessage('Try again.')
             }
           }
         }
       } else if (ph === 'toTray') {
-        const right = s.carried === targetIdx
-        if (s.stage === 'open') {
-          const p = stageP(T.open, dt)
-          s.close = 1 - easeOutCubic(p)
-          if (s.st > 0.12 && !s.released) {
-            s.released = true // fingers part: the toy lets go (one-shot)
-            if (right) {
-              a.setTrayMode('open') // the hatch slides open to receive it
-              if (reduce) {
-                // reduced motion: no flight — straight to the verdict
-                if (carriedEl.current) carriedEl.current.style.visibility = 'hidden'
-                s.carried = -1
-                a.setOverTray(false)
-                a.setTrayMode('win')
-                nextStage('beat')
-                a.setPhaseBoth('celebrate')
-              } else {
-                // measure the hatch rim line in the toy's own coordinate space
-                // so the clip line sits EXACTLY on the tray's top edge
-                const m = machineEl.current?.getBoundingClientRect()
-                const tr = trayEl.current?.getBoundingClientRect()
-                if (m && tr) s.mouthY = tr.top - m.top + 2
-                s.fallV = 30 // and gravity takes it from here
+        const right = s.carried >= 0 && pile[s.carried]?.toy === target
+        s.flightTime += dt
+        const p = clamp01(s.flightTime / s.flightDur)
+
+        // Smooth claw recoil settling back into resting pose
+        s.close += (0 - s.close) * (1 - Math.exp(-8 * dt))
+        s.y += (HOME_Y - s.y) * (1 - Math.exp(-8 * dt))
+
+        if (s.carried >= 0) {
+          const w = pile[s.carried].w
+
+          // Smooth projectile horizontal motion
+          s.carry.x = s.arcStartX + (s.arcTargetX - s.arcStartX) * p
+
+          // Smooth parabolic arc with gravitational descent
+          const arcLift = Math.sin(Math.PI * Math.pow(p, 0.82))
+          s.carry.y = s.arcStartY + (s.arcTargetY - s.arcStartY) * Math.pow(p, 1.45) - s.arcHeight * arcLift
+
+          // Fluid aerobatic 360 degree spin (smooth sine ease in and out: zero rotational velocity at launch and landing)
+          const rotP = 0.5 * (1 - Math.cos(Math.PI * p))
+          s.xrot = s.startRot + s.flightDir * 360 * rotP
+
+          // Dynamic squash and stretch
+          const arc = 4 * p * (1 - p)
+          s.stretch = 0.06 * arc
+
+          if (right) {
+            // Target diving into parted hatch chute: smooth perspective plunge into depth
+            if (p >= 0.58) {
+              const plungeP = clamp01((p - 0.58) / 0.42)
+              s.scale = Math.max(0.42, 1 - plungeP * 0.55)
+              if (carriedEl.current) {
+                carriedEl.current.style.clipPath = ''
+                carriedEl.current.style.opacity = `${Math.max(0, 1 - Math.pow(plungeP, 1.4)).toFixed(3)}`
+                carriedEl.current.style.filter = `brightness(${(1 - plungeP * 0.5).toFixed(2)}) drop-shadow(0 ${((1 - plungeP) * 8).toFixed(1)}px 8px rgba(25, 30, 45, ${(0.2 * (1 - plungeP)).toFixed(2)}))`
               }
-            } else {
-              s.fallV = 40 // a wrong toy just drops onto the closed lid
+            } else if (carriedEl.current) {
+              s.scale = 1
+              carriedEl.current.style.clipPath = ''
+              carriedEl.current.style.opacity = '1'
+              carriedEl.current.style.filter = 'drop-shadow(0 6px 14px rgba(30, 30, 40, 0.22))'
+            }
+          } else {
+            // Wrong toy landing on closed hatch lid
+            if (carriedEl.current) {
+              carriedEl.current.style.clipPath = ''
+              carriedEl.current.style.opacity = '1'
+              carriedEl.current.style.filter = 'drop-shadow(0 6px 14px rgba(30, 30, 40, 0.22))'
+              s.scale = 1
             }
           }
         }
-        // RIGHT toy: free fall into the open hatch. No arc, no fade — the toy
-        // drops under the same gravity as everything else, drifts gently over
-        // the mouth, and is SWALLOWED by the rim: a clip line fixed at the
-        // tray's top edge eats it from the bottom up while it dims into the
-        // dark of the chute. Reads as going INTO the machine, not vanishing.
-        if (right && s.released && s.carried >= 0) {
-          s.fallV = Math.min(s.fallV + DROP_G * dt, 460)
-          s.carry.y += s.fallV * dt
-          s.carry.x += (TRAY.cx - s.carry.x) * (1 - Math.exp(-2.2 * dt))
-          s.xrot += -s.xrot * (1 - Math.exp(-4 * dt)) // falls upright
-          s.stretch = (Math.abs(s.fallV) / 460) * 0.09 // elongates with speed
-          const w = pile[s.carried].w
-          const sunk = s.carry.y + w / 2 - s.mouthY
-          if (sunk > 0 && carriedEl.current) {
-            carriedEl.current.style.clipPath = `inset(0 0 ${sunk.toFixed(1)}px 0)`
-            carriedEl.current.style.filter = `brightness(${Math.max(0.4, 1 - (sunk / w) * 0.75).toFixed(3)})`
-          }
-          if (sunk >= w + 4) {
-            // fully below the rim — it's in the machine now
+
+        if (p >= 1) {
+          if (right) {
+            // TARGET CAPTURED: Immediate triumph ("ĂN LUÔN")
             if (carriedEl.current) {
               carriedEl.current.style.visibility = 'hidden'
               carriedEl.current.style.clipPath = ''
               carriedEl.current.style.filter = ''
+              carriedEl.current.style.opacity = ''
             }
-            s.carried = -1 // gone — stops the JSX re-showing it
+            s.carried = -1
+            s.scale = 1
             a.setOverTray(false)
-            a.setTrayMode('win') // hatch shuts behind it, slot lights green + ring
+            a.setTrayMode('win')
             nextStage('beat')
             a.setPhaseBoth('celebrate')
-          }
-        }
-        // WRONG toy: gravity drop onto the closed lid, bounce, reject
-        if (!right && s.fallV !== 0) {
-          s.fallV = Math.min(s.fallV + DROP_G * dt, 360)
-          s.carry.y += s.fallV * dt
-          s.carry.x += (TRAY.cx - s.carry.x) * (1 - Math.exp(-4 * dt))
-          s.xrot += -s.xrot * (1 - Math.exp(-3 * dt)) // straighten in free fall
-          s.stretch = (Math.abs(s.fallV) / 460) * 0.09 // same fall physics
-          if (s.fallV > 0 && s.carry.y >= TRAY.cy) {
-            if (s.fallV > 200) {
-              s.carry.y = TRAY.cy
-              s.fallV = -s.fallV * 0.28
-              s.xrot += rand(-7, 7) // the impact knocks it off-kilter
-            } else {
-              s.carry.y = TRAY.cy
-              s.fallV = 0
-              s.stretch = 0 // at rest on the lid
-              a.setOverTray(false)
-              a.setTrayMode('no')
-              a.setMessage(
-                `That’s the ${TOY_META[pile[s.carried].toy].label}! Find the ${TOY_META[target].label}.`,
-              )
-              nextStage('beat')
-              a.setPhaseBoth('deny')
+            a.setVerified(true)
+            onVerifyRef.current?.()
+          } else {
+            // WRONG TARGET: Closed lid security barrier rejects
+            if (carriedEl.current) {
+              carriedEl.current.style.clipPath = ''
+              carriedEl.current.style.filter = ''
+              carriedEl.current.style.opacity = ''
             }
+            s.carry.y = s.arcTargetY
+            s.stretch = 0
+            s.scale = 1
+            a.setOverTray(false)
+            a.setTrayMode('no')
+            a.setMessage(
+              `That’s the ${TOY_META[pile[s.carried].toy].label}! Find the ${TOY_META[target].label}.`,
+            )
+            nextStage('beat')
+            a.setPhaseBoth('deny')
           }
         }
       } else if (ph === 'celebrate') {
-        // right toy: a short beat in the tray, then the verdict fires —
-        // green ring + check + dimmed glass. No hop, no waggle.
         if (s.stage === 'beat') {
-          if (stageP(0.28, dt) >= 1) {
+          if (stageP(0.24, dt) >= 1) {
             nextStage('shine')
-            api.current.setVerified(true) // ring + check + dim run together
-            onVerifyRef.current?.()
           }
         } else if (s.stage === 'shine') {
-          if (stageP(0.7, dt) >= 1) api.current.setPhaseBoth('done')
+          if (stageP(0.65, dt) >= 1) {
+            s.chosenToy = -1
+            api.current.setPhaseBoth('done')
+          }
         }
       } else if (ph === 'deny') {
         // wrong toy: the rejected catch is drawn back UP off the closed lid and
@@ -755,6 +860,7 @@ export function ClawCaptcha({
             b.vrot += rand(-1, 1)
             ripple(pile[idx].x, 0.25, idx)
             s.carried = -1
+            s.chosenToy = -1
             a.setPhaseBoth('idle')
           }
         }
@@ -770,50 +876,85 @@ export function ClawCaptcha({
   }, [reduce, targetIdx, target, pile])
 
   // ---- controls ----
+  const resetGame = () => {
+    const s = sim.current
+    s.carried = -1
+    s.chosenToy = -1
+    s.x = (CLAW_MIN + CLAW_MAX) / 2
+    s.y = HOME_Y
+    s.vx = 0
+    s.drive = 0
+    s.sway = 0
+    s.xrot = 0
+    s.close = 0
+    s.scale = 1
+    s.stretch = 0
+    s.swallow = 0
+    s.stage = 'antic'
+    s.st = 0
+    setVerified(false)
+    setTrayMode('')
+    setOverTray(false)
+    setMessage(null)
+    setPhaseBoth('idle')
+    if (carriedEl.current) {
+      carriedEl.current.style.visibility = 'hidden'
+      carriedEl.current.style.clipPath = ''
+      carriedEl.current.style.filter = ''
+      carriedEl.current.style.opacity = ''
+      carriedEl.current.style.transform = ''
+    }
+  }
+
   const action = () => {
     const s = sim.current
-    if (verified) return
-    if (phaseRef.current === 'idle') {
-      setMessage(null)
+    if (verified || phaseRef.current !== 'idle') return
+    setMessage(null)
+    const cand = candidateAt(s.x)
+    if (cand >= 0) {
+      s.chosenToy = cand
       s.close = 0
       s.stage = 'antic'
       s.st = 0
       setPhaseBoth('seq')
-    } else if (phaseRef.current === 'carry') {
-      if (s.x >= TRAY.min && s.x <= TRAY.max) {
-        if (carriedEl.current) {
-          carriedEl.current.style.visibility = 'visible'
-          carriedEl.current.style.opacity = ''
-          carriedEl.current.style.clipPath = ''
-          carriedEl.current.style.filter = ''
-        }
-        s.stage = 'open'
-        s.st = 0
-        s.fallV = 0
-        s.swallow = 0
-        s.stretch = 0
-        s.released = false
-        setOverTray(false) // neutral hatch until it opens (right) or rejects (wrong)
-        setPhaseBoth('toTray')
-      } else {
-        setMessage('Move the toy over the drop zone first.')
-      }
+    } else if (targetIdx >= 0) {
+      // 1-click solve: smoothly aim at target duck, grab, and fly into drop slot!
+      onSelectToy(targetIdx)
+    } else {
+      s.chosenToy = -1
+      s.close = 0
+      s.stage = 'antic'
+      s.st = 0
+      setPhaseBoth('seq')
     }
+  }
+
+  const onSelectToy = (idx: number) => {
+    const s = sim.current
+    if (verified || phaseRef.current !== 'idle') return
+    setMessage(null)
+    const tgt = pile[idx]
+    if (!tgt) return
+    s.chosenToy = idx
+    s.startX = s.x
+    s.targetX = tgt.x
+    s.autoMoveTime = 0
+    s.autoMoveDur = reduce ? 0.05 : Math.max(0.35, Math.min(0.8, Math.abs(tgt.x - s.x) / 180))
+    setPhaseBoth('aim')
   }
 
   const stickDrag = useRef<{ id: number; startX: number } | null>(null)
   const onStickDown = (e: React.PointerEvent) => {
-    if (verified) return
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    if (verified || phaseRef.current !== 'idle') return
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     stickDrag.current = { id: e.pointerId, startX: e.clientX }
     if (stickEl.current) stickEl.current.style.transition = 'none'
   }
   const onStickMove = (e: React.PointerEvent) => {
     const d = stickDrag.current
     if (!d || e.pointerId !== d.id) return
-    const dx = Math.max(-26, Math.min(26, e.clientX - d.startX))
-    dir.current = dx / 26
-    // a stick only ROTATES around its ball joint — it never leaves the socket
+    const dx = Math.max(-28, Math.min(28, e.clientX - d.startX))
+    dir.current = dx / 28
     if (stickEl.current) stickEl.current.style.transform = `rotate(${(dx * 1.05).toFixed(1)}deg)`
   }
   const onStickUp = (e: React.PointerEvent) => {
@@ -826,9 +967,53 @@ export function ClawCaptcha({
     }
   }
 
+  const glassDrag = useRef<{ id: number; startX: number; clawStartX: number } | null>(null)
+  const onGlassDown = (e: React.PointerEvent) => {
+    if (verified || phaseRef.current !== 'idle') return
+    if ((e.target as HTMLElement).closest('.cc-toy')) return
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    glassDrag.current = { id: e.pointerId, startX: e.clientX, clawStartX: sim.current.x }
+  }
+  const onGlassMove = (e: React.PointerEvent) => {
+    const g = glassDrag.current
+    if (!g || e.pointerId !== g.id) return
+    const m = machineEl.current?.getBoundingClientRect()
+    const scale = m && m.width > 0 ? m.width / GW : 1
+    const delta = (e.clientX - g.startX) / scale
+    sim.current.x = Math.max(CLAW_MIN, Math.min(CLAW_MAX, g.clawStartX + delta))
+  }
+  const onGlassUp = (e: React.PointerEvent) => {
+    if (glassDrag.current?.id !== e.pointerId) return
+    glassDrag.current = null
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (verified || phaseRef.current !== 'idle') return
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        dir.current = -1
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        dir.current = 1
+      } else if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        action()
+      }
+    }
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        dir.current = 0
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [verified])
+
   const t = TOY_META[target]
-  const busy = phase !== 'idle' && phase !== 'carry'
-  const stepNo = verified || phase === 'carry' || phase === 'toTray' || phase === 'celebrate' ? 3 : phase === 'seq' ? 2 : 1
+  const busy = phase !== 'idle'
   const carried = sim.current.carried
   const carriedW = carried >= 0 ? pile[carried].w : 80
 
@@ -864,7 +1049,7 @@ export function ClawCaptcha({
       <p className="clawcap-sub" aria-live="polite">
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
-            key={verified ? 'done' : (message ?? 'challenge')}
+            key={verified ? 'done' : busy ? 'busy' : message ? `msg-${message}` : 'challenge'}
             style={{ display: 'inline-block' }}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -873,6 +1058,8 @@ export function ClawCaptcha({
           >
             {verified ? (
               'You’re human. Nice catch.'
+            ) : busy ? (
+              'Catching target…'
             ) : message ? (
               message
             ) : (
@@ -888,19 +1075,15 @@ export function ClawCaptcha({
         </AnimatePresence>
       </p>
 
-      <ol className="clawcap-steps" aria-hidden="true">
-        {/* one shared pill that SLIDES between segments */}
-        <span className="clawcap-steps-pill" style={{ transform: `translateX(${(stepNo - 1) * 100}%)` }} />
-        {(['Move', 'Grab', 'Drop'] as const).map((label, i) => (
-          <li key={label} className={stepNo === i + 1 ? 'is-active' : undefined}>
-            <span className="clawcap-step-n">{i + 1}</span> {label}
-          </li>
-        ))}
-      </ol>
-
       <div ref={machineEl} className="clawcap-machine">
         <div className="clawcap-case">
-          <div className={verified ? 'clawcap-glass clawcap-glass--dim' : 'clawcap-glass'}>
+          <div
+            className={verified ? 'clawcap-glass clawcap-glass--dim' : 'clawcap-glass'}
+            onPointerDown={onGlassDown}
+            onPointerMove={onGlassMove}
+            onPointerUp={onGlassUp}
+            onPointerCancel={onGlassUp}
+          >
             <div className="cc-rail" />
             {/* the carriage the cable actually hangs from */}
             <div ref={trolleyEl} className="cc-trolley" aria-hidden="true" />
@@ -913,10 +1096,14 @@ export function ClawCaptcha({
                 ref={(el) => {
                   pileEls.current[i] = el
                 }}
-                className="cc-toy"
+                className={`cc-toy ${phase === 'idle' && !verified ? 'cc-toy--clickable' : ''}`}
                 src={`${assetBase}${p.toy}.png`}
                 alt=""
                 draggable={false}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSelectToy(i)
+                }}
                 style={{
                   left: p.x - p.w / 2,
                   bottom: p.b,
@@ -929,9 +1116,7 @@ export function ClawCaptcha({
             ))}
             <div className="cc-pile-shadow" />
 
-            {/* the rig: cable + claw drawn in ONE svg. The coil group is
-                scaled to the cable length, the claw group sits at exactly
-                that length — same coordinate space, no seams possible. */}
+            {/* the rig: cable + claw drawn in ONE svg */}
             <svg ref={rigEl} className="cc-rig" width="36" height={COIL_LEN + 70} viewBox={`0 0 36 ${COIL_LEN + 70}`} aria-hidden="true">
               <g ref={coilEl} transform={`translate(9 0) scale(1 ${COIL_LEN / 100})`}>
                 <path
@@ -961,6 +1146,7 @@ export function ClawCaptcha({
               </g>
             </svg>
 
+            {/* Specular glass sheen */}
             <div className="cc-glass-shine" />
           </div>
 
@@ -986,6 +1172,9 @@ export function ClawCaptcha({
 
             <div
               ref={trayEl}
+              onClick={verified ? resetGame : undefined}
+              title={verified ? 'Click to replay' : undefined}
+              style={{ cursor: verified ? 'pointer' : undefined }}
               className={
                 'cc-tray' +
                 (trayMode === 'open'
@@ -999,16 +1188,13 @@ export function ClawCaptcha({
                         : '')
               }
             >
-              {/* the hatch: a dark interior under two doors that part to
-                  swallow a correct catch. Clipped so the doors slide out of
-                  sight; the success ring lives on the tray itself, uncliped. */}
+              {/* the hatch: dark interior chute under two sliding doors */}
               <span className="cc-tray-hatch" aria-hidden="true">
-                <span className="cc-tray-mouth" />
+                <span className="cc-tray-mouth">
+                  <span className="cc-tray-vortex" />
+                </span>
                 <span className="cc-tray-door cc-tray-door--l" />
                 <span className="cc-tray-door cc-tray-door--r" />
-                {/* one seamless skin over the closed doors — the split only
-                    exists while the hatch is actually open */}
-                <span className="cc-tray-skin" />
               </span>
               {trayMode === 'win' && !reduce && (
                 <span className="cc-confetti" aria-hidden="true">
@@ -1030,46 +1216,33 @@ export function ClawCaptcha({
               )}
               <span className="cc-tray-label">
                 {trayMode === 'win' ? (
-                  // a clean check — the catch is in
                   <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
                     <path d="m3.6 8.6 2.9 2.9 6-6.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 ) : trayMode === 'no' ? (
-                  // try-again loop — it goes back to the pile
                   <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
                     <path d="M13.2 8A5.2 5.2 0 1 1 11.6 4.25" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                     <path d="M11.7 1.5v2.9h2.9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 ) : (
-                  // a toy over the parted slot — this is where the catch goes in
                   <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
                     <circle cx="8" cy="4.9" r="2.7" fill="none" stroke="currentColor" strokeWidth="1.5" />
                     <path d="M2.4 12.1h3.7M9.9 12.1h3.7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
                 )}
-                <span>{trayMode === 'win' ? 'Nice catch!' : trayMode === 'no' ? 'Hmm, wrong toy' : overTray ? 'Release!' : 'Drop here'}</span>
+                <span>{trayMode === 'win' ? 'Nice catch!' : trayMode === 'open' || overTray ? 'Open' : 'Drop slot'}</span>
               </span>
             </div>
 
             <button
               type="button"
-              className={phase === 'carry' && overTray ? 'cc-action cc-action--ready' : 'cc-action'}
-              onClick={action}
-              disabled={busy || verified}
-              aria-label={phase === 'carry' ? 'Drop the toy' : 'Grab'}
+              className="cc-action"
+              onClick={verified ? resetGame : action}
+              disabled={busy}
+              aria-label={verified ? 'Replay' : 'Grab'}
+              title={verified ? 'Click to replay' : 'Grab'}
             >
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.span
-                  key={phase === 'carry' ? 'drop' : 'grab'}
-                  style={{ display: 'inline-block' }}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.16, ease: 'easeOut' }}
-                >
-                  {phase === 'carry' ? 'Drop' : 'Grab'}
-                </motion.span>
-              </AnimatePresence>
+              {verified ? '↻' : 'Grab'}
             </button>
           </div>
         </div>

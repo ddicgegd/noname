@@ -11,21 +11,14 @@
 - **NO SPONTANEOUS PLANS**: NEVER generate plans, execution outlines, step-by-step roadmaps, or speculative preparation phases unless the user explicitly requests one (e.g., via `/plan`, "create a plan", "lên kế hoạch").
 - **DEFAULT TO DIRECT ACTION**: Execute the requested task immediately and directly without unnecessary conversational overhead.
 
-### 1.2. SEAMLESS HOT RELOAD & SERVICE HEALTH MANAGEMENT
-- **ZERO UNNECESSARY RESTARTS (CRITICAL FOR UX)**:
-  - **Frontend & Client Logic Changes (`src/**`)**: DO NOT kill or restart the dev server (`fuser -k 3000` is strictly forbidden for frontend edits). Vite Fast Refresh / HMR automatically reflects all UI, component, CSS, and algorithmic/client logic changes immediately without reloading the page and preserves user state.
-  - **Server Liveness Check**: Verify that the server is alive via `curl -s http://localhost:3000/api/health`. If healthy (`{"status":"ok",...}`), KEEP IT RUNNING and DO NOT restart.
-- **MANDATORY RESTART CONDITIONS (ONLY WHEN EXPLICITLY REQUIRED)**:
-  Restart the server ONLY when:
-  1. Backend server code is modified (e.g., `server.ts`).
-  2. Project dependencies or environment configurations are modified (`package.json`, `.env`).
-  3. The server process is dead or health check fails.
-- **EXACT RESTART SEQUENCE (WHEN REQUIRED)**:
-  1. Kill old process on port 3000: `fuser -k 3000/tcp 2>/dev/null || true`
-  2. Launch dev server in background via `run_command`: `npm run dev`
-  3. Verify health endpoint: `curl -s http://localhost:3000/api/health`
+### 1.2. SEAMLESS DUAL HOT-RELOAD & ZERO-RESTART GUARANTEE
+- **AUTOMATIC DUAL HOT-RELOAD (PERSISTENT DAEMON)**:
+  - **Frontend (`src/**`)**: Vite HMR automatically reflects UI, component, CSS, and client-side logic changes immediately (0.05s) without manual page reloads and preserves state.
+  - **Backend & GraphQL (`server.ts`)**: `tsx watch` daemon automatically recompiles and hot-reloads backend endpoints and resolvers on file change (0.2s) without dropping connections.
+- **ABSOLUTE BAN ON MANUAL RESTARTS IN CHAT PROMPTS**:
+  - NEVER execute `npm run dev`, `fuser -k 3000`, or background server spawn commands inside chat turns. Doing so breaks the T3 Code JSON-RPC transport and causes `session/cancel` socket collisions.
 - **DEFINITION OF DONE**:
-  The task is complete when code changes are applied and `http://localhost:3000/api/health` returns `{"status":"ok",...}` (without restarting if server was already running and changes were frontend-only).
+  - The task is complete immediately once file modifications are applied. The persistent server automatically hot-reloads both frontend and backend seamlessly.
 
 ### 1.3. STRICT SCOPE ADHERENCE & IMMEDIATE REMEDIATION
 - **EXACT SCOPE COMPLIANCE**: Delivering incorrect output, exceeding requested scope, or performing unsolicited modifications is a critical system violation.

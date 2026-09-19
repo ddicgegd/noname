@@ -14,6 +14,7 @@ import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { createAuthAction, savePendingAction } from "@/lib/authAction";
 import { addToCart as apiAddToCart, removeCartItem as apiRemoveCartItem, updateCartItemQuantity as apiUpdateCartQuantity } from "@/services/cartService";
 import { useChainedSpringList } from "@/hooks/useChainedSpringList";
+import { useToast } from "@/components/ui/Toast";
 
 export interface CartItem {
   id: string;
@@ -360,6 +361,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showCartMenu, setShowCartMenu] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
+  const { showToast } = useToast();
   
   // Search state
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -491,6 +493,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   // ONLY hide when opening up # (either product modal is open or URL has #)
   const isProductPage = currentPage === "product" || cleanPath === "/p";
   const isProductModalActive = isProductPage && Boolean(isProductDetailOpen || isProductHashActive);
+  const hideCartOnProductHash = !loggedInUser && isProductModalActive;
 
   // 3. Account / Profile page (/a, /a#, /profile): Auto-hide operates in /a and /a#
   const isAccountRoute = ["/a", "/profile", "/account", "/accounts"].includes(cleanPath);
@@ -950,7 +953,7 @@ const resolveProductMetadata = (skuOrName: string) => {
     });
     
     if (idsToRemove.length === 0) {
-      alert("Vui lòng tích chọn sản phẩm bạn muốn xóa!");
+      showToast("Vui lòng tích chọn sản phẩm bạn muốn xóa!", "warning");
       return;
     }
     
@@ -1475,9 +1478,10 @@ const resolveProductMetadata = (skuOrName: string) => {
         </div>
 
         {/* Subtle 3D Divider */}
-        <BevelDivider />
+        {!hideCartOnProductHash && <BevelDivider />}
 
         {/* 2. Shopping Cart Button */}
+        {!hideCartOnProductHash && (
         <div className="relative" ref={cartRef}>
           <motion.button 
             animate={isBouncing ? { 
@@ -1518,7 +1522,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/98 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900"
+                className="absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900"
               >
                 {/* Decorative ambient glow (+20% radiance) */}
                 <div className="absolute top-0 right-0 w-72 h-72 bg-[#FF4D24]/36 rounded-full blur-[70px] pointer-events-none -z-10" />
@@ -1990,7 +1994,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                         onClick={() => {
                           const totalSelected = selectedGroupKeys.length;
                           if (totalSelected === 0) {
-                            alert("Vui lòng tích chọn ít nhất 1 sản phẩm để thanh toán!");
+                            showToast("Vui lòng tích chọn ít nhất 1 sản phẩm để thanh toán!", "warning");
                             return;
                           }
                           const executeCheckout = createAuthAction({
@@ -2022,6 +2026,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             )}
           </AnimatePresence>
         </div>
+        )}
 
         {/* Subtle 3D Divider */}
         <BevelDivider />

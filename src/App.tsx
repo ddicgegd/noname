@@ -18,6 +18,7 @@ import ProfilePage from "./components/ProfilePage";
 import TermsPage from "./components/TermsPage";
 import OrderPage from "./components/OrderPage";
 import { GenieCartFlyProvider } from "./components/ui/genie-cart-fly";
+import { ToastProvider } from "./components/ui/Toast";
 import { AnimatePresence, motion } from "motion/react";
 import { 
   getFullCart, 
@@ -68,20 +69,41 @@ export default function App() {
     if (["/p", "/product"].includes(cleanPath)) return "product";
     if (["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath)) return "order";
     if (["/auth-report", "/diagnostic"].includes(cleanPath)) return "auth-report";
-    if (["/a", "/profile", "/account", "/accounts"].includes(cleanPath)) {
-      if (cleanPath !== "/a" && typeof window !== "undefined") {
-        window.history.replaceState({}, "", "/a" + window.location.hash + window.location.search);
+    if (["/m", "/profile", "/account", "/accounts", "/me"].includes(cleanPath)) {
+      if (cleanPath !== "/m" && typeof window !== "undefined") {
+        window.history.replaceState({}, "", "/m" + window.location.hash + window.location.search);
       }
       return "profile";
     }
     if (["/verify-email", "/verify"].includes(cleanPath)) {
-      window.history.replaceState({}, "", "/auth#login" + window.location.search);
+      window.history.replaceState({}, "", "/a#login" + window.location.search);
       return "auth";
     }
-    if (cleanPath === "/auth") return "auth";
+    if (["/recovery", "/forgot-password"].includes(cleanPath)) {
+      window.history.replaceState({}, "", "/a#recovery" + window.location.search);
+      return "auth";
+    }
+    if (["/a", "/auth"].includes(cleanPath)) {
+      if (cleanPath !== "/a" && typeof window !== "undefined") {
+        window.history.replaceState({}, "", "/a" + window.location.hash + window.location.search);
+      }
+      return "auth";
+    }
     if (["/terms", "/privacy"].includes(cleanPath)) return "terms";
     return "landing";
   };
+
+  const VALID_AUTH_HASHES = [
+    "#login",
+    "#register",
+    "#verify",
+    "#recovery",
+    "#forgot-password",
+    "#forgot",
+    "#recovery-token",
+    "#manual-token",
+    "#reset-password",
+  ];
 
   const getPathFromPage = (page: string) => {
     switch (page) {
@@ -91,13 +113,16 @@ export default function App() {
       case "auth-report": return "/auth-report";
       case "profile": {
         const hash = window.location.hash;
-        return hash ? `/a${hash}` : "/a";
+        return hash ? `/m${hash}` : "/m";
       }
       case "auth": {
         const hash = window.location.hash.toLowerCase();
-        if (hash === "#register") return "/auth#register";
-        if (hash === "#verify") return "/auth#verify";
-        return "/auth#login";
+        if (hash === "#register") return "/a#register";
+        if (hash === "#verify") return "/a#verify";
+        if (["#recovery", "#forgot-password", "#forgot"].includes(hash)) return "/a#recovery";
+        if (["#recovery-token", "#manual-token"].includes(hash)) return "/a#recovery-token";
+        if (hash === "#reset-password") return "/a#reset-password";
+        return "/a#login";
       }
       case "terms": return "/terms";
       default: return "/";
@@ -108,13 +133,13 @@ export default function App() {
     const page = getPageFromPath(window.location.pathname);
     if (page === "auth") {
       const hash = window.location.hash.toLowerCase();
-      if (!["#login", "#register", "#verify"].includes(hash)) {
-        window.history.replaceState({}, "", "/auth#login");
+      if (!VALID_AUTH_HASHES.includes(hash)) {
+        window.history.replaceState({}, "", "/a#login");
       }
     } else if (page === "profile") {
       const cleanPath = window.location.pathname.toLowerCase().replace(/\/$/, "");
-      if (cleanPath !== "/a") {
-        window.history.replaceState({}, "", "/a" + window.location.hash + window.location.search);
+      if (cleanPath !== "/m") {
+        window.history.replaceState({}, "", "/m" + window.location.hash + window.location.search);
       }
     }
     return page;
@@ -189,8 +214,8 @@ export default function App() {
       setCurrentPage(page);
       if (page === "auth") {
         const hash = window.location.hash.toLowerCase();
-        if (!["#login", "#register", "#verify"].includes(hash)) {
-          window.history.replaceState({}, "", "/auth#login");
+        if (!VALID_AUTH_HASHES.includes(hash)) {
+          window.history.replaceState({}, "", "/a#login");
         }
       }
     };
@@ -210,15 +235,21 @@ export default function App() {
     if (page === "auth") {
       const hash = window.location.hash.toLowerCase();
       if (hash === "#register") {
-        targetPath = "/auth#register";
+        targetPath = "/a#register";
       } else if (hash === "#verify") {
-        targetPath = "/auth#verify";
+        targetPath = "/a#verify";
+      } else if (["#recovery", "#forgot-password", "#forgot"].includes(hash)) {
+        targetPath = "/a#recovery";
+      } else if (["#recovery-token", "#manual-token"].includes(hash)) {
+        targetPath = "/a#recovery-token";
+      } else if (hash === "#reset-password") {
+        targetPath = "/a#reset-password";
       } else {
-        targetPath = "/auth#login";
+        targetPath = "/a#login";
       }
     } else if (page === "profile") {
       const hash = window.location.hash;
-      targetPath = hash ? `/a${hash}` : "/a";
+      targetPath = hash ? `/m${hash}` : "/m";
     }
     if (window.location.pathname + window.location.hash !== targetPath) {
       window.history.pushState({}, "", targetPath);
@@ -372,10 +403,11 @@ export default function App() {
   };
 
   return (
-    <GenieCartFlyProvider>
-      <div className="relative w-full min-h-screen overflow-x-clip bg-[#E4E4E4] text-[#111111]">
-      {/* 1. Splash Screen Transition Curtain */}
-      <SplashScreen />
+    <ToastProvider>
+      <GenieCartFlyProvider>
+        <div className="relative w-full min-h-screen overflow-x-clip bg-[#E4E4E4] text-[#111111]">
+        {/* 1. Splash Screen Transition Curtain */}
+        <SplashScreen />
 
       {/* 2. Synchronized Top Floating Glassmorphism Navbar */}
       {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && (
@@ -426,6 +458,7 @@ export default function App() {
           >
             <ProductPage 
               cartItems={cartItems}
+              onRemoveCartItem={handleRemoveCartItem}
               onAddToCart={handleAddToCart} 
               onNavigate={navigate} 
               onFlyEffect={handleFlyEffect}
@@ -581,7 +614,8 @@ export default function App() {
           </motion.div>
         ))}
       </AnimatePresence>
-      </div>
-    </GenieCartFlyProvider>
+        </div>
+      </GenieCartFlyProvider>
+    </ToastProvider>
   );
 }

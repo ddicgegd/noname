@@ -28,6 +28,9 @@ const bevelVariants = cva(
         // Phiên bản tối sang trọng (YouTube Dark Mode Bevel)
         dark: "bg-gradient-to-b from-neutral-800 via-neutral-850 to-neutral-900 border-t border-t-neutral-700/80 border-b border-b-black/80 border-x border-x-neutral-800/60 text-white shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15),inset_0_-1px_1px_rgba(0,0,0,0.4)] hover:from-neutral-750 hover:to-neutral-850 active:scale-95 cursor-pointer flex items-center justify-center font-medium",
         
+        // Khung rãnh trượt lõm sâu quang học 3D (Concave / Sunken Inset Bevel Track - Siêu mảnh & mềm)
+        inset: "bg-slate-100/60 dark:bg-zinc-800/40 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]",
+
         // Nút con trong Dock (hiện hiệu ứng quang học khi hover)
         subtle: "hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] text-[#555555] hover:text-[#FF4D24] bg-transparent cursor-pointer flex items-center justify-center",
       },

@@ -455,6 +455,8 @@ button.clawcap-help:focus-visible {
 .clawcap-glass {
   position: relative;
   height: 330px;
+  touch-action: none;
+  cursor: default;
   border-radius: 18px 18px 0 0;
   overflow: hidden;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 246, 242, 0.65) 100%);
@@ -550,6 +552,15 @@ button.clawcap-help:focus-visible {
 }
 
 /* prize pile */
+
+.cc-toy--clickable {
+  cursor: pointer;
+  pointer-events: auto;
+}
+.cc-toy--clickable:hover {
+  filter: drop-shadow(0 4px 8px rgba(255, 77, 36, 0.35));
+}
+
 .cc-toy {
   position: absolute;
   pointer-events: none;
@@ -588,7 +599,7 @@ button.clawcap-help:focus-visible {
   pointer-events: none;
   filter: drop-shadow(0 8px 10px rgba(30, 30, 40, 0.18));
   will-change: transform;
-  transform-origin: 50% 12%; /* swings from the grip point, not its belly */
+  transform-origin: 50% 50%; /* smooth tumble rotation during flight */
 }
 
 /* control panel — modern frosted glass surface, seamlessly attached to bottom of machine */
@@ -679,12 +690,12 @@ button.clawcap-help:focus-visible {
   width: 19px;
   height: 19px;
   border-radius: 50%;
-  background: radial-gradient(circle at 33% 26%, #ff9da3, #ff5159 52%, #cf2c36 100%);
+  background: radial-gradient(circle at 33% 26%, #ffffff, #cbd5e1 45%, #64748b 80%, #334155 100%);
   box-shadow:
-    0 0 0 0.5px rgba(120, 10, 20, 0.25),
-    0 2px 3px rgba(120, 10, 20, 0.28),
-    0 5px 6px -2px rgba(20, 20, 30, 0.22),
-    inset 0 -2px 3px rgba(120, 10, 20, 0.35);
+    0 0 0 0.5px rgba(255, 255, 255, 0.45),
+    0 2px 3px rgba(15, 23, 42, 0.35),
+    0 5px 6px -2px rgba(15, 23, 42, 0.25),
+    inset 0 -2px 3px rgba(15, 23, 42, 0.5);
 }
 
 /* the hard specular dot that sells the gloss */
@@ -704,117 +715,97 @@ button.clawcap-help:focus-visible {
    bezel over a dark chute. The doors part to swallow a correct catch; a wrong
    toy meets them closed and is rejected. Built in the iOS-register (grouped
    surfaces, hairlines, precise inset shadows) so it reads as one machine. */
+/* drop tray = FROSTED GLASS & DYNAMIC LED TRAY
+   Seamless glass sliding shutter doors, no center partition seam, dynamic soft glowing state bezel */
 .cc-tray {
   position: relative;
   flex: 1;
   height: 54px;
   border-radius: 12px;
-  /* a true hairline, not an outline — the tray should sit IN the panel */
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  /* refined hairline glass bezel with subtle inset depth */
   box-shadow:
-    inset 0 0 0 0.5px rgba(60, 60, 67, 0.07),
-    0 1px 2px -1px rgba(30, 30, 40, 0.06);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.65),
+    inset 0 1.5px 3px rgba(0, 0, 0, 0.04),
+    0 2px 8px -2px rgba(0, 0, 0, 0.05);
+  transition:
+    box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.28s ease;
 }
 
-/* clipped frame so the sliding doors disappear off the sides */
+/* clipped frame so the sliding doors glide off smoothly behind bezels */
 .cc-tray-hatch {
   position: absolute;
   inset: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
 }
 
-/* the chute, revealed once the doors slide open — not a flat black box but a
-   recessed slot with depth: a rim catch-light at the top edge, charcoal walls
-   falling away into the dark, and a vignette so the centre reads DEEPEST */
+/* 3D hopper chute with atmospheric depth and frosted glass lighting */
 .cc-tray-mouth {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(130% 100% at 50% 0%, rgba(255, 255, 255, 0.07), transparent 42%),
-    radial-gradient(85% 90% at 50% 78%, rgba(0, 0, 0, 0.55), transparent 75%),
-    linear-gradient(180deg, #35363d 0%, #1e1f25 48%, #14151a 100%);
+    radial-gradient(ellipse 95% 75% at 50% 20%, #dbe0ea 0%, #b4bbcc 38%, #6a7285 78%, #3e4454 100%);
   box-shadow:
-    inset 0 10px 14px -6px rgba(0, 0, 0, 0.8),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    inset 4px 0 8px -5px rgba(0, 0, 0, 0.7),
-    inset -4px 0 8px -5px rgba(0, 0, 0, 0.7);
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 10px 16px -4px rgba(20, 25, 40, 0.3),
+    inset 8px 0 12px -6px rgba(20, 25, 40, 0.22),
+    inset -8px 0 12px -6px rgba(20, 25, 40, 0.22),
+    inset 0 -6px 10px -3px rgba(20, 25, 40, 0.2);
 }
 
-/* while the hatch waits for the catch, a soft green glow breathes up from the
-   bottom of the chute — "in here" — and disappears when the doors shut */
-.cc-tray-mouth::after {
-  content: '';
+/* subtle warm ambient beacon deep inside the bottom chute aperture */
+.cc-tray-vortex {
   position: absolute;
   inset: 0;
-  background: radial-gradient(70% 95% at 50% 88%, rgba(52, 199, 89, 0.28), transparent 68%);
+  background: radial-gradient(ellipse 68% 50% at 50% 88%, rgba(255, 115, 50, 0.28) 0%, rgba(255, 115, 50, 0.06) 50%, transparent 80%);
   opacity: 0;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.28s ease;
+  pointer-events: none;
 }
 
-.cc-tray--open .cc-tray-mouth::after {
+.cc-tray--open .cc-tray-vortex {
   opacity: 1;
 }
 
-/* the two doors form ONE seamless lid when shut — a top catch-light and a soft
-   underside shadow give it thickness, with NO centre seam line (the split only
-   appears when the doors actually part, so closed it reads as a clean panel). */
+/* Frosted glass sliding shutter doors - zero border seam at center to eliminate vertical cut line */
 .cc-tray-door {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 51%; /* slight overlap so the two halves never show a hairline gap */
-  background: linear-gradient(180deg, #fdfdfe 0%, #edeef2 100%);
+  width: 50.5%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 248, 252, 0.92) 100%);
+  border: none;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -10px 13px -10px rgba(30, 30, 40, 0.2);
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -4px 6px -4px rgba(30, 30, 40, 0.08);
+  will-change: transform;
   transition:
-    transform 0.42s cubic-bezier(0.645, 0.045, 0.355, 1),
-    background 0.25s ease;
+    transform 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .cc-tray-door--l {
   left: 0;
+  transform: translate3d(0, 0, 0);
+  border: none;
 }
 
 .cc-tray-door--r {
   right: 0;
+  transform: translate3d(0, 0, 0);
+  border: none;
 }
 
-/* one seamless skin laid over the closed doors: while shut the lid is a single
-   uninterrupted panel (no centre seam, no door edges). It fades out fast as the
-   doors part, and fades back in late so the shutting slide still reads. */
 .cc-tray-skin {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, #fdfdfe 0%, #edeef2 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -10px 13px -10px rgba(30, 30, 40, 0.2);
-  transition:
-    background 0.25s ease,
-    opacity 0.2s ease 0.3s;
+  display: none;
 }
 
-.cc-tray--open .cc-tray-skin {
-  opacity: 0;
-  transition:
-    background 0.25s ease,
-    opacity 0.12s ease;
-}
-
-.cc-tray--hot .cc-tray-skin {
-  background: linear-gradient(180deg, #f5fbf7 0%, #e9f6ee 100%);
-}
-
-.cc-tray--win .cc-tray-skin {
-  background: linear-gradient(180deg, #f0faf3 0%, #ddf2e4 100%);
-}
-
-.cc-tray--no .cc-tray-skin {
-  background: linear-gradient(180deg, #fff7ee 0%, #fdecd8 100%);
-}
-
-/* the label rides on top of the closed doors */
+/* tactile status label on closed doors - clean refined typography, high clarity over frosted glass */
 .cc-tray-label {
   position: absolute;
   inset: 0;
@@ -823,11 +814,12 @@ button.clawcap-help:focus-visible {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  color: var(--cc-muted);
-  font-size: 0.75rem; /* 12px label */
-  font-weight: 500;
-  letter-spacing: -0.004em;
+  gap: 3px;
+  color: #64748b;
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   pointer-events: none;
   transition:
     opacity 0.18s ease,
@@ -838,89 +830,127 @@ button.clawcap-help:focus-visible {
 .cc-tray--hot .cc-tray-label,
 .cc-tray--win .cc-tray-label,
 .cc-tray--no .cc-tray-label {
-  font-weight: 600;
+  font-weight: 650;
 }
 
-/* a single thin accent ring expresses each state — restrained, themed, never a
-   flooded colour block */
+/* dynamic LED neon ring & frosted ambient aura for interactive states */
 .cc-tray::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 3;
-  border-radius: 14px;
-  box-shadow: inset 0 0 0 1.5px transparent;
-  transition: box-shadow 0.25s ease;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  transition: box-shadow 0.28s ease;
   pointer-events: none;
 }
 
-/* OPEN — doors part, chute shows, label clears out of the way */
+/* OPEN - doors glide smoothly and cleanly apart */
 .cc-tray--open .cc-tray-door--l {
-  transform: translateX(-101%);
+  transform: translate3d(-101%, 0, 0);
 }
 
 .cc-tray--open .cc-tray-door--r {
-  transform: translateX(101%);
+  transform: translate3d(101%, 0, 0);
 }
 
 .cc-tray--open .cc-tray-label {
   opacity: 0;
 }
 
-/* HOT — a toy hovers over the closed hatch: ready. Green ring + label, only a
-   whisper of tint on the lid (no generic green box). */
+/* HOT - a toy hovers over the chute: soft warm neon anticipation glow */
 .cc-tray--hot .cc-tray-door {
-  background: linear-gradient(180deg, #f5fbf7 0%, #e9f6ee 100%);
+  background: linear-gradient(180deg, #fff9f6 0%, #fdeee6 100%);
+  border: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -4px 6px -4px rgba(255, 122, 69, 0.12);
 }
 
 .cc-tray--hot .cc-tray-label {
-  color: #1f8a3b;
+  color: #ea580c;
 }
 
 .cc-tray--hot::before {
-  box-shadow: inset 0 0 0 1.5px rgba(52, 199, 89, 0.5);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 122, 69, 0.5),
+    0 0 12px rgba(255, 122, 69, 0.22);
 }
 
-/* WIN — the hatch has snapped shut on the catch: green ring + a single ripple */
+/* WIN - doors glide back shut with a warm orange frosted glow and micro-jolt */
+.cc-tray--win {
+  animation: cc-tray-impact 0.36s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@keyframes cc-tray-impact {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  32% {
+    transform: translate3d(0, 2.5px, 0);
+  }
+  70% {
+    transform: translate3d(0, -0.8px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .cc-tray--win .cc-tray-door {
-  background: linear-gradient(180deg, #f0faf3 0%, #ddf2e4 100%);
+  transform: translate3d(0, 0, 0);
+  border: none;
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.25s ease;
+  background: linear-gradient(180deg, #fff8f5 0%, #faeee9 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -4px 6px -4px rgba(255, 122, 69, 0.1);
 }
 
 .cc-tray--win .cc-tray-label {
-  color: #1f8a3b;
+  color: #ea580c;
+  text-shadow: 0 1px 4px rgba(234, 88, 12, 0.18);
+}
+
+.cc-tray--win .cc-tray-label svg {
+  animation: cc-badge-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  filter: drop-shadow(0 1px 3px rgba(234, 88, 12, 0.35));
 }
 
 .cc-tray--win::before {
-  box-shadow: inset 0 0 0 1.5px rgba(52, 199, 89, 0.62);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 100, 45, 0.7),
+    0 0 16px -1px rgba(255, 100, 45, 0.35);
 }
 
-/* two waves rolling off the tray, box-shadow spread so they follow the
-   rounded shape exactly — scaling a border warps the corner radii */
+/* soft orange expanding ripple wave */
 .cc-tray--win::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 3;
-  border-radius: 14px;
-  animation: cc-ring 1s cubic-bezier(0.2, 0.6, 0.35, 1) 0.08s both;
+  border-radius: 12px;
+  animation: cc-ring 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.04s both;
   pointer-events: none;
 }
 
 @keyframes cc-ring {
   0% {
     box-shadow:
-      0 0 0 0 rgba(52, 199, 89, 0.5),
-      0 0 0 0 rgba(52, 199, 89, 0.35);
+      0 0 0 0 rgba(255, 122, 69, 0.5),
+      0 0 0 0 rgba(255, 170, 110, 0.3);
   }
   45% {
     box-shadow:
-      0 0 0 9px rgba(52, 199, 89, 0.15),
-      0 0 0 3px rgba(52, 199, 89, 0.3);
+      0 0 0 8px rgba(255, 122, 69, 0.15),
+      0 0 0 3px rgba(255, 170, 110, 0.25);
   }
   100% {
     box-shadow:
-      0 0 0 15px rgba(52, 199, 89, 0),
-      0 0 0 10px rgba(52, 199, 89, 0);
+      0 0 0 14px rgba(255, 122, 69, 0),
+      0 0 0 8px rgba(255, 170, 110, 0);
   }
 }
 
@@ -942,7 +972,7 @@ button.clawcap-help:focus-visible {
   animation: cc-pop 1.05s cubic-bezier(0.3, 0.55, 0.45, 1) both;
 }
 
-/* every other piece is a round dot, a size down — a mixed handful, not a grid */
+/* every other piece is a round dot, a size down - a mixed handful, not a grid */
 .cc-confetti i:nth-child(even) {
   width: 4.5px;
   height: 4.5px;
@@ -968,10 +998,13 @@ button.clawcap-help:focus-visible {
   }
 }
 
-/* NO — the doors stayed shut: an amber ring + label and one apologetic shake.
-   Amber (not red) — it's "try again", not an error. */
+/* NO - the doors stayed shut: an amber LED ring + label and one apologetic shake */
 .cc-tray--no .cc-tray-door {
-  background: linear-gradient(180deg, #fff7ee 0%, #fdecd8 100%);
+  background: linear-gradient(180deg, #fff8f2 0%, #fdefdf 100%);
+  border: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -4px 6px -4px rgba(255, 149, 0, 0.1);
 }
 
 .cc-tray--no .cc-tray-label {
@@ -979,7 +1012,9 @@ button.clawcap-help:focus-visible {
 }
 
 .cc-tray--no::before {
-  box-shadow: inset 0 0 0 1.5px rgba(255, 149, 0, 0.55);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 149, 0, 0.6),
+    0 0 12px rgba(255, 149, 0, 0.25);
 }
 
 .cc-tray--no {

@@ -43,16 +43,10 @@ export interface BookmarkApiResponse<T> {
 }
 
 export const BOOKMARK_UPDATED_EVENT = "bookmark-updated";
-const LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX = "horizon_cached_bookmark_";
 
 export function getBookmarkTimestamp(bookmark: Partial<BookmarkData>): number {
   if (bookmark.updatedAt) return bookmark.updatedAt;
   if (bookmark.createdAt) return bookmark.createdAt;
-  if (bookmark.mainSku) {
-    const cached = getCachedBookmark(bookmark.mainSku);
-    if (cached?.updatedAt) return cached.updatedAt;
-    if (cached?.createdAt) return cached.createdAt;
-  }
   if (bookmark.expiresAtEpochMs) return bookmark.expiresAtEpochMs;
   return 0;
 }
@@ -67,35 +61,6 @@ export function sortBookmarksNewestFirst(list: BookmarkData[]): BookmarkData[] {
     if (timeB !== timeA) return timeB - timeA;
     return (b.expiresAtEpochMs || 0) - (a.expiresAtEpochMs || 0);
   });
-}
-
-export function getCachedBookmark(mainSku: string): BookmarkData | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(`${LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX}${mainSku}`);
-    if (raw) return JSON.parse(raw);
-  } catch (_) {}
-  return null;
-}
-
-export function setCachedBookmark(mainSku: string, data: BookmarkData | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (data) {
-      const existing = getCachedBookmark(mainSku);
-      const enhancedData: BookmarkData = {
-        ...data,
-        createdAt: data.createdAt || existing?.createdAt || Date.now(),
-        updatedAt: data.updatedAt || Date.now(),
-        items: Array.isArray(data.items)
-          ? [...data.items].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
-          : [],
-      };
-      localStorage.setItem(`${LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX}${mainSku}`, JSON.stringify(enhancedData));
-    } else {
-      localStorage.removeItem(`${LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX}${mainSku}`);
-    }
-  } catch (_) {}
 }
 
 export function dispatchBookmarkUpdated(): void {
@@ -131,6 +96,39 @@ function getBaseUrl(): string {
   return `${base}/api/bookmarks`;
 }
 
+const LOCAL_BOOKMARKS_PREFIX = "horizon_bookmark_";
+
+export function getLocalBookmark(mainSku: string): BookmarkData | null {
+  if (typeof window === "undefined" || !mainSku) return null;
+  try {
+    const raw = localStorage.getItem(`${LOCAL_BOOKMARKS_PREFIX}${mainSku}`);
+    if (!raw) return null;
+    const data: BookmarkData = JSON.parse(raw);
+    if (data && Array.isArray(data.items) && data.items.length > 0) {
+      if (data.expiresAtEpochMs && Date.now() > data.expiresAtEpochMs) {
+        localStorage.removeItem(`${LOCAL_BOOKMARKS_PREFIX}${mainSku}`);
+        return null;
+      }
+      return data;
+    }
+  } catch (_) {}
+  return null;
+}
+
+export function saveLocalBookmark(mainSku: string, data: BookmarkData): void {
+  if (typeof window === "undefined" || !mainSku || !data) return;
+  try {
+    localStorage.setItem(`${LOCAL_BOOKMARKS_PREFIX}${mainSku}`, JSON.stringify(data));
+  } catch (_) {}
+}
+
+export function deleteLocalBookmark(mainSku: string): void {
+  if (typeof window === "undefined" || !mainSku) return;
+  try {
+    localStorage.removeItem(`${LOCAL_BOOKMARKS_PREFIX}${mainSku}`);
+  } catch (_) {}
+}
+
 /**
  * 1. Lưu tạm thời danh sách chuẩn bị (Staging - TTL 1 giờ)
  * POST /api/bookmarks/{mainSku}/staging
@@ -140,23 +138,53 @@ export async function stageBookmarkItems(
   items: { sku: string; quantity: number }[]
 ): Promise<BookmarkApiResponse<BookmarkData>> {
   const url = `${getBaseUrl()}/${encodeURIComponent(mainSku)}/staging`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: getBookmarkHeaders(),
-    body: JSON.stringify({ items }),
-  });
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: getBookmarkHeaders(),
+      body: JSON.stringify({ items }),
+    });
 
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || `Lỗi staging bookmark (HTTP ${response.status})`);
+    if (response.ok) {
+      const result = await response.json();
+      if (result?.data) {
+        saveLocalBookmark(mainSku, result.data);
+      }
+      dispatchBookmarkUpdated();
+      return result;
+    }
+  } catch (err) {
+    console.warn("Lỗi kết nối API staging bookmark:", err);
   }
 
-  const result = await response.json();
-  if (result?.data) {
-    setCachedBookmark(mainSku, result.data);
-  }
+  // Fallback: update local bookmark cache
+  const local = getLocalBookmark(mainSku);
+  const totalCount = items.reduce((s, i) => s + (i.quantity || 1), 0);
+  const fallbackData: BookmarkData = local || {
+    mainSku,
+    totalItems: totalCount,
+    totalPrice: 0,
+    totalSalePrice: 0,
+    totalDiscount: 0,
+    ttlSecondsRemaining: 3600,
+    expiresAtEpochMs: Date.now() + 3600 * 1000,
+    formattedRemainingTime: "59 phút 59 giây",
+    items: items.map(i => ({
+      sku: i.sku,
+      productName: i.sku,
+      imageUrl: "",
+      unitPrice: 0,
+      salePrice: 0,
+      quantity: i.quantity,
+      subTotal: 0,
+      isAvailable: true,
+      stock: 999
+    }))
+  };
+
+  saveLocalBookmark(mainSku, fallbackData);
   dispatchBookmarkUpdated();
-  return result;
+  return { success: true, data: fallbackData };
 }
 
 /**
@@ -169,20 +197,30 @@ export async function persistBookmarkItem(
   quantity: number = 1
 ): Promise<BookmarkApiResponse<{ mainSku: string; item: { sku: string; quantity: number }; totalItemsInBookmark: number; ttlSecondsRemaining: number }>> {
   const url = `${getBaseUrl()}/${encodeURIComponent(mainSku)}/items`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: getBookmarkHeaders(),
-    body: JSON.stringify({ sku, quantity }),
-  });
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: getBookmarkHeaders(),
+      body: JSON.stringify({ sku, quantity }),
+    });
 
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || `Lỗi lưu bookmark 7 ngày (HTTP ${response.status})`);
-  }
+    if (response.ok) {
+      const result = await response.json();
+      dispatchBookmarkUpdated();
+      return result;
+    }
+  } catch (_) {}
 
-  const result = await response.json();
   dispatchBookmarkUpdated();
-  return result;
+  return {
+    success: true,
+    data: {
+      mainSku,
+      item: { sku, quantity },
+      totalItemsInBookmark: quantity,
+      ttlSecondsRemaining: 7 * 86400
+    }
+  };
 }
 
 /**
@@ -193,22 +231,35 @@ export async function persistStagedBookmark(
   mainSku: string
 ): Promise<BookmarkApiResponse<BookmarkData>> {
   const url = `${getBaseUrl()}/${encodeURIComponent(mainSku)}/persist`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: getBookmarkHeaders(),
-  });
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: getBookmarkHeaders(),
+    });
 
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || `Lỗi lưu bookmark 7 ngày (HTTP ${response.status})`);
+    if (response.ok) {
+      const result = await response.json();
+      if (result?.data) {
+        saveLocalBookmark(mainSku, result.data);
+      }
+      dispatchBookmarkUpdated();
+      return result;
+    }
+  } catch (_) {}
+
+  // Fallback: extend local expiry to 7 days
+  const local = getLocalBookmark(mainSku);
+  if (local) {
+    local.expiresAtEpochMs = Date.now() + 7 * 86400 * 1000;
+    local.ttlSecondsRemaining = 7 * 86400;
+    local.formattedRemainingTime = "7 ngày";
+    saveLocalBookmark(mainSku, local);
+    dispatchBookmarkUpdated();
+    return { success: true, data: local };
   }
 
-  const result = await response.json();
-  if (result?.data) {
-    setCachedBookmark(mainSku, result.data);
-  }
   dispatchBookmarkUpdated();
-  return result;
+  return { success: true, data: null as any };
 }
 
 /**
@@ -216,32 +267,25 @@ export async function persistStagedBookmark(
  * GET /api/bookmarks/{mainSku}
  */
 export async function getBookmarkDetails(mainSku: string): Promise<BookmarkData | null> {
-  const url = `${getBaseUrl()}/${encodeURIComponent(mainSku)}`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: getBookmarkHeaders(),
-  });
+  try {
+    const url = `${getBaseUrl()}/${encodeURIComponent(mainSku)}`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: getBookmarkHeaders(),
+    });
 
-  if (!response.ok) {
-    if (response.status === 404) {
-      const cached = getCachedBookmark(mainSku);
-      if (cached && cached.totalItems > 0) {
-        return cached;
+    if (response.ok) {
+      const json = await response.json();
+      const data = json?.data || null;
+      if (data && data.totalItems > 0) {
+        saveLocalBookmark(mainSku, data);
+        return data;
       }
-      return null;
     }
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || `Lỗi lấy bookmark (HTTP ${response.status})`);
-  }
+  } catch (_) {}
 
-  const json = await response.json();
-  const data = json?.data || null;
-  if (data && data.totalItems > 0) {
-    setCachedBookmark(mainSku, data);
-  } else {
-    setCachedBookmark(mainSku, null);
-  }
-  return data;
+  // Fallback to local cache if API failed or returned 404
+  return getLocalBookmark(mainSku);
 }
 
 /**
@@ -249,6 +293,9 @@ export async function getBookmarkDetails(mainSku: string): Promise<BookmarkData 
  * GET /api/bookmarks
  */
 export async function getAllBookmarks(): Promise<BookmarkData[]> {
+  const result: BookmarkData[] = [];
+  const seenSkus = new Set<string>();
+
   try {
     const url = `${getBaseUrl()}`;
     const response = await fetch(url, {
@@ -259,36 +306,38 @@ export async function getAllBookmarks(): Promise<BookmarkData[]> {
     if (response.ok) {
       const json = await response.json();
       const serverList: BookmarkData[] = Array.isArray(json?.data) ? json.data : [];
-      if (serverList.length > 0) {
-        serverList.forEach((bm) => setCachedBookmark(bm.mainSku, bm));
-        return sortBookmarksNewestFirst(serverList);
+      for (const bm of serverList) {
+        if (bm && bm.mainSku && bm.totalItems > 0) {
+          result.push(bm);
+          seenSkus.add(bm.mainSku);
+          saveLocalBookmark(bm.mainSku, bm);
+        }
       }
     }
   } catch (err) {
     console.warn("Lỗi fetch bookmarks từ API:", err);
   }
 
-  // Fallback cache hydration if offline or initial load
+  // Merge with local bookmarks not already in server response
   if (typeof window !== "undefined") {
     try {
-      const localList: BookmarkData[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith(LOCAL_STORAGE_BOOKMARK_CACHE_PREFIX)) {
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw) as BookmarkData;
-            if (parsed && parsed.mainSku && (parsed.totalItems > 0 || parsed.items?.length > 0)) {
-              localList.push(parsed);
+        if (key && key.startsWith(LOCAL_BOOKMARKS_PREFIX)) {
+          const sku = key.slice(LOCAL_BOOKMARKS_PREFIX.length);
+          if (!seenSkus.has(sku)) {
+            const cached = getLocalBookmark(sku);
+            if (cached && cached.totalItems > 0) {
+              result.push(cached);
+              seenSkus.add(sku);
             }
           }
         }
       }
-      if (localList.length > 0) return sortBookmarksNewestFirst(localList);
     } catch (_) {}
   }
 
-  return [];
+  return sortBookmarksNewestFirst(result);
 }
 
 /**
@@ -299,33 +348,31 @@ export async function removeBookmarkItem(
   mainSku: string,
   sku: string
 ): Promise<BookmarkApiResponse<{ mainSku: string; removedSku: string; remainingItemsCount: number }>> {
-  const url = `${getBaseUrl()}/${encodeURIComponent(mainSku)}/items/${encodeURIComponent(sku)}`;
-  const response = await fetch(url, {
-    method: "DELETE",
-    headers: getBookmarkHeaders(),
-  });
-
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || `Lỗi xóa phụ kiện khỏi bookmark (HTTP ${response.status})`);
-  }
-
-  const result = await response.json();
-  const cached = getCachedBookmark(mainSku);
-  if (cached) {
-    cached.items = (cached.items || []).filter((it) => it.sku !== sku);
-    cached.totalItems = cached.items.reduce((s, it) => s + (it.quantity || 1), 0);
-    cached.totalSalePrice = cached.items.reduce((s, it) => s + (it.salePrice || 0) * (it.quantity || 1), 0);
-    cached.totalPrice = cached.items.reduce((s, it) => s + (it.unitPrice || it.salePrice || 0) * (it.quantity || 1), 0);
-    cached.totalDiscount = Math.max(0, cached.totalPrice - cached.totalSalePrice);
-    if (cached.items.length === 0) {
-      setCachedBookmark(mainSku, null);
+  // Update local cache
+  const local = getLocalBookmark(mainSku);
+  if (local) {
+    local.items = local.items.filter(i => i.sku !== sku);
+    local.totalItems = local.items.reduce((sum, it) => sum + (it.quantity || 1), 0);
+    if (local.totalItems > 0) {
+      saveLocalBookmark(mainSku, local);
     } else {
-      setCachedBookmark(mainSku, cached);
+      deleteLocalBookmark(mainSku);
     }
   }
+
+  try {
+    const url = `${getBaseUrl()}/${encodeURIComponent(mainSku)}/items/${encodeURIComponent(sku)}`;
+    await fetch(url, {
+      method: "DELETE",
+      headers: getBookmarkHeaders(),
+    });
+  } catch (_) {}
+
   dispatchBookmarkUpdated();
-  return result;
+  return {
+    success: true,
+    data: { mainSku, removedSku: sku, remainingItemsCount: local ? local.totalItems : 0 }
+  };
 }
 
 /**
@@ -335,19 +382,18 @@ export async function removeBookmarkItem(
 export async function clearBookmark(
   mainSku: string
 ): Promise<BookmarkApiResponse<{ mainSku: string }>> {
-  const url = `${getBaseUrl()}/${encodeURIComponent(mainSku)}`;
-  const response = await fetch(url, {
-    method: "DELETE",
-    headers: getBookmarkHeaders(),
-  });
+  deleteLocalBookmark(mainSku);
+  try {
+    const url = `${getBaseUrl()}/${encodeURIComponent(mainSku)}`;
+    await fetch(url, {
+      method: "DELETE",
+      headers: getBookmarkHeaders(),
+    });
+  } catch (_) {}
 
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || `Lỗi xóa bookmark (HTTP ${response.status})`);
-  }
-
-  const result = await response.json();
-  setCachedBookmark(mainSku, null);
   dispatchBookmarkUpdated();
-  return result;
+  return {
+    success: true,
+    data: { mainSku }
+  };
 }

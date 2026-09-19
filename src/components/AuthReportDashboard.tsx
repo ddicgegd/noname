@@ -8,6 +8,7 @@ import {
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell, PieChart, Pie } from "recharts";
 import { getApiBaseUrl } from "../lib/api";
 import { STORAGE_KEYS } from "../lib/storageKeys";
+import { useToast } from "./ui/Toast";
 
 interface AuthReportDashboardProps {
   onNavigate: (page: "landing" | "product" | "auth" | "auth-report" | "terms") => void;
@@ -322,6 +323,7 @@ const GRAPHQL_PRESETS = [
 ];
 
 export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardProps) {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<"diagnostics" | "jwt" | "redis" | "traffic" | "me-profile">("diagnostics");
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -1154,7 +1156,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
                           return;
                         }
                       }
-                      alert("Không tìm thấy Access Token nào từ phiên hoạt động trước đó.");
+                      showToast("Không tìm thấy Access Token nào từ phiên hoạt động trước đó.", "warning");
                     }}
                     className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold rounded-xl text-slate-300 transition-all cursor-pointer text-center"
                   >
