@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, PackageOpen, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame, ShieldCheck, Bookmark } from "lucide-react";
 import { Dock, DockIcon } from "@/components/ui/dock";
@@ -30,6 +30,25 @@ export interface CartItem {
   size?: string;
   availableSizes?: string[];
   quantity?: number;
+}
+
+export interface GroupedCartItem {
+  id: string;
+  groupKey: string;
+  sku?: string;
+  name: string;
+  price: string;
+  unitPrice: string;
+  oldPrice?: string;
+  discount?: string;
+  icon: string;
+  imageUrl?: string;
+  color: string;
+  availableColors: string[];
+  size: string;
+  availableSizes: string[];
+  ids: string[];
+  quantity: number;
 }
 
 interface NavbarProps {
@@ -463,9 +482,11 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     }
 
     const handleLocationSync = () => {
-      setIsProductHashActive(getIsProductHashActive());
+      const nextHashActive = getIsProductHashActive();
+      setIsProductHashActive(prev => (prev === nextHashActive ? prev : nextHashActive));
       if (typeof window !== "undefined") {
-        setCurrentPath(window.location.pathname.toLowerCase().replace(/\/$/, ""));
+        const nextPath = window.location.pathname.toLowerCase().replace(/\/$/, "");
+        setCurrentPath(prev => (prev === nextPath ? prev : nextPath));
       }
     };
 
@@ -495,11 +516,9 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const isProductModalActive = isProductPage && Boolean(isProductDetailOpen || isProductHashActive);
   const hideCartOnProductHash = !loggedInUser && isProductModalActive;
 
-  // 3. Account / Profile page (/a, /a#, /profile): Auto-hide operates in /a and /a#
-  const isAccountRoute = ["/a", "/profile", "/account", "/accounts"].includes(cleanPath);
-  const isAccountPage = currentPage === "profile" || isAccountRoute;
-
-  const isAutoHideMode = isOrderPage || isProductModalActive || isAccountPage;
+  // 3. Account / Profile page: Auto-hide does NOT apply to /m (Navbar stays visible)
+  const isAuthRoute = ["/a"].includes(cleanPath);
+  const isAutoHideMode = isOrderPage || isProductModalActive || (currentPage === "auth" && isAuthRoute);
 
   const navRef = useRef<HTMLElement | null>(null);
   const isHoveringNavRef = useRef(false);
@@ -766,62 +785,47 @@ const resolveProductMetadata = (skuOrName: string) => {
     setExpandedGroupKey(prev => prev === groupKey ? null : groupKey);
   };
 
-  // Group cart items by name, color, and size
-  const groupedCartItems = cartItems.reduce((acc, item) => {
-    const meta = resolveProductMetadata(item.name || item.sku || "");
-    const color = item.color || meta.defaultColor;
-    const size = item.size || meta.defaultSize;
-    const availableColors = item.availableColors || meta.colors;
-    const availableSizes = item.availableSizes || meta.sizes;
-    const displayName = (item.name && !item.name.startsWith("ATTR-")) ? item.name : meta.name;
-    const imageUrl = item.imageUrl || meta.imageUrl;
-    const discount = item.discount || (item.oldPrice ? calculateCartDiscount(item.price, item.oldPrice) : undefined) || meta.discount || "Giảm 10%";
+  // Group cart items by name, color, and size (Memoized to avoid re-calculating on every render)
+  const groupedCartItems = useMemo<GroupedCartItem[]>(() => {
+    return cartItems.reduce((acc: GroupedCartItem[], item) => {
+      const meta = resolveProductMetadata(item.name || item.sku || "");
+      const color = item.color || meta.defaultColor;
+      const size = item.size || meta.defaultSize;
+      const availableColors = item.availableColors || meta.colors;
+      const availableSizes = item.availableSizes || meta.sizes;
+      const displayName = (item.name && !item.name.startsWith("ATTR-")) ? item.name : meta.name;
+      const imageUrl = item.imageUrl || meta.imageUrl;
+      const discount = item.discount || (item.oldPrice ? calculateCartDiscount(item.price, item.oldPrice) : undefined) || meta.discount || "Giảm 10%";
 
-    const groupKey = `${displayName}-${color}-${size}-${item.price}`;
-    const existing = acc.find(i => i.groupKey === groupKey);
-    const itemQty = item.quantity || 1;
-    if (existing) {
-      existing.ids.push(item.id);
-      existing.quantity += itemQty;
-    } else {
-      acc.push({
-        id: item.id,
-        groupKey,
-        sku: item.sku,
-        name: displayName,
-        price: item.price,
-        unitPrice: item.price,
-        oldPrice: item.oldPrice,
-        discount,
-        icon: item.icon,
-        imageUrl,
-        color,
-        availableColors,
-        size,
-        availableSizes,
-        ids: [item.id],
-        quantity: itemQty,
-      });
-    }
-    return acc;
-  }, [] as {
-    id: string;
-    groupKey: string;
-    sku?: string;
-    name: string;
-    price: string;
-    unitPrice: string;
-    oldPrice?: string;
-    discount?: string;
-    icon: string;
-    imageUrl?: string;
-    color: string;
-    availableColors: string[];
-    size: string;
-    availableSizes: string[];
-    ids: string[];
-    quantity: number;
-  }[]);
+      const groupKey = `${displayName}-${color}-${size}-${item.price}`;
+      const existing = acc.find(i => i.groupKey === groupKey);
+      const itemQty = item.quantity || 1;
+      if (existing) {
+        existing.ids.push(item.id);
+        existing.quantity += itemQty;
+      } else {
+        acc.push({
+          id: item.id,
+          groupKey,
+          sku: item.sku,
+          name: displayName,
+          price: item.price,
+          unitPrice: item.price,
+          oldPrice: item.oldPrice,
+          discount,
+          icon: item.icon,
+          imageUrl,
+          color,
+          availableColors,
+          size,
+          availableSizes,
+          ids: [item.id],
+          quantity: itemQty,
+        });
+      }
+      return acc;
+    }, []);
+  }, [cartItems]);
 
   const [selectedGroupKeys, setSelectedGroupKeys] = useState<string[]>([]);
   const totalCartCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
@@ -848,7 +852,13 @@ const resolveProductMetadata = (skuOrName: string) => {
         return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
       });
     } else {
-      setSelectedGroupKeys(prev => prev.filter(k => currentKeys.includes(k)));
+      setSelectedGroupKeys(prev => {
+        const filtered = prev.filter(k => currentKeys.includes(k));
+        if (filtered.length === prev.length && filtered.every((k, i) => k === prev[i])) {
+          return prev;
+        }
+        return filtered;
+      });
     }
   }, [groupedCartItems]);
 
@@ -925,7 +935,7 @@ const resolveProductMetadata = (skuOrName: string) => {
     return count;
   };
 
-  const { bindDrag, dismissIndices, isDismissing, offsets, activeIdx } = useChainedSpringList({
+  const { bindDrag, dismissIndices, isDismissing, offsets, activeIdx } = useChainedSpringList<GroupedCartItem>({
     items: groupedCartItems,
     onDismiss: (item) => {
       const idsToRemove = item.sku ? [item.sku] : item.ids;

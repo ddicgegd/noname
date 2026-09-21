@@ -58,6 +58,14 @@
    - For all frontend UI development, redesigns, landing pages, or styling tasks, ALWAYS activate and follow `.agents/skills/design-taste-frontend/SKILL.md`.
    - Apply Brief Inference (page kind, vibe, audience, brand assets) and enforce anti-slop aesthetics.
 6. **Defect-Targeted Fix Constraint**: Confine all UI repairs strictly to the minimal defect site. Preserve full hierarchy, padding, margin, and adjacent component layouts intact.
+7. **Master-Detail Synchronous State Alignment (Filter Tabs & Item Selection)**:
+   - In 2-column or Master-Detail layouts with tab/tag filtering: Switching tabs MUST update both the filter criteria AND synchronously select the first valid matching item (`setSelectedId(firstValidId)`) in the same event handler pass.
+   - NEVER leave state desynchronized across render frames or rely solely on delayed `useEffect` calls to fix out-of-sync selection, as intermediate renders with invalid IDs break `AnimatePresence` animations and cause blank/gray screen crashes.
+8. **Async Auto-Fetch Loop Guardrails (useRef Set Cache Pattern)**:
+   - When auto-fetching item details upon selection, ALWAYS guard with a synchronous `useRef<Set<string>>` cache (`fetchedRef.current.add(id)` called BEFORE initiating the async request).
+   - Ensure `useEffect` dependencies and state setters never trigger runaway cascading re-renders (`Maximum update depth exceeded`).
+9. **Zero-Redundant Network on Client Filtering**:
+   - Filter pill clicks and keyboard navigation (`A`/`D`/Arrows) over an already loaded in-memory dataset MUST filter locally in memory (0ms). NEVER trigger unsolicited background network syncs on every click/keystroke that race against local state.
 
 ---
 
@@ -66,3 +74,15 @@
 1. **Frontend Isolation**: NEVER modify frontend/UI source files when performing backend or API integration tasks unless explicitly requested.
 2. **Strict Endpoint Scope**: DO NOT create, modify, or extend API endpoints beyond the explicitly assigned scope.
 3. **Targeted Context Isolation**: Restrict inspection strictly to the designated backend handlers, schemas, and endpoints.
+4. **Mandatory Real Backend OpenAPI/Swagger Audit**:
+   - Before integrating or modifying any endpoint connected to the Spring Boot backend (port 8080), the agent MUST fetch and inspect the OpenAPI/Swagger schema (`http://localhost:8080/v3/api-docs` or controller code) to verify:
+     - Exact paths and HTTP methods.
+     - Mandatory parameters (`required: true`) vs optional parameters.
+     - Exact Enum values (case-sensitive).
+5. **Zero-Speculation Contract & Strict Enum Alignment**:
+   - Speculating or guessing API parameter names, query/body formats, or Enum values is STRICTLY PROHIBITED.
+   - All Enums on Frontend/Gateway (e.g. `OrderStatus`) must match backend Java definitions 100% or use explicit adapters.
+6. **Real Backend Evidence Constraint (No Mock-Only Success Claims)**:
+   - When verifying API endpoints before UI integration, the agent MUST execute requests directly against the live backend (port 8080) covering positive, negative, missing parameter, and edge cases.
+   - Local mock tests MUST ONLY be reported as "mock fallback verification" and NEVER conflated with real backend verification.
+

@@ -3,11 +3,11 @@ import { motion, AnimatePresence } from "motion/react";
 import { 
   User, Lock, Mail, ChevronDown, ChevronUp, CheckCircle, 
   Eye, EyeOff, AlertCircle, RefreshCw, ArrowRight, ArrowLeft, Phone,
-  Shield, Check, X, Sliders, ShoppingBag, ClipboardList, Truck, Package, 
+  Shield, Check, X, Sliders, ShoppingBag, ClipboardList, Truck, Package, PackageOpen, 
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
   Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
-  LocateFixed, Map, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Crown
+  LocateFixed, Map as LucideMap, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Crown
 } from "lucide-react";
 import { apiRequest, unifiedFetch, getUnifiedAccessToken } from "../lib/api";
 import { STORAGE_KEYS } from "../lib/storageKeys";
@@ -40,6 +40,8 @@ import {
   getOrderDetail,
   normalizeOrderDtoToUiItem,
   normalizeSummaryToUiItem,
+  resolveAttributeDisplayName,
+  formatDateDisplay,
   UiOrderItem,
   saveCachedOrders,
   getCachedOrders,
@@ -199,6 +201,79 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [bookmarkActionLoading, setBookmarkActionLoading] = useState<string>("");
   const [isSecurityBtnHovered, setIsSecurityBtnHovered] = useState<boolean>(false);
   const [isAddressHovered, setIsAddressHovered] = useState<boolean>(false);
+
+  // Navigation Tutorial banner state & active keypress indicator
+  const [showNavTutorial, setShowNavTutorial] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("horizon_nav_tutorial_dismissed") !== "true";
+    }
+    return true;
+  });
+  const [activePressedKeys, setActivePressedKeys] = useState<{ [key: string]: boolean }>({});
+  const activeKeyTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const [tutorialCountdown, setTutorialCountdown] = useState<number>(30);
+
+  const triggerKeyHighlight = useCallback((keyName: "A" | "D" | "Left" | "Right" | "W" | "S" | "Up" | "Down") => {
+    const existing = activeKeyTimeoutsRef.current.get(keyName);
+    if (existing) {
+      clearTimeout(existing);
+    }
+    setActivePressedKeys(prev => ({ ...prev, [keyName]: true }));
+    const timer = setTimeout(() => {
+      setActivePressedKeys(prev => {
+        const next = { ...prev };
+        delete next[keyName];
+        return next;
+      });
+      activeKeyTimeoutsRef.current.delete(keyName);
+    }, 400);
+    activeKeyTimeoutsRef.current.set(keyName, timer);
+  }, []);
+
+  const isHorizontalActive = Boolean(
+    activePressedKeys["A"] || activePressedKeys["D"] || activePressedKeys["Left"] || activePressedKeys["Right"]
+  );
+  const isVerticalActive = Boolean(
+    activePressedKeys["W"] || activePressedKeys["S"] || activePressedKeys["Up"] || activePressedKeys["Down"]
+  );
+
+  const handleDismissTutorial = useCallback(() => {
+    setShowNavTutorial(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("horizon_nav_tutorial_dismissed", "true");
+    }
+  }, []);
+
+  const handleToggleTutorial = useCallback(() => {
+    setShowNavTutorial((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        if (next) {
+          localStorage.removeItem("horizon_nav_tutorial_dismissed");
+        } else {
+          localStorage.setItem("horizon_nav_tutorial_dismissed", "true");
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  // 30s auto-dismiss countdown timer when tutorial popup is visible
+  useEffect(() => {
+    if (!showNavTutorial) return;
+    setTutorialCountdown(30);
+    const interval = setInterval(() => {
+      setTutorialCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          handleDismissTutorial();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showNavTutorial, handleDismissTutorial]);
 
 
   // Listen to open-accounts-center event from Navbar
@@ -495,28 +570,32 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>("ALL");
   const [isOrdersSyncing, setIsOrdersSyncing] = useState<boolean>(false);
+  const fetchedOrderDetailsRef = useRef<Set<string>>(new Set());
   const activeOrder = orders.find(o => o.id === selectedOrderId);
   const isOrderDelivered = activeOrder?.status === "delivered";
 
-  // Helper resolver for order color theme: emerald (xanh lá), amber (vàng), blue (xanh dương), orange (cam)
-  const getOrderColorTheme = (order?: OrderItem | null): "emerald" | "amber" | "blue" | "orange" => {
+  // Helper resolver for order color theme: emerald (đã giao), sky (đang giao), indigo (đang xử lý), amber (chờ thanh toán), rose (đã hủy)
+  const getOrderColorTheme = (order?: OrderItem | null): "emerald" | "sky" | "indigo" | "amber" | "rose" => {
     if (!order) return "emerald";
     const st = (order.status || "").toLowerCase();
     const text = (order.statusText || "").toLowerCase();
 
-    if (st === "delivered" || text.includes("giao thành công") || text.includes("kích hoạt thành công") || text.includes("hoàn tất")) {
+    if (st === "delivered" || st === "completed" || text.includes("giao thành công") || text.includes("kích hoạt thành công") || text.includes("hoàn tất")) {
       return "emerald";
     }
-    if (st === "processing" || text.includes("xử lý") || text.includes("bảo hành") || text.includes("kiểm thử")) {
+    if (st === "shipped" || text.includes("vận chuyển") || text.includes("đang giao")) {
+      return "sky";
+    }
+    if (st === "processing" || st === "confirmed" || text.includes("xử lý") || text.includes("bảo hành") || text.includes("kiểm thử")) {
+      return "indigo";
+    }
+    if (st === "pending" || st === "waiting_payment" || st === "verifying" || text.includes("chờ") || text.includes("xác nhận") || text.includes("xác thực") || text.includes("chờ duyệt") || text.includes("chờ xác")) {
       return "amber";
     }
-    if (st === "pending" || st === "verifying" || text.includes("xác nhận") || text.includes("xác thực") || text.includes("chờ duyệt") || text.includes("chờ xác")) {
-      return "blue";
+    if (st === "cancelled" || st === "refunded" || text.includes("hủy") || text.includes("hoàn tiền")) {
+      return "rose";
     }
-    if (st === "shipped" || text.includes("vận chuyển") || text.includes("đang giao")) {
-      return "orange";
-    }
-    return "orange";
+    return "indigo";
   };
 
   const orderTheme = getOrderColorTheme(activeOrder);
@@ -529,26 +608,40 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     ? (activeOrder.deliverySteps || [])
     : (activeOrder.deliverySteps || []).slice(0, Math.min(activeOrder.deliverySteps?.length || 0, endpointIndex + 2));
 
-  // Helper tính toán số lượng cho từng bộ lọc trạng thái
-  const getFilterCount = (filterId: string): number => {
-    if (filterId === "ALL") return orders.length;
-    if (filterId === "PENDING") return orders.filter(o => o.status === "pending" || o.statusText.includes("Chờ")).length;
-    if (filterId === "PROCESSING") return orders.filter(o => o.status === "processing" || o.statusText.includes("xử lý") || o.statusText.includes("chuẩn bị")).length;
-    if (filterId === "SHIPPED") return orders.filter(o => o.status === "shipped" || o.statusText.includes("vận chuyển") || o.statusText.includes("giao")).length;
-    if (filterId === "DELIVERED") return orders.filter(o => o.status === "delivered" || o.statusText.includes("thành công") || o.statusText.includes("Hoàn tất")).length;
-    if (filterId === "CANCELLED") return orders.filter(o => o.status === "cancelled" || o.statusText.includes("hủy") || o.statusText.includes("hoàn tiền")).length;
-    return 0;
+  // Helper lọc và phân loại trạng thái an toàn tuyệt đối
+  const matchesStatusFilter = (order: OrderItem, filter: StatusFilterType): boolean => {
+    if (!order) return false;
+    if (filter === "ALL") return true;
+
+    const st = (order.status || "").toLowerCase();
+    const text = typeof order.statusText === "string" ? order.statusText.toLowerCase() : "";
+    const rawSt = typeof (order as any).rawOrder?.currentStatus === "string" ? (order as any).rawOrder.currentStatus.toUpperCase() : "";
+
+    if (filter === "PENDING") {
+      return st === "pending" || rawSt === "WAITING_PAYMENT" || rawSt === "PENDING" || text.includes("chờ") || text.includes("thanh toán");
+    }
+    if (filter === "PROCESSING") {
+      return st === "processing" || rawSt === "PROCESSING" || rawSt === "CONFIRMED" || text.includes("xử lý") || text.includes("chuẩn bị");
+    }
+    if (filter === "SHIPPED") {
+      return st === "shipped" || rawSt === "SHIPPING" || rawSt === "SHIPPED" || text.includes("vận chuyển") || text.includes("giao");
+    }
+    if (filter === "DELIVERED") {
+      return st === "delivered" || rawSt === "DELIVERED" || rawSt === "COMPLETED" || text.includes("thành công") || text.includes("hoàn tất");
+    }
+    if (filter === "CANCELLED") {
+      return st === "cancelled" || rawSt === "CANCELLED" || text.includes("hủy") || text.includes("hoàn tiền");
+    }
+    return true;
   };
 
-  const filteredOrders = orders.filter(item => {
-    if (statusFilter === "ALL") return true;
-    if (statusFilter === "PENDING") return item.status === "pending" || item.statusText.includes("Chờ");
-    if (statusFilter === "PROCESSING") return item.status === "processing" || item.statusText.includes("xử lý") || item.statusText.includes("chuẩn bị");
-    if (statusFilter === "SHIPPED") return item.status === "shipped" || item.statusText.includes("vận chuyển") || item.statusText.includes("giao");
-    if (statusFilter === "DELIVERED") return item.status === "delivered" || item.statusText.includes("thành công") || item.statusText.includes("Hoàn tất");
-    if (statusFilter === "CANCELLED") return item.status === "cancelled" || item.statusText.includes("hủy") || item.statusText.includes("hoàn tiền");
-    return true;
-  });
+  // Helper tính toán số lượng cho từng bộ lọc trạng thái
+  const getFilterCount = (filterId: StatusFilterType): number => {
+    if (filterId === "ALL") return orders.length;
+    return orders.filter(o => matchesStatusFilter(o, filterId)).length;
+  };
+
+  const filteredOrders = orders.filter(item => matchesStatusFilter(item, statusFilter));
 
   const activeTheme = getOrderStatusTheme(activeOrder?.statusText || activeOrder?.status);
 
@@ -556,6 +649,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [showFilterLeftFade, setShowFilterLeftFade] = useState<boolean>(false);
   const [showFilterRightFade, setShowFilterRightFade] = useState<boolean>(true);
   const filterPillsRef = useRef<HTMLDivElement>(null);
+  const ordersListContainerRef = useRef<HTMLDivElement>(null);
 
   const handleFilterScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
@@ -628,28 +722,60 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         sortDirection: "DESC",
       });
 
-      if (res?.data?.contents && res.data.contents.length > 0) {
+      if (res?.data?.contents) {
         const serverOrders = res.data.contents.map(normalizeSummaryToUiItem);
         setOrders(prevOrders => {
-          const merged = [...serverOrders];
-          prevOrders.forEach(localOrder => {
-            const idx = merged.findIndex(o => o.id === localOrder.id);
-            if (idx !== -1) {
-              merged[idx] = {
-                ...localOrder,
-                ...merged[idx],
-                shippingAddress: (localOrder.shippingAddress && localOrder.shippingAddress !== "Đang tải địa chỉ nhận hàng...") ? localOrder.shippingAddress : (merged[idx].shippingAddress || localOrder.shippingAddress),
-                deliverySteps: (localOrder.deliverySteps && localOrder.deliverySteps.length > 0) ? localOrder.deliverySteps : merged[idx].deliverySteps,
-                rawOrder: localOrder.rawOrder || merged[idx].rawOrder,
-                orderItemsList: localOrder.orderItemsList || merged[idx].orderItemsList
+          const cleanPrev = prevOrders.filter(o => o.id && !o.id.startsWith("HZ-"));
+          let merged: UiOrderItem[];
+          
+          if (filter === "ALL") {
+            merged = serverOrders.map(so => {
+              const localOrder = cleanPrev.find(o => o.id === so.id);
+              if (!localOrder) return so;
+              return {
+                ...so,
+                shippingAddress: (localOrder.shippingAddress && localOrder.shippingAddress !== "Đang tải địa chỉ nhận hàng...") ? localOrder.shippingAddress : so.shippingAddress,
+                deliverySteps: (localOrder.deliverySteps && localOrder.deliverySteps.length > 0) ? localOrder.deliverySteps : so.deliverySteps,
+                rawOrder: localOrder.rawOrder || so.rawOrder,
+                orderItemsList: localOrder.orderItemsList || so.orderItemsList
               };
-            } else if (filter === "ALL") {
-              merged.push(localOrder);
-            }
-          });
+            });
+          } else {
+            // Upsert / Merge single-status orders into existing order pool without wiping other tab counts
+            const map = new Map<string, UiOrderItem>();
+            cleanPrev.forEach(o => map.set(o.id, o));
+            serverOrders.forEach(so => {
+              const existing = map.get(so.id);
+              if (existing) {
+                const resolvedName = resolveAttributeDisplayName(so.name || existing.name, null, so.id);
+                map.set(so.id, {
+                  ...existing,
+                  ...so,
+                  name: resolvedName,
+                  shippingAddress: (existing.shippingAddress && existing.shippingAddress !== "Đang tải địa chỉ nhận hàng...") ? existing.shippingAddress : (so.shippingAddress || existing.shippingAddress),
+                  deliverySteps: (existing.deliverySteps && existing.deliverySteps.length > 0) ? existing.deliverySteps : so.deliverySteps,
+                  rawOrder: existing.rawOrder || so.rawOrder,
+                  orderItemsList: existing.orderItemsList || so.orderItemsList
+                });
+              } else {
+                map.set(so.id, so);
+              }
+            });
+            merged = Array.from(map.values());
+          }
+
           saveCachedOrders(merged);
           return merged;
         });
+
+        if (serverOrders.length > 0) {
+          setSelectedOrderId(prev => {
+            if (!prev || !serverOrders.some(o => o.id === prev)) {
+              return serverOrders[0].id;
+            }
+            return prev;
+          });
+        }
       }
     } catch (err) {
       console.warn("GraphQL sync orders error:", err);
@@ -660,13 +786,18 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
   // Lấy chi tiết đơn hàng (orderItems, statusHistory, paymentMethod) từ GraphQL
   const fetchOrderDetailFromGateway = useCallback(async (orderId: string) => {
-    if (!orderId) return;
+    if (!orderId || fetchedOrderDetailsRef.current.has(orderId)) return;
+    fetchedOrderDetailsRef.current.add(orderId);
     try {
       const detailDto = await getOrderDetail(orderId);
       if (detailDto && detailDto.orderNumber) {
         const detailedUiItem = normalizeOrderDtoToUiItem(detailDto);
         setOrders(prev => {
-          const next = prev.map(o => o.id === orderId ? { ...o, ...detailedUiItem } : o);
+          const next = prev.map(o => o.id === orderId ? {
+            ...o,
+            ...detailedUiItem,
+            name: resolveAttributeDisplayName(detailedUiItem.name || o.name, null, orderId)
+          } : o);
           saveCachedOrders(next);
           return next;
         });
@@ -677,9 +808,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   }, []);
 
   const handleSelectOrder = (orderId: string) => {
+    if (!orderId) return;
     setSelectedOrderId(orderId);
-    const target = orders.find(o => o.id === orderId);
-    if (target && (!target.orderItemsList || target.orderItemsList.length === 0)) {
+    if (!fetchedOrderDetailsRef.current.has(orderId)) {
       fetchOrderDetailFromGateway(orderId);
     }
   };
@@ -764,7 +895,22 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     }
   }, [statusFilter]);
 
-  const prevStatusFilterRef = useRef<StatusFilterType>(statusFilter);
+  const handleFilterChange = (filterId: StatusFilterType) => {
+    setStatusFilter(filterId);
+    const matching = orders.filter(item => matchesStatusFilter(item, filterId));
+    if (matching.length > 0) {
+      const isCurrentValid = matching.some(o => o.id === selectedOrderId);
+      if (!isCurrentValid) {
+        const firstId = matching[0].id;
+        setSelectedOrderId(firstId);
+        if (!fetchedOrderDetailsRef.current.has(firstId)) {
+          fetchOrderDetailFromGateway(firstId);
+        }
+      }
+    } else {
+      setSelectedOrderId("");
+    }
+  };
 
   // Tự động chọn (Select) thẻ đơn hàng đầu tiên:
   // 1. Ngay khi load trang / mount component hoặc khi orders được nạp từ cache/API
@@ -776,27 +922,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       return;
     }
 
-    const filterChanged = prevStatusFilterRef.current !== statusFilter;
-    prevStatusFilterRef.current = statusFilter;
-
-    const matchingOrders = orders.filter(item => {
-      if (statusFilter === "ALL") return true;
-      if (statusFilter === "PENDING") return item.status === "pending" || item.statusText.includes("Chờ");
-      if (statusFilter === "PROCESSING") return item.status === "processing" || item.statusText.includes("xử lý") || item.statusText.includes("chuẩn bị");
-      if (statusFilter === "SHIPPED") return item.status === "shipped" || item.statusText.includes("vận chuyển") || item.statusText.includes("giao");
-      if (statusFilter === "DELIVERED") return item.status === "delivered" || item.statusText.includes("thành công") || item.statusText.includes("Hoàn tất");
-      if (statusFilter === "CANCELLED") return item.status === "cancelled" || item.statusText.includes("hủy") || item.statusText.includes("hoàn tiền");
-      return true;
-    });
+    const matchingOrders = orders.filter(item => matchesStatusFilter(item, statusFilter));
 
     if (matchingOrders.length > 0) {
       const isCurrentSelectedValid = matchingOrders.some(o => o.id === selectedOrderId);
       
-      // Nếu vừa chuyển tab HOẶC chưa có đơn hàng nào được chọn HOẶC đơn hàng đang chọn không còn nằm trong danh sách bộ lọc
-      if (filterChanged || !selectedOrderId || !isCurrentSelectedValid) {
+      if (!selectedOrderId || !isCurrentSelectedValid) {
         const firstOrder = matchingOrders[0];
         setSelectedOrderId(firstOrder.id);
-        if (!firstOrder.orderItemsList || firstOrder.orderItemsList.length === 0) {
+        if (!fetchedOrderDetailsRef.current.has(firstOrder.id)) {
           fetchOrderDetailFromGateway(firstOrder.id);
         }
       }
@@ -805,8 +939,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     }
   }, [statusFilter, orders, selectedOrderId, fetchOrderDetailFromGateway]);
 
-  // Keyboard navigation for Filter Pills: A / D hoặc Mũi tên Trái / Phải
-  // Chặn điều hướng khi đã ở mút cuối bên trái hoặc bên phải
+  // Keyboard navigation:
+  // 1. A / D hoặc Mũi tên Trái / Phải: Chuyển đổi Filter Tab ngang
+  // 2. W / S hoặc Mũi tên Lên / Xuống: Di chuyển chọn thẻ đơn hàng dọc và tự động cuộn
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input, textarea or select
@@ -815,30 +950,111 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         return;
       }
 
-      if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+      const key = e.key;
+      const code = e.code;
+
+      // 1. Horizontal Navigation: A / D / ArrowLeft / ArrowRight
+      if (key === "a" || key === "A" || code === "KeyA") {
+        triggerKeyHighlight("A");
+        e.preventDefault();
         const currentIndex = STATUS_FILTER_OPTIONS.findIndex(opt => opt.id === statusFilter);
-        // Nếu không phải ở điểm đầu bên trái thì mới cho chuyển tab lùi lại
         if (currentIndex > 0) {
-          e.preventDefault();
           const nextFilter = STATUS_FILTER_OPTIONS[currentIndex - 1].id;
-          setStatusFilter(nextFilter);
-          syncOrdersFromGraphQL(nextFilter);
+          handleFilterChange(nextFilter);
         }
-      } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+      } else if (key === "d" || key === "D" || code === "KeyD") {
+        triggerKeyHighlight("D");
+        e.preventDefault();
         const currentIndex = STATUS_FILTER_OPTIONS.findIndex(opt => opt.id === statusFilter);
-        // Nếu không phải ở điểm cuối cùng bên phải thì mới cho chuyển tab tiến lên
         if (currentIndex >= 0 && currentIndex < STATUS_FILTER_OPTIONS.length - 1) {
-          e.preventDefault();
           const nextFilter = STATUS_FILTER_OPTIONS[currentIndex + 1].id;
-          setStatusFilter(nextFilter);
-          syncOrdersFromGraphQL(nextFilter);
+          handleFilterChange(nextFilter);
+        }
+      } else if (key === "ArrowLeft" || code === "ArrowLeft") {
+        triggerKeyHighlight("Left");
+        e.preventDefault();
+        const currentIndex = STATUS_FILTER_OPTIONS.findIndex(opt => opt.id === statusFilter);
+        if (currentIndex > 0) {
+          const nextFilter = STATUS_FILTER_OPTIONS[currentIndex - 1].id;
+          handleFilterChange(nextFilter);
+        }
+      } else if (key === "ArrowRight" || code === "ArrowRight") {
+        triggerKeyHighlight("Right");
+        e.preventDefault();
+        const currentIndex = STATUS_FILTER_OPTIONS.findIndex(opt => opt.id === statusFilter);
+        if (currentIndex >= 0 && currentIndex < STATUS_FILTER_OPTIONS.length - 1) {
+          const nextFilter = STATUS_FILTER_OPTIONS[currentIndex + 1].id;
+          handleFilterChange(nextFilter);
+        }
+      }
+
+      // 2. Vertical Navigation: W / S / ArrowUp / ArrowDown
+      else if (key === "w" || key === "W" || code === "KeyW") {
+        triggerKeyHighlight("W");
+        e.preventDefault();
+        if (filteredOrders.length > 0) {
+          const currentIndex = filteredOrders.findIndex(o => o.id === selectedOrderId);
+          const prevIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+          const targetOrder = filteredOrders[prevIndex];
+          if (targetOrder && targetOrder.id !== selectedOrderId) {
+            handleSelectOrder(targetOrder.id);
+            requestAnimationFrame(() => {
+              const el = ordersListContainerRef.current?.querySelector(`[data-order-id="${targetOrder.id}"]`) as HTMLElement;
+              el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            });
+          }
+        }
+      } else if (key === "ArrowUp" || code === "ArrowUp") {
+        triggerKeyHighlight("Up");
+        e.preventDefault();
+        if (filteredOrders.length > 0) {
+          const currentIndex = filteredOrders.findIndex(o => o.id === selectedOrderId);
+          const prevIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+          const targetOrder = filteredOrders[prevIndex];
+          if (targetOrder && targetOrder.id !== selectedOrderId) {
+            handleSelectOrder(targetOrder.id);
+            requestAnimationFrame(() => {
+              const el = ordersListContainerRef.current?.querySelector(`[data-order-id="${targetOrder.id}"]`) as HTMLElement;
+              el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            });
+          }
+        }
+      } else if (key === "s" || key === "S" || code === "KeyS") {
+        triggerKeyHighlight("S");
+        e.preventDefault();
+        if (filteredOrders.length > 0) {
+          const currentIndex = filteredOrders.findIndex(o => o.id === selectedOrderId);
+          const nextIndex = currentIndex >= 0 && currentIndex < filteredOrders.length - 1 ? currentIndex + 1 : filteredOrders.length - 1;
+          const targetOrder = filteredOrders[nextIndex];
+          if (targetOrder && targetOrder.id !== selectedOrderId) {
+            handleSelectOrder(targetOrder.id);
+            requestAnimationFrame(() => {
+              const el = ordersListContainerRef.current?.querySelector(`[data-order-id="${targetOrder.id}"]`) as HTMLElement;
+              el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            });
+          }
+        }
+      } else if (key === "ArrowDown" || code === "ArrowDown") {
+        triggerKeyHighlight("Down");
+        e.preventDefault();
+        if (filteredOrders.length > 0) {
+          const currentIndex = filteredOrders.findIndex(o => o.id === selectedOrderId);
+          const nextIndex = currentIndex >= 0 && currentIndex < filteredOrders.length - 1 ? currentIndex + 1 : filteredOrders.length - 1;
+          const targetOrder = filteredOrders[nextIndex];
+          if (targetOrder && targetOrder.id !== selectedOrderId) {
+            handleSelectOrder(targetOrder.id);
+            requestAnimationFrame(() => {
+              const el = ordersListContainerRef.current?.querySelector(`[data-order-id="${targetOrder.id}"]`) as HTMLElement;
+              el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            });
+          }
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [statusFilter, syncOrdersFromGraphQL]);
+  }, [statusFilter, orders, selectedOrderId, filteredOrders, fetchOrderDetailFromGateway, triggerKeyHighlight]);
 
 
 
@@ -864,180 +1080,29 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         setUser(localUser);
       }
 
-      // Initialize mockup order history
-      const storedOrders = localStorage.getItem(STORAGE_KEYS.USER_ORDERS) || localStorage.getItem("horizon_user_orders");
-      let activeOrders: OrderItem[] = [];
-      if (storedOrders) {
-        activeOrders = JSON.parse(storedOrders);
-      }
-      
-      const SEED_VERSION_KEY = "horizon_orders_seed_v5";
-      const needsReSeed = localStorage.getItem(SEED_VERSION_KEY) !== "true" ||
-        activeOrders.length < 7 ||
-        !activeOrders.some(o => o.id === "HZ-8831-C" && o.estimatedDelivery);
+      // Initialize real order history from cache & GraphQL Gateway
+      const cachedOrders = getCachedOrders();
+      let activeOrders: OrderItem[] = Array.isArray(cachedOrders) ? cachedOrders : [];
 
-      if (needsReSeed) {
-        // Seed rich, fully synchronized mock orders matching Horizon Mobile & Web products
-        activeOrders = [
-          {
-            id: "HZ-7711-R",
-            name: "Thiết bị định tuyến Router Horizon Core Lite (Bảo hành & Đổi mới)",
-            price: "1,890,000 VND",
-            date: "14/07/2026",
-            status: "processing",
-            statusText: "Đang xử lý bảo hành",
-            estimatedDelivery: "15/07/2026",
-            carrier: "Viettel Post (Hỗ trợ đổi trả)",
-            trackingNumber: "VT-RETURN-7711",
-            shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-            deliverySteps: [
-              { title: "Gửi yêu cầu bảo hành", desc: "Khách hàng thông báo lỗi cổng WAN chập chờn", time: "14/07/2026 08:00", completed: true, active: false },
-              { title: "Duyệt yêu cầu hỗ trợ", desc: "Kỹ thuật viên Horizon xác nhận hỗ trợ đổi mới 1-đổi-1", time: "14/07/2026 09:30", completed: true, active: false },
-              { title: "Thu hồi thiết bị cũ", desc: "Nhân viên vận chuyển đã thu lại thiết bị lỗi tận nơi", time: "14/07/2026 13:00", completed: true, active: false },
-              { title: "Đang trung chuyển thiết bị cũ", desc: "Thiết bị lỗi đang trên đường về trung tâm kiểm thử Hà Nội", time: "14/07/2026 16:30", completed: true, active: false },
-              { title: "Tiếp nhận và kiểm thử lỗi", desc: "Kỹ thuật viên phòng LAB xác nhận lỗi IC nguồn cổng WAN", time: "15/07/2026 08:15", completed: true, active: false },
-              { title: "Xuất kho thiết bị thay thế mới", desc: "Sản phẩm Router Horizon Core Lite mới 100% nguyên seal đã được kích hoạt số serial mới", time: "15/07/2026 10:00", completed: true, active: false },
-              { title: "Bàn giao đơn vị chuyển phát", desc: "Thiết bị mới đã chuyển giao cho bưu cục Viettel Post", time: "15/07/2026 14:00", completed: true, active: false },
-              { title: "Đang xử lý đổi mới thiết bị", desc: "Kỹ thuật viên hoàn tất niêm phong và theo dõi xử lý đổi mới", time: "15/07/2026 15:45", completed: true, active: true },
-              { title: "Dự kiến bàn giao & Hoàn tất", desc: "Khách hàng nhận hàng và đồng kiểm cùng shipper", time: "15/07/2026 18:00", completed: false, active: false }
-            ]
-          },
-          {
-            id: "HZ-5520-V",
-            name: "Khóa bảo mật phần cứng Horizon Security Key Token V2",
-            price: "850,000 VND",
-            date: "14/07/2026",
-            status: "pending",
-            statusText: "Cần xác nhận đơn hàng",
-            estimatedDelivery: "16/07/2026",
-            carrier: "Horizon Security & Verification Gateway",
-            trackingNumber: "HZ-AUTH-5520",
-            shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-            deliverySteps: [
-              { title: "Khởi tạo đơn hàng trực tuyến", desc: "Hệ thống ghi nhận đơn hàng mua Khóa bảo mật Token V2", time: "14/07/2026 14:10", completed: true, active: false },
-              { title: "Cần xác thực danh tính & bảo mật", desc: "Vui lòng xác nhận mã OTP bảo mật hoặc căn cước trên ứng dụng di động", time: "14/07/2026 14:30", completed: true, active: true },
-              { title: "Xác nhận đối soát thanh toán", desc: "Bộ phận kế toán duyệt đối soát giao dịch thanh toán trực tuyến", time: "15/07/2026 09:00", completed: false, active: false },
-              { title: "Xuất kho niêm phong thiết bị", desc: "Kỹ thuật viên chuẩn bị phần cứng và cấu hình khóa bảo mật riêng", time: "15/07/2026 14:00", completed: false, active: false },
-              { title: "Bàn giao vận chuyển bảo mật", desc: "Đơn vị vận chuyển chuyên dụng nhận gói hàng nguyên niêm phong", time: "16/07/2026 10:00", completed: false, active: false },
-              { title: "Dự kiến giao & Kích hoạt thiết bị", desc: "Người nhận đồng kiểm niêm phong và ký biên bản giao nhận", time: "16/07/2026 16:30", completed: false, active: false }
-            ]
-          },
-          {
-            id: "HZ-9981-A",
-            name: "Thiết bị Gateway kết nối Gateway Horizon Pro V2",
-            price: "2,490,000 VND",
-            date: "12/07/2026",
-            status: "shipped",
-            statusText: "Đang vận chuyển",
-            estimatedDelivery: "14/07/2026",
-            carrier: "Horizon Express (GHN)",
-            trackingNumber: "HZEX91802931",
-            shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-            deliverySteps: [
-              { title: "Đã tiếp nhận đơn hàng", desc: "Đơn hàng đã được xác nhận thành công trên hệ thống ERP", time: "12/07/2026 14:30", completed: true, active: false },
-              { title: "Đang đóng gói sản phẩm", desc: "Bộ phận kho đang kiểm tra kỹ thuật thiết bị Gateway Pro V2", time: "12/07/2026 18:20", completed: true, active: false },
-              { title: "Đã bàn giao cho vận chuyển", desc: "Đơn hàng đã rời kho Tổng cục phân phối Horizon Hà Nội", time: "13/07/2026 09:15", completed: true, active: false },
-              { title: "Đang trung chuyển qua trạm", desc: "Thiết bị đang được chuyển phát nhanh vào trạm trung chuyển TP. Hồ Chí Minh", time: "14/07/2026 04:22", completed: true, active: true },
-              { title: "Đang giao tới địa chỉ", desc: "Shipper sẽ liên hệ qua số điện thoại đăng ký trước khi giao", time: "14/07/2026 17:00", completed: false, active: false }
-            ]
-          },
-          {
-            id: "HZ-4421-S",
-            name: "Gói bản quyền Premium Cloud ERP API Enterprise (Thường niên)",
-            price: "1,200,000 VND",
-            date: "10/07/2026",
-            status: "delivered",
-            statusText: "Đã kích hoạt thành công",
-            estimatedDelivery: "10/07/2026",
-            carrier: "Kích hoạt tự động (Instant Email API)",
-            trackingNumber: "LIC-JWT-921820",
-            shippingAddress: "Gửi trực tiếp qua Email tài khoản đăng nhập",
-            deliverySteps: [
-              { title: "Tạo đơn đăng ký dịch vụ", desc: "Hệ thống ghi nhận yêu cầu mua gói Enterprise", time: "10/07/2026 10:00", completed: true, active: false },
-              { title: "Xác thực thanh toán qua ví", desc: "Xác nhận chuyển khoản thành công", time: "10/07/2026 10:02", completed: true, active: false },
-              { title: "Cấp phát mã bản quyền khóa API", desc: "Tạo cấu trúc Token cấp phép thành viên", time: "10/07/2026 10:03", completed: true, active: false },
-              { title: "Đã kích hoạt & Giao dịch hoàn tất", desc: "Hệ thống Gateway ERP cấu hình thành công quyền truy cập", time: "10/07/2026 10:03", completed: true, active: true }
-            ]
-          },
-          {
-            id: "HZ-1205-X",
-            name: "Cáp sạc siêu dẫn chuyên dụng Horizon FastLink C1 (1.5m)",
-            price: "350,000 VND",
-            date: "08/07/2026",
-            status: "delivered",
-            statusText: "Đã giao hàng",
-            estimatedDelivery: "09/07/2026",
-            carrier: "Viettel Post",
-            trackingNumber: "VT77291032",
-            shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-            deliverySteps: [
-              { title: "Đã tiếp nhận đơn hàng", desc: "Ghi nhận đơn hàng cáp sạc siêu dẫn trên hệ thống bán lẻ", time: "08/07/2026 09:00", completed: true, active: false },
-              { title: "Kiểm thử & Đóng gói sản phẩm", desc: "Đã hoàn tất đo thông mạch và đóng hộp kèm chứng nhận chống gãy gập", time: "08/07/2026 11:30", completed: true, active: false },
-              { title: "Bàn giao đơn vị vận chuyển", desc: "Bưu cục Viettel Post tiếp nhận kiện hàng và quét mã vận đơn", time: "08/07/2026 14:15", completed: true, active: false },
-              { title: "Đang giao tới địa chỉ", desc: "Bưu tá liên hệ người nhận và giao kiện hàng đến địa chỉ", time: "09/07/2026 14:00", completed: true, active: false },
-              { title: "Đã giao hàng & Ký nhận hoàn tất", desc: "Người nhận ký xác nhận đồng kiểm thành công tại địa chỉ văn phòng", time: "09/07/2026 16:45", completed: true, active: true }
-            ]
-          },
-          {
-            id: "HZ-3094-M",
-            name: "Bộ định tuyến hiệu năng cao Horizon Core Router Max",
-            price: "4,890,000 VND",
-            date: "05/07/2026",
-            status: "delivered",
-            statusText: "Đã giao hàng",
-            estimatedDelivery: "07/07/2026",
-            carrier: "Horizon Express (GHN)",
-            trackingNumber: "HZEX10294827",
-            shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-            deliverySteps: [
-              { title: "Xác nhận đơn hàng", desc: "Hệ thống ERP xác thực đơn mua thiết bị Core Router Max", time: "05/07/2026 08:15", completed: true, active: false },
-              { title: "Xuất kho & Đóng gói chuyên dụng", desc: "Thiết bị hoàn tất kiểm thử cổng quang 10Gbps và đóng kiện chống sốc", time: "05/07/2026 11:00", completed: true, active: false },
-              { title: "Đang vận chuyển liên tỉnh", desc: "Kiện hàng rời kho tổng Đà Nẵng vận chuyển vào TP. Hồ Chí Minh", time: "06/07/2026 14:00", completed: true, active: false },
-              { title: "Đang chuyển phát nhanh nội thành", desc: "Shipper đã nhận hàng từ bưu cục trung tâm Quận 1", time: "07/07/2026 09:30", completed: true, active: false },
-              { title: "Đã giao hàng & Lắp đặt hoàn tất", desc: "Kỹ thuật viên bàn giao và khách hàng ký biên bản nghiệm thu", time: "07/07/2026 11:30", completed: true, active: true }
-            ]
-          },
-          {
-            id: "HZ-8831-C",
-            name: "Bộ chuyển đổi tín hiệu thông minh Horizon Gateway Nano V1",
-            price: "990,000 VND",
-            date: "01/07/2026",
-            status: "delivered",
-            statusText: "Đã giao hàng",
-            estimatedDelivery: "03/07/2026",
-            carrier: "Giao Hàng Tiết Kiệm",
-            trackingNumber: "GHTK8829310",
-            shippingAddress: "Số 15 Lê Duẩn, Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-            deliverySteps: [
-              { title: "Tiếp nhận đơn hàng trực tuyến", desc: "Giao dịch mua thiết bị Nano V1 đã được ghi nhận trên cổng ERP", time: "01/07/2026 14:00", completed: true, active: false },
-              { title: "Kiểm tra & Xuất kho sản phẩm", desc: "Bộ phận kỹ thuật nạp firmware tiêu chuẩn và dán tem bảo hành điện tử", time: "01/07/2026 16:30", completed: true, active: false },
-              { title: "Đã bàn giao cho GHTK", desc: "Đơn vị vận chuyển lấy hàng tại kho và vận chuyển ra trung tâm phân loại", time: "02/07/2026 08:45", completed: true, active: false },
-              { title: "Đang phát hàng tới người nhận", desc: "Shipper liên hệ người nhận trước khi giao tại địa chỉ đăng ký", time: "03/07/2026 08:30", completed: true, active: false },
-              { title: "Đã giao hàng & Bàn giao hoàn tất", desc: "Hàng đã trao tận tay khách hàng kèm phiếu bảo hành điện tử", time: "03/07/2026 10:15", completed: true, active: true }
-            ]
-          }
-        ];
-        localStorage.setItem(SEED_VERSION_KEY, "true");
-        localStorage.setItem(STORAGE_KEYS.USER_ORDERS, JSON.stringify(activeOrders));
-      }
+      // Clean up any obsolete mock IDs or outdated cached dates
+      activeOrders = activeOrders
+        .filter(o => o.id && !o.id.startsWith("HZ-"))
+        .map(o => {
+          const rawDate = o.rawOrder?.createdAt;
+          const freshDateStr = rawDate ? formatDateDisplay(rawDate) : (o.date && !o.date.includes("21/09/2026") ? o.date : "");
+          return {
+            ...o,
+            date: freshDateStr,
+            name: resolveAttributeDisplayName(o.name, null, o.id)
+          };
+        });
 
-      // Ensure all loaded orders have valid dd/mm/yyyy formatted estimatedDelivery
-      activeOrders = activeOrders.map(order => {
-        if (!order.estimatedDelivery || !/^\d{2}\/\d{2}\/\d{4}$/.test(order.estimatedDelivery)) {
-          if (order.id === "HZ-7711-R") return { ...order, estimatedDelivery: "15/07/2026" };
-          if (order.id === "HZ-5520-V") return { ...order, estimatedDelivery: "16/07/2026" };
-          if (order.id === "HZ-9981-A") return { ...order, estimatedDelivery: "14/07/2026" };
-          if (order.id === "HZ-8831-C") return { ...order, estimatedDelivery: "03/07/2026" };
-          return { ...order, estimatedDelivery: order.date || "15/07/2026" };
-        }
-        return order;
-      });
       setOrders(activeOrders);
       if (activeOrders.length > 0) {
         setSelectedOrderId(activeOrders[0].id);
       }
 
-      // Kích hoạt đồng bộ GraphQL Order ngầm
+      // Kích hoạt đồng bộ GraphQL Order live
       syncOrdersFromGraphQL("ALL");
 
       // Cho phép hiển thị giao diện ngay lập tức thay vì bắt người dùng chờ API
@@ -1910,6 +1975,179 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         </AnimatePresence>
       </div>
 
+      {/* Floating Tutorial Popup Notification: Keyboard Navigation Guide */}
+      <div className="fixed bottom-6 right-4 sm:right-6 z-[99998] pointer-events-none max-w-md w-[calc(100vw-32px)] sm:w-[440px]">
+        <AnimatePresence>
+          {showNavTutorial && (
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              className="pointer-events-auto relative w-full overflow-hidden rounded-3xl border-t border-t-white/95 border-b border-b-slate-400/50 border-x border-x-white/80 dark:border-white/20 bg-white/90 dark:bg-zinc-900/90 p-5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.25),0_10px_25px_-5px_rgba(255,77,36,0.18),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 text-left select-none"
+            >
+              {/* Ambient gradient aura */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-[#FF4D24]/[0.06] via-indigo-500/[0.03] to-purple-500/[0.04]"
+              />
+
+              {/* Popup Header */}
+              <div className="relative z-10 flex items-start justify-between gap-3 mb-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-orange-50 to-orange-100/80 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100 flex items-center justify-center text-[#FF4D24] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_rgba(255,77,36,0.15)] shrink-0">
+                    <Sparkles className="w-5 h-5 stroke-[2.2]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-sans font-black text-sm text-slate-900 dark:text-white tracking-tight leading-none">
+                        Thông báo: Mẹo điều hướng
+                      </h4>
+                      <span className="text-[9.5px] font-extrabold font-mono px-2 py-0.5 rounded-full bg-orange-500/10 text-[#FF4D24] border border-orange-200/70 uppercase">
+                        Tutorial
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-500 dark:text-slate-400 font-medium mt-1 leading-tight">
+                      Thao tác bàn phím siêu tốc trên cổng tài khoản
+                    </p>
+                  </div>
+                </div>
+
+                {/* 30s Countdown Auto-Dismiss Indicator */}
+                <div
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-b from-orange-50/90 to-orange-100/60 dark:bg-zinc-800/80 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100 dark:border-white/10 text-[#FF4D24] shadow-[0_1px_2px_rgba(255,77,36,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] shrink-0 select-none cursor-default"
+                  title={`Tự động ẩn sau ${tutorialCountdown} giây`}
+                >
+                  <Clock className="w-3.5 h-3.5 stroke-[2.2] animate-pulse" />
+                  <span className="font-mono text-xs font-black tracking-tight">{tutorialCountdown}s</span>
+                </div>
+              </div>
+
+              {/* Popup Body: 2 Navigation Dimensions with Soft Subtle Active State */}
+              <div className="relative z-10 space-y-2 mb-4">
+                {/* 1. Hướng ngang: Điều chỉnh Tag Lọc */}
+                <div className={`p-2.5 rounded-2xl transition-all duration-150 border ${
+                  isHorizontalActive
+                    ? "bg-orange-50/80 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800/50 shadow-sm"
+                    : "bg-black/[0.025] dark:bg-white/5 border-slate-100/80 dark:border-white/5"
+                }`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full transition-colors duration-150 shrink-0 ${
+                        isHorizontalActive ? "bg-[#FF4D24]" : "bg-slate-300 dark:bg-zinc-600"
+                      }`} />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                        Hướng ngang: Đổi Tag bộ lọc
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
+                        activePressedKeys["A"]
+                          ? "bg-[#FF4D24] text-white border border-[#FF4D24] shadow-sm scale-95"
+                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24]"
+                      }`}>
+                        A
+                      </kbd>
+                      <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
+                        activePressedKeys["D"]
+                          ? "bg-[#FF4D24] text-white border border-[#FF4D24] shadow-sm scale-95"
+                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24]"
+                      }`}>
+                        D
+                      </kbd>
+                      <span className="text-[10px] text-slate-400 font-bold px-0.5">/</span>
+                      <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
+                        activePressedKeys["Left"]
+                          ? "bg-[#FF4D24] text-white border border-[#FF4D24] shadow-sm scale-95"
+                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24]"
+                      }`}>
+                        ←
+                      </kbd>
+                      <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
+                        activePressedKeys["Right"]
+                          ? "bg-[#FF4D24] text-white border border-[#FF4D24] shadow-sm scale-95"
+                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24]"
+                      }`}>
+                        →
+                      </kbd>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-4">
+                    Nhấn phím <b>A</b>, <b>D</b> hoặc <b>mũi tên hướng ngang</b> để điều chỉnh tag.
+                  </p>
+                </div>
+
+                {/* 2. Hướng dọc: Chuyển Card Đơn Hàng */}
+                <div className={`p-2.5 rounded-2xl transition-all duration-150 border ${
+                  isVerticalActive
+                    ? "bg-indigo-50/80 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/50 shadow-sm"
+                    : "bg-black/[0.025] dark:bg-white/5 border-slate-100/80 dark:border-white/5"
+                }`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full transition-colors duration-150 shrink-0 ${
+                        isVerticalActive ? "bg-indigo-600" : "bg-slate-300 dark:bg-zinc-600"
+                      }`} />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                        Hướng dọc: Chuyển Card đơn hàng
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
+                        activePressedKeys["W"]
+                          ? "bg-indigo-600 text-white border border-indigo-600 shadow-sm scale-95"
+                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600"
+                      }`}>
+                        W
+                      </kbd>
+                      <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
+                        activePressedKeys["S"]
+                          ? "bg-indigo-600 text-white border border-indigo-600 shadow-sm scale-95"
+                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600"
+                      }`}>
+                        S
+                      </kbd>
+                      <span className="text-[10px] text-slate-400 font-bold px-0.5">/</span>
+                      <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
+                        activePressedKeys["Up"]
+                          ? "bg-indigo-600 text-white border border-indigo-600 shadow-sm scale-95"
+                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600"
+                      }`}>
+                        ↑
+                      </kbd>
+                      <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
+                        activePressedKeys["Down"]
+                          ? "bg-indigo-600 text-white border border-indigo-600 shadow-sm scale-95"
+                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600"
+                      }`}>
+                        ↓
+                      </kbd>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-4">
+                    Nhấn phím <b>W</b>, <b>S</b> hoặc <b>mũi tên hướng dọc</b> để chuyển đổi card đơn hàng.
+                  </p>
+                </div>
+              </div>
+
+              {/* Popup Footer Button */}
+              <div className="relative z-10 flex items-center justify-between gap-3 pt-1">
+                <span className="text-[10.5px] text-slate-400 font-mono">
+                  Ấn phím bất kỳ để kiểm tra
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDismissTutorial}
+                  className="px-4 py-2 bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] hover:brightness-105 active:scale-95 text-white text-xs font-extrabold rounded-xl transition-all cursor-pointer border-t border-t-white/60 border-b border-b-[#9E2407] border-x border-x-[#FF4D24]/80 shadow-[0_3px_10px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.4)]"
+                >
+                  Đã hiểu & Bắt đầu
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-10 xl:px-12 flex-1 min-h-0 flex flex-col space-y-2.5 pb-1">
         
         {/* Top control actions (Optimized & Unified with 3D Bevel, maintaining exact layout height) */}
@@ -2018,7 +2256,22 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <RefreshCw className="w-3 h-3 text-[#FF4D24] animate-spin shrink-0" />
                     )}
                   </div>
-                  <span className="text-[11px] text-[#FF4D24] font-bold font-mono bg-gradient-to-b from-orange-50 via-orange-50/80 to-orange-100/60 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100/80 shadow-[0_1px_2px_rgba(255,77,36,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] px-2.5 py-0.5 rounded-full">{orders.length} Đơn hàng</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleTutorial}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer active:scale-95 border ${
+                        showNavTutorial
+                          ? "text-[#FF4D24] bg-orange-50/90 border-orange-200/80 shadow-sm"
+                          : "text-slate-600 hover:text-[#FF4D24] bg-white/80 hover:bg-orange-50 border-slate-200/80 hover:border-orange-200 shadow-sm"
+                      }`}
+                      title={showNavTutorial ? "Đóng hướng dẫn phím tắt" : "Mở popup hướng dẫn phím tắt"}
+                    >
+                      <Sparkles className="w-3 h-3 text-[#FF4D24]" />
+                      <span>{showNavTutorial ? "Đang mở mẹo" : "Mẹo phím tắt"}</span>
+                    </button>
+                    <span className="text-[11px] text-[#FF4D24] font-bold font-mono bg-gradient-to-b from-orange-50 via-orange-50/80 to-orange-100/60 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100/80 shadow-[0_1px_2px_rgba(255,77,36,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] px-2.5 py-0.5 rounded-full">{orders.length} Đơn hàng</span>
+                  </div>
                 </div>
 
                 {/* Status Filter Pills Bar with Concave Sunken Bevel Track & A/D keyboard navigation */}
@@ -2028,17 +2281,17 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     <div
                       ref={filterPillsRef}
                       onScroll={handleFilterScroll}
-                      className="flex items-center gap-1 overflow-x-auto hide-scrollbar transition-all duration-300 relative z-10 py-1 px-1"
+                      className="flex items-center gap-1 overflow-x-auto hide-scrollbar transition-all duration-300 relative z-10 py-1 px-1.5"
                       style={{
                         maskImage: `linear-gradient(to right, 
                           transparent 0%, 
-                          black ${showFilterLeftFade ? "16px" : "0px"}, 
-                          black calc(100% - ${showFilterRightFade ? "16px" : "0px"}), 
+                          black ${showFilterLeftFade ? "8px" : "0px"}, 
+                          black calc(100% - ${showFilterRightFade ? "8px" : "0px"}), 
                           transparent 100%)`,
                         WebkitMaskImage: `linear-gradient(to right, 
                           transparent 0%, 
-                          black ${showFilterLeftFade ? "16px" : "0px"}, 
-                          black calc(100% - ${showFilterRightFade ? "16px" : "0px"}), 
+                          black ${showFilterLeftFade ? "8px" : "0px"}, 
+                          black calc(100% - ${showFilterRightFade ? "8px" : "0px"}), 
                           transparent 100%)`
                       }}
                     >
@@ -2050,14 +2303,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             key={opt.id}
                             data-filter-id={opt.id}
                             type="button"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.96 }}
-                            transition={{ type: "spring", stiffness: 500, damping: 28 }}
-                            onClick={() => {
-                              setStatusFilter(opt.id);
-                              syncOrdersFromGraphQL(opt.id);
-                            }}
-                            className={`relative px-3 py-1.5 rounded-full text-[11px] font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none antialiased ${
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ duration: 0.15, ease: "easeOut" }}
+                            onClick={() => handleFilterChange(opt.id)}
+                            className={`relative px-3 py-1.5 rounded-full text-[11px] font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none antialiased outline-none focus:outline-none ring-0 focus:ring-0 border-0 ${
                               isFilterActive
                                 ? "text-white"
                                 : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
@@ -2067,7 +2317,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               <motion.div
                                 layoutId="statusFilterPillActive"
                                 className="absolute inset-0 rounded-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E63E14] border-t border-t-white/80 border-b border-b-[#9E2407]/50 border-x border-x-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.15),0_1.5px_4px_rgba(255,77,36,0.35)] z-0"
-                                transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.55 }}
+                                transition={{ type: "spring", stiffness: 280, damping: 26, mass: 0.8 }}
                               />
                             )}
                             <span className={`relative z-10 tracking-tight font-extrabold antialiased leading-none ${
@@ -2092,6 +2342,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 <div className="flex-1 min-h-0 relative overflow-hidden rounded-2xl">
                   {/* Scrollable Container with Smooth Translucent Masking */}
                   <div 
+                    ref={ordersListContainerRef}
                     onScroll={handleScroll}
                     className="hide-scrollbar h-full overflow-y-auto px-1 py-1 transition-all duration-300"
                     style={{
@@ -2110,15 +2361,19 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     <AnimatePresence mode="wait" initial={false}>
                       <motion.div
                         key={statusFilter}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.18, ease: "easeInOut" }}
                         className="space-y-2.5"
                       >
                         {filteredOrders.length === 0 ? (
-                          <div className="bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-xl rounded-2xl p-8 text-center text-slate-400 text-xs shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]">
-                            Không tìm thấy đơn hàng nào phù hợp với bộ lọc.
+                          <div className="h-64 sm:h-80 flex flex-col items-center justify-center p-8 select-none pointer-events-none">
+                            <div className="relative flex flex-col items-center justify-center">
+                              <div className="w-16 h-16 rounded-2xl bg-gradient-to-b from-white/95 via-white/80 to-slate-100/60 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-white/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center">
+                                <PackageOpen className="w-8 h-8 text-slate-300 stroke-[1.4]" />
+                              </div>
+                            </div>
                           </div>
                         ) : (
                           filteredOrders.map((item) => {
@@ -2127,6 +2382,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             return (
                               <div
                                 key={item.id}
+                                data-order-id={item.id}
                                 onClick={() => handleSelectOrder(item.id)}
                                 className={`p-3.5 rounded-2xl text-left cursor-pointer transition-all duration-150 relative ${
                                   isSelected 
@@ -2168,7 +2424,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                                 {/* Ngày mua bên trái, [Tổng thanh toán] : [Giá] bên phải (Cắt ngắn giá bằng dấu ... nếu quá dài, không xuống dòng) */}
                                 <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-slate-100/80 gap-2 min-w-0">
-                                  <span className="text-[10px] text-slate-400 font-medium shrink-0 whitespace-nowrap">Ngày mua: {item.date}</span>
+                                  <span className="text-[10px] text-slate-400 font-medium shrink-0 whitespace-nowrap">
+                                    {item.date ? `Ngày mua: ${item.date}` : "Chờ ghi nhận ngày mua"}
+                                  </span>
                                   <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
                                     <span className="text-[11px] text-slate-500 shrink-0 whitespace-nowrap">Tổng thanh toán:</span>
                                     <span 
@@ -2215,17 +2473,39 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     >
                       {/* Multi-corner Ambient Luxury Glow Aura (hiệu ứng ám màu tương đồng OrderPage/ProductPage) */}
                       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl z-0 select-none">
-                        <div className="absolute -top-10 -right-10 h-44 w-44 rounded-full bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.08] to-transparent blur-3xl" />
-                        <div className={`absolute -bottom-10 -left-10 h-44 w-44 rounded-full blur-3xl ${
+                        <div className={`absolute -top-10 -right-10 h-44 w-44 rounded-full blur-3xl transition-colors duration-500 ${
                           orderTheme === "emerald"
-                            ? "bg-gradient-to-tr from-emerald-500/[0.10] via-teal-500/[0.08] to-transparent"
+                            ? "bg-gradient-to-br from-emerald-500/[0.12] via-teal-500/[0.08] to-transparent"
+                            : orderTheme === "sky"
+                            ? "bg-gradient-to-br from-sky-500/[0.12] via-blue-500/[0.08] to-transparent"
+                            : orderTheme === "indigo"
+                            ? "bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.08] to-transparent"
                             : orderTheme === "amber"
-                            ? "bg-gradient-to-tr from-amber-500/[0.12] via-orange-400/[0.08] to-transparent"
-                            : orderTheme === "blue"
-                            ? "bg-gradient-to-tr from-blue-500/[0.12] via-sky-400/[0.08] to-transparent"
-                            : "bg-gradient-to-tr from-amber-500/[0.10] via-[#FF4D24]/[0.08] to-transparent"
+                            ? "bg-gradient-to-br from-amber-500/[0.12] via-orange-500/[0.08] to-transparent"
+                            : "bg-gradient-to-br from-rose-500/[0.12] via-red-500/[0.08] to-transparent"
                         }`} />
-                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(99,102,241,0.04)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(255,77,36,0.035)_0%,transparent_70%)]" />
+                        <div className={`absolute -bottom-10 -left-10 h-44 w-44 rounded-full blur-3xl transition-colors duration-500 ${
+                          orderTheme === "emerald"
+                            ? "bg-gradient-to-tr from-emerald-500/[0.10] via-teal-400/[0.06] to-transparent"
+                            : orderTheme === "sky"
+                            ? "bg-gradient-to-tr from-sky-500/[0.10] via-cyan-400/[0.06] to-transparent"
+                            : orderTheme === "indigo"
+                            ? "bg-gradient-to-tr from-indigo-500/[0.10] via-violet-400/[0.06] to-transparent"
+                            : orderTheme === "amber"
+                            ? "bg-gradient-to-tr from-amber-500/[0.10] via-yellow-400/[0.06] to-transparent"
+                            : "bg-gradient-to-tr from-rose-500/[0.10] via-pink-400/[0.06] to-transparent"
+                        }`} />
+                        <div className={`absolute inset-0 transition-all duration-500 ${
+                          orderTheme === "emerald"
+                            ? "bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(16,185,129,0.05)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(20,184,166,0.035)_0%,transparent_70%)]"
+                            : orderTheme === "sky"
+                            ? "bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(14,165,233,0.05)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(56,189,248,0.035)_0%,transparent_70%)]"
+                            : orderTheme === "indigo"
+                            ? "bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(99,102,241,0.05)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(139,92,246,0.035)_0%,transparent_70%)]"
+                            : orderTheme === "amber"
+                            ? "bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(245,158,11,0.05)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(251,146,60,0.035)_0%,transparent_70%)]"
+                            : "bg-[radial-gradient(ellipse_70%_50%_at_85%_15%,rgba(244,63,94,0.05)_0%,transparent_70%),radial-gradient(ellipse_70%_50%_at_15%_85%,rgba(251,113,133,0.035)_0%,transparent_70%)]"
+                        }`} />
                       </div>
                       
                       {/* Header info of selected Order: Hợp nhất hoàn toàn với nền khung lớn, icon và badge có hiệu ứng bevel làm mịn */}
@@ -2258,7 +2538,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 ? activeOrder.estimatedDelivery
                                 : activeOrder.date && /^\d{2}\/\d{2}\/\d{4}$/.test(activeOrder.date)
                                   ? activeOrder.date
-                                  : "15/07/2026"}
+                                  : "Chưa cập nhật"}
                             </span>
                           </div>
                         </div>
@@ -2290,10 +2570,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               // Mốc đang xử lý thực tế (nếu đơn hàng chưa hoàn tất)
                               const isStepInProgress = step.active && !isOrderDelivered;
                               
-                              // Xác định màu chủ đề theo step hoặc theo đơn hàng
-                              const stepText = (step.title + " " + step.desc).toLowerCase();
-                              const isStepVerification = isStepInProgress && (stepText.includes("xác nhận") || stepText.includes("xác thực") || stepText.includes("chờ duyệt") || stepText.includes("chờ xác"));
-                              const currentTheme = isStepVerification ? "blue" : orderTheme;
+                              // Xác định màu chủ đề đồng bộ tuyệt đối theo đơn hàng (orderTheme)
+                              const currentTheme = orderTheme;
 
                               // Đường hành trình đã qua nối tiếp tới mốc tiếp theo
                               const isConnectingTraversed = step.completed && (nextStep?.completed || nextStep?.active);
@@ -2315,21 +2593,27 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                         isConnectingTraversed 
                                           ? orderTheme === "emerald"
                                             ? "h-[calc(100%+0.625rem)] bg-gradient-to-b from-emerald-500/70 to-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
+                                            : orderTheme === "sky"
+                                            ? "h-[calc(100%+0.625rem)] bg-gradient-to-b from-sky-500/80 via-sky-600/70 to-emerald-500/60 shadow-[0_0_8px_rgba(14,165,233,0.25)]"
+                                            : orderTheme === "indigo"
+                                            ? "h-[calc(100%+0.625rem)] bg-gradient-to-b from-indigo-500/80 via-indigo-600/70 to-sky-500/60 shadow-[0_0_8px_rgba(99,102,241,0.25)]"
                                             : orderTheme === "amber"
-                                            ? "h-[calc(100%+0.625rem)] bg-gradient-to-b from-amber-500/85 via-amber-500/70 to-orange-500/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]"
-                                            : orderTheme === "blue"
-                                            ? "h-[calc(100%+0.625rem)] bg-gradient-to-b from-blue-500/80 via-blue-600/70 to-indigo-500/60 shadow-[0_0_8px_rgba(59,130,246,0.25)]"
-                                            : "h-[calc(100%+0.625rem)] bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#FF4D24] shadow-[0_0_8px_rgba(255,77,36,0.25)]" 
+                                            ? "h-[calc(100%+0.625rem)] bg-gradient-to-b from-amber-500/85 via-amber-500/70 to-indigo-500/60 shadow-[0_0_8px_rgba(245,158,11,0.25)]"
+                                            : "h-[calc(100%+0.625rem)] bg-gradient-to-b from-rose-500/80 via-rose-600/70 to-red-500/60 shadow-[0_0_8px_rgba(244,63,94,0.25)]" 
                                           : currentTheme === "amber"
                                             ? "h-12 bg-gradient-to-b from-amber-500/80 via-orange-400/30 to-transparent"
-                                            : currentTheme === "blue"
-                                            ? "h-12 bg-gradient-to-b from-blue-500/80 via-indigo-500/30 to-transparent"
-                                            : "h-12 bg-gradient-to-b from-[#FF4D24]/80 via-[#FF4D24]/30 to-transparent"
+                                            : currentTheme === "sky"
+                                            ? "h-12 bg-gradient-to-b from-sky-500/80 via-blue-500/30 to-transparent"
+                                            : currentTheme === "indigo"
+                                            ? "h-12 bg-gradient-to-b from-indigo-500/80 via-violet-500/30 to-transparent"
+                                            : currentTheme === "rose"
+                                            ? "h-12 bg-gradient-to-b from-rose-500/80 via-red-500/30 to-transparent"
+                                            : "h-12 bg-gradient-to-b from-emerald-500/80 via-teal-500/30 to-transparent"
                                       }`}
                                     />
                                   )}
 
-                                  {/* Điểm mốc poind: Đậm vừa, hài hòa và không bị nhìn xuyên qua */}
+                                  {/* Điểm mốc point: Đậm vừa, hài hòa và không bị nhìn xuyên qua */}
                                   <div className="absolute left-[-28px] -translate-x-1/2 top-1/2 -translate-y-1/2 z-10">
                                     {isStepInProgress ? (
                                       <div className="relative flex items-center justify-center">
@@ -2337,16 +2621,24 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                         <div className={`absolute w-9 h-9 rounded-full blur-xs pointer-events-none ${
                                           currentTheme === "amber"
                                             ? "bg-gradient-to-tr from-amber-500/25 via-orange-400/20 to-transparent"
-                                            : currentTheme === "blue"
-                                            ? "bg-gradient-to-tr from-blue-500/25 via-indigo-500/20 to-transparent"
-                                            : "bg-gradient-to-tr from-[#FF4D24]/20 via-amber-500/15 to-transparent"
+                                            : currentTheme === "sky"
+                                            ? "bg-gradient-to-tr from-sky-500/25 via-blue-400/20 to-transparent"
+                                            : currentTheme === "indigo"
+                                            ? "bg-gradient-to-tr from-indigo-500/25 via-violet-400/20 to-transparent"
+                                            : currentTheme === "rose"
+                                            ? "bg-gradient-to-tr from-rose-500/25 via-red-500/20 to-transparent"
+                                            : "bg-gradient-to-tr from-emerald-500/20 via-teal-500/15 to-transparent"
                                         }`} />
                                         <div className={`relative w-5 h-5 rounded-full border border-white flex items-center justify-center ${
                                           currentTheme === "amber"
                                             ? "bg-gradient-to-tr from-amber-400 via-amber-500 to-orange-500 ring-3 ring-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.35)]"
-                                            : currentTheme === "blue"
-                                            ? "bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 ring-3 ring-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.35)]"
-                                            : "bg-gradient-to-tr from-[#FF6B4A] via-[#FF4D24] to-amber-500 ring-3 ring-[#FF4D24]/15 shadow-[0_0_10px_rgba(255,77,36,0.3)]"
+                                            : currentTheme === "sky"
+                                            ? "bg-gradient-to-tr from-sky-400 via-sky-500 to-blue-500 ring-3 ring-sky-500/20 shadow-[0_0_10px_rgba(14,165,233,0.35)]"
+                                            : currentTheme === "indigo"
+                                            ? "bg-gradient-to-tr from-indigo-400 via-indigo-500 to-violet-600 ring-3 ring-indigo-500/20 shadow-[0_0_10px_rgba(99,102,241,0.35)]"
+                                            : currentTheme === "rose"
+                                            ? "bg-gradient-to-tr from-rose-400 via-rose-500 to-red-500 ring-3 ring-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.35)]"
+                                            : "bg-gradient-to-tr from-emerald-400 via-emerald-500 to-teal-500 ring-3 ring-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
                                         }`}>
                                           <div className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
                                         </div>
@@ -2363,11 +2655,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                       <div className={`w-5 h-5 rounded-full border border-white/90 flex items-center justify-center ${
                                         orderTheme === "emerald"
                                           ? "bg-gradient-to-b from-emerald-500/90 to-emerald-600/90 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
+                                          : orderTheme === "sky"
+                                          ? "bg-gradient-to-b from-sky-500/90 to-blue-600/90 shadow-[0_0_8px_rgba(14,165,233,0.25)]"
+                                          : orderTheme === "indigo"
+                                          ? "bg-gradient-to-b from-indigo-500/90 to-indigo-600/90 shadow-[0_0_8px_rgba(99,102,241,0.25)]"
                                           : orderTheme === "amber"
                                           ? "bg-gradient-to-b from-amber-400/90 via-amber-500/90 to-orange-400/85 shadow-[0_0_8px_rgba(245,158,11,0.25)]"
-                                          : orderTheme === "blue"
-                                          ? "bg-gradient-to-b from-blue-500/90 to-indigo-600/90 shadow-[0_0_8px_rgba(59,130,246,0.25)]"
-                                          : "bg-gradient-to-b from-[#FF6B4A] via-[#FF4D24] to-amber-500/90 shadow-[0_0_8px_rgba(255,77,36,0.2)]"
+                                          : "bg-gradient-to-b from-rose-500/90 via-red-500/90 to-rose-600/90 shadow-[0_0_8px_rgba(244,63,94,0.2)]"
                                       }`}>
                                         <div className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
                                       </div>
@@ -2383,9 +2677,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     isStepInProgress
                                       ? currentTheme === "amber"
                                         ? "bg-gradient-to-b from-amber-50/95 via-white/95 to-orange-50/45 border-t-white border-b-amber-300/80 border-x-amber-200/60 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(245,158,11,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(245,158,11,0.04)]"
-                                        : currentTheme === "blue"
-                                        ? "bg-gradient-to-b from-blue-50/95 via-white/95 to-indigo-50/40 border-t-white border-b-blue-200/80 border-x-blue-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(59,130,246,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(59,130,246,0.04)]"
-                                        : "bg-gradient-to-b from-orange-50/90 via-white/90 to-amber-50/50 border-t-white border-b-orange-200/80 border-x-orange-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(255,77,36,0.04)]"
+                                        : currentTheme === "sky"
+                                        ? "bg-gradient-to-b from-sky-50/95 via-white/95 to-blue-50/45 border-t-white border-b-sky-300/80 border-x-sky-200/60 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(14,165,233,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(14,165,233,0.04)]"
+                                        : currentTheme === "indigo"
+                                        ? "bg-gradient-to-b from-indigo-50/95 via-white/95 to-violet-50/40 border-t-white border-b-indigo-200/80 border-x-indigo-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(99,102,241,0.04)]"
+                                        : currentTheme === "rose"
+                                        ? "bg-gradient-to-b from-rose-50/90 via-white/90 to-red-50/50 border-t-white border-b-rose-200/80 border-x-rose-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(244,63,94,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(244,63,94,0.04)]"
+                                        : "bg-gradient-to-b from-emerald-50/90 via-white/90 to-teal-50/50 border-t-white border-b-emerald-200/80 border-x-emerald-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(16,185,129,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(16,185,129,0.04)]"
                                       : isOrderDelivered && isLast
                                         ? "bg-gradient-to-b from-emerald-50/90 via-white/90 to-emerald-50/50 border-t-white border-b-emerald-200/80 border-x-emerald-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(16,185,129,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(16,185,129,0.04)]"
                                         : step.completed
@@ -2398,9 +2696,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                           isStepInProgress 
                                             ? currentTheme === "amber"
                                               ? "text-amber-900 font-black"
-                                              : currentTheme === "blue"
-                                              ? "text-blue-700 font-black"
-                                              : "text-[#FF4D24] font-black" 
+                                              : currentTheme === "sky"
+                                              ? "text-sky-900 font-black"
+                                              : currentTheme === "indigo"
+                                              ? "text-indigo-900 font-black"
+                                              : currentTheme === "rose"
+                                              ? "text-rose-900 font-black"
+                                              : "text-emerald-900 font-black" 
                                             : isOrderDelivered && isLast
                                               ? "text-emerald-700 font-black"
                                               : step.completed 
@@ -2423,9 +2725,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                           isStepInProgress
                                             ? currentTheme === "amber"
                                               ? "bg-gradient-to-b from-amber-50 to-orange-50/80 border-t-white border-b-amber-300/70 border-x-amber-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-amber-900"
-                                              : currentTheme === "blue"
-                                              ? "bg-gradient-to-b from-blue-50 to-blue-100/70 border-t-white border-b-blue-200/70 border-x-blue-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-blue-700"
-                                              : "bg-gradient-to-b from-orange-50 to-orange-100/70 border-t-white border-b-orange-200/70 border-x-orange-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-[#FF4D24]"
+                                              : currentTheme === "sky"
+                                              ? "bg-gradient-to-b from-sky-50 to-blue-50/80 border-t-white border-b-sky-300/70 border-x-sky-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-sky-900"
+                                              : currentTheme === "indigo"
+                                              ? "bg-gradient-to-b from-indigo-50 to-violet-50/80 border-t-white border-b-indigo-200/70 border-x-indigo-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-indigo-900"
+                                              : currentTheme === "rose"
+                                              ? "bg-gradient-to-b from-rose-50 to-red-50/80 border-t-white border-b-rose-200/70 border-x-rose-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-rose-900"
+                                              : "bg-gradient-to-b from-emerald-50 to-teal-50/80 border-t-white border-b-emerald-200/70 border-x-emerald-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-emerald-900"
                                             : isOrderDelivered && isLast
                                               ? "bg-gradient-to-b from-emerald-50 to-emerald-100/70 border-t-white border-b-emerald-200/70 border-x-emerald-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-emerald-700"
                                               : step.completed
@@ -2436,9 +2742,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                             isStepInProgress 
                                               ? currentTheme === "amber"
                                                 ? "text-amber-700"
-                                                : currentTheme === "blue"
-                                                ? "text-blue-600"
-                                                : "text-[#FF4D24]" 
+                                                : currentTheme === "sky"
+                                                ? "text-sky-600"
+                                                : currentTheme === "indigo"
+                                                ? "text-indigo-600"
+                                                : currentTheme === "rose"
+                                                ? "text-rose-600"
+                                                : "text-emerald-600" 
                                               : isOrderDelivered && isLast
                                                 ? "text-emerald-600"
                                                 : step.completed 
@@ -2480,11 +2790,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             <div className={`w-[34px] h-[34px] rounded-[10px] bg-gradient-to-b border-t border-t-white flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
                               orderTheme === "emerald"
                                 ? "from-emerald-50 via-emerald-50/80 to-emerald-100/60 border-b-emerald-200/80 border-x-emerald-100/80 text-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(16,185,129,0.08)]"
+                                : orderTheme === "sky"
+                                ? "from-sky-50 via-sky-50/80 to-blue-100/60 border-b-sky-200/80 border-x-sky-100/80 text-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(14,165,233,0.08)]"
+                                : orderTheme === "indigo"
+                                ? "from-indigo-50 via-indigo-50/80 to-violet-100/60 border-b-indigo-200/80 border-x-indigo-100/80 text-indigo-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.08)]"
                                 : orderTheme === "amber"
                                 ? "from-amber-50 via-amber-50/80 to-orange-100/60 border-b-amber-200/80 border-x-amber-100/80 text-amber-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(245,158,11,0.08)]"
-                                : orderTheme === "blue"
-                                ? "from-blue-50 via-blue-50/80 to-indigo-100/60 border-b-blue-200/80 border-x-blue-100/80 text-blue-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(59,130,246,0.08)]"
-                                : "from-orange-50/90 via-orange-50/70 to-rose-100/50 border-b-orange-200/80 border-x-orange-100/80 text-[#FF4D24] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(255,77,36,0.08)]"
+                                : "from-rose-50/90 via-rose-50/70 to-red-100/50 border-b-rose-200/80 border-x-rose-100/80 text-rose-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(244,63,94,0.08)]"
                             }`}>
                               <HoverMorphIcon 
                                 defaultIcon={LucideMapPin} 
@@ -2492,9 +2804,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 isHovered={isAddressHovered} 
                                 className={`w-[17px] h-[17px] ${
                                   orderTheme === "emerald" ? "text-emerald-600 group-hover:text-emerald-700" :
+                                  orderTheme === "sky" ? "text-sky-600 group-hover:text-sky-700" :
+                                  orderTheme === "indigo" ? "text-indigo-600 group-hover:text-indigo-700" :
                                   orderTheme === "amber" ? "text-amber-600 group-hover:text-amber-700" :
-                                  orderTheme === "blue" ? "text-blue-600 group-hover:text-blue-700" :
-                                  "text-[#FF4D24] group-hover:text-[#e03d15]"
+                                  "text-rose-600 group-hover:text-rose-700"
                                 }`} 
                                 size={17} 
                               />
@@ -2518,9 +2831,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-2xl p-12 text-center text-slate-400 text-xs flex items-center justify-center shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]"
+                      className="flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-2xl p-12 flex flex-col items-center justify-center shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] select-none pointer-events-none"
                     >
-                      Vui lòng chọn một đơn hàng ở danh sách bên trái để theo dõi hành trình chi tiết.
+                      <div className="relative flex flex-col items-center justify-center">
+                        <div className="w-18 h-18 rounded-2xl bg-gradient-to-b from-white/95 via-white/80 to-slate-100/60 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-white/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center">
+                          <Truck className="w-8 h-8 text-slate-300 stroke-[1.4]" />
+                        </div>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -3404,7 +3721,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             ) : (
                               <div className="flex flex-col items-center justify-center gap-3 p-6 text-center z-10 max-w-sm">
                                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 text-indigo-600 flex items-center justify-center shadow-[0_2px_6px_rgba(99,102,241,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]">
-                                  <Map className="w-7 h-7" />
+                                  <LucideMap className="w-7 h-7" />
                                 </div>
                                 <div className="space-y-1">
                                   <p className="text-sm font-bold text-slate-800">Chưa có vị trí trên bản đồ</p>

@@ -1,46 +1,32 @@
-# Implementation Plan: Order GraphQL Integration & Color System at `/m`
+# Implementation Plan: Loại Bỏ Mock UI, Đồng Bộ Endpoints & Màu Sắc Đơn Hàng Tại `/m`
 
-## Overview
-Kế hoạch triển khai tích hợp giao thức GraphQL Gateway cho phân hệ Quản lý Đơn hàng (Order Management) và hệ thống mã màu nhận diện trạng thái (Semantic Color System) trực tiếp vào giao diện Cổng hội viên `/m` (`ProfilePage`). Kế hoạch bám sát tài liệu đặc tả [docs/ORDER_GRAPHQL_API.md](docs/ORDER_GRAPHQL_API.md) và các quy tắc anti-slop, design-system của Horizon.
+## Objective
+Thực thi tinh gọn việc loại bỏ dữ liệu & giao diện Mock UI tại trang `/m`, kết nối endpoint GraphQL Gateway lấy dữ liệu thật, chuẩn hóa bảng màu trạng thái cho Card Order & Timeline Status Tree, và sửa lỗi ẩn Navbar không mong muốn tại `/m`.
 
-## Architecture Decisions
-1. **Hybrid Data Strategy (Cache-First + Network Sync)**: Khởi tạo danh sách đơn hàng ngay lập tức từ local cache (0ms lag), song song gọi GraphQL query `myOrdersList` qua `/graphql` để cập nhật dữ liệu mới nhất từ server.
-2. **Master-Detail Flow**: Danh sách bên trái fetch tóm tắt (`contents`), khi chọn đơn hàng sẽ nạp chi tiết từ `myOrderDetail` hoặc cache chi tiết để render Timeline & Hóa đơn.
-3. **Horizon Semantic Color Engine**: Chuẩn hóa màu sắc trạng thái (Amber cho Chờ thanh toán, Indigo cho Đang xử lý, Sky cho Đang giao, Emerald cho Đã hoàn tất, Rose cho Đã hủy/Hoàn tiền) kết hợp hiệu ứng Bevel 3D Glassmorphism.
-4. **Resilient Offline & Guest Fallback**: Tự động fallback dữ liệu mẫu đồng bộ 100% với DTO nếu gateway chưa kết nối backend thật hoặc người dùng ở trạng thái Guest.
+## Proposed Changes
 
-## Task List
+### 1. Sửa GraphQL Schema trong Backend Gateway (`server.ts`)
+- Chuyển trường `status` trong query `myOrdersList` từ `GraphQLNonNull(OrderStatusEnum)` thành `OrderStatusEnum` (optional) để hỗ trợ truy vấn tất cả đơn hàng (tab ALL).
+- Kiểm tra và xác thực endpoint bằng lệnh test (curl/npx tsx) đảm bảo trả về dữ liệu đúng định dạng DTO.
 
-### Phase 1: Foundation & GraphQL Client Services
-- [ ] **Task 1**: Chuẩn hóa & Mở rộng Service GraphQL Order (`src/services/orderService.ts`)
-- [ ] **Task 2**: Xây dựng Cache Adapter & DTO Normalizer cho phân hệ Order
+### 2. Loại bỏ Mock UI & Đồng Bộ Loading Dữ Liệu Thật (`src/components/ProfilePage.tsx`)
+- Xóa bỏ logic gieo dữ liệu giả (`seed mock orders`, `horizon_orders_seed_v5`, `HZ-7711-R`,...) trong `loadProfileAndOrders`.
+- Khởi tạo danh sách đơn hàng từ cache thực tế hoặc gọi trực tiếp `syncOrdersFromGraphQL()` khi component mount / đổi tab.
+- Thêm giao diện Skeleton Loading / Shimmer Loader khi đang đồng bộ và Empty State lịch sự chuẩn Bevel khi chưa có đơn hàng.
 
-### Checkpoint: Foundation
-- [ ] `orderService.ts` thực hiện thành công query `myOrdersList` và `myOrderDetail` qua `/graphql`.
-- [ ] TypeScript build & lint sạch (`npm run lint` hoặc `tsc --noEmit`).
+### 3. Đồng Bộ Hệ Thống Màu Sắc Tag & Status Tree Timeline
+- Đồng bộ hàm giải mã màu và thẻ trạng thái `getOrderStatusTheme` từ `src/lib/orderStatusTheme.ts` vào toàn bộ:
+  - Header Tag trên Order Card (badge background, text color, dot glow, border accent).
+  - Các mốc trạng thái (Delivery Steps) trong Hành trình giao hàng (Status Tree):
+    - Mốc đang xử lý (`active`): Glow ambient tương ứng (Amber/Indigo/Sky/Emerald).
+    - Đường line kết nối giữa các mốc đã hoàn thành (`completed`): Gradient chuẩn theo trạng thái đơn hàng.
+    - Mốc hoàn tất (`isOrderDelivered`): Icon Check xanh Emerald Bevel.
+    - Mốc chờ thực hiện: Màu slate trung tính làm mờ tinh tế.
 
-### Phase 2: UI Color Engine & Bevel Styling
-- [ ] **Task 3**: Xây dựng Helper Bảng mã màu ngữ nghĩa (Semantic Color Tokens Matrix)
-- [ ] **Task 4**: Tạo Status Filter Pills & Nâng cấp Timeline Tracking Visuals
+### 4. Điều Chỉnh Hiển Thị Navbar (`src/components/Navbar.tsx`)
+- Loại bỏ `/m`, `/profile`, `/account` khỏi danh sách `isAccountPage` thuộc chế độ auto-hide trong `Navbar.tsx` để Navbar luôn hiển thị cố định, ổn định trên đầu trang `/m`.
 
-### Checkpoint: Color & Visuals
-- [ ] Các thẻ trạng thái, chấm tín hiệu (status dot) và thanh timeline hiển thị đúng bộ màu ngữ nghĩa và hiệu ứng kính mờ (Bevel Glassmorphism).
-
-### Phase 3: Dynamic Data Integration at `/m` (ProfilePage)
-- [ ] **Task 5**: Tích hợp luồng dữ liệu GraphQL Order vào `src/components/ProfilePage.tsx`
-- [ ] **Task 6**: Thiết lập Smart Interval Polling & Đồng bộ hành trình đơn hàng Realtime
-
-### Checkpoint: Complete & Verification
-- [ ] Route `/m` tải dữ liệu đơn hàng mượt mà, hỗ trợ lọc theo tab trạng thái.
-- [ ] Khi bấm vào đơn hàng, Timeline chi tiết cập nhật chính xác theo DTO GraphQL.
-- [ ] Dev server hoạt động ổn định không lỗi console runtime.
-
-## Risks and Mitigations
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Backend Spring Boot offline hoặc chưa có token auth | Medium | Tự động fallback về mock store có schema đồng bộ 100% với GraphQL DTO |
-| Layout vỡ trên màn hình nhỏ hoặc mobile | High | Áp dụng cấu trúc Responsive Grid + Flex cuộn mượt mà, kiểm tra breakpoint `md` và `lg` |
-| Quá nhiều query gây giật lag khi chuyển tab | Low | Áp dụng bộ nhớ đệm (Cache-first) theo key `status-page` trong memory |
-
-## Open Questions
-- Không có câu hỏi nghẽn; toàn bộ DTO và quy tắc UI đã được đặc tả chi tiết tại [docs/ORDER_GRAPHQL_API.md](docs/ORDER_GRAPHQL_API.md).
+## Verification Strategy
+- **Backend Test**: Chạy `curl` kiểm tra `myOrdersList` với status và không có status.
+- **Frontend Test**: Chạy `npx tsc --noEmit` xác thực toàn bộ TypeScript type safety.
+- **Visual Inspection**: Kiểm tra giao diện `/m`, chuyển đổi các tab trạng thái (Tất cả, Chờ thanh toán, Đang xử lý, Đang giao, Đã giao, Đã hủy) và kiểm tra màu sắc tương ứng.

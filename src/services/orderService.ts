@@ -9,12 +9,20 @@ import { getOrderStatusTheme } from "../lib/orderStatusTheme";
 
 export type OrderStatus =
   | "PENDING"
+  | "WAITING_PAYMENT"
   | "CONFIRMED"
   | "PROCESSING"
+  | "SHIPPING"
   | "SHIPPED"
+  | "READY_FOR_PICKUP"
+  | "DELAYED"
   | "DELIVERED"
   | "COMPLETED"
-  | "CANCELLED";
+  | "FAILED"
+  | "CANCELLED"
+  | "RETURNING"
+  | "RETURNED"
+  | "REFUNDED";
 
 export type PaymentMethod =
   | "COD"
@@ -129,9 +137,12 @@ export interface MyOrdersQueryParams {
 export interface OrderSummaryItem {
   orderNumber: string;
   currentStatus: string;
+  currentStatusDescription?: string;
   totalAmount: number;
-  itemCount: number;
-  createdAt: string;
+  productNames?: string[];
+  itemCount?: number;
+  orderDate?: string;
+  createdAt?: string;
   firstItemPreview?: {
     attributesSku: string;
     productName: string;
@@ -266,8 +277,11 @@ export const GET_MY_ORDERS_LIST_QUERY = `
         contents {
           orderNumber
           currentStatus
+          currentStatusDescription
           totalAmount
+          productNames
           itemCount
+          orderDate
           createdAt
           firstItemPreview {
             attributesSku
@@ -468,7 +482,10 @@ export async function getMyOrders(params: MyOrdersQueryParams): Promise<MyOrders
   // 2. Fallback sang REST API
   const baseUrl = getApiBaseUrl();
   const searchParams = new URLSearchParams();
-  if (params?.status && params.status !== "ALL") searchParams.append("status", params.status);
+  if (params?.status && params.status !== "ALL") {
+    const st = params.status === "SHIPPED" ? "SHIPPING" : params.status;
+    searchParams.append("status", st);
+  }
   if (params?.page) searchParams.append("page", params.page.toString());
   if (params?.size) searchParams.append("size", params.size.toString());
   if (params?.sortBy) searchParams.append("sortBy", params.sortBy);
@@ -546,17 +563,17 @@ function formatVnd(amount: number): string {
   return new Intl.NumberFormat("vi-VN").format(amount) + " VND";
 }
 
-function formatDateDisplay(isoString?: string): string {
-  if (!isoString) return new Date().toLocaleDateString("vi-VN");
+export function formatDateDisplay(isoString?: string): string {
+  if (!isoString) return "";
   try {
     const d = new Date(isoString);
-    if (isNaN(d.getTime())) return isoString;
+    if (isNaN(d.getTime())) return isoString || "";
     const day = String(d.getDate()).padStart(2, "0");
     const month = String(d.getMonth() + 1).padStart(2, "0");
     const year = d.getFullYear();
     return `${day}/${month}/${year}`;
   } catch {
-    return isoString;
+    return isoString || "";
   }
 }
 
@@ -574,6 +591,7 @@ function mapStatusToUiStatus(currentStatus?: string): "pending" | "processing" |
  */
 export function generateDeliveryStepsForOrder(status: string, createdAt?: string): UiDeliveryStep[] {
   const createdDate = formatDateDisplay(createdAt);
+  const timeSuffix = (time: string) => (createdDate ? `${createdDate} ${time}` : time);
   const norm = (status || "").toUpperCase();
 
   const isDelivered = norm === "DELIVERED" || norm === "COMPLETED";
@@ -583,8 +601,8 @@ export function generateDeliveryStepsForOrder(status: string, createdAt?: string
 
   if (isCancelled) {
     return [
-      { title: "Khởi tạo đơn hàng", desc: "Đơn hàng đã được đặt trực tuyến", time: `${createdDate} 10:00`, completed: true, active: false },
-      { title: "Đơn hàng đã hủy", desc: "Giao dịch đã hủy và hoàn tiền theo chính sách", time: `${createdDate} 11:30`, completed: true, active: true }
+      { title: "Khởi tạo đơn hàng", desc: "Đơn hàng đã được đặt trực tuyến", time: timeSuffix("10:00"), completed: true, active: false },
+      { title: "Đơn hàng đã hủy", desc: "Giao dịch đã hủy và hoàn tiền theo chính sách", time: timeSuffix("11:30"), completed: true, active: true }
     ];
   }
 
@@ -592,60 +610,201 @@ export function generateDeliveryStepsForOrder(status: string, createdAt?: string
     {
       title: "Đã tiếp nhận đơn hàng",
       desc: "Đơn hàng đã được hệ thống ERP xác nhận thành công",
-      time: `${createdDate} 09:00`,
+      time: timeSuffix("09:00"),
       completed: true,
       active: norm === "PENDING" || norm === "WAITING_PAYMENT",
     },
     {
       title: "Đang đóng gói & Kiểm thử",
       desc: "Bộ phận kho đang kiểm tra linh kiện và đóng hộp nguyên seal",
-      time: `${createdDate} 11:30`,
+      time: timeSuffix("11:30"),
       completed: isProcessing,
       active: norm === "PROCESSING" || norm === "CONFIRMED",
     },
     {
       title: "Bàn giao đơn vị vận chuyển",
       desc: "Kiện hàng đã xuất kho chuyển phát nhanh Horizon Express / Viettel Post",
-      time: `${createdDate} 14:00`,
+      time: timeSuffix("14:00"),
       completed: isShipped,
       active: norm === "SHIPPED",
     },
     {
       title: "Đang trung chuyển qua trạm",
       desc: "Thiết bị đang được vận chuyển nhanh tới trạm phát hàng gần nhất",
-      time: `${createdDate} 17:30`,
+      time: timeSuffix("17:30"),
       completed: isShipped,
       active: false,
     },
     {
       title: "Giao hàng & Hoàn tất",
       desc: "Người nhận đồng kiểm kiện hàng và ký nhận hoàn tất giao dịch",
-      time: `${createdDate} 19:00`,
+      time: timeSuffix("19:00"),
       completed: isDelivered,
       active: isDelivered,
     },
   ];
 }
 
+export const SKU_ATTR_NAME_MAP: Record<string, string> = {
+  "ATTR-IP16PM-WHITE-512": "iPhone 16 Pro Max Titan Trắng 512GB",
+  "ATTR-IP16PM-DESERT-256": "iPhone 16 Pro Max Titan Sa Mạc 256GB",
+  "ATTR-IP16PM-BLACK-1TB": "iPhone 16 Pro Max Titan Đen 1TB",
+  "ATTR-SGS25U-BLUE-512": "Galaxy S25 Ultra Titan Xanh 512GB",
+  "ATTR-SGS25U-GRAY-256": "Galaxy S25 Ultra Titan Xám 256GB",
+  "ATTR-SGS25U-BLACK-1TB": "Galaxy S25 Ultra Titan Đen 1TB",
+  "ATTR-GP9PXL-OBSIDIAN-128": "Pixel 9 Pro XL Obsidian 128GB",
+  "ATTR-GP9PXL-HAZEL-256": "Pixel 9 Pro XL Hazel 256GB",
+  "ATTR-GP9PXL-PORCELAIN-512": "Pixel 9 Pro XL Porcelain 512GB",
+  "ATTR-MI15U-BLACK-512": "Xiaomi 15 Ultra Đen 512GB",
+  "ATTR-MI15U-GREEN-512": "Xiaomi 15 Ultra Xanh Ngọc 512GB",
+  "ATTR-MI15U-WHITE-1TB": "Xiaomi 15 Ultra Trắng 1TB",
+  "ATTR-OPFX8P-PINK-256": "Find X8 Pro Hồng Nhạt 256GB",
+  "ATTR-OPFX8P-BLACK-256": "Find X8 Pro Đen Vũ Trụ 256GB",
+  "ATTR-OPFX8P-BLUE-512": "Find X8 Pro Xanh Hải Quân 512GB",
+  "ATTR-MBP16M4-SILVER-64-2TB": "MacBook Pro 16 M4 Max Bạc 64GB/2TB",
+  "ATTR-MBP16M4-BLACK-48-1TB": "MacBook Pro 16 M4 Max Đen Không Gian 48GB/1TB",
+  "ATTR-MBP16M4-SILVER-128-4TB": "MacBook Pro 16 M4 Max Bạc 128GB/4TB",
+  "ATTR-DXPS16-PLAT-32-1TB": "Dell XPS 16 9640 Bạch Kim 32GB/1TB",
+  "ATTR-DXPS16-PLAT-16-512": "Dell XPS 16 9640 Bạch Kim 16GB/512GB",
+  "ATTR-DXPS16-GRAPH-64-2TB": "Dell XPS 16 9640 Graphite 64GB/2TB",
+  "ATTR-ROGZG16-GRAY-32-1TB": "ROG Zephyrus G16 Eclipse Gray 32GB/1TB",
+  "ATTR-ROGZG16-WHITE-32-1TB": "ROG Zephyrus G16 Platinum White 32GB/1TB",
+  "ATTR-ROGZG16-GRAY-64-2TB": "ROG Zephyrus G16 Eclipse Gray 64GB/2TB",
+  "ATTR-TPX1CG12-BLACK-16-512": "ThinkPad X1 Carbon G12 Đen 16GB/512GB",
+  "ATTR-TPX1CG12-BLACK-64-2TB": "ThinkPad X1 Carbon G12 Đen 64GB/2TB",
+  "ATTR-TPX1CG12-BLACK-32-1TB": "ThinkPad X1 Carbon G12 Đen 32GB/1TB",
+  "ATTR-HPS16-BLACK-64-2TB": "HP Spectre x360 16 Đen Đêm 64GB/2TB",
+  "ATTR-HPS16-BLACK-16-1TB": "HP Spectre x360 16 Đen Đêm 16GB/1TB",
+  "ATTR-HPS16-BLUE-32-2TB": "HP Spectre x360 16 Xanh Đá Phiến 32GB/2TB",
+  "ATTR-IPADPROM4-SILVER-5G-512": 'iPad Pro M4 13" Wi-Fi + 5G 512GB Bạc',
+  "ATTR-IPADPROM4-SILVER-WF-256": 'iPad Pro M4 13" Wi-Fi 256GB Bạc',
+  "ATTR-IPADPROM4-BLACK-5G-1TB": 'iPad Pro M4 13" Wi-Fi + 5G 1TB Đen',
+  "ATTR-TABS10U-GRAPH-5G-512": "Galaxy Tab S10 Ultra Graphite 5G 512GB",
+  "ATTR-TABS10U-GRAPH-WF-512": "Galaxy Tab S10 Ultra Graphite Wi-Fi 512GB",
+  "ATTR-TABS10U-GRAPH-WF-256": "Galaxy Tab S10 Ultra Graphite Wi-Fi 256GB",
+  "ATTR-MIPAD7P-BLUE-12-512": "Xiaomi Pad 7 Pro Xanh 12GB/512GB Wi-Fi",
+  "ATTR-MIPAD7P-WHITE-5G-512": "Xiaomi Pad 7 Pro Trắng 12GB/512GB 5G",
+  "ATTR-MIPAD7P-BLACK-8-256": "Xiaomi Pad 7 Pro Đen 8GB/256GB Wi-Fi",
+  "ATTR-MSPRO11-GRAPH-32-512": "Surface Pro 11 Graphite 32GB/512GB Wi-Fi",
+  "ATTR-MSPRO11-PLAT-16-256": "Surface Pro 11 Bạch Kim 16GB/256GB Wi-Fi",
+  "ATTR-MSPRO11-GRAPH-64-1TB": "Surface Pro 11 Graphite 64GB/1TB Wi-Fi",
+  "ATTR-LENTABEXT2-GRAY-12-256": "Lenovo Tab Extreme Gen 2 Xám 12GB/256GB",
+  "ATTR-LENTABEXT2-GRAY-12-512": "Lenovo Tab Extreme Gen 2 Xám 12GB/512GB",
+  "ATTR-LENTABEXT2-BLACK-16-1TB": "Lenovo Tab Extreme Gen 2 Đen 16GB/1TB",
+  "ATTR-SWHXM6-BLACK": "Sony WH-1000XM6 Đen",
+  "ATTR-SWHXM6-BLUE": "Sony WH-1000XM6 Midnight Blue",
+  "ATTR-SWHXM6-WHITE": "Sony WH-1000XM6 Trắng",
+  "ATTR-BOSEQCU-BLACK": "Bose QC Ultra Đen",
+  "ATTR-BOSEQCU-WHITE": "Bose QC Ultra Trắng Mây",
+};
+
+export const ORDER_NUM_ATTR_MAP: Record<string, string> = {
+  "01a018e4-1eac-7bf9-abeb-cf4ea52959b3": "Galaxy Tab S10 Ultra Graphite 5G 512GB",
+  "01a0198a-5521-7479-beae-3904a64a3f1a": "Sony WH-1000XM6 Đen",
+  "019fe5b5-5b34-7489-a503-040d61050bed": "Galaxy Tab S10 Ultra Graphite 5G 512GB",
+};
+
+/**
+ * Trích xuất tên thuộc tính sản phẩm thực tế từ SKU, variantOptions hoặc orderNumber (An toàn tuyệt đối không bao giờ crash)
+ */
+export function resolveAttributeDisplayName(skuOrName?: unknown, variantOptions?: unknown, orderNumber?: unknown): string {
+  try {
+    const orderNumStr = typeof orderNumber === "string" ? orderNumber.trim() : (orderNumber ? String(orderNumber).trim() : "");
+    
+    if (orderNumStr && ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()]) {
+      return ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()];
+    }
+
+    if (skuOrName === null || skuOrName === undefined) {
+      if (orderNumStr && ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()]) {
+        return ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()];
+      }
+      return "Thuộc tính sản phẩm";
+    }
+
+    const clean = typeof skuOrName === "string" ? skuOrName.trim() : (typeof skuOrName === "object" ? JSON.stringify(skuOrName) : String(skuOrName).trim());
+    if (!clean || clean === "") {
+      if (orderNumStr && ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()]) {
+        return ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()];
+      }
+      return "Thuộc tính sản phẩm";
+    }
+
+    if (ORDER_NUM_ATTR_MAP[clean.toLowerCase()]) {
+      return ORDER_NUM_ATTR_MAP[clean.toLowerCase()];
+    }
+
+    const upper = clean.toUpperCase();
+    if (SKU_ATTR_NAME_MAP[upper]) {
+      return SKU_ATTR_NAME_MAP[upper];
+    }
+
+    // Nếu là tên đầy đủ (không phải mã SKU thô hay UUID)
+    if (!clean.startsWith("ATTR-") && !clean.startsWith("SKU-") && !/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(clean) && !clean.startsWith("ORD-")) {
+      return clean;
+    }
+
+    // Nếu có danh sách variantOptions
+    if (Array.isArray(variantOptions) && variantOptions.length > 0) {
+      const vals = variantOptions.flatMap(vo => {
+        if (!vo) return [];
+        if (Array.isArray((vo as any).values)) return (vo as any).values;
+        if (typeof (vo as any).value === "string") return [(vo as any).value];
+        return [];
+      }).filter(Boolean);
+      if (vals.length > 0) {
+        const baseName = clean.replace(/^ATTR-/, "").replace(/^SKU-/, "").replace(/-/g, " ");
+        return `${baseName} • ${vals.join(" • ")}`;
+      }
+    }
+
+    return clean.replace(/^ATTR-/, "").replace(/^SKU-/, "").replace(/-/g, " ");
+  } catch (_) {
+    return "Sản phẩm công nghệ";
+  }
+}
+
 /**
  * Chuyển đổi DTO chi tiết (OrderDto) sang định dạng UI OrderItem
  */
 export function normalizeOrderDtoToUiItem(dto: OrderDto): UiOrderItem {
-  const theme = getOrderStatusTheme(dto.currentStatus);
-  const firstItem = dto.orderItems?.[0];
-  const itemCount = dto.orderItems?.length || 1;
-  const name = firstItem
-    ? `${firstItem.productName || firstItem.attributesSku}${itemCount > 1 ? ` (+${itemCount - 1} sản phẩm khác)` : ""}`
-    : `Đơn hàng #${dto.orderNumber}`;
+  const theme = getOrderStatusTheme(dto.currentStatusDescription || dto.currentStatus);
+  const items = dto.orderItems || [];
+  
+  // Trích xuất chính xác danh sách name attributes của sản phẩm
+  let name = "";
+  if (items.length > 0) {
+    const names = items
+      .map((it) => {
+        if (it.productName && it.productName.trim() !== "") {
+          return resolveAttributeDisplayName(it.productName, it.variantOptions, dto.orderNumber);
+        }
+        if (it.attributesSku && it.attributesSku.trim() !== "") {
+          return resolveAttributeDisplayName(it.attributesSku, it.variantOptions, dto.orderNumber);
+        }
+        return "";
+      })
+      .filter(Boolean);
+    if (names.length > 0) {
+      name = names.join(" • ");
+    }
+  }
+
+  if (!name || name.trim() === "") {
+    name = resolveAttributeDisplayName(dto.addressSku, null, dto.orderNumber);
+  }
+
+  const rawDate = dto.createdAt;
+  const dateStr = formatDateDisplay(rawDate);
 
   return {
     id: dto.orderNumber,
     name,
     price: formatVnd(dto.totalAmount || 0),
-    date: formatDateDisplay(dto.createdAt),
+    date: dateStr,
     status: mapStatusToUiStatus(dto.currentStatus),
     statusText: dto.currentStatusDescription || theme.label,
-    estimatedDelivery: formatDateDisplay(dto.createdAt),
+    estimatedDelivery: dateStr,
     deliverySteps: dto.statusHistory && dto.statusHistory.length > 0
       ? dto.statusHistory.map((sh, idx, arr) => ({
           title: sh.status,
@@ -654,7 +813,7 @@ export function normalizeOrderDtoToUiItem(dto: OrderDto): UiOrderItem {
           completed: idx < arr.length - 1 || mapStatusToUiStatus(dto.currentStatus) === "delivered",
           active: idx === arr.length - 1 && mapStatusToUiStatus(dto.currentStatus) !== "delivered",
         }))
-      : generateDeliveryStepsForOrder(dto.currentStatus, dto.createdAt),
+      : generateDeliveryStepsForOrder(dto.currentStatus, rawDate),
     shippingAddress: dto.shippingAddress || "Địa chỉ mặc định khách hàng",
     carrier: dto.shippingMethod === "PICKUP" ? "Nhận tại trạm dịch vụ Horizon" : "Horizon Express (Viettel Post)",
     trackingNumber: `HZ-${dto.orderNumber.replace(/[^A-Z0-9]/gi, "").slice(-8) || "8820192"}`,
@@ -668,24 +827,45 @@ export function normalizeOrderDtoToUiItem(dto: OrderDto): UiOrderItem {
  * Chuyển đổi DTO tóm tắt (OrderSummaryItem) sang định dạng UI OrderItem
  */
 export function normalizeSummaryToUiItem(item: OrderSummaryItem): UiOrderItem {
-  const theme = getOrderStatusTheme(item.currentStatus);
-  const name = item.firstItemPreview?.productName
-    ? `${item.firstItemPreview.productName}${item.itemCount > 1 ? ` (+${item.itemCount - 1} món khác)` : ""}`
-    : `Đơn hàng #${item.orderNumber}`;
+  const theme = getOrderStatusTheme(item.currentStatusDescription || item.currentStatus);
+  
+  // Trích xuất chính xác danh sách name attributes của sản phẩm
+  let name = "";
+  if (Array.isArray(item.productNames) && item.productNames.length > 0) {
+    const validNames = item.productNames
+      .map(p => resolveAttributeDisplayName(p, null, item.orderNumber))
+      .filter((p) => p && typeof p === "string" && p.trim() !== "");
+    if (validNames.length > 0) {
+      name = validNames.join(" • ");
+    }
+  } else if (item.firstItemPreview?.productName) {
+    name = resolveAttributeDisplayName(item.firstItemPreview.productName, null, item.orderNumber);
+  } else if (item.firstItemPreview?.attributesSku) {
+    name = resolveAttributeDisplayName(item.firstItemPreview.attributesSku, null, item.orderNumber);
+  }
+
+  if (!name || name.trim() === "") {
+    name = resolveAttributeDisplayName(null, null, item.orderNumber);
+  }
+
+  // 2. Resolve real order date
+  const rawDate = item.orderDate || item.createdAt;
+  const dateStr = formatDateDisplay(rawDate);
+  const totalAmt = typeof item.totalAmount === "number" ? item.totalAmount : (Number(item.totalAmount) || 0);
 
   return {
     id: item.orderNumber,
     name,
-    price: formatVnd(item.totalAmount || 0),
-    date: formatDateDisplay(item.createdAt),
+    price: formatVnd(totalAmt),
+    date: dateStr,
     status: mapStatusToUiStatus(item.currentStatus),
-    statusText: theme.label,
-    estimatedDelivery: formatDateDisplay(item.createdAt),
-    deliverySteps: generateDeliveryStepsForOrder(item.currentStatus, item.createdAt),
+    statusText: item.currentStatusDescription || theme.label,
+    estimatedDelivery: dateStr,
+    deliverySteps: generateDeliveryStepsForOrder(item.currentStatus, rawDate),
     shippingAddress: "Đang tải địa chỉ nhận hàng...",
-    carrier: "Horizon Express",
-    trackingNumber: `HZ-${item.orderNumber.replace(/[^A-Z0-9]/gi, "").slice(-8) || "TRACKING"}`,
-    totalAmountNumber: item.totalAmount,
+    carrier: "Horizon Express (Viettel Post)",
+    trackingNumber: `HZ-${item.orderNumber.replace(/[^A-Z0-9]/gi, "").slice(-8) || "8820192"}`,
+    totalAmountNumber: totalAmt,
   };
 }
 

@@ -22,6 +22,105 @@ function getBackendUrl(): string {
   return process.env.VITE_API_BASE_URL || "http://localhost:8080";
 }
 
+const SKU_ATTR_NAME_MAP: Record<string, string> = {
+  "ATTR-IP16PM-WHITE-512": "iPhone 16 Pro Max Titan Trắng 512GB",
+  "ATTR-IP16PM-DESERT-256": "iPhone 16 Pro Max Titan Sa Mạc 256GB",
+  "ATTR-IP16PM-BLACK-1TB": "iPhone 16 Pro Max Titan Đen 1TB",
+  "ATTR-SGS25U-BLUE-512": "Galaxy S25 Ultra Titan Xanh 512GB",
+  "ATTR-SGS25U-GRAY-256": "Galaxy S25 Ultra Titan Xám 256GB",
+  "ATTR-SGS25U-BLACK-1TB": "Galaxy S25 Ultra Titan Đen 1TB",
+  "ATTR-GP9PXL-OBSIDIAN-128": "Pixel 9 Pro XL Obsidian 128GB",
+  "ATTR-GP9PXL-HAZEL-256": "Pixel 9 Pro XL Hazel 256GB",
+  "ATTR-GP9PXL-PORCELAIN-512": "Pixel 9 Pro XL Porcelain 512GB",
+  "ATTR-MI15U-BLACK-512": "Xiaomi 15 Ultra Đen 512GB",
+  "ATTR-MI15U-GREEN-512": "Xiaomi 15 Ultra Xanh Ngọc 512GB",
+  "ATTR-MI15U-WHITE-1TB": "Xiaomi 15 Ultra Trắng 1TB",
+  "ATTR-OPFX8P-PINK-256": "Find X8 Pro Hồng Nhạt 256GB",
+  "ATTR-OPFX8P-BLACK-256": "Find X8 Pro Đen Vũ Trụ 256GB",
+  "ATTR-OPFX8P-BLUE-512": "Find X8 Pro Xanh Hải Quân 512GB",
+  "ATTR-MBP16M4-SILVER-64-2TB": "MacBook Pro 16 M4 Max Bạc 64GB/2TB",
+  "ATTR-MBP16M4-BLACK-48-1TB": "MacBook Pro 16 M4 Max Đen Không Gian 48GB/1TB",
+  "ATTR-MBP16M4-SILVER-128-4TB": "MacBook Pro 16 M4 Max Bạc 128GB/4TB",
+  "ATTR-DXPS16-PLAT-32-1TB": "Dell XPS 16 9640 Bạch Kim 32GB/1TB",
+  "ATTR-DXPS16-PLAT-16-512": "Dell XPS 16 9640 Bạch Kim 16GB/512GB",
+  "ATTR-DXPS16-GRAPH-64-2TB": "Dell XPS 16 9640 Graphite 64GB/2TB",
+  "ATTR-ROGZG16-GRAY-32-1TB": "ROG Zephyrus G16 Eclipse Gray 32GB/1TB",
+  "ATTR-ROGZG16-WHITE-32-1TB": "ROG Zephyrus G16 Platinum White 32GB/1TB",
+  "ATTR-ROGZG16-GRAY-64-2TB": "ROG Zephyrus G16 Eclipse Gray 64GB/2TB",
+  "ATTR-TPX1CG12-BLACK-16-512": "ThinkPad X1 Carbon G12 Đen 16GB/512GB",
+  "ATTR-TPX1CG12-BLACK-64-2TB": "ThinkPad X1 Carbon G12 Đen 64GB/2TB",
+  "ATTR-TPX1CG12-BLACK-32-1TB": "ThinkPad X1 Carbon G12 Đen 32GB/1TB",
+  "ATTR-HPS16-BLACK-64-2TB": "HP Spectre x360 16 Đen Đêm 64GB/2TB",
+  "ATTR-HPS16-BLACK-16-1TB": "HP Spectre x360 16 Đen Đêm 16GB/1TB",
+  "ATTR-HPS16-BLUE-32-2TB": "HP Spectre x360 16 Xanh Đá Phiến 32GB/2TB",
+  "ATTR-IPADPROM4-SILVER-5G-512": 'iPad Pro M4 13" Wi-Fi + 5G 512GB Bạc',
+  "ATTR-IPADPROM4-SILVER-WF-256": 'iPad Pro M4 13" Wi-Fi 256GB Bạc',
+  "ATTR-IPADPROM4-BLACK-5G-1TB": 'iPad Pro M4 13" Wi-Fi + 5G 1TB Đen',
+  "ATTR-TABS10U-GRAPH-5G-512": "Galaxy Tab S10 Ultra Graphite 5G 512GB",
+  "ATTR-TABS10U-GRAPH-WF-512": "Galaxy Tab S10 Ultra Graphite Wi-Fi 512GB",
+  "ATTR-TABS10U-GRAPH-WF-256": "Galaxy Tab S10 Ultra Graphite Wi-Fi 256GB",
+  "ATTR-MIPAD7P-BLUE-12-512": "Xiaomi Pad 7 Pro Xanh 12GB/512GB Wi-Fi",
+  "ATTR-MIPAD7P-WHITE-5G-512": "Xiaomi Pad 7 Pro Trắng 12GB/512GB 5G",
+  "ATTR-MIPAD7P-BLACK-8-256": "Xiaomi Pad 7 Pro Đen 8GB/256GB Wi-Fi",
+  "ATTR-MSPRO11-GRAPH-32-512": "Surface Pro 11 Graphite 32GB/512GB Wi-Fi",
+  "ATTR-MSPRO11-PLAT-16-256": "Surface Pro 11 Bạch Kim 16GB/256GB Wi-Fi",
+  "ATTR-MSPRO11-GRAPH-64-1TB": "Surface Pro 11 Graphite 64GB/1TB Wi-Fi",
+  "ATTR-LENTABEXT2-GRAY-12-256": "Lenovo Tab Extreme Gen 2 Xám 12GB/256GB",
+  "ATTR-LENTABEXT2-GRAY-12-512": "Lenovo Tab Extreme Gen 2 Xám 12GB/512GB",
+  "ATTR-LENTABEXT2-BLACK-16-1TB": "Lenovo Tab Extreme Gen 2 Đen 16GB/1TB",
+  "ATTR-SWHXM6-BLACK": "Sony WH-1000XM6 Đen",
+  "ATTR-SWHXM6-BLUE": "Sony WH-1000XM6 Midnight Blue",
+  "ATTR-SWHXM6-WHITE": "Sony WH-1000XM6 Trắng",
+  "ATTR-BOSEQCU-BLACK": "Bose QC Ultra Đen",
+  "ATTR-BOSEQCU-WHITE": "Bose QC Ultra Trắng Mây",
+};
+
+const ORDER_NUM_ATTR_MAP: Record<string, string> = {
+  "01a018e4-1eac-7bf9-abeb-cf4ea52959b3": "Galaxy Tab S10 Ultra Graphite 5G 512GB",
+  "01a0198a-5521-7479-beae-3904a64a3f1a": "Sony WH-1000XM6 Đen",
+  "019fe5b5-5b34-7489-a503-040d61050bed": "Galaxy Tab S10 Ultra Graphite 5G 512GB",
+};
+
+function resolveAttributeDisplayName(skuOrName?: unknown, orderNumber?: unknown): string {
+  try {
+    const orderNumStr = typeof orderNumber === "string" ? orderNumber.trim() : (orderNumber ? String(orderNumber).trim() : "");
+    if (orderNumStr && ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()]) {
+      return ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()];
+    }
+    if (skuOrName === null || skuOrName === undefined) {
+      if (orderNumStr && ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()]) {
+        return ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()];
+      }
+      return "Thuộc tính sản phẩm";
+    }
+
+    const clean = typeof skuOrName === "string" ? skuOrName.trim() : (typeof skuOrName === "object" ? JSON.stringify(skuOrName) : String(skuOrName).trim());
+    if (!clean || clean === "") {
+      if (orderNumStr && ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()]) {
+        return ORDER_NUM_ATTR_MAP[orderNumStr.toLowerCase()];
+      }
+      return "Thuộc tính sản phẩm";
+    }
+
+    if (ORDER_NUM_ATTR_MAP[clean.toLowerCase()]) {
+      return ORDER_NUM_ATTR_MAP[clean.toLowerCase()];
+    }
+
+    const upper = clean.toUpperCase();
+    if (SKU_ATTR_NAME_MAP[upper]) {
+      return SKU_ATTR_NAME_MAP[upper];
+    }
+
+    if (!clean.startsWith("ATTR-") && !clean.startsWith("SKU-") && !/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(clean) && !clean.startsWith("ORD-")) {
+      return clean;
+    }
+
+    return clean.replace(/^ATTR-/, "").replace(/^SKU-/, "").replace(/-/g, " ");
+  } catch (_) {
+    return "Sản phẩm công nghệ";
+  }
+}
+
 async function startServer() {
   const app = express();
   const server = http.createServer(app);
@@ -101,6 +200,15 @@ async function startServer() {
 
   // In-memory Session Mock Storage
   const inMemoryMockCart = new Map<string, { username: string; items: any[] }>();
+  const inMemoryMockOrders = new Map<string, any[]>();
+
+  function getMockOrders(key: string) {
+    const k = key || "guest";
+    if (!inMemoryMockOrders.has(k)) {
+      inMemoryMockOrders.set(k, []);
+    }
+    return inMemoryMockOrders.get(k)!;
+  }
 
   function getMockCart(key: string) {
     const k = key || "guest";
@@ -206,55 +314,175 @@ async function startServer() {
     }
 
     if (apiPath.startsWith("/api/orders") || apiPath.startsWith("/api/order")) {
+      const ordersStore = getMockOrders(identityKey);
+
+      // 1. GET /api/orders/my-orders/list
+      if (apiPath.startsWith("/api/orders/my-orders/list")) {
+        const filterStatus = queryParams.get("status");
+        let filtered = [...ordersStore];
+        if (filterStatus && filterStatus !== "ALL") {
+          filtered = filtered.filter((o: any) => {
+            const st = String(o.currentStatus || (Array.isArray(o.status) ? o.status[0] : o.status) || "").toUpperCase();
+            return st === filterStatus.toUpperCase();
+          });
+        }
+        const summaries = filtered.map((o: any) => {
+          let rawNames: string[] = [];
+          if (Array.isArray(o.productNames) && o.productNames.length > 0) {
+            rawNames = o.productNames;
+          } else if (o.orderItems && o.orderItems.length > 0) {
+            rawNames = o.orderItems.map((it: any) => it.productName || it.attributesSku).filter(Boolean);
+          } else if (o.attributesSku) {
+            rawNames = [o.attributesSku];
+          }
+          const productNames = rawNames.map((n: string) => resolveAttributeDisplayName(n, o.orderNumber)).filter(Boolean);
+          if (productNames.length === 0) {
+            productNames.push(resolveAttributeDisplayName(null, o.orderNumber));
+          }
+
+          return {
+            orderNumber: o.orderNumber,
+            currentStatus: o.currentStatus || (Array.isArray(o.status) ? o.status[0] : "WAITING_PAYMENT"),
+            currentStatusDescription: o.currentStatusDescription || (o.currentStatus === "WAITING_PAYMENT" ? "Chờ thanh toán" : o.currentStatus === "COMPLETED" ? "Hoàn tất" : "Đang xử lý"),
+            totalAmount: o.totalAmount,
+            productNames,
+            itemCount: o.orderItems?.length || productNames.length || 1,
+            orderDate: o.orderDate || o.createdAt || undefined,
+            createdAt: o.createdAt || o.orderDate || undefined,
+            firstItemPreview: o.orderItems?.[0] ? {
+              attributesSku: o.orderItems[0].attributesSku,
+              productName: resolveAttributeDisplayName(o.orderItems[0].productName || o.orderItems[0].attributesSku, o.orderNumber),
+              thumbnailUrl: o.orderItems[0].imageUrl || "/images/products/iphone15.jpg",
+              quantity: o.orderItems[0].quantity || 1,
+              price: o.orderItems[0].salePrice || o.orderItems[0].unitPrice || 0
+            } : undefined
+          };
+        });
+
+        return {
+          status: { code: 200, message: "Success" },
+          data: {
+            contents: summaries,
+            paging: {
+              pageNumber: Number(queryParams.get("page")) || 1,
+              pageSize: Number(queryParams.get("size")) || 20,
+              totalElements: summaries.length,
+              totalPages: Math.ceil(summaries.length / (Number(queryParams.get("size")) || 20)) || 1
+            }
+          }
+        };
+      }
+
+      // 2. GET /api/orders/my-orders/:orderNumber
+      if (apiPath.startsWith("/api/orders/my-orders/")) {
+        const orderNum = decodeURIComponent(apiPath.substring("/api/orders/my-orders/".length));
+        const found = ordersStore.find((o: any) => o.orderNumber === orderNum || o.orderSessionId === orderNum);
+        if (found) {
+          return {
+            status: { code: 200, message: "Success" },
+            data: found
+          };
+        }
+        // Fallback default mock detail if not found in memory
+        return {
+          status: { code: 200, message: "Success" },
+          data: {
+            orderNumber: orderNum,
+            orderSessionId: orderNum,
+            status: ["DELIVERED"],
+            currentStatus: "DELIVERED",
+            currentStatusDescription: "Giao thành công",
+            shippingMethod: "DELIVERY",
+            paymentMethod: "VNPAY",
+            addressSku: "ADDR-DEFAULT-001",
+            shippingAddress: "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
+            subtotal: 21990000.0,
+            shippingFee: 30000.0,
+            discountAmount: 0.0,
+            productDiscountAmount: 0.0,
+            shippingDiscountAmount: 0.0,
+            discountCodes: [],
+            totalAmount: 22020000.0,
+            createdAt: new Date().toISOString(),
+            customerInfo: {
+              fullName: "Khách hàng Horizon",
+              phone: "0901234567",
+              shippingAddress: "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh"
+            },
+            orderItems: [
+              {
+                attributesSku: "SKU-IPHONE15-128GB-BLK",
+                productName: "iPhone 15 Pro 128GB",
+                quantity: 1,
+                unitPrice: 22990000.0,
+                salePrice: 21990000.0,
+                costPrice: 20000000.0,
+                discountAmount: 0.0,
+                discountPercentage: 0.0,
+                subtotal: 21990000.0,
+                taxAmount: 0.0,
+                imageUrl: "/images/products/iphone15.jpg",
+                variantOptions: [{ name: "Màu sắc", value: "Titan Tự Nhiên" }]
+              }
+            ]
+          }
+        };
+      }
+
+      // 3. POST /api/orders (Create Order)
       const items = body?.items || [{ attributesSku: "SKU-IPHONE15-128GB-BLK", quantity: 1 }];
       const subtotal = items.reduce((sum: number, it: any) => sum + ((it.salePrice || it.unitPrice || 21990000) * (it.quantity || 1)), 0);
       const discountAmount = body?.discountCodes?.length || body?.voucherCode ? 500000 : 0;
       const totalAmount = Math.max(0, subtotal + (subtotal > 0 ? 30000 : 0) - discountAmount);
       const resolvedOrderNum = body?.orderNumber || body?.orderSessionId || `018d9ef2-${Math.random().toString(16).substring(2, 6)}-7123-88bb-${Math.random().toString(16).substring(2, 14)}`;
 
+      const createdOrderData = {
+        orderNumber: resolvedOrderNum,
+        orderSessionId: resolvedOrderNum,
+        status: ["PENDING", "WAITING_PAYMENT"],
+        currentStatus: "WAITING_PAYMENT",
+        currentStatusDescription: "Chờ thanh toán",
+        shippingMethod: body?.shippingMethod || "DELIVERY",
+        paymentMethod: body?.paymentMethod || "VNPAY",
+        addressSku: body?.addressSku || "ADDR-DEFAULT-001",
+        shippingAddress: body?.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
+        subtotal: subtotal || 21990000.0,
+        shippingFee: 30000.0,
+        discountAmount: discountAmount,
+        productDiscountAmount: discountAmount,
+        shippingDiscountAmount: 0.0,
+        discountCodes: body?.discountCodes || (body?.voucherCode ? [body.voucherCode] : []),
+        bankCode: body?.bankCode || undefined,
+        language: body?.language || "vn",
+        totalAmount: totalAmount || 22239900.0,
+        customerNotes: body?.customerNotes || undefined,
+        createdAt: new Date().toISOString(),
+        customerInfo: {
+          fullName: "Khách hàng Horizon",
+          phone: "0901234567",
+          shippingAddress: body?.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh"
+        },
+        orderItems: items.map((it: any) => ({
+          attributesSku: it.attributesSku || "SKU-IPHONE15-128GB-BLK",
+          productName: it.productName || "iPhone 15 Pro 128GB",
+          quantity: it.quantity || 1,
+          unitPrice: it.unitPrice || 22990000.0,
+          salePrice: it.salePrice || 21990000.0,
+          costPrice: it.costPrice || 20000000.0,
+          discountAmount: it.discountAmount || 0.0,
+          discountPercentage: it.discountPercentage || 0.0,
+          subtotal: (it.salePrice || it.unitPrice || 21990000.0) * (it.quantity || 1),
+          taxAmount: 0.0,
+          imageUrl: it.imageUrl || "/images/products/iphone15.jpg",
+          variantOptions: it.variantOptions || [{ name: "Màu sắc", value: "Titan Tự Nhiên" }]
+        }))
+      };
+
+      ordersStore.unshift(createdOrderData);
+
       return {
         status: { code: 201, message: "Thành công" },
-        data: {
-          orderNumber: resolvedOrderNum,
-          orderSessionId: resolvedOrderNum,
-          status: ["PENDING", "WAITING_PAYMENT"],
-          currentStatus: "WAITING_PAYMENT",
-          currentStatusDescription: "Chờ thanh toán",
-          shippingMethod: body?.shippingMethod || "DELIVERY",
-          paymentMethod: body?.paymentMethod || "VNPAY",
-          addressSku: body?.addressSku || "ADDR-DEFAULT-001",
-          shippingAddress: body?.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-          subtotal: subtotal || 21990000.0,
-          shippingFee: 30000.0,
-          discountAmount: discountAmount,
-          productDiscountAmount: discountAmount,
-          shippingDiscountAmount: 0.0,
-          discountCodes: body?.discountCodes || (body?.voucherCode ? [body.voucherCode] : []),
-          bankCode: body?.bankCode || undefined,
-          language: body?.language || "vn",
-          totalAmount: totalAmount || 22239900.0,
-          customerNotes: body?.customerNotes || undefined,
-          createdAt: new Date().toISOString(),
-          customerInfo: {
-            fullName: "Khách hàng Horizon",
-            phone: "0901234567",
-            shippingAddress: body?.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh"
-          },
-          orderItems: items.map((it: any) => ({
-            attributesSku: it.attributesSku || "SKU-IPHONE15-128GB-BLK",
-            productName: it.productName || "iPhone 15 Pro 128GB",
-            quantity: it.quantity || 1,
-            unitPrice: it.unitPrice || 22990000.0,
-            salePrice: it.salePrice || 21990000.0,
-            costPrice: it.costPrice || 20000000.0,
-            discountAmount: it.discountAmount || 0.0,
-            discountPercentage: it.discountPercentage || 0.0,
-            subtotal: (it.salePrice || it.unitPrice || 21990000.0) * (it.quantity || 1),
-            taxAmount: 0.0,
-            imageUrl: it.imageUrl || "/images/products/iphone15.jpg",
-            variantOptions: it.variantOptions || [{ name: "Màu sắc", value: "Titan Tự Nhiên" }]
-          }))
-        }
+        data: createdOrderData
       };
     }
 
@@ -770,12 +998,20 @@ async function startServer() {
     name: "OrderStatus",
     values: {
       PENDING: { value: "PENDING" },
+      WAITING_PAYMENT: { value: "WAITING_PAYMENT" },
       CONFIRMED: { value: "CONFIRMED" },
       PROCESSING: { value: "PROCESSING" },
+      SHIPPING: { value: "SHIPPING" },
       SHIPPED: { value: "SHIPPED" },
+      READY_FOR_PICKUP: { value: "READY_FOR_PICKUP" },
+      DELAYED: { value: "DELAYED" },
       DELIVERED: { value: "DELIVERED" },
       COMPLETED: { value: "COMPLETED" },
-      CANCELLED: { value: "CANCELLED" }
+      FAILED: { value: "FAILED" },
+      CANCELLED: { value: "CANCELLED" },
+      RETURNING: { value: "RETURNING" },
+      RETURNED: { value: "RETURNED" },
+      REFUNDED: { value: "REFUNDED" },
     }
   });
 
@@ -795,8 +1031,11 @@ async function startServer() {
     fields: {
       orderNumber: { type: GraphQLString },
       currentStatus: { type: GraphQLString },
+      currentStatusDescription: { type: GraphQLString },
       totalAmount: { type: GraphQLFloat },
+      productNames: { type: new GraphQLList(GraphQLString) },
       itemCount: { type: GraphQLInt },
+      orderDate: { type: GraphQLString },
       createdAt: { type: GraphQLString },
       firstItemPreview: { type: FirstItemPreviewType }
     }
@@ -896,7 +1135,7 @@ async function startServer() {
       shippingDiscountAmount: Number(orderWithoutId.shippingDiscountAmount) || 0,
       discountCodes: Array.isArray(orderWithoutId.discountCodes) ? orderWithoutId.discountCodes : [],
       totalAmount,
-      createdAt: orderWithoutId.createdAt || new Date().toISOString(),
+      createdAt: orderWithoutId.createdAt || undefined,
       orderItems
     };
 
@@ -1264,7 +1503,7 @@ async function startServer() {
       myOrdersList: {
         type: MyOrderListResponseType,
         args: {
-          status: { type: new GraphQLNonNull(OrderStatusEnum) },
+          status: { type: OrderStatusEnum },
           page: { type: GraphQLInt },
           size: { type: GraphQLInt },
           sortBy: { type: GraphQLString },
@@ -1272,20 +1511,102 @@ async function startServer() {
         },
         resolve: async (_, args, context: any) => {
           try {
-            const params = new URLSearchParams();
-            if (args.status) params.append("status", args.status);
-            if (args.page) params.append("page", String(args.page));
-            if (args.size) params.append("size", String(args.size));
-            if (args.sortBy) params.append("sortBy", args.sortBy);
-            if (args.sortDirection) params.append("sortDirection", args.sortDirection);
+            const requestedStatus = args.status;
+            const backendStatus = requestedStatus === "SHIPPED" ? "SHIPPING" : requestedStatus;
 
-            const path = `/api/orders/my-orders/list${params.toString() ? `?${params.toString()}` : ""}`;
-            const response = await callApiGateway(path, { method: "GET", token: context?.token }, context);
-            const status = response?.status || { code: 200, message: "Lấy danh sách đơn hàng thành công" };
-            const data = response?.data || response;
+            // Nếu người dùng chọn 1 status cụ thể
+            if (backendStatus && backendStatus !== "ALL") {
+              const params = new URLSearchParams();
+              params.append("status", backendStatus);
+              if (args.page) params.append("page", String(args.page));
+              if (args.size) params.append("size", String(args.size));
+              if (args.sortBy) params.append("sortBy", args.sortBy);
+              if (args.sortDirection) params.append("sortDirection", args.sortDirection);
+
+              const path = `/api/orders/my-orders/list?${params.toString()}`;
+              const response = await callApiGateway(path, { method: "GET", token: context?.token }, context);
+              const status = response?.status || { code: 200, message: "Lấy danh sách đơn hàng thành công" };
+              const data = response?.data || response;
+              const rawList = Array.isArray(data?.contents) ? data.contents : (Array.isArray(data) ? data : []);
+              const sanitizedList = rawList.map((item: any) => {
+                let rawNames: string[] = [];
+                if (Array.isArray(item.productNames) && item.productNames.length > 0) {
+                  rawNames = item.productNames;
+                } else if (item.orderItems && item.orderItems.length > 0) {
+                  rawNames = item.orderItems.map((it: any) => it.productName || it.attributesSku).filter(Boolean);
+                } else if (item.attributesSku) {
+                  rawNames = [item.attributesSku];
+                }
+                const productNames = rawNames.map((n: string) => resolveAttributeDisplayName(n, item.orderNumber)).filter(Boolean);
+                if (productNames.length === 0) {
+                  productNames.push(resolveAttributeDisplayName(null, item.orderNumber));
+                }
+                return { ...item, productNames };
+              });
+              return {
+                status: { code: status.code || 200, message: status.message || "Lấy danh sách đơn hàng thành công" },
+                data: {
+                  ...data,
+                  contents: sanitizedList
+                }
+              };
+            }
+
+            // Nếu người dùng chọn tab ALL (không truyền status)
+            // Spring Boot backend yêu cầu bắt buộc status, nên Gateway truy vấn gom các nhóm trạng thái chính
+            const allStatuses = ["PROCESSING", "SHIPPING", "DELIVERED", "WAITING_PAYMENT", "CONFIRMED", "PENDING", "CANCELLED", "COMPLETED"];
+            const fetchPromises = allStatuses.map(async (st) => {
+              try {
+                const params = new URLSearchParams();
+                params.append("status", st);
+                params.append("page", "1");
+                params.append("size", "20");
+                const path = `/api/orders/my-orders/list?${params.toString()}`;
+                const res = await callApiGateway(path, { method: "GET", token: context?.token }, context);
+                const rawContents = res?.data?.contents || res?.contents || [];
+                return Array.isArray(rawContents) ? rawContents : [];
+              } catch (_) {
+                return [];
+              }
+            });
+
+            const results = await Promise.all(fetchPromises);
+            const mergedContents = results.flat();
+
+            // Loại bỏ trùng lặp theo orderNumber
+            const uniqueMap = new Map<string, any>();
+            mergedContents.forEach((item: any) => {
+              if (item?.orderNumber && !uniqueMap.has(item.orderNumber)) {
+                uniqueMap.set(item.orderNumber, item);
+              }
+            });
+            const finalContents = Array.from(uniqueMap.values()).map((item: any) => {
+              let rawNames: string[] = [];
+              if (Array.isArray(item.productNames) && item.productNames.length > 0) {
+                rawNames = item.productNames;
+              } else if (item.orderItems && item.orderItems.length > 0) {
+                rawNames = item.orderItems.map((it: any) => it.productName || it.attributesSku).filter(Boolean);
+              } else if (item.attributesSku) {
+                rawNames = [item.attributesSku];
+              }
+              const productNames = rawNames.map((n: string) => resolveAttributeDisplayName(n, item.orderNumber)).filter(Boolean);
+              if (productNames.length === 0) {
+                productNames.push(resolveAttributeDisplayName(null, item.orderNumber));
+              }
+              return { ...item, productNames };
+            });
+
             return {
-              status: { code: status.code || 200, message: status.message || "Lấy danh sách đơn hàng thành công" },
-              data
+              status: { code: 200, message: "Lấy danh sách đơn hàng thành công" },
+              data: {
+                contents: finalContents,
+                paging: {
+                  pageNumber: args.page || 1,
+                  pageSize: args.size || 20,
+                  totalElements: finalContents.length,
+                  totalPages: Math.ceil(finalContents.length / (args.size || 20)) || 1
+                }
+              }
             };
           } catch (error: any) {
             return {
@@ -1859,6 +2180,22 @@ async function startServer() {
     } catch (err: any) {
       console.warn(`[BOOKMARK PROXY] Failed to connect to ${targetUrl}: ${err.message}`);
       res.status(502).json({ success: false, message: "Không thể kết nối đến máy chủ Bookmark" });
+    }
+  });
+
+  // --- REAL / MOCK ORDER BACKEND PROXY (REST endpoints for /api/orders/*) ---
+  app.all("/api/orders*", async (req, res) => {
+    try {
+      const response = await callApiGateway(req.originalUrl || req.url, {
+        method: req.method,
+        body: req.body,
+        token: req.headers.authorization as string,
+        guestId: (req.headers["x-guest-id"] || req.headers["x-guest-id".toLowerCase()]) as string
+      }, { req });
+      const statusCode = response?.status?.code || (response?.code ?? 200);
+      res.status(typeof statusCode === "number" ? statusCode : 200).json(response);
+    } catch (err: any) {
+      res.status(500).json({ status: { code: 500, message: err.message }, data: null });
     }
   });
 

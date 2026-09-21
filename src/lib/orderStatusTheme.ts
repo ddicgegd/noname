@@ -120,36 +120,36 @@ export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
 };
 
 export function getOrderStatusTheme(rawStatus?: string): StatusThemeConfig {
-  const normalized = (rawStatus || "").trim().toUpperCase();
+  const normalized = typeof rawStatus === "string" ? rawStatus.trim().toUpperCase() : "";
   if (ORDER_STATUS_THEMES[normalized]) {
     return ORDER_STATUS_THEMES[normalized];
   }
 
-  // Fallback heuristic based on keywords
-  if (normalized.includes("WAIT") || normalized.includes("PENDING")) {
+  // Fallback heuristic based on English and Vietnamese keywords
+  if (normalized.includes("WAIT") || normalized.includes("PENDING") || normalized.includes("CHỜ") || normalized.includes("XÁC THỰC") || normalized.includes("XÁC NHẬN")) {
     return ORDER_STATUS_THEMES.WAITING_PAYMENT;
   }
-  if (normalized.includes("SHIP") || normalized.includes("DELIVERING") || normalized.includes("TRANSIT")) {
+  if (normalized.includes("SHIP") || normalized.includes("DELIVERING") || normalized.includes("TRANSIT") || normalized.includes("VẬN CHUYỂN") || normalized.includes("ĐANG GIAO") || normalized.includes("TRUNG CHUYỂN")) {
     return ORDER_STATUS_THEMES.SHIPPED;
   }
-  if (normalized.includes("COMPLETE") || normalized.includes("DELIVERED") || normalized.includes("DONE")) {
+  if (normalized.includes("COMPLETE") || normalized.includes("DELIVERED") || normalized.includes("DONE") || normalized.includes("THÀNH CÔNG") || normalized.includes("HOÀN TẤT") || normalized.includes("ĐÃ GIAO")) {
     return ORDER_STATUS_THEMES.COMPLETED;
   }
-  if (normalized.includes("CANCEL") || normalized.includes("REFUND")) {
+  if (normalized.includes("CANCEL") || normalized.includes("REFUND") || normalized.includes("HỦY") || normalized.includes("HOÀN TIỀN") || normalized.includes("THẤT BẠI") || normalized.includes("FAILED")) {
     return ORDER_STATUS_THEMES.CANCELLED;
   }
-  if (normalized.includes("PROCESS") || normalized.includes("CONFIRM")) {
+  if (normalized.includes("PROCESS") || normalized.includes("CONFIRM") || normalized.includes("XỬ LÝ") || normalized.includes("ĐÓNG GÓI") || normalized.includes("KIỂM THỬ") || normalized.includes("CHUẨN BỊ") || normalized.includes("BẢO HÀNH")) {
     return ORDER_STATUS_THEMES.PROCESSING;
   }
 
   return {
     label: rawStatus || "Không xác định",
-    badgeClass: "text-slate-700 bg-gradient-to-b from-slate-50 to-slate-100/80 border-t-white border-b-slate-300 border-x-slate-200 shadow-[0_1px_2px_rgba(100,116,139,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
-    dotClass: "bg-slate-500",
-    glowClass: "shadow-[0_0_8px_rgba(100,116,139,0.4)]",
-    iconColor: "text-slate-500",
-    borderAccent: "border-l-slate-400",
-    timelineActiveRing: "ring-4 ring-slate-100 text-slate-700 bg-white border-2 border-slate-400",
-    timelineLineGradient: "from-slate-300 to-slate-400",
+    badgeClass: "text-indigo-700 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t-white border-b-indigo-200/80 border-x-indigo-100/80 shadow-[0_1px_2px_rgba(99,102,241,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    dotClass: "bg-indigo-600",
+    glowClass: "shadow-[0_0_8px_rgba(99,102,241,0.5)]",
+    iconColor: "text-indigo-600",
+    borderAccent: "border-l-indigo-600",
+    timelineActiveRing: "ring-4 ring-indigo-100 text-indigo-600 bg-white border-2 border-indigo-600",
+    timelineLineGradient: "from-indigo-400 to-sky-400",
   };
 }
