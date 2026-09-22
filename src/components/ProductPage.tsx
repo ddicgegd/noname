@@ -2654,6 +2654,8 @@ interface ProductDetailModalProps {
 }
 
 function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemoveCartItem, onNavigate, onBuyNow, showToast, onFlyEffect, onSpawnStars, onFlyToAccount, isLoggedIn = false }: ProductDetailModalProps) {
+  const { showToast: showToastFromHook } = useToast();
+  const toast = showToast || showToastFromHook;
   const isUserLoggedIn = Boolean(isLoggedIn);
   const images = getProductImagesList(product);
   const versions = getProductVersions(product);
@@ -2904,6 +2906,48 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
   const bookmarkCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isPlusAnimating, setIsPlusAnimating] = useState(false);
   const plusAnimTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isCartAnimating, setIsCartAnimating] = useState(false);
+  const cartAnimTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [cartHatMode, setCartHatMode] = useState<'normal' | 'count' | 'bold'>('normal');
+  const [addedCount, setAddedCount] = useState<number>(1);
+  const cartHatTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isAlreadyInCart = useMemo(() => {
+    if (!cartItems || cartItems.length === 0) return false;
+    const currentSku = String(
+      selectedAttribute?.sku ||
+      selectedAttribute?.id ||
+      product.sku ||
+      `ATTR-${String(product.id || "").toUpperCase()}`
+    ).toLowerCase().trim();
+
+    const currentProdId = String(product.id || "").toLowerCase().trim();
+    const currentProdSku = String(product.sku || "").toLowerCase().trim();
+
+    return cartItems.some((item: any) => {
+      const rawSku = String(item.sku || item.attributesSku || item.id || "").toLowerCase().trim();
+      const parts = rawSku.split("__");
+      if (parts.some((p) => p === currentSku)) return true;
+      if (item.sku && String(item.sku).toLowerCase().trim() === currentSku) return true;
+      if (item.attributesSku && String(item.attributesSku).toLowerCase().trim() === currentSku) return true;
+      if (!selectedAttribute?.sku && !selectedAttribute?.id) {
+        if (parts.some((p) => p === currentProdSku || p === currentProdId)) return true;
+      }
+      return false;
+    });
+  }, [cartItems, selectedAttribute, product]);
+
+  useEffect(() => {
+    if (cartHatMode !== 'count') {
+      setCartHatMode(isAlreadyInCart ? 'bold' : 'normal');
+    }
+  }, [isAlreadyInCart]);
+
+  useEffect(() => {
+    return () => {
+      if (cartHatTimeoutRef.current) clearTimeout(cartHatTimeoutRef.current);
+    };
+  }, []);
 
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
 
@@ -4796,43 +4840,45 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
               MUA NGAY
             </BevelButton>
 
-            {/* Shopping Cart action button with hover mini-popup */}
-            <div
-              className="relative"
-              onMouseEnter={() => {
-                if (cartCloseTimeoutRef.current) {
-                  clearTimeout(cartCloseTimeoutRef.current);
-                  cartCloseTimeoutRef.current = null;
-                }
-                if (cartOpenTimeoutRef.current) {
-                  clearTimeout(cartOpenTimeoutRef.current);
-                }
-                cartOpenTimeoutRef.current = setTimeout(() => {
-                  setShowCartPopup(true);
-                }, 175);
-              }}
-              onMouseLeave={() => {
-                if (cartOpenTimeoutRef.current) {
-                  clearTimeout(cartOpenTimeoutRef.current);
-                  cartOpenTimeoutRef.current = null;
-                }
-                if (cartCloseTimeoutRef.current) {
-                  clearTimeout(cartCloseTimeoutRef.current);
-                }
-                cartCloseTimeoutRef.current = setTimeout(() => {
-                  setShowCartPopup(false);
-                }, 300);
-              }}
-            >
-              <button
+            {/* Shopping Cart action button with + icon and cart hat with animation (no popup in /p#) */}
+            <div className="relative">
+              <motion.button
                 ref={cartBtnRef}
                 type="button"
+                whileTap={{ scale: 0.88 }}
+                animate={isCartAnimating ? {
+                  scale: [1, 0.86, 1.2, 0.94, 1.05, 1],
+                  rotate: [0, -10, 10, -5, 2, 0],
+                } : {}}
+                transition={{ duration: 0.5, ease: "easeOut" }}
                 onClick={(e) => {
                   const now = Date.now();
-                  if (now - lastAddCartTimeRef.current < 600) {
+                  if (now - lastAddCartTimeRef.current < 500) {
                     return;
                   }
                   lastAddCartTimeRef.current = now;
+
+                  if (isAlreadyInCart || cartHatMode === 'bold') {
+                    if (toast) {
+                      toast("Sản phẩm này đã có trong giỏ hàng rồi", "info");
+                    }
+                    return;
+                  }
+
+                  setIsCartAnimating(true);
+                  if (cartAnimTimeoutRef.current) clearTimeout(cartAnimTimeoutRef.current);
+                  cartAnimTimeoutRef.current = setTimeout(() => {
+                    setIsCartAnimating(false);
+                  }, 550);
+
+                  const nextCount = (liveCartCount || 0) + 1;
+                  setAddedCount(nextCount);
+                  setCartHatMode('count');
+
+                  if (cartHatTimeoutRef.current) clearTimeout(cartHatTimeoutRef.current);
+                  cartHatTimeoutRef.current = setTimeout(() => {
+                    setCartHatMode('bold');
+                  }, 1300);
 
                   const variantLabel = `${product.name} (${versions.find(v => v.id === activeVersion)?.title || ""} - ${colors.find(c => c.id === activeColor)?.title || ""})`;
                   const attrSku = selectedAttribute?.sku || selectedAttribute?.id || product.sku || `ATTR-${product.id.toUpperCase()}`;
@@ -4848,57 +4894,97 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                     onAddToCart(variantLabel, formattedCurrentPrice, e, String(attrSku));
                   }
                 }}
-                className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0 relative"
-                title="Thêm vào giỏ hàng"
+                className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative"
+                title={isAlreadyInCart || cartHatMode === 'bold' ? "Đã có trong giỏ hàng" : "Thêm vào giỏ hàng"}
               >
-                <ShoppingCartIcon className="size-5 stroke-[2.2]" />
-                {liveCartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#FF4D24] text-white text-[9.5px] font-black rounded-full border-none outline-none ring-0 flex items-center justify-center pointer-events-none shadow-2xs z-10">
-                    {liveCartCount > 99 ? "99+" : liveCartCount}
-                  </span>
+                {/* Ripple ring burst effect on click */}
+                {isCartAnimating && (
+                  <motion.span
+                    initial={{ scale: 0.8, opacity: 0.75 }}
+                    animate={{ scale: 1.85, opacity: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="absolute inset-0 rounded-xl border-2 border-[#FF4D24] pointer-events-none"
+                  />
                 )}
-              </button>
 
-              {/* Cart Hover Mini-Popup */}
-              <CartDropdownMenu
-                isOpen={showCartPopup}
-                position="bottom"
-                cartItems={cartItems || []}
-                onAddToCart={onAddToCart}
-                onRemoveCartItem={onRemoveCartItem}
-                onNavigate={(page) => {
-                  setShowCartPopup(false);
-                  onClose();
-                  if (onNavigate) {
-                    onNavigate(page as any);
-                  }
-                }}
-                onClose={() => setShowCartPopup(false)}
-                onMouseEnter={() => {
-                  if (cartOpenTimeoutRef.current) {
-                    clearTimeout(cartOpenTimeoutRef.current);
-                    cartOpenTimeoutRef.current = null;
-                  }
-                  if (cartCloseTimeoutRef.current) {
-                    clearTimeout(cartCloseTimeoutRef.current);
-                    cartCloseTimeoutRef.current = null;
-                  }
-                }}
-                onMouseLeave={() => {
-                  if (cartCloseTimeoutRef.current) {
-                    clearTimeout(cartCloseTimeoutRef.current);
-                  }
-                  cartCloseTimeoutRef.current = setTimeout(() => {
-                    setShowCartPopup(false);
-                  }, 300);
-                }}
-              />
+                {/* Main Icon: + */}
+                <motion.div
+                  animate={isCartAnimating ? { rotate: [0, 90, 180], scale: [1, 1.3, 1] } : {}}
+                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  className="flex items-center justify-center pointer-events-none"
+                >
+                  <PlusIcon className="size-5 stroke-[2.5] text-[#FF4D24] transition-all duration-200 hover:scale-105" />
+                </motion.div>
+
+                {/* Mũ giỏ hàng (Cart Hat Badge) on top-right with animation */}
+                <AnimatePresence mode="wait">
+                  {cartHatMode === 'count' ? (
+                    <motion.span
+                      key="cart-hat-count"
+                      initial={{ scale: 0, opacity: 0, rotate: -15 }}
+                      animate={{
+                        scale: [0, 0.86, 1.35, 0.92, 1.12, 0.98, 1],
+                        rotate: [0, -14, 14, -8, 4, 0],
+                        y: [4, -5, 2, -2, 0],
+                        opacity: 1,
+                      }}
+                      exit={{ scale: 0.5, opacity: 0 }}
+                      transition={{ duration: 0.55, ease: "easeOut" }}
+                      className="absolute -top-2.5 -right-2.5 min-w-5.5 h-5.5 px-1 rounded-full bg-gradient-to-b from-[#FF5E36] to-[#FF4D24] text-white text-[10.5px] font-black shadow-[0_3px_10px_rgba(255,77,36,0.55)] ring-2 ring-white dark:ring-zinc-900 flex items-center justify-center pointer-events-none z-10"
+                    >
+                      {/* Mini ripple ring burst effect for the count badge */}
+                      <motion.span
+                        initial={{ scale: 0.7, opacity: 0.9 }}
+                        animate={{ scale: 2.1, opacity: 0 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="absolute inset-0 rounded-full border-2 border-[#FF4D24] pointer-events-none"
+                      />
+                      {/* Number text pop & dance */}
+                      <motion.span
+                        initial={{ scale: 0.4 }}
+                        animate={{
+                          scale: [0.4, 1.35, 0.9, 1.1, 1],
+                          rotate: [0, -10, 10, -5, 0],
+                        }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="inline-block leading-none select-none font-sans"
+                      >
+                        {addedCount}
+                      </motion.span>
+                    </motion.span>
+                  ) : cartHatMode === 'bold' || isAlreadyInCart ? (
+                    <motion.span
+                      key="cart-hat-bold"
+                      initial={{ scale: 0.6, opacity: 0 }}
+                      animate={{ scale: [0.6, 1.3, 0.95, 1.05, 1], opacity: 1 }}
+                      exit={{ scale: 0.6, opacity: 0 }}
+                      transition={{ duration: 0.35, ease: "easeOut" }}
+                      className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-orange-50 dark:bg-zinc-900 border-1.5 border-[#FF4D24] shadow-[0_2px_8px_rgba(255,77,36,0.35)] flex items-center justify-center pointer-events-none z-10"
+                      title="Đã có trong giỏ hàng"
+                    >
+                      <ShoppingCartIcon className="size-2.5 stroke-[2.8] text-[#FF4D24] fill-[#FF4D24]" />
+                    </motion.span>
+                  ) : (
+                    <motion.span
+                      key="cart-hat-normal"
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.6, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-white dark:bg-zinc-900 border border-[#FF4D24]/40 shadow-[0_2px_6px_rgba(255,77,36,0.22)] flex items-center justify-center pointer-events-none z-10 transition-transform duration-200"
+                    >
+                      <ShoppingCartIcon className="size-2.5 stroke-[2] text-[#FF4D24]" />
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
             </div>
 
             {/* Bookmark action button with + toggle and hover mini-popup */}
             <div
               className="relative"
               onMouseEnter={() => {
+                if (!hasBookmarkItems) return;
                 if (bookmarkCloseTimeoutRef.current) {
                   clearTimeout(bookmarkCloseTimeoutRef.current);
                   bookmarkCloseTimeoutRef.current = null;
@@ -4985,7 +5071,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
 
               {/* Bookmark Hover Mini-Popup (cart-like circular reveal) */}
               <AnimatePresence>
-                {showBookmarkPopup && (
+                {showBookmarkPopup && hasBookmarkItems && (
                   <motion.div
                     initial={{ opacity: 0, clipPath: "circle(0% at calc(100% - 20px) calc(100% + 18px))", filter: "blur(8px)" }}
                     animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 20px) calc(100% + 18px))", filter: "blur(0px)" }}

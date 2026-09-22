@@ -31,6 +31,7 @@ import {
   removeBookmarkItem,
   persistStagedBookmark,
   BookmarkData,
+  BookmarkItem,
   subscribeBookmarkUpdates,
   sortBookmarksNewestFirst,
 } from "../services/bookmarkService";
@@ -394,9 +395,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     try {
       await removeBookmarkItem(mainSku, itemSku);
       await loadUserBookmarks(false);
-      setSuccessMsg(`Đã xóa "${itemName || itemSku}" khỏi gói phụ kiện`);
+      setSuccessMsg(`Đã xóa "${itemName || itemSku}" khỏi danh sách đã lưu`);
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi xóa phụ kiện khỏi gói");
+      setErrorMsg(err.message || "Lỗi xóa sản phẩm khỏi danh sách đã lưu");
     } finally {
       setBookmarkActionLoading("");
     }
@@ -407,9 +408,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     try {
       await clearBookmark(mainSku);
       await loadUserBookmarks(false);
-      setSuccessMsg(`Đã xóa toàn bộ gói phụ kiện`);
+      setSuccessMsg(`Đã xóa gói đã lưu thành công`);
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi xóa gói phụ kiện");
+      setErrorMsg(err.message || "Lỗi xóa gói đã lưu");
     } finally {
       setBookmarkActionLoading("");
     }
@@ -420,9 +421,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     try {
       await persistStagedBookmark(mainSku);
       await loadUserBookmarks(false);
-      setSuccessMsg(`Đã gia hạn gói phụ kiện lưu 7 ngày`);
+      setSuccessMsg(`Đã gia hạn lưu 7 ngày thành công`);
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi gia hạn gói phụ kiện");
+      setErrorMsg(err.message || "Lỗi gia hạn lưu 7 ngày");
     } finally {
       setBookmarkActionLoading("");
     }
@@ -432,7 +433,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     setBookmarkActionLoading(`checkout::${bookmark.mainSku}`);
     try {
       const cartItems: { sku: string; quantity: number }[] = [];
-      if (bookmark.mainSku && bookmark.mainSku.toLowerCase() !== "bookmarks") {
+      const isPackageWrapper = !bookmark.mainSku || 
+        bookmark.mainSku.toLowerCase() === "bookmarks" || 
+        bookmark.mainSku.startsWith("ORDER-") || 
+        bookmark.mainSku.startsWith("ATTR-") || 
+        (bookmark.items && bookmark.items.some(i => i.sku === bookmark.mainSku));
+
+      if (!isPackageWrapper) {
         cartItems.push({ sku: bookmark.mainSku, quantity: 1 });
       }
       if (bookmark.items && bookmark.items.length > 0) {
@@ -442,28 +449,50 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       }
       if (cartItems.length > 0) {
         await addToCart(cartItems);
-        setSuccessMsg(`Đã chuyển sản phẩm & ${bookmark.totalItems || bookmark.items.length} phụ kiện vào giỏ hàng!`);
+        setSuccessMsg(`Đã chuyển ${bookmark.totalItems || bookmark.items.length} món vào giỏ hàng!`);
       }
       setIsAccountsCenterOpen(false);
       onNavigate("cart");
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi thêm phụ kiện vào giỏ hàng");
+      setErrorMsg(err.message || "Lỗi thêm sản phẩm vào giỏ hàng");
     } finally {
       setBookmarkActionLoading("");
     }
   };
 
-  const getFriendlyMainSkuName = (sku: string): string => {
-    if (!sku || sku.toLowerCase() === "bookmarks") return "Gói phụ kiện đã lưu";
+  const getFriendlyMainSkuName = (sku: string, items?: BookmarkItem[]): string => {
+    if (!sku || sku.toLowerCase() === "bookmarks") return "Gói sản phẩm & phụ kiện đã lưu";
+
+    // 1. If items exist and first item has valid productName, use it
+    if (items && items.length > 0 && items[0].productName) {
+      if (items.length === 1 || sku.startsWith("ATTR-") || sku.startsWith("ORDER-") || sku.startsWith("bm-")) {
+        return items[0].productName;
+      }
+    }
+
     const map: Record<string, string> = {
       "OPPO-FIND-X8-PRO-BLK": "OPPO Find X8 Pro (Đen)",
       "AW-ULTRA-2": "Apple Watch Ultra 2 (Titan)",
       "MACBOOK-PRO-M3-MAX": "MacBook Pro M3 Max",
       "IPHONE-16-PRO-MAX-DESERT": "iPhone 16 Pro Max (Titan)",
       "SONY-WH1000XM6-BLK": "Sony WH-1000XM6 (Đen)",
+      "ATTR-LENTABEXT2-GRAY-12-256": "Lenovo Legion Tab Gen 2",
     };
     if (map[sku]) return map[sku];
-    return sku.replace(/[-_]+/g, " ");
+
+    const s = (sku || "").toUpperCase();
+    if (s.includes("LENTAB") || s.includes("LEGION") || s.includes("LENOVO")) return "Lenovo Legion Tab Gen 2";
+    if (s.includes("IP16PM") || s.includes("IPHONE 16") || s.includes("IPHONE16")) return "iPhone 16 Pro Max";
+    if (s.includes("IP15PM") || s.includes("IPHONE 15") || s.includes("IPHONE15")) return "iPhone 15 Pro Max";
+    if (s.includes("S24U") || s.includes("S25U") || s.includes("SAMSUNG") || s.includes("GALAXY S24")) return "Samsung Galaxy S24 Ultra";
+    if (s.includes("MI14U") || s.includes("MI15U") || s.includes("XIAOMI")) return "Xiaomi 14 Ultra";
+    if (s.includes("MBP") || s.includes("MACBOOK")) return "MacBook Pro M4";
+    if (s.includes("XPS") || s.includes("DELL")) return "Dell XPS 16";
+    if (s.includes("IPAD")) return "iPad Pro M4";
+    if (s.includes("TABS10") || s.includes("TAB S10")) return "Samsung Galaxy Tab S10 Ultra";
+    if (s.includes("AIRPOD") || s.includes("TAI NGHE")) return "AirPods Pro Gen 2";
+
+    return sku.replace(/^ATTR-/, "").replace(/[-_]+/g, " ");
   };
 
   // Error / Success Messages
@@ -1922,7 +1951,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 20, scale: 0.96 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="pointer-events-auto relative w-full flex items-center justify-between gap-3 overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 select-none text-left"
+              className="pointer-events-auto relative w-full flex items-center justify-between gap-3 overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 select-none text-left"
             >
               {/* Ambient tint overlay identical to /p bottom bar */}
               <div
@@ -1980,11 +2009,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         <AnimatePresence>
           {showNavTutorial && (
             <motion.div
-              initial={{ opacity: 0, y: 24, scale: 0.95 }}
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 24, scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
-              className="pointer-events-auto relative w-full overflow-hidden rounded-3xl border-t border-t-white/95 border-b border-b-slate-400/50 border-x border-x-white/80 dark:border-white/20 bg-white/90 dark:bg-zinc-900/90 p-5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.25),0_10px_25px_-5px_rgba(255,77,36,0.18),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 text-left select-none"
+              exit={{ opacity: 0, y: 14, scale: 0.96, transition: { duration: 0.18, ease: "easeIn" } }}
+              transition={{
+                type: "spring",
+                stiffness: 280,
+                damping: 24,
+                mass: 0.8,
+              }}
+              className="pointer-events-auto relative w-full overflow-hidden rounded-3xl border-t border-t-white/95 border-b border-b-slate-400/50 border-x border-x-white/80 dark:border-white/20 bg-white/90 dark:bg-zinc-900/90 p-5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.25),0_10px_25px_-5px_rgba(255,77,36,0.18),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 text-left select-none"
             >
               {/* Ambient gradient aura */}
               <div
@@ -3041,7 +3075,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           { id: "addresses", label: "Sổ địa chỉ nhận hàng", icon: MapPin, count: addresses.length, desc: "Địa chỉ giao nhận" },
                           { id: "payments", label: "Thẻ & Phương thức", icon: CreditCard, count: paymentMethods.length, desc: "Visa, Mastercard, Ví" },
                           { id: "sessions", label: "Thiết bị & Phiên", icon: Laptop, desc: "Quản lý đăng nhập" },
-                          { id: "bookmarks", label: "Phụ kiện đã lưu", icon: Bookmark, count: userBookmarks.length, desc: "Gói phụ kiện mua kèm" }
+                          { id: "bookmarks", label: "Sản phẩm & Phụ kiện đã lưu", icon: Bookmark, count: userBookmarks.length, desc: "Bookmarks 1h & 7 ngày" }
                         ].map(tab => {
                           const Icon = tab.icon;
                           const isActive = activeModalTab === tab.id;
@@ -3113,7 +3147,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           {activeModalTab === "addresses" && "Quản lý sổ địa chỉ giao hàng"}
                           {activeModalTab === "payments" && "Phương thức thanh toán & Quản lý thẻ"}
                           {activeModalTab === "sessions" && "Thiết bị & Phiên hoạt động"}
-                          {activeModalTab === "bookmarks" && "Phụ kiện đã lưu (Bookmarks)"}
+                          {activeModalTab === "bookmarks" && "Sản phẩm & Phụ kiện đã lưu (Bookmarks)"}
                         </>
                       )}
                     </h2>
@@ -3127,7 +3161,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           {activeModalTab === "addresses" && "Lưu trữ các địa chỉ nhận hàng cá nhân hoặc doanh nghiệp để đặt đơn tiện lợi hơn"}
                           {activeModalTab === "payments" && "Quản lý thẻ tín dụng, ghi nợ quốc tế và các ví điện tử thanh toán bảo mật"}
                           {activeModalTab === "sessions" && "Kiểm tra các phiên đăng nhập đang hoạt động và quản lý bảo mật thiết bị kết nối"}
-                          {activeModalTab === "bookmarks" && "Quản lý các gói phụ kiện mua kèm đã chọn tại trang sản phẩm chính, hỗ trợ lưu trữ 1 giờ và 7 ngày"}
+                          {activeModalTab === "bookmarks" && "Quản lý các sản phẩm và gói phụ kiện đã lưu từ PDP và Đơn hàng, hỗ trợ lưu trữ tạm thời 1 giờ và 7 ngày"}
                         </>
                       )}
                     </p>
@@ -4235,6 +4269,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           const isPackageLoading = bookmarkActionLoading === bookmark.mainSku || bookmarkActionLoading === `checkout::${bookmark.mainSku}`;
                           const isExtending = bookmarkActionLoading === `extend::${bookmark.mainSku}`;
                           const isGenericSku = !bookmark.mainSku || bookmark.mainSku.toLowerCase() === "bookmarks";
+                          const isFromOrder = bookmark.mainSku.startsWith("ATTR-") || bookmark.mainSku.startsWith("ORDER-") || bookmark.mainSku.startsWith("bm-") || (bookmark.items && bookmark.items.some(i => i.sku === bookmark.mainSku));
+                          const friendlyTitle = getFriendlyMainSkuName(bookmark.mainSku, bookmark.items);
 
                           return (
                             <Bevel
@@ -4250,11 +4286,17 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   </span>
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                       <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
-                                        {!isGenericSku ? (
-                                          <>Phụ kiện mua cùng: <span className="text-[#FF4D24]">{getFriendlyMainSkuName(bookmark.mainSku)}</span></>
+                                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
+                                        {bookmark.mainSku === "ORDER-BOOKMARK" || isFromOrder ? (
+                                          bookmark.items.length === 1 ? (
+                                            <>Sản phẩm đã lưu: <span className="text-[#FF4D24]">{bookmark.items[0]?.productName || friendlyTitle}</span></>
+                                          ) : (
+                                            <>Gói sản phẩm đơn hàng: <span className="text-[#FF4D24]">{bookmark.items.length} sản phẩm</span></>
+                                          )
+                                        ) : !isGenericSku ? (
+                                          <>Phụ kiện mua cùng: <span className="text-[#FF4D24]">{friendlyTitle}</span></>
                                         ) : (
-                                          "Gói phụ kiện đã lưu"
+                                          "Gói sản phẩm & phụ kiện đã lưu"
                                         )}
                                       </h3>
                                       {!isGenericSku && (
@@ -4264,7 +4306,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                       )}
                                     </div>
                                     <p className="text-[11px] text-slate-500 mt-0.5">
-                                      Bao gồm <strong className="text-slate-700 font-semibold">{bookmark.totalItems || bookmark.items.length} món phụ kiện</strong> mua kèm.
+                                      {bookmark.mainSku === "ORDER-BOOKMARK" || isFromOrder
+                                        ? `Đã lưu từ đơn hàng • Bao gồm ${bookmark.totalItems || bookmark.items.length} món sản phẩm.`
+                                        : `Bao gồm ${bookmark.totalItems || bookmark.items.length} món phụ kiện mua kèm.`}
                                     </p>
                                   </div>
                                 </div>
@@ -4331,10 +4375,29 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                             </span>
                                           </div>
 
-                                          {item.attributesTitle && (
-                                            <p className="text-[11px] text-slate-500 truncate mt-0.5 font-medium">
-                                              {item.attributesTitle}
-                                            </p>
+                                          {(item.attributesTitle || item.color || item.size) && (
+                                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                              {item.color && (
+                                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-50/80 text-[#FF4D24] border border-orange-200/60">
+                                                  Màu: {item.color}
+                                                </span>
+                                              )}
+                                              {item.size && (
+                                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/70">
+                                                  Size: {item.size}
+                                                </span>
+                                              )}
+                                              {!item.color && !item.size && item.attributesTitle && (
+                                                <span className="text-[11px] text-slate-500 truncate font-medium">
+                                                  {item.attributesTitle}
+                                                </span>
+                                              )}
+                                              {item.addedAt && (
+                                                <span className="text-[9.5px] text-slate-400 font-mono">
+                                                  • {new Date(item.addedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                                                </span>
+                                              )}
+                                            </div>
                                           )}
                                         </div>
                                       </div>

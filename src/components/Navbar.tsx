@@ -506,19 +506,14 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const cleanPath = currentPath || (typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : "");
 
   // Detect auto-hide pages:
-  // 1. Order page (/o)
-  const isOrderRoute = ["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath);
-  const isOrderPage = currentPage === "order" || isOrderRoute;
-
-  // 2. Product page: DO NOT hide on http://localhost:3000/p without #
-  // ONLY hide when opening up # (either product modal is open or URL has #)
+  // 1. Product page: DO NOT hide on /p without #. ONLY hide when opening up # (either product modal is open or URL has #)
   const isProductPage = currentPage === "product" || cleanPath === "/p";
   const isProductModalActive = isProductPage && Boolean(isProductDetailOpen || isProductHashActive);
   const hideCartOnProductHash = !loggedInUser && isProductModalActive;
 
-  // 3. Account / Profile page: Auto-hide does NOT apply to /m (Navbar stays visible)
+  // 2. Account / Profile / Order pages: Auto-hide does NOT apply to /o or /m (Navbar stays visible)
   const isAuthRoute = ["/a"].includes(cleanPath);
-  const isAutoHideMode = isOrderPage || isProductModalActive || (currentPage === "auth" && isAuthRoute);
+  const isAutoHideMode = isProductModalActive || (currentPage === "auth" && isAuthRoute);
 
   const navRef = useRef<HTMLElement | null>(null);
   const isHoveringNavRef = useRef(false);
@@ -765,6 +760,17 @@ const resolveProductMetadata = (skuOrName: string) => {
       defaultColor: "Đen Space Black",
       defaultSize: "1TB",
       discount: "Giảm 7%",
+    };
+  }
+  if (s.includes("LENTAB") || s.includes("LEGION") || s.includes("LENOVO")) {
+    return {
+      name: "Lenovo Legion Tab Gen 2 12GB 256GB - Storm Grey",
+      imageUrl: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=500&auto=format&fit=crop&q=80",
+      colors: ["Storm Grey", "Eclipse Black"],
+      sizes: ["12GB/256GB", "16GB/512GB"],
+      defaultColor: "Storm Grey",
+      defaultSize: "12GB/256GB",
+      discount: "Giảm 10%",
     };
   }
   return {
@@ -1363,7 +1369,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(160% at 24px -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at 24px -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute left-0 top-[calc(100%+14px)] w-[330px] sm:w-[360px] rounded-2xl border border-white/80 ring-1 ring-slate-900/[0.06] bg-white/95 backdrop-blur-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_0_0_rgba(255,255,255,1)] p-3 sm:p-3.5 z-50 origin-top-left overflow-hidden text-slate-900"
+                className="absolute left-0 top-[calc(100%+14px)] w-[330px] sm:w-[360px] rounded-2xl border border-slate-200/90 ring-1 ring-slate-900/[0.04] bg-white backdrop-blur-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_0_0_rgba(255,255,255,1)] p-3 sm:p-3.5 z-50 origin-top-left overflow-hidden text-slate-900"
               >
                 {/* Refined Ambient Glow - Warm subtle diffusion */}
                 <div className="absolute -top-10 -right-10 w-36 h-36 bg-[#FF4D24]/[0.08] rounded-full blur-[32px] pointer-events-none" />
@@ -1532,7 +1538,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900"
+                className="absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900"
               >
                 {/* Decorative ambient glow (+20% radiance) */}
                 <div className="absolute top-0 right-0 w-72 h-72 bg-[#FF4D24]/36 rounded-full blur-[70px] pointer-events-none -z-10" />
@@ -2007,22 +2013,31 @@ const resolveProductMetadata = (skuOrName: string) => {
                             showToast("Vui lòng tích chọn ít nhất 1 sản phẩm để thanh toán!", "warning");
                             return;
                           }
-                          const executeCheckout = createAuthAction({
-                            onAuthenticated: () => {
-                              setShowCartMenu(false);
-                              onNavigate("order");
-                            },
-                            onGuest: () => {
-                              savePendingAction({
-                                actionId: "CART_CHECKOUT",
-                                returnUrl: "/o"
-                              });
-                              setShowCartMenu(false);
-                              window.location.hash = "login";
-                              onNavigate("auth");
+
+                          // 1. Trích xuất danh sách SKU & ID của các sản phẩm được tích chọn
+                          const selectedSkus: string[] = [];
+                          groupedCartItems.forEach((group) => {
+                            if (selectedGroupKeys.includes(group.groupKey)) {
+                              if (group.sku) selectedSkus.push(group.sku);
+                              selectedSkus.push(...group.ids);
                             }
                           });
-                          executeCheckout();
+
+                          // 2. Lưu danh sách SKU đã chọn vào localStorage để đồng bộ sang trang Order /o
+                          try {
+                            localStorage.setItem("checkout_selected_skus", JSON.stringify(selectedSkus));
+                            localStorage.removeItem(STORAGE_KEYS.BUY_NOW_PRODUCT);
+                            localStorage.removeItem("horizon_buy_now_product");
+                          } catch (_) {}
+
+                          // 3. Bắn event realtime nếu người dùng đang ở sẵn trang /o
+                          window.dispatchEvent(
+                            new CustomEvent("cart-checkout-selected", { detail: { selectedSkus } })
+                          );
+
+                          // 4. Đóng menu giỏ hàng và chuyển thẳng sang trang /o (Hỗ trợ cả Khách vãng lai / Guest Checkout)
+                          setShowCartMenu(false);
+                          onNavigate("order");
                         }}
                         disabled={getSelectedItemsCount() === 0}
                         className="group w-auto min-w-[165px] h-[36px] justify-center bg-[#111111] hover:bg-black text-white font-sans text-[13.5px] font-extrabold px-5.5 rounded-lg shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer overflow-hidden"
@@ -2090,7 +2105,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-[calc(100%+14px)] w-[295px] rounded-[24px] border border-white/70 bg-white/95 backdrop-blur-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
+                className="absolute right-0 top-[calc(100%+14px)] w-[295px] rounded-[24px] border border-slate-200/90 bg-white backdrop-blur-2xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
               >
                 {/* Decorative background glows */}
                 <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />

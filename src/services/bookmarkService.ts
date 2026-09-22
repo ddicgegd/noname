@@ -12,6 +12,8 @@ export interface BookmarkItem {
   productName: string;
   imageUrl: string;
   attributesTitle?: string;
+  color?: string;
+  size?: string;
   unitPrice: number;
   salePrice: number;
   quantity: number;
@@ -52,15 +54,29 @@ export function getBookmarkTimestamp(bookmark: Partial<BookmarkData>): number {
 }
 
 /**
- * Sắp xếp danh sách bookmark: Các gói bookmark mới nhất (updatedAt / createdAt) luôn xếp ở trên cùng.
+ * Sắp xếp các phụ kiện bên trong gói theo thời gian bấm thêm mới nhất lên trên
+ */
+export function sortBookmarkItemsNewestFirst(items: BookmarkItem[]): BookmarkItem[] {
+  if (!items || !Array.isArray(items)) return [];
+  return [...items].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+}
+
+/**
+ * Sắp xếp danh sách bookmark: Các gói bookmark mới nhất (updatedAt / createdAt) luôn xếp ở trên cùng,
+ * đồng thời các items bên trong từng gói cũng được sắp xếp theo thời gian mới nhất.
  */
 export function sortBookmarksNewestFirst(list: BookmarkData[]): BookmarkData[] {
-  return [...list].sort((a, b) => {
-    const timeA = getBookmarkTimestamp(a);
-    const timeB = getBookmarkTimestamp(b);
-    if (timeB !== timeA) return timeB - timeA;
-    return (b.expiresAtEpochMs || 0) - (a.expiresAtEpochMs || 0);
-  });
+  return [...list]
+    .map((bm) => ({
+      ...bm,
+      items: sortBookmarkItemsNewestFirst(bm.items || []),
+    }))
+    .sort((a, b) => {
+      const timeA = getBookmarkTimestamp(a);
+      const timeB = getBookmarkTimestamp(b);
+      if (timeB !== timeA) return timeB - timeA;
+      return (b.expiresAtEpochMs || 0) - (a.expiresAtEpochMs || 0);
+    });
 }
 
 export function dispatchBookmarkUpdated(): void {

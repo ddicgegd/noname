@@ -9,7 +9,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
-  Info,
+  Bell,
   Key,
   Mail,
   X,
@@ -151,7 +151,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                       ) : msgLower.includes("email") || msgLower.includes("gửi liên kết") ? (
                         <Mail className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />
                       ) : (
-                        <Info className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />
+                        <Bell className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />
                       )
                     ) : (
                       <CheckCircle2 className="w-4 h-4 text-[#FF4D24] stroke-[2.4]" />

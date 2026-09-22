@@ -22,6 +22,7 @@ import {
   removeCartItem as apiRemoveCartItem,
 } from "@/services/cartService";
 import { useToast } from "@/components/ui/Toast";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 
 export interface CartDropdownItem {
   id: string;
@@ -150,6 +151,17 @@ const resolveProductMetadata = (skuOrName: string) => {
       defaultColor: "Đen Space Black",
       defaultSize: "1TB",
       discount: "Giảm 7%",
+    };
+  }
+  if (s.includes("LENTAB") || s.includes("LEGION") || s.includes("LENOVO")) {
+    return {
+      name: "Lenovo Legion Tab Gen 2 12GB 256GB - Storm Grey",
+      imageUrl: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=500&auto=format&fit=crop&q=80",
+      colors: ["Storm Grey", "Eclipse Black"],
+      sizes: ["12GB/256GB", "16GB/512GB"],
+      defaultColor: "Storm Grey",
+      defaultSize: "12GB/256GB",
+      discount: "Giảm 10%",
     };
   }
   return {
@@ -395,7 +407,7 @@ export function CartDropdownMenu({
 
   const containerClasses = isBottomPosition
     ? "absolute right-0 bottom-[calc(100%+18px)] before:absolute before:-bottom-[18px] before:left-0 before:right-0 before:h-[18px] before:content-[''] w-[420px] sm:w-[480px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 dark:border-white/15 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl shadow-[0_16px_40px_-10px_rgba(0,0,0,0.18),0_4px_16px_-2px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-bottom-right overflow-hidden text-slate-900 dark:text-white select-none"
-    : "absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900 select-none";
+    : "absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900 select-none";
 
   const animInitial = isBottomPosition
     ? { opacity: 0, clipPath: "circle(0% at calc(100% - 20px) calc(100% + 18px))", filter: "blur(8px)" }
@@ -886,6 +898,34 @@ export function CartDropdownMenu({
                   whileTap={{ scale: 0.98 }}
                   disabled={getSelectedItemsCount() === 0}
                   onClick={() => {
+                    const totalSelected = selectedGroupKeys.length;
+                    if (totalSelected === 0) {
+                      showToast("Vui lòng tích chọn ít nhất 1 sản phẩm để thanh toán!", "warning");
+                      return;
+                    }
+
+                    // 1. Trích xuất danh sách SKU & ID của các sản phẩm được tích chọn
+                    const selectedSkus: string[] = [];
+                    groupedCartItems.forEach((group) => {
+                      if (selectedGroupKeys.includes(group.groupKey)) {
+                        if (group.sku) selectedSkus.push(group.sku);
+                        selectedSkus.push(...group.ids);
+                      }
+                    });
+
+                    // 2. Lưu danh sách SKU đã chọn vào localStorage để đồng bộ sang trang Order /o
+                    try {
+                      localStorage.setItem("checkout_selected_skus", JSON.stringify(selectedSkus));
+                      localStorage.removeItem(STORAGE_KEYS.BUY_NOW_PRODUCT);
+                      localStorage.removeItem("horizon_buy_now_product");
+                    } catch (_) {}
+
+                    // 3. Bắn event realtime nếu người dùng đang ở sẵn trang /o
+                    window.dispatchEvent(
+                      new CustomEvent("cart-checkout-selected", { detail: { selectedSkus } })
+                    );
+
+                    // 4. Đóng menu giỏ hàng và chuyển thẳng sang trang /o
                     onClose();
                     if (onNavigate) {
                       onNavigate("order");
