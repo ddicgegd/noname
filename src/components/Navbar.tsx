@@ -445,23 +445,21 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     }
     megaMenuTimeoutRef.current = setTimeout(() => {
       setShowProductMegaMenu(false);
-    }, 195); // 30% faster hide after mouse leave (from 280ms to 195ms)
+    }, 90);
   };
 
-  // Helper to detect if URL has # on the product page
-  const getIsProductHashActive = () => {
+  // Helper to detect if URL has a valid product SKU hash on the product page
+  const getIsProductHashActive = useCallback(() => {
     if (typeof window === "undefined") return false;
-    const isProductPath = window.location.pathname.toLowerCase().replace(/\/$/, "") === "/p";
-    if (!isProductPath) return false;
-    const hash = window.location.hash;
-    const href = window.location.href;
-    // Check if hash exists or href contains /p#
-    return Boolean(hash || href.includes("/p#"));
-  };
+    const cleanPath = window.location.pathname.toLowerCase().replace(/\/$/, "");
+    if (cleanPath !== "/p") return false;
+    const hashSku = decodeURIComponent((window.location.hash || "").replace(/^#/, "").trim());
+    return Boolean(hashSku.length > 0);
+  }, []);
 
   // Sync URL hash for /p# and detail modal routes
   const [isProductHashActive, setIsProductHashActive] = useState(getIsProductHashActive);
-  const [currentPath, setCurrentPath] = useState(() => typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : "");
+  const [currentPath, setCurrentPath] = useState(() => (typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : ""));
 
   useEffect(() => {
     // Intercept pushState and replaceState once so URL changes trigger reactive updates
@@ -493,20 +491,18 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     window.addEventListener("hashchange", handleLocationSync);
     window.addEventListener("popstate", handleLocationSync);
     window.addEventListener("locationchange", handleLocationSync);
-    const timer = setInterval(handleLocationSync, 200);
 
     return () => {
       window.removeEventListener("hashchange", handleLocationSync);
       window.removeEventListener("popstate", handleLocationSync);
       window.removeEventListener("locationchange", handleLocationSync);
-      clearInterval(timer);
     };
-  }, []);
+  }, [getIsProductHashActive]);
 
   const cleanPath = currentPath || (typeof window !== "undefined" ? window.location.pathname.toLowerCase().replace(/\/$/, "") : "");
 
   // Detect auto-hide pages:
-  // 1. Product page: DO NOT hide on /p without #. ONLY hide when opening up # (either product modal is open or URL has #)
+  // 1. Product page: DO NOT hide on /p without #. ONLY hide when opening product detail modal (either product modal is open or URL has valid #sku)
   const isProductPage = currentPage === "product" || cleanPath === "/p";
   const isProductModalActive = isProductPage && Boolean(isProductDetailOpen || isProductHashActive);
   const hideCartOnProductHash = !loggedInUser && isProductModalActive;
@@ -516,13 +512,12 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const isAutoHideMode = isProductModalActive || (currentPage === "auth" && isAuthRoute);
 
   const navRef = useRef<HTMLElement | null>(null);
-  const isHoveringNavRef = useRef(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isOrderNavHovered, setIsOrderNavHovered] = useState(false);
   const [isNavFocused, setIsNavFocused] = useState(false);
 
   // Keep navbar visible if not in auto-hide mode, or if hovered/focused/dropdown active
-  const isNavVisible = !isAutoHideMode || isOrderNavHovered || isNavFocused || showAccountMenu || showCartMenu || isSearchExpanded || showProductMegaMenu;
+  const isNavVisible = !isAutoHideMode || isOrderNavHovered || (isNavFocused && isSearchExpanded) || showAccountMenu || showCartMenu || isSearchExpanded || showProductMegaMenu;
 
   // Broadcast navbar visibility state for pages/components that react to it
   useEffect(() => {
@@ -532,64 +527,127 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
     }
   }, [isNavVisible]);
 
+  // When entering auto-hide mode (e.g. opening product detail modal), clear transient hover/focus/mega-menu state
   useEffect(() => {
-    if (!isAutoHideMode) return;
+    if (isAutoHideMode) {
+      setIsNavFocused(false);
+      setShowProductMegaMenu(false);
+      setIsOrderNavHovered(false);
+    }
+  }, [isAutoHideMode]);
 
-    const TOP_THRESHOLD = 72;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (e.clientY <= TOP_THRESHOLD) {
-        if (hoverTimeoutRef.current) {
-          clearTimeout(hoverTimeoutRef.current);
-          hoverTimeoutRef.current = null;
-        }
-        setIsOrderNavHovered(true);
-      } else {
-        if (!isHoveringNavRef.current) {
-          if (!hoverTimeoutRef.current && isOrderNavHovered) {
-            hoverTimeoutRef.current = setTimeout(() => {
-              if (!isHoveringNavRef.current) {
-                setIsOrderNavHovered(false);
-              }
-              hoverTimeoutRef.current = null;
-            }, 420);
-          }
-        }
-      }
-    };
-
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-        hoverTimeoutRef.current = null;
-      }
-    };
-  }, [isAutoHideMode, isOrderNavHovered]);
-
-  const handleNavMouseEnter = () => {
-    isHoveringNavRef.current = true;
+  const clearPendingHide = useCallback(() => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
+  }, []);
+
+  const scheduleHide = useCallback((delayMs = 100) => {
+    if (hoverTimeoutRef.current) return;
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsOrderNavHovered(false);
+      if (!isSearchExpanded) {
+        setIsNavFocused(false);
+      }
+      hoverTimeoutRef.current = null;
+    }, delayMs);
+  }, [isSearchExpanded]);
+
+  useEffect(() => {
+    if (!isAutoHideMode) {
+      setIsOrderNavHovered(false);
+      clearPendingHide();
+      return;
+    }
+
+    const TOP_REVEAL_ZONE = 72; // Pixels from top of viewport for smooth reveal
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Keep navbar revealed when any popup/dropdown or search is open
+      if (showAccountMenu || showCartMenu || showProductMegaMenu || isSearchExpanded) {
+        clearPendingHide();
+        setIsOrderNavHovered(true);
+        return;
+      }
+
+      // Check if cursor is directly over the navbar
+      const navRect = navRef.current?.getBoundingClientRect();
+      const isOverNav = Boolean(
+        navRect &&
+        e.clientX >= navRect.left &&
+        e.clientX <= navRect.right &&
+        e.clientY >= navRect.top &&
+        e.clientY <= navRect.bottom
+      );
+
+      if (e.clientY <= TOP_REVEAL_ZONE || isOverNav) {
+        clearPendingHide();
+        setIsOrderNavHovered(true);
+      } else {
+        // Smoothly hide when outside top zone and not directly hovering navbar
+        scheduleHide(100);
+      }
+    };
+
+    const handleWindowMouseLeave = () => {
+      if (showAccountMenu || showCartMenu || showProductMegaMenu || isSearchExpanded) return;
+      clearPendingHide();
+      scheduleHide(50);
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (showAccountMenu || showCartMenu || showProductMegaMenu || isSearchExpanded) return;
+      if (e.touches[0]?.clientY <= TOP_REVEAL_ZONE) {
+        clearPendingHide();
+        setIsOrderNavHovered(true);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (showAccountMenu || showCartMenu || showProductMegaMenu || isSearchExpanded) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      if (touch.clientY <= TOP_REVEAL_ZONE) {
+        clearPendingHide();
+        setIsOrderNavHovered(true);
+      } else {
+        scheduleHide(100);
+      }
+    };
+
+    const handleScroll = () => {
+      if (showAccountMenu || showCartMenu || showProductMegaMenu || isSearchExpanded) return;
+      clearPendingHide();
+      scheduleHide(60);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    document.addEventListener("mouseleave", handleWindowMouseLeave);
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseleave", handleWindowMouseLeave);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("scroll", handleScroll);
+      clearPendingHide();
+    };
+  }, [isAutoHideMode, showAccountMenu, showCartMenu, showProductMegaMenu, isSearchExpanded, clearPendingHide, scheduleHide]);
+
+  const handleNavMouseEnter = () => {
+    clearPendingHide();
     setIsOrderNavHovered(true);
   };
 
-  const handleNavMouseLeave = (e: React.MouseEvent) => {
-    isHoveringNavRef.current = false;
-    if (isAutoHideMode && e.clientY > 72) {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-      hoverTimeoutRef.current = setTimeout(() => {
-        if (!isHoveringNavRef.current) {
-          setIsOrderNavHovered(false);
-        }
-        hoverTimeoutRef.current = null;
-      }, 420);
-    }
+  const handleNavMouseLeave = () => {
+    if (!isAutoHideMode) return;
+    if (showAccountMenu || showCartMenu || showProductMegaMenu || isSearchExpanded) return;
+    clearPendingHide();
+    scheduleHide(100);
   };
 
   // Close dropdown on click outside & handle Escape key
@@ -973,12 +1031,14 @@ const resolveProductMetadata = (skuOrName: string) => {
       return;
     }
     
-    if (onRemoveCartItem) {
-      dismissIndices(selectedIndices, () => {
+    dismissIndices(selectedIndices, () => {
+      if (onRemoveCartItem) {
         onRemoveCartItem(idsToRemove);
-        setSelectedGroupKeys((prev) => prev.filter((k) => !selectedGroupKeys.includes(k)));
-      });
-    }
+      } else {
+        idsToRemove.forEach(id => apiRemoveCartItem(id).catch(() => {}));
+      }
+      setSelectedGroupKeys((prev) => prev.filter((k) => !selectedGroupKeys.includes(k)));
+    });
   };
 
   const renderHighlightedText = (text: string, query: string) => {
@@ -1009,13 +1069,6 @@ const resolveProductMetadata = (skuOrName: string) => {
 
   return (
     <>
-      {isAutoHideMode && !isNavVisible && (
-        <div
-          className="fixed top-0 left-0 right-0 h-16 z-[110]"
-          onMouseEnter={handleNavMouseEnter}
-          onTouchStart={handleNavMouseEnter}
-        />
-      )}
       <motion.nav
         ref={navRef}
         initial={isAutoHideMode ? "orderHidden" : false}
@@ -1029,12 +1082,12 @@ const resolveProductMetadata = (skuOrName: string) => {
         variants={{
           orderHidden: {
             opacity: 0,
-            y: -30,
-            scaleX: 0.62,
-            scaleY: 0.42,
+            y: -26,
+            scaleX: 0.7,
+            scaleY: 0.5,
             x: "-50%",
             transition: {
-              duration: 0.32,
+              duration: 0.18,
               ease: [0.25, 0.1, 0.25, 1],
             },
           },
@@ -1069,7 +1122,12 @@ const resolveProductMetadata = (skuOrName: string) => {
         }}
         onMouseEnter={handleNavMouseEnter}
         onMouseLeave={handleNavMouseLeave}
-        onFocus={() => setIsNavFocused(true)}
+        onFocus={(e) => {
+          const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+          if (targetTag === "input" || targetTag === "textarea") {
+            setIsNavFocused(true);
+          }
+        }}
         onBlur={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget)) {
             setIsNavFocused(false);
@@ -1086,8 +1144,8 @@ const resolveProductMetadata = (skuOrName: string) => {
               : { opacity: 1, y: 0 }
           }
           transition={{
-            duration: isNavVisible ? 0.28 : 0.18,
-            delay: isNavVisible ? 0.09 : 0,
+            duration: isNavVisible ? 0.28 : 0.14,
+            delay: isNavVisible ? 0.08 : 0,
             ease: "easeOut",
           }}
           className="flex justify-between items-center w-full min-w-0"
@@ -1172,13 +1230,13 @@ const resolveProductMetadata = (skuOrName: string) => {
                       animate={{ opacity: 1, clipPath: "circle(150% at 20% -20px)", filter: "blur(0px)" }}
                       exit={{ opacity: 0, clipPath: "circle(0% at 20% -20px)", filter: "blur(10px)" }}
                       transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[90vw] lg:w-[930px] xl:w-[972px] bg-white/95 backdrop-blur-3xl rounded-[20px] border-0 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.12),0_8px_24px_rgba(0,0,0,0.04)] z-50 flex overflow-hidden mega-menu-popup"
+                      className="absolute top-[calc(100%+4px)] left-1/2 -translate-x-1/2 w-[92vw] max-w-[760px] lg:w-[890px] lg:max-w-none xl:w-[960px] 2xl:w-[1040px] bg-white/95 backdrop-blur-3xl rounded-[20px] border-0 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.12),0_8px_24px_rgba(0,0,0,0.04)] z-50 flex overflow-hidden mega-menu-popup"
                     >
                   {/* Decorative background glows */}
                   <div className="absolute top-0 right-0 w-40 h-40 bg-[#FF4D24]/15 rounded-full blur-[40px] pointer-events-none -z-10" />
 
                   {/* Left Section: Poster (-10% overall scale) */}
-                  <div className="relative shrink-0 w-[242px] overflow-hidden" style={{ aspectRatio: '10/14' }}>
+                  <div className="relative shrink-0 w-[210px] lg:w-[242px] overflow-hidden" style={{ aspectRatio: '10/14' }}>
                     <img src="https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?q=80&w=800&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover" alt="Galaxy Z Fold6" />
                     
                     {/* Dark gradient overlay for text readability */}
@@ -1200,19 +1258,24 @@ const resolveProductMetadata = (skuOrName: string) => {
                         {/* Orange/peach ambient light pool that blends in when hovering the poster */}
                         <div className="absolute left-[-10%] top-[20%] w-[360px] h-[360px] rounded-full bg-[#FF4D24]/20 blur-[80px] pointer-events-none opacity-0 transition-opacity duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] ambient-orange-pool" />
 
-                        {/* Right grid: Columns of Phone & Tablet subcategories (Optimized widths & spacing with perfectly aligned header baselines) */}
-                        <div className="relative z-10 grid grid-cols-[1.75fr_0.95fr_1.35fr_0.85fr_1.55fr] gap-x-4 gap-y-2.5 w-full items-start">
+                        {/* Right grid: Columns of Phone & Tablet subcategories with responsive column shedding on shrink */}
+                        <div className="relative z-10 grid grid-cols-[1.9fr_1fr_1.35fr] lg:grid-cols-[2fr_0.95fr_1.4fr_1fr] 2xl:grid-cols-[2.15fr_0.95fr_1.35fr_0.9fr_1.45fr] gap-x-3.5 xl:gap-x-4 gap-y-2.5 w-full items-start">
                           {CATEGORIES[0]?.columns.map((col, colIdx) => {
                             const isBrandCol = colIdx === 0; // "Hãng điện thoại"
+                            const colVisibilityClass = 
+                              colIdx === 3 ? "hidden lg:flex" : 
+                              colIdx === 4 ? "hidden 2xl:flex" : 
+                              "flex";
+
                             return (
                               <div 
                                 key={colIdx} 
-                                className="flex flex-col gap-2"
+                                className={`${colVisibilityClass} flex-col gap-2 min-w-0`}
                               >
                                 <h4 className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400 font-sans border-b border-slate-100 pb-1.5 h-8 flex items-end mb-1.5 w-full whitespace-nowrap">
                                   {col.title}
                                 </h4>
-                                <div className={isBrandCol ? "grid grid-cols-2 gap-x-2.5 gap-y-1.5" : "flex flex-col gap-1.5"}>
+                                <div className={isBrandCol ? "grid grid-cols-2 gap-x-2.5 gap-y-1.5 w-full" : "flex flex-col gap-1.5 w-full"}>
                                   {col.items.map((item, itemIdx) => (
                                     <a
                                       key={itemIdx}
@@ -1222,9 +1285,9 @@ const resolveProductMetadata = (skuOrName: string) => {
                                         onNavigate("product");
                                         setShowProductMegaMenu(false);
                                       }}
-                                      className="text-[12.5px] text-slate-600 hover:text-primary font-medium flex items-center justify-between gap-1 py-0.5 h-auto transition-all hover:translate-x-0.5 duration-200 outline-none"
+                                      className="text-[12.5px] text-slate-600 hover:text-primary font-medium flex items-center justify-between gap-1 py-0.5 h-auto transition-all hover:translate-x-0.5 duration-200 outline-none min-w-0"
                                     >
-                                      <span className={`transition-colors truncate ${isBrandCol ? 'max-w-[100px]' : 'max-w-[140px]'}`}>{item.name}</span>
+                                      <span className="transition-colors truncate min-w-0 flex-1">{item.name}</span>
                                       {item.tag === "HOT" && (
                                         <span className="text-[9px] font-black tracking-wider px-1 py-0.5 rounded bg-red-500 text-white leading-none uppercase shrink-0">
                                           HOT
@@ -1369,7 +1432,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(160% at 24px -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at 24px -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute left-0 top-[calc(100%+14px)] w-[330px] sm:w-[360px] rounded-2xl border border-slate-200/90 ring-1 ring-slate-900/[0.04] bg-white backdrop-blur-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_0_0_rgba(255,255,255,1)] p-3 sm:p-3.5 z-50 origin-top-left overflow-hidden text-slate-900"
+                className="absolute left-0 top-[calc(100%+14px)] w-[330px] sm:w-[360px] rounded-2xl border border-slate-200/90 ring-1 ring-slate-900/[0.04] bg-white/[0.93] backdrop-blur-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_0_0_rgba(255,255,255,1)] p-3 sm:p-3.5 z-50 origin-top-left overflow-hidden text-slate-900"
               >
                 {/* Refined Ambient Glow - Warm subtle diffusion */}
                 <div className="absolute -top-10 -right-10 w-36 h-36 bg-[#FF4D24]/[0.08] rounded-full blur-[32px] pointer-events-none" />
@@ -1533,19 +1596,25 @@ const resolveProductMetadata = (skuOrName: string) => {
           <AnimatePresence>
             {showCartMenu && (
               <motion.div 
-                layout="position"
+                layout
                 initial={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
-                transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900"
+                transition={{ 
+                  layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] },
+                  type: "spring", 
+                  stiffness: 250, 
+                  damping: 28, 
+                  mass: 0.8 
+                }}
+                className="absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/[0.93] backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900"
               >
                 {/* Decorative ambient glow (+20% radiance) */}
                 <div className="absolute top-0 right-0 w-72 h-72 bg-[#FF4D24]/36 rounded-full blur-[70px] pointer-events-none -z-10" />
                 <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#FF4D24]/18 rounded-full blur-[60px] pointer-events-none -z-10" />
 
                 {/* 1. Header Row (No bottom border to avoid double lines) */}
-                <div className="flex items-center justify-between pb-2 mb-1.5">
+                <motion.div layout transition={{ layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] } }} className="flex items-center justify-between pb-2 mb-1.5">
                   <div className="flex items-center gap-2">
                     <div className="size-7 rounded-lg bg-[#FF4D24]/10 text-[#FF4D24] flex items-center justify-center font-bold">
                       <ShoppingBag size={14} className="stroke-[2.5]" />
@@ -1598,133 +1667,145 @@ const resolveProductMetadata = (skuOrName: string) => {
                       <X size={14} className="stroke-[2.25]" />
                     </button>
                   </div>
-                </div>
+                </motion.div>
                 
-                {/* 2. Item List with Dual Top & Bottom CSS Mask Fade */}
-                {groupedCartItems.length > 0 ? (
-                  <motion.div 
-                    layout
-                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex flex-col gap-2.5 max-h-[440px] overflow-y-auto px-1.5 pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)]"
-                  >
-                    <AnimatePresence initial={false} mode="popLayout">
-                      {groupedCartItems.map((group, index) => {
-                        const groupKey = group.groupKey;
-                        const isSelected = selectedGroupKeys.includes(groupKey);
-                        const rowTotalNumber = parsePrice(group.unitPrice) * group.quantity;
-                        const formattedRowTotal = formatPrice(rowTotalNumber);
-                        const isExpanded = expandedGroupKey === groupKey;
-                        const isNearBottom = groupedCartItems.length >= 2 && index === groupedCartItems.length - 1;
-                        
-                        return (
-                          <motion.div 
-                            layout
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ 
-                              opacity: offsets[index] 
-                                ? Math.max(0, (isSelected ? 1 : 0.6) * (1 - Math.pow(Math.min(1, Math.max(0, offsets[index]) / 240), 1.2))) 
-                                : (isSelected ? 1 : 0.6), 
-                              y: 0,
-                              x: offsets[index] || 0,
-                              rotate: offsets[index] ? Math.min(4, offsets[index] * 0.01) : 0,
-                              scale: offsets[index] && offsets[index] > 20 ? Math.max(0.95, 1 - offsets[index] / 3000) : 1,
-                              filter: offsets[index] && offsets[index] > 50 
-                                ? `blur(${Math.min(2.5, (offsets[index] - 50) * 0.015)}px)` 
-                                : "blur(0px)",
-                            }}
-                            exit={{ 
-                              opacity: 0, 
-                              x: 480, 
-                              rotate: 3.5,
-                              scale: 0.93,
-                              filter: "blur(3px)",
-                              height: 0, 
-                              marginTop: 0, 
-                              marginBottom: 0, 
-                              paddingTop: 0, 
-                              paddingBottom: 0, 
-                              overflow: "hidden", 
-                              transition: { 
-                                x: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
-                                opacity: { duration: 0.22, ease: "easeOut" },
-                                rotate: { duration: 0.28 },
-                                scale: { duration: 0.28 },
-                                height: { duration: 0.28, delay: 0.06, ease: [0.16, 1, 0.3, 1] },
-                              } 
-                            }}
-                            transition={{ 
-                              x: activeIdx === index && !isDismissing
-                                ? { duration: 0 }
-                                : { type: "spring", stiffness: 220, damping: 25, mass: 0.8 },
-                              rotate: { type: "spring", stiffness: 200, damping: 22 },
-                              scale: { type: "spring", stiffness: 220, damping: 25 },
-                              opacity: { duration: 0.2, ease: "easeOut" },
-                              filter: { duration: 0.18 },
-                              layout: { duration: 0.32, ease: [0.16, 1, 0.3, 1] } 
-                            }}
-                            key={groupKey} 
-                            {...bindDrag(index)}
-                            onClick={() => {
-                              if (isDismissing) return;
-                              setSelectedGroupKeys(prev => {
-                                const willDeselect = prev.includes(groupKey);
-                                if (willDeselect) {
-                                  if (expandedGroupKey === groupKey) {
-                                    setExpandedGroupKey(null);
-                                  }
-                                  return prev.filter(k => k !== groupKey);
-                                } else {
-                                  return [...prev, groupKey];
-                                }
-                              });
-                            }}
-                            className={`p-2.5 sm:p-3 pt-3.5 sm:pt-3.5 rounded-xl border select-none relative flex flex-col gap-2 cursor-pointer transition-colors duration-150 overflow-visible ${
-                              isExpanded ? "z-40" : "z-0"
-                            } ${
-                              isSelected 
-                                ? "bg-white border-slate-300 shadow-xs ring-1 ring-slate-900/5" 
-                                : "border-transparent bg-transparent"
-                            }`}
-                          >
-                            {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
-                            {group.discount && (
-                              <>
-                                <div className={`absolute -top-1.5 left-[-4px] h-[21px] text-white text-[9.5px] font-black px-2 rounded-br-md rounded-tr-xs shadow-[1px_2px_4px_rgba(255,77,36,0.22)] flex items-center justify-center z-20 select-none transition-all duration-200 ${
+                {/* 2. Cart Content (Filled vs Empty) with popLayout smooth height morph */}
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {groupedCartItems.length > 0 ? (
+                    <motion.div 
+                      key="cart-filled-content"
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, transition: { duration: 0.22, ease: "easeOut" } }}
+                      transition={{ layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] } }}
+                      className="flex flex-col w-full"
+                    >
+                      {/* Item List with Dual Top & Bottom CSS Mask Fade */}
+                      <div className="flex flex-col gap-2.5 max-h-[440px] overflow-y-auto px-1.5 pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_24px,black_calc(100%-24px),transparent_100%)]">
+                        <AnimatePresence initial={false} mode="popLayout">
+                          {groupedCartItems.map((group, index) => {
+                            const groupKey = group.groupKey;
+                            const isSelected = selectedGroupKeys.includes(groupKey);
+                            const rowTotalNumber = parsePrice(group.unitPrice) * group.quantity;
+                            const formattedRowTotal = formatPrice(rowTotalNumber);
+                            const isExpanded = expandedGroupKey === groupKey;
+                            const isNearBottom = groupedCartItems.length >= 2 && index === groupedCartItems.length - 1;
+                            
+                            return (
+                              <motion.div 
+                                layout
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ 
+                                  opacity: offsets[index] 
+                                    ? Math.max(0, (isSelected ? 1 : 0.6) * (1 - Math.pow(Math.min(1, Math.max(0, offsets[index]) / 320), 1.5))) 
+                                    : (isSelected ? 1 : 0.6), 
+                                  y: 0,
+                                  x: offsets[index] || 0,
+                                  rotate: offsets[index] ? Math.min(4, offsets[index] * 0.01) : 0,
+                                  scale: offsets[index] && offsets[index] > 20 ? Math.max(0.95, 1 - offsets[index] / 3000) : 1,
+                                  filter: offsets[index] && offsets[index] > 50 
+                                    ? `blur(${Math.min(2.5, (offsets[index] - 50) * 0.015)}px)` 
+                                    : "blur(0px)",
+                                }}
+                                exit={{ 
+                                  opacity: 0, 
+                                  x: 420, 
+                                  rotate: 2.5, 
+                                  scale: 0.95, 
+                                  filter: "blur(2px)", 
+                                  height: 0, 
+                                  marginTop: 0, 
+                                  marginBottom: 0, 
+                                  paddingTop: 0, 
+                                  paddingBottom: 0, 
+                                  overflow: "hidden", 
+                                  transition: { 
+                                    x: { duration: 0.38, ease: [0.32, 0.72, 0, 1] }, 
+                                    opacity: { duration: 0.28, ease: "easeOut" }, 
+                                    rotate: { duration: 0.35 }, 
+                                    scale: { duration: 0.35 }, 
+                                    filter: { duration: 0.2 }, 
+                                    height: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] }, 
+                                    marginTop: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] }, 
+                                    marginBottom: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] }, 
+                                    paddingTop: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] }, 
+                                    paddingBottom: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] }, 
+                                  } 
+                                }} 
+                                transition={{ 
+                                  x: activeIdx === index && !isDismissing 
+                                    ? { duration: 0 } 
+                                    : { type: "spring", stiffness: 220, damping: 25, mass: 0.8 }, 
+                                  rotate: { type: "spring", stiffness: 200, damping: 22 }, 
+                                  scale: { type: "spring", stiffness: 220, damping: 25 }, 
+                                  opacity: { duration: 0.32, ease: "easeOut" }, 
+                                  filter: { duration: 0.18 }, 
+                                  layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] } 
+                                }}
+                                key={groupKey} 
+                                {...bindDrag(index)}
+                                onClick={() => {
+                                  if (isDismissing) return;
+                                  setSelectedGroupKeys(prev => {
+                                    const willDeselect = prev.includes(groupKey);
+                                    if (willDeselect) {
+                                      if (expandedGroupKey === groupKey) {
+                                        setExpandedGroupKey(null);
+                                      }
+                                      return prev.filter(k => k !== groupKey);
+                                    } else {
+                                      return [...prev, groupKey];
+                                    }
+                                  });
+                                }}
+                                className={`p-2.5 sm:p-3 pt-3.5 sm:pt-3.5 rounded-xl border select-none relative flex flex-col gap-2 cursor-pointer transition-colors duration-150 overflow-visible ${
+                                  isExpanded ? "z-40" : "z-0"
+                                } ${
                                   isSelected 
-                                    ? "bg-gradient-to-r from-[#FF4D24] to-[#FF6B35]" 
-                                    : "bg-slate-400 opacity-50 shadow-none"
-                                }`}>
-                                  {group.discount}
-                                </div>
-                                {/* 3D Fold Corner for Left Ribbon */}
-                                <div 
-                                  className={`absolute top-[15px] left-[-4px] w-[4px] h-[4px] z-10 transition-colors duration-200 ${
-                                    isSelected ? "bg-[#B43C00]" : "bg-slate-600 opacity-50"
-                                  }`} 
-                                  style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} 
-                                />
-                              </>
-                            )}
-
-                            {/* Top Row: Thumbnail + Info & Variant + Delete */}
-                            <div className="flex items-start gap-2.5">
-                                {/* Product Thumbnail Photo - Edge-to-edge full cover, zero gaps */}
-                                <div className={`relative w-14 h-14 sm:w-16 sm:h-16 aspect-square rounded-xl shrink-0 flex items-center justify-center overflow-hidden transition-all duration-200 group/thumb ${
-                                  isSelected 
-                                  ? "bg-slate-100 border border-slate-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/[0.03]" 
-                                  : "bg-neutral-100/70 border border-neutral-200/60 grayscale opacity-40"
-                                }`}>
-                                  {group.imageUrl ? (
-                                    <img 
-                                      src={group.imageUrl} 
-                                      alt={group.name} 
-                                      className="w-full h-full object-cover object-center block transition-transform duration-300 ease-out group-hover/thumb:scale-105" 
-                                      loading="lazy"
+                                    ? "bg-white border-slate-300 shadow-xs ring-1 ring-slate-900/5" 
+                                    : "border-transparent bg-transparent"
+                                }`}
+                              >
+                                {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
+                                {group.discount && (
+                                  <>
+                                    <div className={`absolute -top-1.5 left-[-4px] h-[21px] text-white text-[9.5px] font-black px-2 rounded-br-md rounded-tr-xs shadow-[1px_2px_4px_rgba(255,77,36,0.22)] flex items-center justify-center z-20 select-none transition-all duration-200 ${
+                                      isSelected 
+                                        ? "bg-gradient-to-r from-[#FF4D24] to-[#FF6B35]" 
+                                        : "bg-slate-400 opacity-50 shadow-none"
+                                    }`}>
+                                      {group.discount}
+                                    </div>
+                                    {/* 3D Fold Corner for Left Ribbon */}
+                                    <div 
+                                      className={`absolute top-[15px] left-[-4px] w-[4px] h-[4px] z-10 transition-colors duration-200 ${
+                                        isSelected ? "bg-[#B43C00]" : "bg-slate-600 opacity-50"
+                                      }`} 
+                                      style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} 
                                     />
-                                  ) : (
-                                    <span className="text-base">{group.icon || "📦"}</span>
-                                  )}
-                                </div>
+                                  </>
+                                )}
+
+                                {/* Top Row: Thumbnail + Info & Variant + Delete */}
+                                <div className="flex items-start gap-2.5">
+                                  {/* Product Thumbnail Photo - Edge-to-edge full cover, zero gaps */}
+                                  <div className={`relative w-14 h-14 sm:w-16 sm:h-16 aspect-square rounded-xl shrink-0 flex items-center justify-center overflow-hidden transition-all duration-200 group/thumb ${
+                                    isSelected 
+                                    ? "bg-slate-100 border border-slate-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/[0.03]" 
+                                    : "bg-neutral-100/70 border border-neutral-200/60 grayscale opacity-40"
+                                  }`}>
+                                    {group.imageUrl ? (
+                                      <img 
+                                        src={group.imageUrl} 
+                                        alt={group.name} 
+                                        className="w-full h-full object-cover object-center block transition-transform duration-300 ease-out group-hover/thumb:scale-105" 
+                                        loading="lazy"
+                                      />
+                                    ) : (
+                                      <span className="text-base">{group.icon || "📦"}</span>
+                                    )}
+                                  </div>
 
                               {/* Info & Variant Pill */}
                               <div className="flex-1 min-w-0 flex flex-col gap-0.5">
@@ -1905,7 +1986,9 @@ const resolveProductMetadata = (skuOrName: string) => {
                                           await apiUpdateCartQuantity(group.sku, group.quantity - 1);
                                         } catch (_) {}
                                       } else {
-                                        onRemoveCartItem && onRemoveCartItem(group.sku || group.ids[group.ids.length - 1]);
+                                        dismissIndices([index], () => {
+                                          onRemoveCartItem && onRemoveCartItem(group.sku || group.ids[group.ids.length - 1]);
+                                        });
                                       }
                                     } else {
                                       setSelectedGroupKeys(prev => [...prev, groupKey]);
@@ -1947,34 +2030,10 @@ const resolveProductMetadata = (skuOrName: string) => {
                         );
                       })}
                     </AnimatePresence>
-                  </motion.div>
-                ) : (
-                  <motion.div 
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
-                    className="py-12 text-center flex flex-col items-center justify-center gap-2.5 text-slate-400"
-                  >
-                    <div className="size-12 rounded-full bg-slate-50/80 border border-slate-200/60 flex items-center justify-center text-slate-400 shadow-2xs">
-                      <PackageOpen size={22} className="stroke-[1.75]" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-700">Giỏ hàng của bạn đang trống</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Khám phá các sản phẩm và dịch vụ đám mây ngay</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setShowCartMenu(false);
-                        onNavigate("product");
-                      }}
-                      className="mt-1 text-xs font-bold text-[#FF4D24] bg-orange-50 hover:bg-orange-100 px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Duyệt sản phẩm
-                    </button>
-                  </motion.div>
-                )}
+                  </div>
 
-                {/* 3. Footer (Tóm tắt & Nút thanh toán) */}
-                {groupedCartItems.length > 0 && (
-                  <div className="pt-1 mt-1 flex flex-col gap-1.5">
+                  {/* 3. Footer (Tóm tắt & Nút thanh toán) */}
+                  <div className="pt-1 mt-1 flex flex-col gap-1.5 overflow-hidden">
                     {/* Summary row */}
                     <div className="flex items-center justify-between text-[11px] text-slate-500">
                       <span>Đã chọn ({getSelectedItemsCount()} món)</span>
@@ -2046,7 +2105,40 @@ const resolveProductMetadata = (skuOrName: string) => {
                       </motion.button>
                     </div>
                   </div>
-                )}
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="cart-empty-view"
+                  layout
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ 
+                    layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] },
+                    opacity: { duration: 0.25, ease: "easeOut" },
+                    scale: { duration: 0.25, ease: "easeOut" }
+                  }}
+                  className="py-12 text-center flex flex-col items-center justify-center gap-2.5 text-slate-400 w-full"
+                >
+                  <div className="size-12 rounded-full bg-slate-50/80 border border-slate-200/60 flex items-center justify-center text-slate-400 shadow-2xs">
+                    <PackageOpen size={22} className="stroke-[1.75]" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-700">Giỏ hàng của bạn đang trống</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Khám phá các sản phẩm và dịch vụ đám mây ngay</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowCartMenu(false);
+                      onNavigate("product");
+                    }}
+                    className="mt-1 text-xs font-bold text-[#FF4D24] bg-orange-50 hover:bg-orange-100 px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Duyệt sản phẩm
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
               </motion.div>
             )}
           </AnimatePresence>
@@ -2054,7 +2146,7 @@ const resolveProductMetadata = (skuOrName: string) => {
         )}
 
         {/* Subtle 3D Divider */}
-        <BevelDivider />
+        {!hideCartOnProductHash && <BevelDivider />}
 
         {/* 3. Account Button / Profile Section */}
         <div className="relative" ref={menuRef}>
@@ -2105,7 +2197,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-[calc(100%+14px)] w-[295px] rounded-[24px] border border-slate-200/90 bg-white backdrop-blur-2xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
+                className="absolute right-0 top-[calc(100%+14px)] w-[295px] rounded-[24px] border border-slate-200/90 bg-white/[0.93] backdrop-blur-2xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
               >
                 {/* Decorative background glows */}
                 <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />

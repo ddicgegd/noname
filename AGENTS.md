@@ -46,6 +46,24 @@
 - **ABSOLUTE FIDELITY TO REFERENCE SAMPLES (NO SPECULATIVE EFFECTS)**: When the user provides an image, reference code, or design pattern, adhere strictly to its exact nature. NEVER invent unrequested effects, SVG blur/glow filters, solid replacements for dashed strokes, or speculative box shadows that break layout hierarchy.
 - **ZERO UI REGRESSION**: All fixes must preserve existing layout dimensions, container paddings, and display hierarchy. New styles or animations must never introduce boundary clipping (`overflow-hidden` truncation), edge bleeding, or occlusion of neighboring elements.
 
+### 1.10. STRICT ADHERENCE TO NEGATIVE CONSTRAINTS & ZERO-FABRICATION PROTOCOL
+- **ABSOLUTE BAN ON SPECULATIVE CONTAINERS & MASKS**:
+  - When asked to extend or adjust an existing visual effect, the agent MUST ONLY manipulate boundary constraints (e.g. overflow, dimensions, offsets) of the existing effect.
+  - NEVER wrap original media layers in speculative container divs.
+  - NEVER introduce artificial opacity masks, fade gradients, or color washes onto existing content unless explicitly requested word-for-word.
+- **ZERO-TOLERANCE ON VERIFICATION FRAUD**:
+  - A clean build (`npm run build`) or type-check (`tsc --noEmit`) is ONLY proof of syntactic validity, NEVER proof of visual correctness.
+  - NEVER declare a UI task complete or output `GOAL_COMPLETE` without direct, visual, in-browser rendering evidence matching reference aesthetics.
+
+### 1.11. SUBAGENT DELEGATION GUARDRAILS & ANTI-POISONING
+- **FAITHFUL PROMPT PROPAGATION**: When delegating tasks to subagents, the primary agent MUST forward the user's exact requirements, bounds, and negative constraints verbatim. NEVER inject speculative architectures, unrequested mask designs, or subjective biases into the subagent prompt.
+- **PRIMARY AGENT SOLE ACCOUNTABILITY**: The primary agent remains 100% accountable for the final outcome. NEVER accept subagent claims of completion without independent verification.
+
+### 1.12. POST-FAILURE DISCIPLINE & ANTI-RATIONALIZATION
+- **DIRECT DEFECT CONFRONTATION**: When confronted with a defect or user challenge, identify and acknowledge the exact defect location and cause immediately.
+- **ABSOLUTE BAN ON DEFENSIVE TABLES & EXCUSES**: NEVER construct comparative self-defense tables to argue "partial correctness".
+- **ABSOLUTE BAN ON SPECULATIVE GIT MINING**: NEVER execute `git status`, `git log`, or `git diff` on unrelated modified files in the workspace to invent external excuses or shift blame.
+
 ---
 
 ## 2. FRONTEND & UI DEVELOPMENT DIRECTIVES

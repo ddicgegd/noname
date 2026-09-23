@@ -1,0 +1,18 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "Optical Seam Blur Prototype": {
+      "versions": [
+        {
+          "path": "index.html",
+          "createdAt": "2026-09-22T18:40:14.625Z",
+          "status": "needs-review"
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-09-22T18:40:14.625Z",
+  "updatedAt": "2026-09-22T18:40:14.625Z"
+}

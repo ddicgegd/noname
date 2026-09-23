@@ -375,11 +375,9 @@ export function CartDropdownMenu({
   });
 
   const handleDeleteSelected = () => {
-    const selectedIndices: number[] = [];
     const idsToRemove: string[] = [];
-    groupedCartItems.forEach((group, index) => {
+    groupedCartItems.forEach((group) => {
       if (selectedGroupKeys.includes(group.groupKey)) {
-        selectedIndices.push(index);
         if (group.sku) {
           idsToRemove.push(group.sku);
         } else {
@@ -392,6 +390,10 @@ export function CartDropdownMenu({
       showToast("Vui lòng tích chọn sản phẩm bạn muốn xóa!", "warning");
       return;
     }
+
+    const selectedIndices = groupedCartItems
+      .map((group, idx) => (selectedGroupKeys.includes(group.groupKey) ? idx : -1))
+      .filter((idx) => idx !== -1);
 
     dismissIndices(selectedIndices, () => {
       if (onRemoveCartItem) {
@@ -406,8 +408,8 @@ export function CartDropdownMenu({
   const isBottomPosition = position === "bottom";
 
   const containerClasses = isBottomPosition
-    ? "absolute right-0 bottom-[calc(100%+18px)] before:absolute before:-bottom-[18px] before:left-0 before:right-0 before:h-[18px] before:content-[''] w-[420px] sm:w-[480px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 dark:border-white/15 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl shadow-[0_16px_40px_-10px_rgba(0,0,0,0.18),0_4px_16px_-2px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-bottom-right overflow-hidden text-slate-900 dark:text-white select-none"
-    : "absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900 select-none";
+    ? "absolute right-0 bottom-[calc(100%+18px)] before:absolute before:-bottom-[18px] before:left-0 before:right-0 before:h-[18px] before:content-[''] w-[420px] sm:w-[480px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 dark:border-white/15 bg-white/[0.93] dark:bg-zinc-900/[0.93] backdrop-blur-2xl shadow-[0_16px_40px_-10px_rgba(0,0,0,0.18),0_4px_16px_-2px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-bottom-right overflow-hidden text-slate-900 dark:text-white select-none"
+    : "absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/[0.93] backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900 select-none";
 
   const animInitial = isBottomPosition
     ? { opacity: 0, clipPath: "circle(0% at calc(100% - 20px) calc(100% + 18px))", filter: "blur(8px)" }
@@ -425,10 +427,17 @@ export function CartDropdownMenu({
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          layout
           initial={animInitial}
           animate={animAnimate}
           exit={animExit}
-          transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
+          transition={{ 
+            layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] },
+            type: "spring", 
+            stiffness: 250, 
+            damping: 28, 
+            mass: 0.8 
+          }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           className={containerClasses}
@@ -438,7 +447,7 @@ export function CartDropdownMenu({
           <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#FF4D24]/18 rounded-full blur-[60px] pointer-events-none -z-10" />
 
           {/* 1. Header Row */}
-          <div className="flex items-center justify-between pb-2 mb-1.5 border-b border-slate-100 dark:border-white/10">
+          <motion.div layout transition={{ layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] } }} className="flex items-center justify-between pb-2 mb-1.5 border-b border-slate-100 dark:border-white/10">
             <div className="flex items-center gap-2">
               <div className="size-7 rounded-lg bg-[#FF4D24]/10 text-[#FF4D24] flex items-center justify-center font-bold">
                 <ShoppingBag size={14} className="stroke-[2.5]" />
@@ -491,70 +500,82 @@ export function CartDropdownMenu({
                 <X size={14} className="stroke-[2.25]" />
               </button>
             </div>
-          </div>
+          </motion.div>
 
-          {/* 2. Item List */}
-          {groupedCartItems.length > 0 ? (
-            <motion.div
-              layout
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="flex flex-col gap-2.5 max-h-[360px] sm:max-h-[400px] overflow-y-auto px-1.5 pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_20px,black_calc(100%-20px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_20px,black_calc(100%-20px),transparent_100%)]"
-            >
-              <AnimatePresence initial={false} mode="popLayout">
-                {groupedCartItems.map((group, index) => {
-                  const groupKey = group.groupKey;
-                  const isSelected = selectedGroupKeys.includes(groupKey);
-                  const rowTotalNumber = parsePrice(group.unitPrice) * group.quantity;
-                  const formattedRowTotal = formatPrice(rowTotalNumber);
-                  const isExpanded = expandedGroupKey === groupKey;
-                  const isNearBottom = isBottomPosition ? index < 2 : (groupedCartItems.length >= 2 && index === groupedCartItems.length - 1);
+          {/* 2. Cart Content (Filled vs Empty) with popLayout smooth height morph */}
+          <AnimatePresence mode="popLayout" initial={false}>
+            {groupedCartItems.length > 0 ? (
+              <motion.div
+                key="cart-filled-content"
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, transition: { duration: 0.22, ease: "easeOut" } }}
+                transition={{ layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] } }}
+                className="flex flex-col w-full"
+              >
+                {/* Item List */}
+                <div className="flex flex-col gap-2.5 max-h-[360px] sm:max-h-[400px] overflow-y-auto px-1.5 pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,transparent_0,black_20px,black_calc(100%-20px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0,black_20px,black_calc(100%-20px),transparent_100%)]">
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {groupedCartItems.map((group, index) => {
+                      const groupKey = group.groupKey;
+                      const isSelected = selectedGroupKeys.includes(groupKey);
+                    const rowTotalNumber = parsePrice(group.unitPrice) * group.quantity;
+                    const formattedRowTotal = formatPrice(rowTotalNumber);
+                    const isExpanded = expandedGroupKey === groupKey;
+                    const isNearBottom = isBottomPosition ? index < 2 : (groupedCartItems.length >= 2 && index === groupedCartItems.length - 1);
 
-                  return (
-                    <motion.div
-                      layout
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{
-                        opacity: offsets[index]
-                          ? Math.max(0, (isSelected ? 1 : 0.6) * (1 - Math.pow(Math.min(1, Math.max(0, offsets[index]) / 240), 1.2)))
-                          : (isSelected ? 1 : 0.6),
-                        y: 0,
-                        x: offsets[index] || 0,
-                        rotate: offsets[index] ? Math.min(4, offsets[index] * 0.01) : 0,
-                        scale: offsets[index] && offsets[index] > 20 ? Math.max(0.95, 1 - offsets[index] / 3000) : 1,
-                        filter: offsets[index] && offsets[index] > 50
-                          ? `blur(${Math.min(2.5, (offsets[index] - 50) * 0.015)}px)`
-                          : "blur(0px)",
-                      }}
-                      exit={{
-                        opacity: 0,
-                        x: 480,
-                        rotate: 3.5,
-                        scale: 0.93,
-                        filter: "blur(3px)",
-                        height: 0,
-                        marginTop: 0,
-                        marginBottom: 0,
-                        paddingTop: 0,
-                        paddingBottom: 0,
-                        overflow: "hidden",
-                        transition: {
-                          x: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
-                          opacity: { duration: 0.22, ease: "easeOut" },
-                          rotate: { duration: 0.28 },
-                          scale: { duration: 0.28 },
-                          height: { duration: 0.28, delay: 0.06, ease: [0.16, 1, 0.3, 1] },
-                        }
-                      }}
-                      transition={{
-                        x: activeIdx === index && !isDismissing
-                          ? { duration: 0 }
-                          : { type: "spring", stiffness: 220, damping: 25, mass: 0.8 },
-                        rotate: { type: "spring", stiffness: 200, damping: 22 },
-                        scale: { type: "spring", stiffness: 220, damping: 25 },
-                        opacity: { duration: 0.2, ease: "easeOut" },
-                        filter: { duration: 0.18 },
-                        layout: { duration: 0.32, ease: [0.16, 1, 0.3, 1] }
-                      }}
+                    return (
+                      <motion.div
+                        layout
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{
+                          opacity: offsets[index]
+                            ? Math.max(0, (isSelected ? 1 : 0.6) * (1 - Math.pow(Math.min(1, Math.max(0, offsets[index]) / 320), 1.5)))
+                            : (isSelected ? 1 : 0.6),
+                          y: 0,
+                          x: offsets[index] || 0,
+                          rotate: offsets[index] ? Math.min(4, offsets[index] * 0.01) : 0,
+                          scale: offsets[index] && offsets[index] > 20 ? Math.max(0.95, 1 - offsets[index] / 3000) : 1,
+                          filter: offsets[index] && offsets[index] > 50
+                            ? `blur(${Math.min(2.5, (offsets[index] - 50) * 0.015)}px)`
+                            : "blur(0px)",
+                        }}
+                        exit={{
+                          opacity: 0,
+                          x: 420,
+                          rotate: 2.5,
+                          scale: 0.95,
+                          filter: "blur(2px)",
+                          height: 0,
+                          marginTop: 0,
+                          marginBottom: 0,
+                          paddingTop: 0,
+                          paddingBottom: 0,
+                          overflow: "hidden",
+                          transition: {
+                            x: { duration: 0.38, ease: [0.32, 0.72, 0, 1] },
+                            opacity: { duration: 0.28, ease: "easeOut" },
+                            rotate: { duration: 0.35 },
+                            scale: { duration: 0.35 },
+                            filter: { duration: 0.2 },
+                            height: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] },
+                            marginTop: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] },
+                            marginBottom: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] },
+                            paddingTop: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] },
+                            paddingBottom: { duration: 0.34, delay: 0.12, ease: [0.32, 0.72, 0, 1] },
+                          }
+                        }}
+                        transition={{
+                          x: activeIdx === index && !isDismissing
+                            ? { duration: 0 }
+                            : { type: "spring", stiffness: 220, damping: 25, mass: 0.8 },
+                          rotate: { type: "spring", stiffness: 200, damping: 22 },
+                          scale: { type: "spring", stiffness: 220, damping: 25 },
+                          opacity: { duration: 0.32, ease: "easeOut" },
+                          filter: { duration: 0.18 },
+                          layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] }
+                        }}
                       key={groupKey}
                       {...bindDrag(index)}
                       onClick={() => {
@@ -794,11 +815,13 @@ export function CartDropdownMenu({
                                     await apiUpdateCartQuantity(group.sku, group.quantity - 1);
                                   } catch (_) {}
                                 } else {
-                                  if (onRemoveCartItem) {
-                                    onRemoveCartItem(group.sku || group.ids[group.ids.length - 1]);
-                                  } else if (group.sku) {
-                                    apiRemoveCartItem(group.sku).catch(() => {});
-                                  }
+                                  dismissIndices([index], () => {
+                                    if (onRemoveCartItem) {
+                                      onRemoveCartItem(group.sku || group.ids[group.ids.length - 1]);
+                                    } else if (group.sku) {
+                                      apiRemoveCartItem(group.sku).catch(() => {});
+                                    }
+                                  });
                                 }
                               } else {
                                 setSelectedGroupKeys(prev => [...prev, groupKey]);
@@ -839,13 +862,98 @@ export function CartDropdownMenu({
                     </motion.div>
                   );
                 })}
-              </AnimatePresence>
+                </AnimatePresence>
+              </div>
+
+              {/* 3. Footer (Tóm tắt & Nút thanh toán) */}
+              <div className="pt-2 mt-1 border-t border-slate-100 dark:border-white/10 flex flex-col gap-1.5 overflow-hidden">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400">
+                  <span>Đã chọn ({getSelectedItemsCount()} món)</span>
+                  <span>Ưu đãi thành viên có thể trừ lên tới <strong className="text-emerald-600 dark:text-emerald-400 font-mono">7%</strong></span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-0.5">
+                  <div className="flex flex-col">
+                    <span className="text-[9.5px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider">Tổng thanh toán</span>
+                    <div className="overflow-hidden h-6 flex items-center">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={calculateTotalValue()}
+                          initial={{ y: 10, opacity: 0, filter: "blur(2px)" }}
+                          animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                          exit={{ y: -10, opacity: 0, filter: "blur(2px)" }}
+                          transition={{ type: "spring", stiffness: 450, damping: 28 }}
+                          className="text-base sm:text-[17px] font-black font-mono text-[#FF4D24] leading-tight block"
+                        >
+                          {formatPrice(calculateTotalValue())}
+                        </motion.span>
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    disabled={getSelectedItemsCount() === 0}
+                    onClick={() => {
+                      const totalSelected = selectedGroupKeys.length;
+                      if (totalSelected === 0) {
+                        showToast("Vui lòng tích chọn ít nhất 1 sản phẩm để thanh toán!", "warning");
+                        return;
+                      }
+
+                      // 1. Trích xuất danh sách SKU & ID của các sản phẩm được tích chọn
+                      const selectedSkus: string[] = [];
+                      groupedCartItems.forEach((group) => {
+                        if (selectedGroupKeys.includes(group.groupKey)) {
+                          if (group.sku) selectedSkus.push(group.sku);
+                          selectedSkus.push(...group.ids);
+                        }
+                      });
+
+                      // 2. Lưu danh sách SKU đã chọn vào localStorage để đồng bộ sang trang Order /o
+                      try {
+                        localStorage.setItem("checkout_selected_skus", JSON.stringify(selectedSkus));
+                        localStorage.removeItem(STORAGE_KEYS.BUY_NOW_PRODUCT);
+                        localStorage.removeItem("horizon_buy_now_product");
+                      } catch (_) {}
+
+                      // 3. Bắn event realtime nếu người dùng đang ở sẵn trang /o
+                      window.dispatchEvent(
+                        new CustomEvent("cart-checkout-selected", { detail: { selectedSkus } })
+                      );
+
+                      // 4. Đóng menu giỏ hàng và chuyển thẳng sang trang /o
+                      onClose();
+                      if (onNavigate) {
+                        onNavigate("order");
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                      getSelectedItemsCount() > 0
+                        ? "bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] text-white hover:brightness-105 shadow-[0_4px_12px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.4)]"
+                        : "bg-slate-100 dark:bg-zinc-800 text-slate-400 cursor-not-allowed shadow-none"
+                    }`}
+                  >
+                    <span>Thanh toán</span>
+                    <span className="text-[10px] opacity-90">({getSelectedItemsCount()})</span>
+                  </motion.button>
+                </div>
+              </div>
             </motion.div>
           ) : (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="py-12 text-center flex flex-col items-center justify-center gap-2.5 text-slate-400"
+              key="cart-empty-view"
+              layout
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ 
+                layout: { duration: 0.38, ease: [0.32, 0.72, 0, 1] },
+                opacity: { duration: 0.25, ease: "easeOut" },
+                scale: { duration: 0.25, ease: "easeOut" }
+              }}
+              className="py-12 text-center flex flex-col items-center justify-center gap-2.5 text-slate-400 w-full"
             >
               <div className="size-12 rounded-full bg-slate-50/80 dark:bg-zinc-800/80 border border-slate-200/60 dark:border-white/10 flex items-center justify-center text-slate-400 shadow-2xs">
                 <PackageOpen size={22} className="stroke-[1.75]" />
@@ -865,84 +973,7 @@ export function CartDropdownMenu({
               </button>
             </motion.div>
           )}
-
-          {/* 3. Footer (Tóm tắt & Nút thanh toán) */}
-          {groupedCartItems.length > 0 && (
-            <div className="pt-2 mt-1 border-t border-slate-100 dark:border-white/10 flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400">
-                <span>Đã chọn ({getSelectedItemsCount()} món)</span>
-                <span>Ưu đãi thành viên có thể trừ lên tới <strong className="text-emerald-600 dark:text-emerald-400 font-mono">7%</strong></span>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 pt-0.5">
-                <div className="flex flex-col">
-                  <span className="text-[9.5px] font-bold text-slate-400 dark:text-zinc-400 uppercase tracking-wider">Tổng thanh toán</span>
-                  <div className="overflow-hidden h-6 flex items-center">
-                    <AnimatePresence mode="popLayout" initial={false}>
-                      <motion.span
-                        key={calculateTotalValue()}
-                        initial={{ y: 10, opacity: 0, filter: "blur(2px)" }}
-                        animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-                        exit={{ y: -10, opacity: 0, filter: "blur(2px)" }}
-                        transition={{ type: "spring", stiffness: 450, damping: 28 }}
-                        className="text-base sm:text-[17px] font-black font-mono text-[#FF4D24] leading-tight block"
-                      >
-                        {formatPrice(calculateTotalValue())}
-                      </motion.span>
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={getSelectedItemsCount() === 0}
-                  onClick={() => {
-                    const totalSelected = selectedGroupKeys.length;
-                    if (totalSelected === 0) {
-                      showToast("Vui lòng tích chọn ít nhất 1 sản phẩm để thanh toán!", "warning");
-                      return;
-                    }
-
-                    // 1. Trích xuất danh sách SKU & ID của các sản phẩm được tích chọn
-                    const selectedSkus: string[] = [];
-                    groupedCartItems.forEach((group) => {
-                      if (selectedGroupKeys.includes(group.groupKey)) {
-                        if (group.sku) selectedSkus.push(group.sku);
-                        selectedSkus.push(...group.ids);
-                      }
-                    });
-
-                    // 2. Lưu danh sách SKU đã chọn vào localStorage để đồng bộ sang trang Order /o
-                    try {
-                      localStorage.setItem("checkout_selected_skus", JSON.stringify(selectedSkus));
-                      localStorage.removeItem(STORAGE_KEYS.BUY_NOW_PRODUCT);
-                      localStorage.removeItem("horizon_buy_now_product");
-                    } catch (_) {}
-
-                    // 3. Bắn event realtime nếu người dùng đang ở sẵn trang /o
-                    window.dispatchEvent(
-                      new CustomEvent("cart-checkout-selected", { detail: { selectedSkus } })
-                    );
-
-                    // 4. Đóng menu giỏ hàng và chuyển thẳng sang trang /o
-                    onClose();
-                    if (onNavigate) {
-                      onNavigate("order");
-                    }
-                  }}
-                  className={`px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer ${
-                    getSelectedItemsCount() > 0
-                      ? "bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] text-white hover:brightness-105 shadow-[0_4px_12px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.4)]"
-                      : "bg-slate-100 dark:bg-zinc-800 text-slate-400 cursor-not-allowed shadow-none"
-                  }`}
-                >
-                  <span>Thanh toán</span>
-                  <span className="text-[10px] opacity-90">({getSelectedItemsCount()})</span>
-                </motion.button>
-              </div>
-            </div>
-          )}
+        </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>

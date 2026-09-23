@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, PointerEvent } from 'react';
+import { useState, useRef, useCallback, useEffect, PointerEvent } from 'react';
 
 export interface UseChainedSpringOptions<T> {
   items: T[];
@@ -30,6 +30,12 @@ export function useChainedSpringList<T>({
     timeoutsRef.current.forEach(t => clearTimeout(t));
     timeoutsRef.current = [];
   };
+
+  useEffect(() => {
+    return () => {
+      clearTimeouts();
+    };
+  }, []);
 
   const handlePointerDown = useCallback((e: PointerEvent, index: number) => {
     if ((e.target as HTMLElement).closest('button, input, select, a, [role="button"]')) {
@@ -84,13 +90,16 @@ export function useChainedSpringList<T>({
 
     if (finalDeltaX >= threshold) {
       setIsDismissing(true);
-      const targetIdx = activeIdx;
-      setOffsets({});
-      setActiveIdx(null);
-      setIsDismissing(false);
-      if (onDismiss) {
-        onDismiss(items[targetIdx], targetIdx);
-      }
+      setOffsets(prev => ({ ...prev, [targetIdx]: 460 }));
+      const timer = setTimeout(() => {
+        setOffsets({});
+        setActiveIdx(null);
+        setIsDismissing(false);
+        if (onDismiss) {
+          onDismiss(items[targetIdx], targetIdx);
+        }
+      }, 280);
+      timeoutsRef.current.push(timer);
     } else {
       setOffsets({});
       setActiveIdx(null);
@@ -103,7 +112,7 @@ export function useChainedSpringList<T>({
     setIsDismissing(true);
 
     const total = items.length;
-    const exitDistance = 360;
+    const exitDistance = 460;
 
     // 1. Tính toán vị trí tâm (Center Item)
     const center = (total - 1) / 2;
@@ -127,7 +136,7 @@ export function useChainedSpringList<T>({
     });
 
     const activeExitIndices = new Set<number>();
-    const tierStep = Math.min(staggerDelay, 45);
+    const tierStep = Math.min(staggerDelay, 55);
 
     // 3. Kích hoạt hiệu ứng lan truyền mượt mà từ tâm ra ngoài
     distanceTiers.forEach((tier, tierIdx) => {
@@ -163,22 +172,18 @@ export function useChainedSpringList<T>({
       timeoutsRef.current.push(timer);
     });
 
-    // 4. Đồng bộ hoàn tất: kích hoạt onComplete ngay (30ms đối với 1 item) để AnimatePresence nhận diện unmount và co giãn chiều cao đồng thời không độ trễ
-    const dismissLeadTime = indices.length === 1 ? 30 : 120;
-    const totalDuration = (distanceTiers.length - 1) * tierStep + dismissLeadTime;
+    // 4. Đồng bộ hoàn tất: Đợi toàn bộ các tầng hoàn thành slide (340ms cho spring di chuyển)
+    const slideDuration = 340;
+    const totalDuration = (distanceTiers.length - 1) * tierStep + slideDuration;
 
     const completionTimer = setTimeout(() => {
       onComplete && onComplete();
-    }, dismissLeadTime);
-    timeoutsRef.current.push(completionTimer);
-
-    const cleanupTimer = setTimeout(() => {
       setOffsets({});
       setActiveIdx(null);
       setIsDismissing(false);
       clearTimeouts();
-    }, totalDuration + 180);
-    timeoutsRef.current.push(cleanupTimer);
+    }, totalDuration);
+    timeoutsRef.current.push(completionTimer);
   }, [isDismissing, items.length, maxChainedDepth, tensionDecay, staggerDelay]);
 
   const bindDrag = useCallback((index: number) => ({

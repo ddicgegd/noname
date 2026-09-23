@@ -134,6 +134,35 @@ export function getLocalBookmark(mainSku: string): BookmarkData | null {
 export function saveLocalBookmark(mainSku: string, data: BookmarkData): void {
   if (typeof window === "undefined" || !mainSku || !data) return;
   try {
+    const existingRaw = localStorage.getItem(`${LOCAL_BOOKMARKS_PREFIX}${mainSku}`);
+    if (existingRaw) {
+      try {
+        const existingData: BookmarkData = JSON.parse(existingRaw);
+        if (existingData && Array.isArray(existingData.items) && existingData.items.length > 0) {
+          const itemMap = new Map<string, BookmarkItem>();
+          for (const it of existingData.items) {
+            if (it && it.sku) itemMap.set(it.sku, it);
+          }
+          if (Array.isArray(data.items)) {
+            data.items = data.items.map((it) => {
+              const prev = itemMap.get(it.sku);
+              if (prev) {
+                return {
+                  ...prev,
+                  ...it,
+                  productName: (it.productName && it.productName !== it.sku) ? it.productName : prev.productName,
+                  imageUrl: it.imageUrl || prev.imageUrl,
+                  attributesTitle: it.attributesTitle || prev.attributesTitle,
+                  unitPrice: it.unitPrice || prev.unitPrice,
+                  salePrice: it.salePrice || prev.salePrice,
+                };
+              }
+              return it;
+            });
+          }
+        }
+      } catch (_) {}
+    }
     localStorage.setItem(`${LOCAL_BOOKMARKS_PREFIX}${mainSku}`, JSON.stringify(data));
   } catch (_) {}
 }

@@ -1115,7 +1115,17 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct,
   const variantCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Payment Method State
-  const [paymentType, setPaymentType] = useState<"bank" | "loan" | "paypal" | "card" | "cod">("bank");
+  const [paymentType, setPaymentType] = useState<"bank" | "loan" | "paypal" | "card" | "cod">(() => {
+    try {
+      const saved = sessionStorage.getItem("horizon_payment_type") || localStorage.getItem("horizon_payment_type");
+      if (saved === "loan" || saved === "bank" || saved === "paypal" || saved === "card" || saved === "cod") {
+        sessionStorage.removeItem("horizon_payment_type");
+        localStorage.removeItem("horizon_payment_type");
+        return saved;
+      }
+    } catch (_) {}
+    return "bank";
+  });
   const [selectedBank, setSelectedBank] = useState<string>("vcb");
   const [bankSubMethod, setBankSubMethod] = useState<"card" | "qr">("card");
   const [bankCardAnimKey, setBankCardAnimKey] = useState(0);
