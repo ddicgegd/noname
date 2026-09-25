@@ -62,22 +62,20 @@ export function TraditionalCustomerChat({
     setCustomerText(
       'Hệ thống checkout bị nghẽn thanh toán khi lượng truy cập tăng đột biến, tỷ lệ drop-off lên tới 35%. Cần giải pháp xử lý gấp!'
     );
-    setUploadedFileName(undefined);
     setCustomerStatus('sending');
+    setUploadedFileName(undefined);
     setActiveBubbleIndex(-1);
     setBubble1Lines([]);
     setBubble2Ready(false);
     setBubble3Ready(false);
 
-    // Customer message sending -> sent
     const t1 = setTimeout(() => {
       setCustomerStatus('sent');
-    }, 450);
+    }, 700);
 
-    // Bot Bubble 1 appears
     const t2 = setTimeout(() => {
       setActiveBubbleIndex(1);
-    }, 850);
+    }, 1200);
 
     return () => {
       clearTimeout(t1);
@@ -90,8 +88,8 @@ export function TraditionalCustomerChat({
     if (!externalMessage) return;
 
     setCustomerText(externalMessage.text);
-    setUploadedFileName(externalMessage.file);
     setCustomerStatus('sending');
+    setUploadedFileName(externalMessage.file);
     setActiveBubbleIndex(-1);
     setBubble1Lines([]);
     setBubble2Ready(false);
@@ -99,11 +97,11 @@ export function TraditionalCustomerChat({
 
     const t1 = setTimeout(() => {
       setCustomerStatus('sent');
-    }, 400);
+    }, 600);
 
     const t2 = setTimeout(() => {
       setActiveBubbleIndex(1);
-    }, 800);
+    }, 1100);
 
     return () => {
       clearTimeout(t1);
@@ -113,35 +111,38 @@ export function TraditionalCustomerChat({
 
   // Sequence progression handlers
   const handleBubble1LoaderComplete = useCallback(() => {
-    // Start typing lines
-    setBubble1Lines(['Lock Contention Detected']);
+    setBubble1Lines([
+      '▸ [Phát hiện] Quá tải cổng thanh toán 2.4s trên cụm Redis replica-02',
+    ]);
   }, []);
 
   const handleLine1Complete = useCallback(() => {
-    setBubble1Lines((prev) =>
-      prev.length === 1 ? [...prev, 'DB Connection Pool 100%'] : prev
-    );
+    setBubble1Lines((prev) => [
+      ...prev,
+      '✖ [Nguyên nhân] Cạn kiệt hàng đợi kết nối do 45.000 lượt thanh toán cùng lúc',
+    ]);
   }, []);
 
   const handleLine2Complete = useCallback(() => {
-    setBubble1Lines((prev) =>
-      prev.length === 2 ? [...prev, 'Optimization Solution Ready'] : prev
-    );
+    setBubble1Lines((prev) => [
+      ...prev,
+      '✔ [Tự động khắc phục] Tự động mở rộng hàng đợi & điều hướng sang cụm dự phòng',
+    ]);
   }, []);
 
   const handleLine3Complete = useCallback(() => {
-    // Bubble 1 complete -> show Bubble 2 after brief pause
-    setTimeout(() => {
+    const t = setTimeout(() => {
       setActiveBubbleIndex(2);
-    }, 450);
+    }, 800);
+    return () => clearTimeout(t);
   }, []);
 
   const handleBubble2LoaderComplete = useCallback(() => {
     setBubble2Ready(true);
-    // Bubble 2 complete -> show Bubble 3 after brief pause
-    setTimeout(() => {
+    const t = setTimeout(() => {
       setActiveBubbleIndex(3);
-    }, 500);
+    }, 900);
+    return () => clearTimeout(t);
   }, []);
 
   const handleBubble3LoaderComplete = useCallback(() => {
@@ -161,22 +162,22 @@ export function TraditionalCustomerChat({
       >
         {/* ── 1. CUSTOMER CHAT BUBBLE (Right) ──────────────────────── */}
         <div className="flex gap-2 flex-row-reverse items-start">
-          <div className="w-6.5 h-6.5 rounded-full bg-gradient-to-br from-slate-700 via-slate-800 to-black text-white shrink-0 flex items-center justify-center shadow-xs text-[10px] font-bold select-none">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-800 via-slate-900 to-black text-white shrink-0 flex items-center justify-center shadow-xs text-[10.5px] font-bold select-none ring-1 ring-black/10">
             KH
           </div>
           <div className="flex flex-col items-end max-w-[85%]">
-            <div className="bg-gradient-to-br from-[#FF4D24] to-[#e03a12] text-white rounded-2xl rounded-tr-xs px-3.5 py-2.5 shadow-[0_4px_16px_rgba(255,77,36,0.2)] border border-white/20">
+            <div className="bg-gradient-to-br from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] text-white rounded-2xl rounded-tr-xs px-4 py-3 shadow-[0_4px_16px_rgba(255,77,36,0.22),inset_0_1px_0_rgba(255,255,255,0.3)] border border-white/20">
               {uploadedFileName && (
-                <div className="flex items-center gap-1 mb-1 bg-black/15 px-2 py-0.5 rounded text-white text-[11px]">
+                <div className="flex items-center gap-1.5 mb-1.5 bg-black/20 backdrop-blur-xs px-2.5 py-1 rounded-lg text-white text-[11px] font-mono border border-white/10">
                   <span className="material-symbols-outlined text-[13px]">description</span>
-                  <span className="truncate max-w-[130px]">{uploadedFileName}</span>
+                  <span className="truncate max-w-[140px] font-medium">{uploadedFileName}</span>
                 </div>
               )}
-              <p className="text-[12.5px] font-medium leading-relaxed">{customerText}</p>
+              <p className="text-[13px] font-medium leading-relaxed tracking-tight">{customerText}</p>
             </div>
 
             {/* Sending status */}
-            <div className="flex items-center gap-1 mt-0.5 text-[9.5px] text-[#777777] pr-1 select-none">
+            <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-500 font-medium pr-1 select-none font-mono">
               {customerStatus === 'sending' ? (
                 <>
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
@@ -184,7 +185,7 @@ export function TraditionalCustomerChat({
                 </>
               ) : (
                 <>
-                  <span className="material-symbols-outlined text-[12px] text-emerald-600 font-bold">
+                  <span className="material-symbols-outlined text-[13px] text-emerald-600 font-bold">
                     done_all
                   </span>
                   <span>Đã gửi</span>
@@ -197,28 +198,28 @@ export function TraditionalCustomerChat({
         {/* ── 2. BOT CHAT BUBBLE 1: Chẩn đoán sự cố ─────────────────── */}
         {activeBubbleIndex >= 1 && (
           <div className="flex gap-2.5 items-start">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF4D24] to-[#ff7a59] text-white shrink-0 flex items-center justify-center shadow-xs mt-0.5 select-none">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF4D24] to-[#ff7a59] text-white shrink-0 flex items-center justify-center shadow-[0_2px_8px_rgba(255,77,36,0.25)] mt-0.5 select-none ring-1 ring-white/30">
               <span className="material-symbols-outlined text-[14px]">smart_toy</span>
             </div>
 
-            <div className="max-w-[88%] bg-white/95 backdrop-blur-md rounded-2xl rounded-tl-xs px-3.5 py-2.5 border border-slate-200/80 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.06)] flex flex-col gap-2 font-mono text-[12.5px]">
+            <div className="max-w-[88%] bg-white/95 backdrop-blur-xl rounded-2xl rounded-tl-xs px-4 py-3.5 border border-slate-200/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2.5 font-mono text-[12.5px]">
               <ShimmerLoader
                 key={`loader-1-${replayKey}`}
-                labels={['Scanning…', 'Analysing…', 'Detecting…', 'Profiling…']}
+                labels={['Đang quét…', 'Phân tích…', 'Chẩn đoán…', 'Kiểm tra…']}
                 icons={['✦', '◆', '✶', '❋', '✸']}
                 duration={2500}
-                tokenTarget={0.6}
                 showPercent={true}
                 onComplete={handleBubble1LoaderComplete}
               />
 
               {bubble1Lines.length > 0 && (
-                <div className="flex flex-col gap-1 pt-1 border-t border-slate-100">
+                <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-100">
                   <TypeWritter
                     key="line-1"
                     text={bubble1Lines[0]}
                     speed={18}
-                    style={{ color: '#1e293b', fontSize: 12, fontWeight: 500 }}
+                    cursorColor="#FF4D24"
+                    style={{ color: '#1e293b', fontSize: 12, fontWeight: 600 }}
                     onComplete={handleLine1Complete}
                   />
                   {bubble1Lines.length > 1 && (
@@ -226,7 +227,8 @@ export function TraditionalCustomerChat({
                       key="line-2"
                       text={bubble1Lines[1]}
                       speed={18}
-                      style={{ color: '#dc2626', fontSize: 12, fontWeight: 500 }}
+                      cursorColor="#ef4444"
+                      style={{ color: '#dc2626', fontSize: 12, fontWeight: 600 }}
                       onComplete={handleLine2Complete}
                     />
                   )}
@@ -235,7 +237,8 @@ export function TraditionalCustomerChat({
                       key="line-3"
                       text={bubble1Lines[2]}
                       speed={18}
-                      style={{ color: '#16a34a', fontSize: 12, fontWeight: 600 }}
+                      cursorColor="#16a34a"
+                      style={{ color: '#15803d', fontSize: 12, fontWeight: 700 }}
                       onComplete={handleLine3Complete}
                     />
                   )}
@@ -248,14 +251,14 @@ export function TraditionalCustomerChat({
         {/* ── 3. BOT CHAT BUBBLE 2: Triển khai giải pháp ────────────── */}
         {activeBubbleIndex >= 2 && (
           <div className="flex gap-2.5 items-start">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF4D24] to-[#ff7a59] text-white shrink-0 flex items-center justify-center shadow-xs mt-0.5 select-none">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF4D24] to-[#ff7a59] text-white shrink-0 flex items-center justify-center shadow-[0_2px_8px_rgba(255,77,36,0.25)] mt-0.5 select-none ring-1 ring-white/30">
               <span className="material-symbols-outlined text-[14px]">smart_toy</span>
             </div>
 
-            <div className="max-w-[88%] bg-white/95 backdrop-blur-md rounded-2xl rounded-tl-xs px-3.5 py-2.5 border border-slate-200/80 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.06)] flex flex-col gap-1.5 font-mono text-[12.5px]">
+            <div className="max-w-[88%] bg-white/95 backdrop-blur-xl rounded-2xl rounded-tl-xs px-4 py-3.5 border border-slate-200/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2 font-mono text-[12.5px]">
               <ShimmerLoader
                 key={`loader-2-${replayKey}`}
-                labels={['Booting…', 'Loading…', 'Preparing…', 'Initializing…']}
+                labels={['Khởi động…', 'Đang nạp…', 'Chuẩn bị…', 'Khởi tạo…']}
                 icons={['✦', '◆', '✶', '❋', '✸']}
                 duration={2200}
                 showPercent={false}
@@ -263,8 +266,9 @@ export function TraditionalCustomerChat({
               />
 
               {bubble2Ready && (
-                <div className="text-violet-700 font-semibold text-[12.5px] leading-relaxed pt-0.5 border-t border-slate-100">
-                  Let's build something great 🚀 • Đã tối ưu pool kết nối
+                <div className="text-slate-800 font-semibold text-[12px] leading-relaxed pt-1.5 border-t border-slate-100 flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#FF4D24]" />
+                  <span>Đã tối ưu kết nối máy chủ • Phân tải sang 3 cụm dự phòng</span>
                 </div>
               )}
             </div>
@@ -274,24 +278,26 @@ export function TraditionalCustomerChat({
         {/* ── 4. BOT CHAT BUBBLE 3: Kết quả nghiệm thu ───────────────── */}
         {activeBubbleIndex >= 3 && (
           <div className="flex gap-2.5 items-start">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF4D24] to-[#ff7a59] text-white shrink-0 flex items-center justify-center shadow-xs mt-0.5 select-none">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF4D24] to-[#ff7a59] text-white shrink-0 flex items-center justify-center shadow-[0_2px_8px_rgba(255,77,36,0.25)] mt-0.5 select-none ring-1 ring-white/30">
               <span className="material-symbols-outlined text-[14px]">smart_toy</span>
             </div>
 
-            <div className="max-w-[88%] bg-white/95 backdrop-blur-md rounded-2xl rounded-tl-xs px-3.5 py-2.5 border border-slate-200/80 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.06)] flex flex-col gap-1.5 font-mono text-[12.5px]">
+            <div className="max-w-[88%] bg-white/95 backdrop-blur-xl rounded-2xl rounded-tl-xs px-4 py-3.5 border border-slate-200/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2 font-mono text-[12.5px]">
               <ShimmerLoader
                 key={`loader-3-${replayKey}`}
-                labels={['Syncing…', 'Configuring…', 'Setting up…', 'Onboarding…']}
+                labels={['Đồng bộ…', 'Cấu hình…', 'Thiết lập…', 'Hoàn tất…']}
                 icons={['◈', '◉', '⬡', '⬢', '◍']}
                 duration={2000}
-                tokenTarget={0.8}
                 showPercent={false}
                 onComplete={handleBubble3LoaderComplete}
               />
 
               {bubble3Ready && (
-                <div className="text-emerald-700 font-semibold text-[12.5px] leading-relaxed pt-0.5 border-t border-slate-100">
-                  Ticket #SUP-8924 resolved • Hệ thống thanh toán đã khôi phục 99.8% ✅
+                <div className="text-emerald-800 bg-emerald-50/70 border border-emerald-200/60 px-3 py-2 rounded-xl font-semibold text-[12px] leading-relaxed pt-1.5 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-emerald-600 font-bold shrink-0">
+                    check_circle
+                  </span>
+                  <span>Yêu cầu #SUP-8924 đã giải quyết • Hệ thống thanh toán đã khôi phục 99.8%</span>
                 </div>
               )}
             </div>

@@ -239,12 +239,149 @@ async function startServer() {
       }
     };
   }
+  interface DeviceSessionRecord {
+    id: string;
+    deviceName: string;
+    clientType: "DESKTOP" | "MOBILE" | "TABLET";
+    deviceDetail: string;
+    ip: string;
+    location: string;
+    lastActive: string;
+    lastActiveAt: string;
+    isCurrent: boolean;
+  }
+
+  const activeSessionsStore: Record<string, DeviceSessionRecord[]> = {};
+
+  function parseUserAgentDetails(ua?: string) {
+    let browser = "Chrome";
+    let os = "macOS";
+    let type: "DESKTOP" | "MOBILE" | "TABLET" = "DESKTOP";
+
+    if (!ua) {
+      return {
+        deviceName: "Trình duyệt Web (Phiên hiện tại)",
+        clientType: "DESKTOP" as const,
+        deviceDetail: "Trình duyệt Web"
+      };
+    }
+
+    if (/Windows NT 10\.0|Windows NT 11\.0|Windows/i.test(ua)) os = "Windows";
+    else if (/Macintosh|Mac OS X/i.test(ua)) os = "macOS";
+    else if (/Android/i.test(ua)) { os = "Android"; type = "MOBILE"; }
+    else if (/iPhone/i.test(ua)) { os = "iOS (iPhone)"; type = "MOBILE"; }
+    else if (/iPad/i.test(ua)) { os = "iPadOS"; type = "TABLET"; }
+    else if (/Linux/i.test(ua)) os = "Linux";
+
+    if (/Edg\/([0-9]+)/i.test(ua)) {
+      const v = ua.match(/Edg\/([0-9]+)/)?.[1];
+      browser = `Edge ${v || ""}`.trim();
+    } else if (/Chrome\/([0-9]+)/i.test(ua)) {
+      const v = ua.match(/Chrome\/([0-9]+)/)?.[1];
+      browser = `Chrome ${v || ""}`.trim();
+    } else if (/Safari\/([0-9]+)/i.test(ua) && !/Chrome/i.test(ua)) {
+      browser = "Safari";
+    } else if (/Firefox\/([0-9]+)/i.test(ua)) {
+      const v = ua.match(/Firefox\/([0-9]+)/)?.[1];
+      browser = `Firefox ${v || ""}`.trim();
+    }
+
+    return {
+      deviceName: "Trình duyệt Web (Phiên hiện tại)",
+      clientType: type,
+      deviceDetail: `${browser} • ${os}`
+    };
+  }
+
+  function getUserSessions(identityKey: string, userAgent?: string, clientIp?: string): DeviceSessionRecord[] {
+    const key = identityKey || "horizon_admin";
+    if (!activeSessionsStore[key] || activeSessionsStore[key].length === 0) {
+      const uaInfo = parseUserAgentDetails(userAgent);
+      activeSessionsStore[key] = [
+        {
+          id: "sess_curr_" + Math.random().toString(36).substring(2, 10),
+          deviceName: uaInfo.deviceName,
+          clientType: uaInfo.clientType,
+          deviceDetail: uaInfo.deviceDetail,
+          ip: clientIp && clientIp !== "::1" && clientIp !== "127.0.0.1" ? clientIp : "118.69.182.10",
+          location: "TP. Hồ Chí Minh, Việt Nam",
+          lastActive: "Vừa xong",
+          lastActiveAt: new Date().toISOString(),
+          isCurrent: true
+        }
+      ];
+    }
+    return activeSessionsStore[key];
+  }
 
   // In-memory Mock REST API handlers
-  function mockRestApiCall(apiPath: string, method: string, body: any, queryParams: URLSearchParams, identityKey = "guest") {
+  function mockRestApiCall(apiPath: string, method: string, body: any, queryParams: URLSearchParams, identityKey = "guest", userAgent = "", clientIp = "") {
     console.log(`[MOCK BACKEND FALLBACK] Intercepted ${method} ${apiPath} [key: ${identityKey}]`);
     
+    if (apiPath === "/api/auth/sessions" || apiPath === "/api/v1/auth/sessions" || apiPath.startsWith("/api/auth/sessions?") || apiPath.startsWith("/api/v1/auth/sessions?")) {
+      if (queryParams.get("reset") === "true") {
+        delete activeSessionsStore[identityKey || "horizon_admin"];
+      }
+      const sessions = getUserSessions(identityKey, userAgent, clientIp);
+      return {
+        status: { code: 200, message: "Truy xuất danh sách phiên thiết bị thành công" },
+        data: {
+          totalActive: sessions.length,
+          currentSessionId: sessions.find(s => s.isCurrent)?.id || sessions[0]?.id || "sess_web_current",
+          sessions: [...sessions]
+        }
+      };
+    }
+
+    if ((apiPath === "/api/auth/sessions/others" || apiPath === "/api/v1/auth/sessions/others") && method === "DELETE") {
+      const sessions = getUserSessions(identityKey, userAgent, clientIp);
+      const initialCount = sessions.length;
+      const current = sessions.find(s => s.isCurrent) || sessions[0];
+      activeSessionsStore[identityKey || "horizon_admin"] = current ? [current] : [];
+      const terminatedCount = Math.max(0, initialCount - (current ? 1 : 0));
+      return {
+        status: { code: 200, message: "Đã đăng xuất khỏi tất cả các thiết bị khác thành công" },
+        data: {
+          terminatedCount,
+          remainingActive: current ? 1 : 0
+        }
+      };
+    }
+
+    if ((apiPath.startsWith("/api/auth/sessions/") || apiPath.startsWith("/api/v1/auth/sessions/")) && method === "DELETE") {
+      const prefix = apiPath.startsWith("/api/v1/auth/sessions/") ? "/api/v1/auth/sessions/" : "/api/auth/sessions/";
+      const targetSessionId = decodeURIComponent(apiPath.substring(prefix.length));
+      const sessions = getUserSessions(identityKey, userAgent, clientIp);
+      activeSessionsStore[identityKey || "horizon_admin"] = sessions.filter(s => s.id !== targetSessionId);
+      const remainingActive = activeSessionsStore[identityKey || "horizon_admin"].length;
+      return {
+        status: { code: 200, message: "Đã thu hồi phiên thiết bị thành công" },
+        data: {
+          terminatedSessionId: targetSessionId,
+          remainingActive
+        }
+      };
+    }
     if (apiPath === "/api/auth/me") {
+      if (method === "PUT") {
+        const bodyObj = typeof body === "string" ? JSON.parse(body) : (body || {});
+        return {
+          status: { code: 200, message: "Cập nhật thông tin hồ sơ thành công" },
+          data: {
+            id: 1,
+            username: "horizon_admin",
+            fullName: bodyObj?.fullName || "Horizon Administrator",
+            email: "admin@horizon.net",
+            phoneNumber: bodyObj?.phoneNumber || "0971791373",
+            avatarUrl: bodyObj?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+            dateOfBirth: bodyObj?.dateOfBirth || "1995-01-01",
+            gender: bodyObj?.gender || "MALE",
+            rank: "GOLD",
+            status: "ACTIVE",
+            roles: ["ROLE_ADMIN", "ROLE_USER"]
+          }
+        };
+      }
       return {
         status: { code: 200, message: "Success" },
         data: {
@@ -262,11 +399,45 @@ async function startServer() {
         }
       };
     }
+    if (apiPath === "/api/auth/me/avatar" && method === "POST") {
+      return {
+        status: { code: 200, message: "Cập nhật ảnh đại diện thành công" },
+        data: {
+          id: 1,
+          username: "horizon_admin",
+          fullName: "Horizon Administrator",
+          email: "admin@horizon.net",
+          avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+          rank: "GOLD",
+          status: "ACTIVE"
+        }
+      };
+    }
+    if (apiPath.startsWith("/api/auth/verify-email")) {
+      const token = queryParams.get("token") || "";
+      if (!token) {
+        return {
+          status: { code: 400, message: "Token is required" },
+          data: null
+        };
+      }
+      return {
+        status: { code: 200, message: "Xác thực email thành công. Tài khoản của bạn đã được kích hoạt." },
+        data: null
+      };
+    }
+
+    if (apiPath.startsWith("/api/auth/resend-verification")) {
+      return {
+        status: { code: 200, message: "Nếu email tồn tại trên hệ thống và chưa được kích hoạt, liên kết xác thực mới đã được gửi. Vui lòng kiểm tra." },
+        data: null
+      };
+    }
 
     if (apiPath.startsWith("/api/auth/recover-account/")) {
       const email = apiPath.substring("/api/auth/recover-account/".length);
       return {
-        status: { code: 200, message: "Success" },
+        status: { code: 200, message: "Nếu email tồn tại trên hệ thống, liên kết khôi phục tài khoản đã được gửi. Vui lòng kiểm tra." },
         message: `Yêu cầu khôi phục tài khoản đã được gửi đến email ${decodeURIComponent(email)}.`
       };
     }
@@ -280,7 +451,7 @@ async function startServer() {
         };
       }
       return {
-        status: { code: 200, message: "Success" },
+        status: { code: 200, message: "Mã token hợp lệ. Vui lòng thiết lập mật khẩu mới." },
         data: {
           username: "horizon_admin",
           fullName: "Horizon Administrator",
@@ -294,22 +465,22 @@ async function startServer() {
 
     if (apiPath.startsWith("/api/auth/reset-password")) {
       return {
-        status: { code: 200, message: "Success" },
-        message: "Mật khẩu đã được cập nhật thành công."
+        status: { code: 200, message: "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại." },
+        message: "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại."
       };
     }
 
     if (apiPath.startsWith("/api/auth/change-username")) {
       return {
-        status: { code: 200, message: "Success" },
-        message: "Tên đăng nhập đã được thay đổi thành công."
+        status: { code: 200, message: "Đổi tên đăng nhập thành công. Vui lòng đăng nhập lại." },
+        message: "Đổi tên đăng nhập thành công. Vui lòng đăng nhập lại."
       };
     }
 
     if (apiPath.startsWith("/api/auth/change-password")) {
       return {
-        status: { code: 200, message: "Success" },
-        message: "Mật khẩu đã được thay đổi thành công."
+        status: { code: 200, message: "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại." },
+        message: "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại."
       };
     }
 
@@ -620,7 +791,7 @@ async function startServer() {
         }
         throw new Error("Unauthorized");
       }
-      if (statusCode === 404 || statusCode >= 500) {
+      if (statusCode === 403 || statusCode === 404 || statusCode >= 500) {
         throw new Error(`Backend returned status ${statusCode}`);
       }
       const text = await res.text();
@@ -644,8 +815,10 @@ async function startServer() {
         const parsedUrl = new URL(apiPath, "http://localhost");
         const queryParams = parsedUrl.searchParams;
         const identityKey = guestId || token || "guest";
-        return mockRestApiCall(parsedUrl.pathname, method, body, queryParams, identityKey);
-      } catch (fallbackErr: any) {
+        const userAgent = (context?.req?.headers?.["user-agent"] as string) || "";
+        const clientIp = (context?.req?.ip || context?.req?.headers?.["x-forwarded-for"] as string) || "";
+        return mockRestApiCall(parsedUrl.pathname, method, body, queryParams, identityKey, userAgent, clientIp);
+      } catch (fallbackErr) {
         console.error("[API GATEWAY FALLBACK ERROR] Fallback also failed:", fallbackErr);
         throw err;
       }
@@ -1739,6 +1912,27 @@ async function startServer() {
   const RootMutation = new GraphQLObjectType({
     name: "Mutation",
     fields: {
+      resendVerification: {
+        type: MessageResponseType,
+        args: {
+          email: { type: new GraphQLNonNull(GraphQLString) }
+        },
+        resolve: async (_, args, context: any) => {
+          try {
+            const path = `/api/auth/resend-verification`;
+            const response = await callApiGateway(path, { method: "POST", body: { email: args.email } }, context);
+            return {
+              status: response?.status ? { code: response.status.code, message: response.status.message } : { code: 200, message: "Success" },
+              message: response?.message || response?.status?.message || "Liên kết xác thực mới đã được gửi nếu email tồn tại."
+            };
+          } catch (error: any) {
+            return {
+              status: { code: 500, message: error.message },
+              message: error.message
+            };
+          }
+        }
+      },
       recoverAccount: {
         type: MessageResponseType,
         args: {
@@ -1763,21 +1957,24 @@ async function startServer() {
       resetPassword: {
         type: MessageResponseType,
         args: {
-          code: { type: new GraphQLNonNull(GraphQLString) },
+          token: { type: GraphQLString },
+          code: { type: GraphQLString },
           newPassword: { type: new GraphQLNonNull(GraphQLString) },
           confirmPassword: { type: new GraphQLNonNull(GraphQLString) }
         },
         resolve: async (_, args, context: any) => {
           try {
-            const path = `/api/auth/reset-password?code=${encodeURIComponent(args.code)}`;
+            const path = `/api/auth/reset-password`;
+            const tokenToUse = args.token || args.code || "";
             const payload = {
+              token: tokenToUse,
               newPassword: args.newPassword,
               confirmPassword: args.confirmPassword
             };
             const response = await callApiGateway(path, { method: "POST", body: payload }, context);
             return {
               status: response?.status ? { code: response.status.code, message: response.status.message } : { code: 200, message: "Success" },
-              message: response?.message || response?.status?.message || "Đặt lại mật khẩu thành công."
+              message: response?.message || response?.status?.message || "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại."
             };
           } catch (error: any) {
             return {
@@ -2195,6 +2392,25 @@ async function startServer() {
       const statusCode = response?.status?.code || (response?.code ?? 200);
       res.status(typeof statusCode === "number" ? statusCode : 200).json(response);
     } catch (err: any) {
+      res.status(500).json({ status: { code: 500, message: err.message }, data: null });
+    }
+  });
+
+  // --- REAL / MOCK AUTH BACKEND PROXY (REST endpoints for /api/auth/*) ---
+  app.all(["/api/auth*", "/api/v1/auth*"], async (req, res) => {
+    try {
+      const response = await callApiGateway(req.originalUrl || req.url, {
+        method: req.method,
+        body: req.body,
+        token: req.headers.authorization as string,
+        guestId: (req.headers["x-guest-id"] || req.headers["x-guest-id".toLowerCase()]) as string
+      }, { req });
+      const statusCode = response?.status?.code || (response?.code ?? 200);
+      res.status(typeof statusCode === "number" ? statusCode : 200).json(response);
+    } catch (err: any) {
+      if (err.message === "Unauthorized") {
+        return res.status(401).json({ status: { code: 401, message: "Unauthorized" }, data: null });
+      }
       res.status(500).json({ status: { code: 500, message: err.message }, data: null });
     }
   });

@@ -38,10 +38,28 @@ export interface AuthDataResponse {
   id?: number;
   fullName?: string;
   roles?: string[];
+  rank?: string;
+  status?: string;
 }
 
 export interface AccountRecoveryRequest {
   email: string;
+}
+
+export interface ResendVerificationRequest {
+  email: string;
+}
+
+export interface AccountVerificationRequest {
+  token: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
 }
 
 export interface ChangePasswordRequest {
@@ -51,11 +69,35 @@ export interface ChangePasswordRequest {
 }
 
 export interface ChangeUsernameRequest {
-  token: string;
   newUsername: string;
+  token?: string;
 }
 
 export interface RefreshTokenRequest {
   refreshToken: string;
   deviceInfo: DeviceInfo;
 }
+
+export interface UpdateProfileRequest {
+  fullName?: string;
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  avatarUrl?: string;
+  gender?: string;
+}
+
+export interface MyProfileResponse {
+  id?: string | number;
+  username?: string;
+  email?: string;
+  fullName?: string;
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  avatarUrl?: string;
+  gender?: string;
+  rank?: string;
+  status?: string;
+  roles?: string[];
+}
+
+export * from "./session";

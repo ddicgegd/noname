@@ -76,11 +76,27 @@ export default function App() {
       return "profile";
     }
     if (["/verify-email", "/verify"].includes(cleanPath)) {
-      window.history.replaceState({}, "", "/a#login" + window.location.search);
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, "", "/a" + window.location.search + "#verify");
+      }
       return "auth";
     }
-    if (["/recovery", "/forgot-password"].includes(cleanPath)) {
-      window.history.replaceState({}, "", "/a#recovery" + window.location.search);
+    if (["/resend-verification", "/resend"].includes(cleanPath)) {
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, "", "/a" + window.location.search + "#resend-verification");
+      }
+      return "auth";
+    }
+    if (["/recovery", "/forgot-password", "/forgot"].includes(cleanPath)) {
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, "", "/a" + window.location.search + "#recovery");
+      }
+      return "auth";
+    }
+    if (["/reset-password", "/reset"].includes(cleanPath)) {
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, "", "/a" + window.location.search + "#reset-password");
+      }
       return "auth";
     }
     if (["/a", "/auth"].includes(cleanPath)) {
@@ -97,6 +113,8 @@ export default function App() {
     "#login",
     "#register",
     "#verify",
+    "#verify-email",
+    "#resend-verification",
     "#recovery",
     "#forgot-password",
     "#forgot",
@@ -116,9 +134,10 @@ export default function App() {
         return hash ? `/m${hash}` : "/m";
       }
       case "auth": {
-        const hash = window.location.hash.toLowerCase();
+        const hash = window.location.hash.toLowerCase().split("?")[0];
         if (hash === "#register") return "/a#register";
-        if (hash === "#verify") return "/a#verify";
+        if (["#verify", "#verify-email"].includes(hash)) return "/a#verify";
+        if (hash === "#resend-verification") return "/a#resend-verification";
         if (["#recovery", "#forgot-password", "#forgot"].includes(hash)) return "/a#recovery";
         if (["#recovery-token", "#manual-token"].includes(hash)) return "/a#recovery-token";
         if (hash === "#reset-password") return "/a#reset-password";
@@ -213,7 +232,7 @@ export default function App() {
       const page = getPageFromPath(window.location.pathname);
       setCurrentPage(page);
       if (page === "auth") {
-        const hash = window.location.hash.toLowerCase();
+        const hash = window.location.hash.toLowerCase().split("?")[0];
         if (!VALID_AUTH_HASHES.includes(hash)) {
           window.history.replaceState({}, "", "/a#login");
         }
@@ -236,8 +255,10 @@ export default function App() {
       const hash = window.location.hash.toLowerCase();
       if (hash === "#register") {
         targetPath = "/a#register";
-      } else if (hash === "#verify") {
+      } else if (["#verify", "#verify-email"].includes(hash)) {
         targetPath = "/a#verify";
+      } else if (hash === "#resend-verification") {
+        targetPath = "/a#resend-verification";
       } else if (["#recovery", "#forgot-password", "#forgot"].includes(hash)) {
         targetPath = "/a#recovery";
       } else if (["#recovery-token", "#manual-token"].includes(hash)) {

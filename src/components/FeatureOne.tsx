@@ -180,42 +180,43 @@ export default function FeatureOne() {
 
   return (
     <section id="features" className="py-16 px-4 sm:px-8 md:px-16 relative">
-      <div className="w-[85%] 2xl:max-w-[1800px] mx-auto bg-gradient-to-b from-white/60 via-white/40 to-white/20 border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-[24px] shadow-[0_12px_40px_-8px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] overflow-hidden">
+      <div className="w-[85%] 2xl:max-w-[1800px] mx-auto bg-gradient-to-b from-white/70 via-white/50 to-white/30 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-[26px] shadow-[0_16px_44px_-10px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,1)] overflow-hidden">
         
         {/* FIRST FEATURE: Trao đổi & xử lý vấn đề khách hàng */}
         <div className="flex flex-col md:flex-row min-h-[596px]">
           {/* Left Side: Copywriting */}
           <div className="p-8 sm:p-12 w-full md:w-1/2 flex flex-col justify-center">
-            <span className="font-display font-bold text-xs uppercase text-primary mb-4 tracking-widest">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF4D24]/10 border border-[#FF4D24]/20 text-[#FF4D24] font-mono text-[11px] font-bold tracking-widest uppercase mb-4 w-fit select-none">
               01 / 04
-            </span>
-            <h3 className="font-display text-3xl sm:text-4xl text-[#111111] font-bold mb-6 leading-tight">
+            </div>
+            <h3 className="font-display text-3xl sm:text-4xl text-slate-900 font-bold mb-5 leading-tight tracking-tight">
               Trao đổi & xử lý vấn đề khách hàng
             </h3>
-            <p className="font-sans text-base sm:text-lg text-[#555555] mb-8 max-w-md">
+            <p className="font-sans text-base sm:text-lg text-slate-600 mb-8 max-w-md leading-relaxed">
               Tự động phân tích yêu cầu, chẩn đoán nguyên nhân gốc rễ và xử lý sự cố trực tiếp với khách hàng qua luồng tương tác và báo cáo kỹ thuật thông minh.
             </p>
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
               <a
                 href="#pricing"
                 onClick={handleScrollToPricing}
-                className="inline-flex items-center justify-center gap-2 bg-gradient-to-b from-white/90 via-white/75 to-white/55 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_2px_8px_-1px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] backdrop-blur-md text-[#111111] hover:bg-[#FF4D24] hover:text-white hover:border-[#FF4D24] font-medium px-8 py-4 rounded-[14px] w-fit transition-all duration-300 hover:scale-[1.03] active:scale-95 cursor-pointer select-none"
+                className="inline-flex items-center justify-center gap-2.5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/80 border-x border-x-white/80 shadow-[0_2px_10px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] backdrop-blur-md text-slate-900 hover:text-white hover:bg-gradient-to-b hover:from-[#FF5E3A] hover:via-[#FF4D24] hover:to-[#E03A12] hover:border-[#FF4D24] hover:shadow-[0_4px_16px_rgba(255,77,36,0.35)] font-semibold text-[15px] px-8 py-4 rounded-[14px] w-fit transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer select-none"
               >
-                Bắt đầu trải nghiệm
+                <span>Bắt đầu trải nghiệm</span>
+                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </a>
             </div>
 
             {/* Feature Highlights Pills */}
             <div className="mt-8 pt-6 border-t border-black/5 flex flex-wrap gap-2.5 select-none">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/60 border border-white/80 shadow-xs text-xs text-slate-700 font-medium">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/70 backdrop-blur-md border border-white/90 shadow-[0_1px_3px_rgba(0,0,0,0.04)] text-xs text-slate-700 font-medium">
                 <span className="material-symbols-outlined text-[15px] text-[#FF4D24]">bolt</span>
                 <span>Chẩn đoán &lt; 500ms</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/60 border border-white/80 shadow-xs text-xs text-slate-700 font-medium">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/70 backdrop-blur-md border border-white/90 shadow-[0_1px_3px_rgba(0,0,0,0.04)] text-xs text-slate-700 font-medium">
                 <span className="material-symbols-outlined text-[15px] text-[#FF4D24]">shield</span>
                 <span>Tự động sửa lỗi</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/60 border border-white/80 shadow-xs text-xs text-slate-700 font-medium">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/70 backdrop-blur-md border border-white/90 shadow-[0_1px_3px_rgba(0,0,0,0.04)] text-xs text-slate-700 font-medium">
                 <span className="material-symbols-outlined text-[15px] text-[#FF4D24]">sync</span>
                 <span>Đồng bộ đa kênh</span>
               </div>
@@ -232,7 +233,8 @@ export default function FeatureOne() {
             </div>
 
             {/* Glowing Glass Chat Card */}
-            <div className="relative z-10 w-[92%] max-w-xl min-h-[470px] bg-gradient-to-b from-white/90 via-white/75 to-white/60 backdrop-blur-[32px] rounded-2xl border-t border-t-white border-x border-x-white/70 border-b border-b-slate-300/60 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col overflow-hidden">
+            <div className="relative z-10 w-[92%] max-w-xl min-h-[470px] bg-gradient-to-b from-white/95 via-white/80 to-white/65 backdrop-blur-[32px] rounded-2xl border-t border-t-white border-x border-x-white/70 border-b border-b-slate-300/60 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col overflow-hidden">
+
               {/* Chat Frame Body */}
               <div className="flex-1 p-3.5 sm:p-4 flex flex-col justify-between overflow-hidden relative">
                 {/* Scroll Area with Clean View */}
@@ -504,14 +506,14 @@ export default function FeatureOne() {
         <div className="flex flex-col md:flex-row-reverse min-h-[596px]">
           {/* Right Side: Copywriting */}
           <div className="p-8 sm:p-12 w-full md:w-1/2 flex flex-col justify-center">
-            <span className="font-display font-bold text-xs uppercase text-primary mb-4 tracking-widest">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FF4D24]/10 border border-[#FF4D24]/20 text-[#FF4D24] font-mono text-[11px] font-bold tracking-widest uppercase mb-4 w-fit select-none">
               02 / 04
-            </span>
-            <h3 className="font-display text-3xl sm:text-4xl text-[#111111] font-bold mb-6 leading-tight">
-              A backend for your SaaS
+            </div>
+            <h3 className="font-display text-3xl sm:text-4xl text-slate-900 font-bold mb-5 leading-tight tracking-tight">
+              Hạ tầng Backend cho SaaS
             </h3>
-            <p className="font-sans text-base sm:text-lg text-[#555555] mb-8 max-w-md">
-              Robust infrastructure generated instantly. From authentication to database schemas, Horizon writes the backend so you can focus on the user experience.
+            <p className="font-sans text-base sm:text-lg text-slate-600 mb-8 max-w-md leading-relaxed">
+              Hạ tầng mạnh mẽ được sinh tự động ngay tức thì. Từ xác thực bảo mật đến mô hình cơ sở dữ liệu, hệ thống tự động xử lý toàn bộ backend để bạn tập trung phát triển trải nghiệm.
             </p>
           </div>
 
@@ -541,10 +543,10 @@ export default function FeatureOne() {
                   </div>
                   <div>
                     <span className="block text-black font-bold text-sm leading-none">
-                      Deployment
+                      Triển khai hệ thống
                     </span>
-                    <span className="text-black/50 text-[10px] font-bold uppercase tracking-widest block mt-1">
-                      v1.2.0-stable
+                    <span className="text-black/50 text-[10px] font-bold uppercase tracking-widest block mt-1 font-mono">
+                      v1.2.0-ổn định
                     </span>
                   </div>
                 </div>
@@ -552,7 +554,7 @@ export default function FeatureOne() {
                 {/* Sparkline Graph */}
                 <div className="flex flex-col items-end gap-1 select-none">
                   <div className="text-[10px] font-bold text-[#555555] uppercase tracking-tighter">
-                    Health
+                    Độ ổn định
                   </div>
                   <svg className="w-16 h-6 overflow-visible" viewBox="0 0 60 20">
                     <path
@@ -573,7 +575,7 @@ export default function FeatureOne() {
                   <div className="flex items-center justify-between text-xs font-semibold">
                     <div className="flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#27C93F] shadow-[0_0_8px_rgba(39,201,63,0.8)] animate-pulse" />
-                      <span className="text-black">Edge Runtime</span>
+                      <span className="text-black">Runtime máy chủ Edge</span>
                     </div>
                     <span className="text-black font-mono">99.9%</span>
                   </div>
@@ -589,7 +591,7 @@ export default function FeatureOne() {
                       <span className="material-symbols-outlined text-[14px] font-bold text-[#27C93F]">
                         verified_user
                       </span>
-                      <span>SSL Certification active</span>
+                      <span>Chứng chỉ bảo mật SSL đang kích hoạt</span>
                     </div>
                     <span className="font-mono opacity-60">12:45:01</span>
                   </div>
@@ -598,16 +600,16 @@ export default function FeatureOne() {
                       <span className="material-symbols-outlined text-[14px] font-bold text-[#27C93F]">
                         storage
                       </span>
-                      <span>Database migration 100%</span>
+                      <span>Đồng bộ cơ sở dữ liệu 100%</span>
                     </div>
                     <span className="font-mono opacity-60">12:45:03</span>
                   </div>
                   <div className="flex items-center justify-between text-[#555555] text-[11px] font-medium">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
-                      <span>CDN Edge propagation...</span>
+                      <span>Phân phối CDN toàn cầu...</span>
                     </div>
-                    <span className="font-mono opacity-60">Running</span>
+                    <span className="font-mono opacity-60">Đang chạy</span>
                   </div>
                 </div>
 
@@ -618,7 +620,7 @@ export default function FeatureOne() {
                       check_circle
                     </span>
                     <span className="text-black text-[12px] font-bold">
-                      Live in production
+                      Đang vận hành thực tế
                     </span>
                   </div>
                   <span className="text-[#555555] text-[10px] font-mono font-bold px-2 py-0.5 bg-black/5 rounded">

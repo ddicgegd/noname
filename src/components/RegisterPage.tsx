@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Mail, Lock, User, ArrowRight, ArrowLeft, Eye, EyeOff, ShieldCheck, CheckCircle, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Info, Shield, Cpu, RefreshCw, Check, Loader2, Settings, Key, Terminal, Server, ChevronDown, ChevronUp, X, Coins } from "lucide-react";
-import { 
+import { Mail, Lock, User, ArrowRight, ArrowLeft, Eye, EyeOff, ShieldCheck, CheckCircle, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Info, Shield, Cpu, RefreshCw, Check, Loader2, Settings, Key, Terminal, Server, ChevronDown, ChevronUp, X } from "lucide-react";
+import {
   User as MorphUser,
   AtSign as MorphAtSign,
   CircleUser as MorphCircleUser,
@@ -27,6 +27,9 @@ import {
   loginUser,
   registerUser,
   recoverAccount as apiRecoverAccount,
+  resendVerification as apiResendVerification,
+  verifyEmail as apiVerifyEmail,
+  resetPassword as apiResetPassword,
   changePassword as apiChangePassword,
   changeUsername as apiChangeUsername,
   validateResetToken as apiValidateResetToken
@@ -99,6 +102,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
   // UI helper states
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -157,14 +161,16 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [verifyOverlayTimeLeft, setVerifyOverlayTimeLeft] = useState(2);
 
   // --- ACCOUNT RECOVERY STATE VARIABLES ---
-  const [recoveryMode, setRecoveryMode] = useState<"NONE" | "SEND_LINK" | "MANUAL_TOKEN" | "RESET_PASSWORD">(() => {
+  const [recoveryMode, setRecoveryMode] = useState<"NONE" | "SEND_LINK" | "MANUAL_TOKEN" | "RESET_PASSWORD" | "RESEND_VERIFICATION">(() => {
     if (typeof window === "undefined") return "NONE";
     const hash = window.location.hash.toLowerCase();
     if (hash === "#recovery-token" || hash === "#manual-token") return "MANUAL_TOKEN";
     if (hash === "#reset-password") return "RESET_PASSWORD";
+    if (hash === "#resend-verification") return "RESEND_VERIFICATION";
     if (hash === "#recovery" || hash === "#forgot-password" || hash === "#forgot") return "SEND_LINK";
     return "NONE";
   });
+  const [resendEmail, setResendEmail] = useState("");
   const [isPasswordResetExpanded, setIsPasswordResetExpanded] = useState(false);
   const [isUsernameChangeExpanded, setIsUsernameChangeExpanded] = useState(false);
   const [manualTokenInput, setManualTokenInput] = useState("");
@@ -220,19 +226,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         setIsSignUp(true);
         setIsVerifyingMode(false);
         setRecoveryMode("NONE");
-      } else if (hash === "#verify") {
-        const params = new URLSearchParams(window.location.search);
-        const hasToken = ["token", "code", "verify-email", "verify"].some((p) => params.has(p));
-        if (!lastRegEmail && !hasToken) {
-          window.location.hash = "login";
-          setIsSignUp(false);
-          setIsVerifyingMode(false);
-          setRecoveryMode("NONE");
-        } else {
-          setIsSignUp(false);
-          setIsVerifyingMode(true);
-          setRecoveryMode("NONE");
-        }
+      } else if (hash === "#verify" || hash === "#verify-email") {
+        setIsSignUp(false);
+        setIsVerifyingMode(true);
+        setRecoveryMode("NONE");
+      } else if (hash === "#resend-verification") {
+        setIsSignUp(false);
+        setIsVerifyingMode(false);
+        setRecoveryMode("RESEND_VERIFICATION");
       } else if (hash === "#recovery" || hash === "#forgot-password" || hash === "#forgot") {
         setIsSignUp(false);
         setIsVerifyingMode(false);
@@ -252,7 +253,6 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       }
     };
     window.addEventListener("hashchange", handleHashChange);
-    // Align state on mount
     handleHashChange();
     return () => {
       window.removeEventListener("hashchange", handleHashChange);
@@ -267,8 +267,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [verificationResultState, setVerificationResultState] = useState<"SUCCESS" | "FAILED" | null>(null);
   const [showApiSettings, setShowApiSettings] = useState(false);
 
-  // Countdown timer for email verification (5 minutes)
-  const [timeLeft, setTimeLeft] = useState<number>(300);
+  // Countdown timer for email verification (15 minutes TTL = 900s)
+  const [timeLeft, setTimeLeft] = useState<number>(900);
 
   useEffect(() => {
     let timerInterval: any = null;
@@ -283,7 +283,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         });
       }, 1000);
     } else {
-      setTimeLeft(300);
+      setTimeLeft(900);
     }
     return () => {
       if (timerInterval) clearInterval(timerInterval);
@@ -457,81 +457,60 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     try {
       await new Promise((r) => setTimeout(r, 600));
 
-      const response = await fetch(`http://localhost:8080/api/auth/verify-email?token=${encodeURIComponent(tokenClean)}`, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-        },
+      const response = await apiVerifyEmail(tokenClean);
+      const backendMsg = extractBackendMessage(response);
+      const msgText = backendMsg.message || "Xác thực email thành công. Tài khoản của bạn đã được kích hoạt.";
+
+      setVerifyOverlayStatus("success");
+      setVerifyOverlayMsg(msgText);
+      setVerifyOverlayTimeLeft(2);
+
+      let returnedEmail = "";
+      if (response && response.data && typeof response.data === "object" && typeof (response.data as Record<string, unknown>).email === "string") {
+        returnedEmail = (response.data as Record<string, unknown>).email as string;
+      }
+      if (returnedEmail.length > 0) {
+        setEmail(returnedEmail);
+      }
+
+      setSuccessMsg(msgText);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "success",
+        message: msgText,
       });
-
-      const text = await response.text();
-      let resData: any = {};
-      try {
-        resData = JSON.parse(text);
-      } catch {
-        resData = {};
-      }
-
-      const backendMsg = extractBackendMessage(resData);
-
-      if (response.ok) {
-        setVerifyOverlayStatus("success");
-        setVerifyOverlayMsg(backendMsg.message ?? "Tài khoản của bạn đã được xác thực thành công.");
-        setVerifyOverlayTimeLeft(2);
-
-        let returnedEmail = "";
-        if (resData.data !== undefined && resData.data !== null && typeof resData.data.email === "string") {
-          returnedEmail = resData.data.email;
-        }
-        if (returnedEmail.length > 0) {
-          setEmail(returnedEmail);
-        }
-
-        setSuccessMsg(backendMsg.message ?? "Kích hoạt tài khoản thành công! Vui lòng đăng nhập.");
-
-        const interval = setInterval(() => {
-          setVerifyOverlayTimeLeft((prev) => {
-            if (prev <= 1) {
-              clearInterval(interval);
-              setShowVerifyOverlay(false);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      } else {
-        setVerifyOverlayStatus("error");
-        setVerifyOverlayMsg(backendMsg.message ?? "Mã xác thực không hợp lệ hoặc đã hết hạn.");
-        setVerifyOverlayTimeLeft(4);
-
-        const interval = setInterval(() => {
-          setVerifyOverlayTimeLeft((prev) => {
-            if (prev <= 1) {
-              clearInterval(interval);
-              setShowVerifyOverlay(false);
-              setIsSignUp(true);
-              window.location.hash = "register";
-              setErrorMsg(backendMsg.message ?? "Mã xác thực không hợp lệ hoặc đã hết hạn.");
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      }
-    } catch (err) {
-      setVerifyOverlayStatus("error");
-      setVerifyOverlayMsg("Không thể kết nối tới máy chủ backend. Vui lòng kiểm tra lại trạng thái server.");
-      setVerifyOverlayTimeLeft(4);
 
       const interval = setInterval(() => {
         setVerifyOverlayTimeLeft((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
             setShowVerifyOverlay(false);
-            setIsSignUp(true);
-            window.location.hash = "register";
-            setErrorMsg("Kích hoạt email thất bại do lỗi kết nối tới server.");
+            window.location.hash = "login";
+            setIsSignUp(false);
+            setIsVerifyingMode(false);
+            setRecoveryMode("NONE");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      const cleanReason = sanitizeErrorMessage(errorObj.message || "") || "Mã xác thực email không hợp lệ hoặc đã hết hạn.";
+      setVerifyOverlayStatus("error");
+      setVerifyOverlayMsg(cleanReason);
+      setVerifyOverlayTimeLeft(4);
+      setErrorMsg(cleanReason);
+
+      const interval = setInterval(() => {
+        setVerifyOverlayTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setShowVerifyOverlay(false);
+            window.location.hash = "resend-verification";
+            setRecoveryMode("RESEND_VERIFICATION");
+            setIsSignUp(false);
+            setIsVerifyingMode(false);
             return 0;
           }
           return prev - 1;
@@ -540,37 +519,81 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     }
   };
 
-  // On mount, parse token from URL if present
+  // On mount, parse token and routing from URL
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    let tokenParam = params.get("token");
-    if (!tokenParam) tokenParam = params.get("code");
-    if (!tokenParam) tokenParam = params.get("verify-email");
-    if (!tokenParam) tokenParam = params.get("verify");
-
-    if (tokenParam) {
-      let isRecovery = false;
-      if (params.has("token")) isRecovery = true;
-      if (params.has("code")) isRecovery = true;
-      if (tokenParam.startsWith("recovery-")) isRecovery = true;
-
-      if (isRecovery) {
-        // Account recovery flow
+    const pathname = window.location.pathname.toLowerCase().replace(/\/$/, "");
+    const rawHash = window.location.hash.toLowerCase();
+    const hash = rawHash.split("?")[0];
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashQuery = window.location.hash.includes("?") ? window.location.hash.substring(window.location.hash.indexOf("?") + 1) : "";
+    const hashParams = new URLSearchParams(hashQuery);
+    const tokenParam = searchParams.get("token") || hashParams.get("token") || searchParams.get("code") || hashParams.get("code") || "";
+    // Flow 1: Reset Password (Path /reset-password or Hash #reset-password)
+    if (pathname === "/reset-password" || pathname === "/reset" || hash === "#reset-password") {
+      if (tokenParam) {
         window.history.replaceState({}, document.title, "/a#reset-password");
-        window.location.hash = "reset-password";
         setRecoveryToken(tokenParam);
         setRecoveryMode("RESET_PASSWORD");
         setIsPasswordResetExpanded(true);
         validateRecoveryToken(tokenParam);
       } else {
-        // Email verification flow - trigger overlay directly on top of login form
-        window.history.replaceState({}, document.title, "/a#login");
+        setRecoveryMode("RESET_PASSWORD");
+        setIsPasswordResetExpanded(true);
+      }
+      return;
+    }
+
+    // Flow 2: Email Verification (Path /verify-email or Hash #verify / #verify-email)
+    if (pathname === "/verify-email" || pathname === "/verify" || hash === "#verify" || hash === "#verify-email") {
+      if (tokenParam) {
+        window.history.replaceState({}, document.title, "/a#verify");
         setVerificationTokenInput(tokenParam);
         setShowVerifyOverlay(true);
         setVerifyOverlayStatus("loading");
         setVerifyOverlayMsg("Đang tiến hành xác minh tài khoản với server...");
         executeOverlayVerification(tokenParam);
+      } else {
+        setIsSignUp(false);
+        setIsVerifyingMode(true);
+        setRecoveryMode("NONE");
       }
+      return;
+    }
+
+    // Flow 3: Resend Verification (Path /resend-verification or Hash #resend-verification)
+    if (pathname === "/resend-verification" || pathname === "/resend" || hash === "#resend-verification") {
+      window.history.replaceState({}, document.title, "/a#resend-verification");
+      setRecoveryMode("RESEND_VERIFICATION");
+      setIsSignUp(false);
+      setIsVerifyingMode(false);
+      return;
+    }
+
+    // Flow 4: Forgot Password / Account Recovery (Path /forgot-password or Hash #recovery / #forgot-password)
+    if (pathname === "/recovery" || pathname === "/forgot-password" || pathname === "/forgot" || hash === "#recovery" || hash === "#forgot-password" || hash === "#forgot") {
+      window.history.replaceState({}, document.title, "/a#recovery");
+      setRecoveryMode("SEND_LINK");
+      setIsSignUp(false);
+      setIsVerifyingMode(false);
+      return;
+    }
+
+    // Flow 5: Manual Token entry
+    if (hash === "#recovery-token" || hash === "#manual-token") {
+      setRecoveryMode("MANUAL_TOKEN");
+      setIsSignUp(false);
+      setIsVerifyingMode(false);
+      return;
+    }
+
+    if (hash === "#register") {
+      setIsSignUp(true);
+      setIsVerifyingMode(false);
+      setRecoveryMode("NONE");
+    } else {
+      setIsSignUp(false);
+      setIsVerifyingMode(false);
+      setRecoveryMode("NONE");
     }
   }, []);
 
@@ -651,6 +674,84 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       setLoading(false);
     }
   };
+  const handleResendVerificationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+    setToastNotification(null);
+    setFieldErrors(prev => ({ ...prev, resendEmail: "" }));
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const cleanEmail = (resendEmail || email || lastRegEmail || "").trim();
+      if (!cleanEmail) {
+        setFieldErrors(prev => ({ ...prev, resendEmail: "Vui lòng nhập địa chỉ email đăng ký." }));
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          title: "Chưa nhập email",
+          message: "Vui lòng nhập địa chỉ email đăng ký.",
+        });
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        setFieldErrors(prev => ({ ...prev, resendEmail: "Địa chỉ email không đúng định dạng (ví dụ: name@domain.com)." }));
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          title: "Địa chỉ email không hợp lệ",
+          message: "Địa chỉ email không đúng định dạng (ví dụ: name@domain.com).",
+        });
+        return;
+      }
+
+      let response: unknown = null;
+      let reqErr: unknown = null;
+      try {
+        response = await apiResendVerification(cleanEmail);
+      } catch (err: unknown) {
+        reqErr = err;
+      }
+
+      if (reqErr) {
+        const errorObj = reqErr as Error;
+        console.error("Resend verification request failed:", errorObj);
+        const cleanReason = sanitizeErrorMessage(errorObj.message);
+        setErrorMsg(cleanReason);
+        setToastNotification({
+          id: Date.now().toString(),
+          type: "error",
+          message: cleanReason,
+        });
+        return;
+      }
+
+      const extracted = extractBackendMessage(response as ApiResponse);
+      const successText = extracted.message || "Nếu email tồn tại trên hệ thống và chưa được kích hoạt, liên kết xác thực mới đã được gửi. Vui lòng kiểm tra.";
+      setSuccessMsg(successText);
+      setCooldownTime(60);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "success",
+        message: successText,
+      });
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      console.error("Unexpected error in resend verification:", errorObj);
+      const cleanReason = sanitizeErrorMessage(errorObj.message);
+      setErrorMsg(cleanReason);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "error",
+        message: cleanReason,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -661,8 +762,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setFieldErrors(prev => ({ ...prev, newPassword: "", confirmPassword: "" }));
 
     try {
-      // Guaranteed hold loading animation for at least 500ms (0.5s)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       if (!recoveryNewPassword) {
         setFieldErrors(prev => ({ ...prev, newPassword: "Mật khẩu mới không được để trống." }));
@@ -692,26 +792,34 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         return;
       }
 
-      const response = await apiChangePassword({
+      const response = await apiResetPassword({
         token: recoveryToken,
         newPassword: recoveryNewPassword,
         confirmPassword: recoveryConfirmPassword,
       });
 
       const extracted = extractBackendMessage(response);
-      setSuccessMsg(extracted.message);
+      const successText = extracted.message || "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại.";
+      setSuccessMsg(successText);
       setToastNotification({
         id: Date.now().toString(),
         type: "success",
-        message: extracted.message,
+        message: successText,
       });
-      addAuditLog("VERIFY", { token: recoveryToken }, "SUCCESS", extracted.message, apiBaseUrl, getClientDeviceInfo());
+      addAuditLog("VERIFY", { token: recoveryToken }, "SUCCESS", successText, apiBaseUrl, getClientDeviceInfo());
 
       setRecoveryNewPassword("");
       setRecoveryConfirmPassword("");
-    } catch (err: any) {
-      console.error("Password reset failed:", err);
-      const cleanReason = sanitizeErrorMessage(err.message);
+
+      setTimeout(() => {
+        window.location.hash = "login";
+        setRecoveryMode("NONE");
+        setIsSignUp(false);
+      }, 1500);
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      console.error("Password reset failed:", errorObj);
+      const cleanReason = sanitizeErrorMessage(errorObj.message);
       setErrorMsg(cleanReason);
       setToastNotification({
         id: Date.now().toString(),
@@ -733,8 +841,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setFieldErrors(prev => ({ ...prev, newUsername: "" }));
 
     try {
-      // Guaranteed hold loading animation for at least 500ms (0.5s)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       if (!recoveryNewUsername || !recoveryNewUsername.trim()) {
         setFieldErrors(prev => ({ ...prev, newUsername: "Tên đăng nhập mới không được để trống." }));
@@ -747,18 +854,25 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       }
 
       const response = await apiChangeUsername({
-        token: recoveryToken,
         newUsername: recoveryNewUsername.trim(),
       });
 
       const extracted = extractBackendMessage(response);
-      setSuccessMsg(extracted.message);
+      const successText = extracted.message || "Đổi tên đăng nhập thành công. Vui lòng đăng nhập lại.";
+      setSuccessMsg(successText);
       setToastNotification({
         id: Date.now().toString(),
         type: "success",
-        message: extracted.message,
+        message: successText,
       });
-      addAuditLog("VERIFY", { token: recoveryToken, newUsername: recoveryNewUsername.trim() }, "SUCCESS", extracted.message, apiBaseUrl, getClientDeviceInfo());
+      addAuditLog("VERIFY", { newUsername: recoveryNewUsername.trim() }, "SUCCESS", successText, apiBaseUrl, getClientDeviceInfo());
+
+      // Backend invalidates session on username change: clear client tokens and redirect to login
+      localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      window.dispatchEvent(new Event("user-auth-change"));
 
       if (recoveryUser) {
         setRecoveryUser({
@@ -770,16 +884,23 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       setRecoveryNewUsername("");
       setIsUsernameChangeExpanded(false);
-    } catch (err: any) {
-      console.error("Username change failed:", err);
-      const cleanReason = sanitizeErrorMessage(err.message);
+
+      setTimeout(() => {
+        window.location.hash = "login";
+        setRecoveryMode("NONE");
+        setIsSignUp(false);
+      }, 1500);
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      console.error("Username change failed:", errorObj);
+      const cleanReason = sanitizeErrorMessage(errorObj.message);
       setErrorMsg(cleanReason);
       setToastNotification({
         id: Date.now().toString(),
         type: "error",
         message: cleanReason,
       });
-      addAuditLog("VERIFY", { token: recoveryToken, newUsername: recoveryNewUsername.trim() }, "FAILED", `Đổi tên đăng nhập thất bại: ${cleanReason}`, apiBaseUrl, getClientDeviceInfo());
+      addAuditLog("VERIFY", { newUsername: recoveryNewUsername.trim() }, "FAILED", `Đổi tên đăng nhập thất bại: ${cleanReason}`, apiBaseUrl, getClientDeviceInfo());
     } finally {
       setLoading(false);
     }
@@ -849,10 +970,33 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
               let finalUsername = userData.username;
               if (!finalUsername) finalUsername = savedUsername ?? savedEmail.split("@")[0];
 
+              let userFullName = userData.fullName;
+              let actualUsername = finalUsername;
+              if (accessJWT) {
+                try {
+                  const meRes = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/auth/me`, {
+                    method: "GET",
+                    headers: {
+                      "Authorization": `Bearer ${accessJWT}`,
+                      "Accept": "application/json"
+                    }
+                  });
+                  if (meRes.ok) {
+                    const meJson = await meRes.json();
+                    if (meJson?.data?.fullName) {
+                      userFullName = meJson.data.fullName;
+                    }
+                    if (meJson?.data?.username) {
+                      actualUsername = meJson.data.username;
+                    }
+                  }
+                } catch (_) {}
+              }
+
               const realUserObj = {
                 id: userData.id ?? 1,
-                fullName: userData.fullName ?? finalUsername,
-                username: finalUsername,
+                fullName: userFullName || actualUsername,
+                username: actualUsername,
                 email: finalEmail,
                 roles: userRoles,
                 status: "ACTIVE"
@@ -877,6 +1021,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
               localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(redisProfile));
               localStorage.setItem(STORAGE_KEYS.REFRESH_TOKENS_MAP, JSON.stringify(redisRefreshTokens));
               localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(realUserObj));
+              window.dispatchEvent(new Event("user-auth-change"));
             }
 
             // Merge guest cart with authenticated user cart
@@ -918,18 +1063,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setVerificationResultState(null);
     setVerificationLogs([
       `[INFO] Khởi chạy quy trình xác thực tài khoản...`,
-      `[INFO] Phương thức: GỌI TRỰC TIẾP API BACKEND`
+      `[INFO] Phương thức: GET /api/auth/verify-email?token={token}`
     ]);
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setVerificationLogs(prev => [
-      ...prev,
-      `[INFO] Đang kết nối tới ${apiBaseUrl}...`
-    ]);
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-    let cleanPath = verifyApiPath;
-    if (!cleanPath.startsWith("/")) cleanPath = "/" + cleanPath;
+    await new Promise((resolve) => setTimeout(resolve, 400));
 
     let tokenClean = tokenToUse;
     if (tokenToUse.includes("token=")) {
@@ -937,104 +1074,61 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       if (parts[1]) tokenClean = parts[1].split("&")[0];
     }
 
-    const fullUrl = `${apiBaseUrl.replace(/\/$/, "")}${cleanPath}?token=${tokenClean}`;
-
     setVerificationLogs(prev => [
       ...prev,
-      `[INFO] Gửi yêu cầu HTTP ${verifyMethod}: ${fullUrl}`,
-      `[INFO] Đang chờ phản hồi từ Spring Boot Server...`
+      `[INFO] Đang kết nối tới ${apiBaseUrl}...`,
+      `[INFO] Gửi yêu cầu xác thực token: ${tokenClean}`
     ]);
 
     try {
-      const headers: Record<string, string> = {
-        "Accept": "application/json",
-        "Content-Type": "application/json"
-      };
-
-      const response = await fetch(fullUrl, {
-        method: verifyMethod,
-        headers
-      });
+      const response = await apiVerifyEmail(tokenClean);
+      const extractedMsg = extractBackendMessage(response);
+      const successMessage = extractedMsg.message || "Xác thực email thành công. Tài khoản của bạn đã được kích hoạt.";
 
       setVerificationLogs(prev => [
         ...prev,
-        `[INFO] Nhận phản hồi HTTP Status: ${response.status} ${response.statusText}`
+        `[OK] Backend phản hồi: SUCCESS (200 OK)`,
+        `[OK] Đã kích hoạt tài khoản trên hệ thống!`,
+        `[OK] ${successMessage}`
       ]);
+      setVerificationResultState("SUCCESS");
 
-      if (response.ok) {
-        const responseText = await response.text();
-        const isHtml = responseText.trim().startsWith("<") || responseText.toLowerCase().includes("<html");
-
-        if (isHtml) {
-          setVerificationLogs(prev => [
-            ...prev,
-            `[ERROR] Nhận phản hồi HTML thay vì JSON từ Server.`
-          ]);
-          throw new Error("Phản hồi không hợp lệ: Server trả về trang HTML thay vì dữ liệu JSON.");
-        }
-
-        let resData: ApiResponse = {};
-        try {
-          resData = JSON.parse(responseText);
-        } catch {
-          resData = {};
-        }
-
-        const extractedMsg = extractBackendMessage(resData);
-
-        setVerificationLogs(prev => [
-          ...prev,
-          `[OK] Spring Boot phản hồi: SUCCESS`,
-          `[OK] Đã kích hoạt tài khoản trên CSDL thực tế!`,
-          `[OK] ${extractedMsg.message}`
-        ]);
-        setVerificationResultState("SUCCESS");
-
-        let returnedEmail = "";
-        if (resData.data !== undefined && resData.data !== null && typeof resData.data.email === "string") {
-          returnedEmail = resData.data.email;
-        }
-
-        if (returnedEmail.length > 0) {
-          setEmail(returnedEmail);
-        }
-        setSuccessMsg(extractedMsg.message);
-        setIsSignUp(false);
-
-        addAuditLog("VERIFY", { token: tokenClean }, "SUCCESS", extractedMsg.message, apiBaseUrl, getClientDeviceInfo());
-        handleVerificationSuccess(returnedEmail);
-      } else {
-        const errBody = await response.text().catch(() => "");
-        let parsedErr = "";
-        try {
-          const jsonErr = JSON.parse(errBody);
-          const extractedErr = extractBackendMessage(jsonErr);
-          parsedErr = extractedErr.message;
-        } catch {
-          parsedErr = errBody;
-        }
-
-        setVerificationLogs(prev => [
-          ...prev,
-          `[ERROR] Server trả về lỗi: Code ${response.status}`,
-          parsedErr.length > 0 ? `[ERROR] Chi tiết: ${parsedErr}` : `[ERROR] Token không hợp lệ hoặc đã hết hạn.`
-        ]);
-        setVerificationResultState("FAILED");
-
-        addAuditLog("VERIFY", { token: tokenClean }, "FAILED", `Kích hoạt email thất bại: Server trả về lỗi Code ${response.status} - ${parsedErr}`, apiBaseUrl, getClientDeviceInfo());
+      let returnedEmail = "";
+      if (response && response.data && typeof response.data === "object" && typeof (response.data as Record<string, unknown>).email === "string") {
+        returnedEmail = (response.data as Record<string, unknown>).email as string;
       }
-    } catch (err: any) {
-      console.error("Real API Verification Failed:", err);
-      const errDetail = typeof err.message === "string" ? err.message : "Network error";
+
+      if (returnedEmail.length > 0) {
+        setEmail(returnedEmail);
+      }
+      setSuccessMsg(successMessage);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "success",
+        message: successMessage,
+      });
+      setIsSignUp(false);
+
+      addAuditLog("VERIFY", { token: tokenClean }, "SUCCESS", successMessage, apiBaseUrl, getClientDeviceInfo());
+      handleVerificationSuccess(returnedEmail);
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      console.error("Real API Verification Failed:", errorObj);
+      const cleanReason = sanitizeErrorMessage(errorObj.message || "") || "Mã xác thực email không hợp lệ hoặc đã hết hạn.";
       setVerificationLogs(prev => [
         ...prev,
-        `[ERROR] Không thể kết nối tới Server Spring Boot tại địa chỉ: ${apiBaseUrl}`,
-        `[ERROR] Chi tiết lỗi: ${errDetail}`,
-        `[INFO] Mẹo: Hãy chắc chắn rằng Server Spring Boot của bạn đang chạy tại ${apiBaseUrl} và đã cấu hình cho phép CORS cho origin của trang web này.`
+        `[ERROR] Xác thực thất bại: ${cleanReason}`,
+        `[INFO] Mã xác thực có thời hạn 15 phút. Bạn có thể nhấn nút gửi lại mã mới bên dưới.`
       ]);
       setVerificationResultState("FAILED");
+      setErrorMsg(cleanReason);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "error",
+        message: cleanReason,
+      });
 
-      addAuditLog("VERIFY", { token: tokenClean }, "FAILED", "Kích hoạt email thất bại do lỗi kết nối: " + errDetail, apiBaseUrl, getClientDeviceInfo());
+      addAuditLog("VERIFY", { token: tokenClean }, "FAILED", `Kích hoạt email thất bại: ${cleanReason}`, apiBaseUrl, getClientDeviceInfo());
     } finally {
       setIsVerifyingRequest(false);
     }
@@ -1052,61 +1146,49 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     }
 
     if (targetEmail.length === 0 || targetEmail.trim().length === 0) {
-      setErrorMsg("Không tìm thấy email đăng ký ban đầu để gửi lại mã.");
+      window.location.hash = "resend-verification";
+      setRecoveryMode("RESEND_VERIFICATION");
+      setIsVerifyingMode(false);
       return;
     }
 
     setLoading(true);
     const devInfo = getClientDeviceInfo();
-    let regName = username.trim();
-    if (regName.length === 0) regName = targetEmail.split("@")[0];
-    let regFullName = fullName.trim();
-    if (regFullName.length === 0) regFullName = regName;
-
-    const payload: UserRegisterRequest = {
-      name: regName,
-      fullName: regFullName,
-      email: targetEmail.trim().toLowerCase(),
-      password,
-      confirmPassword: password
-    };
-
     setVerificationLogs(prev => [
       ...prev,
-      `[INFO] Yêu cầu gửi lại mã xác thực cho email: ${payload.email}...`
+      `[INFO] Yêu cầu gửi lại mã xác thực cho email: ${targetEmail.trim()}...`
     ]);
 
     try {
-      const res = await registerUser(payload);
+      const res = await apiResendVerification(targetEmail.trim());
       const extractedMsg = extractBackendMessage(res);
-      setSuccessMsg(extractedMsg.message);
+      const successMessage = extractedMsg.message || "Nếu email tồn tại trên hệ thống và chưa được kích hoạt, liên kết xác thực mới đã được gửi. Vui lòng kiểm tra.";
+      setSuccessMsg(successMessage);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "success",
+        message: successMessage,
+      });
 
-      let token = "";
-      if (res.data !== undefined && res.data !== null) {
-        if (typeof res.data.token === "string") token = res.data.token;
-        else if (typeof res.data.accessToken === "string") token = res.data.accessToken;
-      }
-
-      if (token.length > 0) {
-        localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_TOKEN, token);
-        setLastRegToken(token);
-      }
-      localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_EMAIL, payload.email);
-      localStorage.setItem(STORAGE_KEYS.LAST_REGISTRATION_MESSAGE, extractedMsg.message);
-
-      setLastRegEmail(payload.email);
-      setTimeLeft(300);
+      setTimeLeft(900);
+      setCooldownTime(60);
 
       setVerificationLogs(prev => [
         ...prev,
-        `[OK] Đã phát hành yêu cầu xác thực mới!`,
-        `[OK] ${extractedMsg.message}`
+        `[OK] Đã gửi yêu cầu xác thực mới!`,
+        `[OK] ${successMessage}`
       ]);
-      addAuditLog("REGISTER", payload, "SUCCESS", `[GỬI LẠI MÃ] ${extractedMsg.message}`, apiBaseUrl, devInfo);
-    } catch (err: any) {
-      console.warn("Real Backend Resend Failed:", err);
-      const cleanReason = sanitizeErrorMessage(err.message);
+      addAuditLog("VERIFY", { email: targetEmail }, "SUCCESS", `[GỬI LẠI MÃ] ${successMessage}`, apiBaseUrl, devInfo);
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      console.warn("Real Backend Resend Failed:", errorObj);
+      const cleanReason = sanitizeErrorMessage(errorObj.message);
       setErrorMsg(cleanReason);
+      setToastNotification({
+        id: Date.now().toString(),
+        type: "error",
+        message: cleanReason,
+      });
       setVerificationLogs(prev => [
         ...prev,
         `[ERROR] Gửi lại mã thất bại: ${cleanReason}`
@@ -1242,10 +1324,33 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
             let finalUsername = userData.username;
             if (!finalUsername) finalUsername = email.split("@")[0];
 
+            let userFullName = userData.fullName;
+            let actualUsername = finalUsername;
+            if (accessJWT) {
+              try {
+                const meRes = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/auth/me`, {
+                  method: "GET",
+                  headers: {
+                    "Authorization": `Bearer ${accessJWT}`,
+                    "Accept": "application/json"
+                  }
+                });
+                if (meRes.ok) {
+                  const meJson = await meRes.json();
+                  if (meJson?.data?.fullName) {
+                    userFullName = meJson.data.fullName;
+                  }
+                  if (meJson?.data?.username) {
+                    actualUsername = meJson.data.username;
+                  }
+                }
+              } catch (_) {}
+            }
+
             const realUserObj = {
               id: userData.id ?? 1,
-              fullName: userData.fullName ?? finalUsername,
-              username: finalUsername,
+              fullName: userFullName || actualUsername,
+              username: actualUsername,
               email: finalEmail,
               roles: userRoles,
               status: "ACTIVE"
@@ -1265,6 +1370,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
             localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(redisProfile));
             localStorage.setItem(STORAGE_KEYS.REFRESH_TOKENS_MAP, JSON.stringify(redisRefreshTokens));
             localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(realUserObj));
+            window.dispatchEvent(new Event("user-auth-change"));
           }
 
           // Merge guest cart with authenticated user cart
@@ -1391,8 +1497,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#E4E4E4] text-[#111111] flex flex-col items-center justify-center relative py-20 px-4 md:px-10 overflow-hidden select-none">
-
+    <div className="w-full min-h-screen bg-[#E4E4E4] text-[#111111] flex flex-col items-center justify-center relative py-12 px-4 md:px-10 overflow-hidden select-none">
       {/* Top Left Branding Header */}
       <div
         onClick={() => onNavigate("landing")}
@@ -1446,15 +1551,17 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         className="absolute top-1/2 left-1/2 w-[400px] h-[400px] rounded-full bg-gradient-to-tr from-purple-500 to-amber-500 blur-[110px] pointer-events-none -translate-x-1/2 -translate-y-1/2"
       />
 
-      <div className="max-w-[540px] w-full z-10" style={{ zoom: 1.2 }}>
+      <div className="max-w-[540px] w-full z-10" style={{ zoom: 1.15 }}>
 
         {/* Auth Glassmorphism Card */}
-        <div
+        <motion.div
+          layout
+          transition={{ layout: { duration: 0.28, ease: [0.16, 1, 0.3, 1] } }}
           ref={cardRef}
           onMouseMove={handleMouseMove}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
-          className="relative bg-white/70 backdrop-blur-2xl rounded-3xl border border-white/80 p-10 md:p-12 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.07)] overflow-hidden transition-all duration-300"
+          className="relative bg-white/70 backdrop-blur-2xl rounded-3xl border border-white/80 p-9 md:p-11 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.07)] overflow-hidden"
         >
           {/* Spotlight follow background */}
           <div
@@ -1466,7 +1573,151 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
           />
 
           <AnimatePresence mode="wait">
-            {recoveryMode === "SEND_LINK" ? (
+            {recoveryMode === "RESEND_VERIFICATION" ? (
+              <motion.div
+                key="resend-verification-form"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
+                      <Mail className="w-4.5 h-4.5 text-[#FF4D24]" />
+                    </div>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-black text-[#111111] tracking-tight font-sans">
+                        Gửi lại email xác thực
+                      </h2>
+                      <p className="text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider">
+                        RESEND VERIFICATION PORTAL
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                    Nhập địa chỉ email đăng ký tài khoản của bạn. Hệ thống sẽ kiểm tra và gửi lại liên kết kích hoạt mới có thời hạn 15 phút.
+                  </p>
+                </div>
+
+                <form onSubmit={handleResendVerificationSubmit} noValidate className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="resend-email-input">
+                      Địa chỉ Email đăng ký
+                    </label>
+                    <div 
+                      className="relative"
+                      onMouseEnter={() => setHoveredField("resendEmail")}
+                      onMouseLeave={() => setHoveredField(null)}
+                    >
+                      <HoverMorphIcon
+                        defaultIcon={MorphMail}
+                        hoverIcon={MorphMailCheck}
+                        isHovered={focusedField === "resendEmail" || hoveredField === "resendEmail" || Boolean(resendEmail || email)}
+                        size={16}
+                        className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                          fieldErrors["resendEmail"] ? "text-red-500" : focusedField === "resendEmail" ? "text-[#FF4D24]" : "text-slate-400"
+                        }`}
+                      />
+                      <input
+                        id="resend-email-input"
+                        type="email"
+                        placeholder="Nhập địa chỉ email đăng ký của bạn"
+                        value={resendEmail || email}
+                        onChange={(e) => {
+                          setResendEmail(e.target.value);
+                          setEmail(e.target.value);
+                          if (fieldErrors["resendEmail"]) {
+                            setFieldErrors(prev => ({ ...prev, resendEmail: "" }));
+                          }
+                        }}
+                        onFocus={() => setFocusedField("resendEmail")}
+                        onBlur={() => setFocusedField(null)}
+                        className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
+                          fieldErrors["resendEmail"]
+                            ? "border-red-500 focus:ring-red-500/15"
+                            : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
+                        } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.hash = "login";
+                        setRecoveryMode("NONE");
+                        setErrorMsg("");
+                        setSuccessMsg("");
+                      }}
+                      title="Quay lại trang Đăng nhập"
+                      aria-label="Quay lại trang Đăng nhập"
+                      className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-[#FF4D24] transition-transform duration-200 group-hover:-translate-x-0.5" />
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={loading || cooldownTime > 0}
+                      className={`relative flex-1 ${
+                        loading || cooldownTime > 0
+                          ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
+                          : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                      } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
+                    >
+                      {loading && <DynamicButtonShimmer />}
+                      <span 
+                        className="flex items-center justify-center gap-2 transition-all duration-200" 
+                        style={{ 
+                          opacity: loading ? 0 : 1,
+                          transform: loading ? "translateY(-6px) scale(0.96)" : "translateY(0px) scale(1)",
+                          pointerEvents: loading ? "none" : "auto"
+                        }}
+                      >
+                        {cooldownTime > 0 ? (
+                          <span>Gửi lại sau ({cooldownTime}s)</span>
+                        ) : (
+                          <>
+                            <span>Gửi lại mã xác thực</span>
+                            <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
+                          </>
+                        )}
+                      </span>
+                      <span 
+                        className="absolute inset-0 flex items-center justify-center text-white transition-all duration-200" 
+                        style={{ 
+                          opacity: loading ? 1 : 0,
+                          transform: loading ? "translateY(0px) scale(1)" : "translateY(6px) scale(0.96)",
+                          pointerEvents: loading ? "auto" : "none"
+                        }}
+                      >
+                        <DynamicButtonLoader text="Đang gửi mã mới" />
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60 text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.hash = "verify";
+                        setIsVerifyingMode(true);
+                        setRecoveryMode("NONE");
+                        setErrorMsg("");
+                        setSuccessMsg("");
+                      }}
+                      className="text-xs font-bold text-slate-700 hover:text-[#FF4D24] transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 mx-auto font-sans py-1"
+                    >
+                      <Key className="w-3.5 h-3.5 text-[#FF4D24]" />
+                      <span>Đã có mã kích hoạt? Nhập mã</span>
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            ) : recoveryMode === "SEND_LINK" ? (
               <motion.div
                 key="account-recovery-send-form"
                 initial={{ opacity: 0, scale: 0.98 }}
@@ -1490,7 +1741,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     </div>
                   </div>
                   <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                    Nhập địa chỉ email đăng ký của bạn. Hệ thống sẽ kiểm tra và gửi liên kết khôi phục tài khoản (Magic Link) có thời hạn 10 phút.
+                    Nhập địa chỉ email đã đăng ký. Hệ thống sẽ gửi liên kết và mã xác thực đặt lại mật khẩu có thời hạn 20 phút.
                   </p>
                 </div>
 
@@ -1602,7 +1853,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       }}
                       className="text-xs font-bold text-slate-700 hover:text-[#FF4D24] transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 mx-auto font-sans py-1"
                     >
-                      <Coins className="w-3.5 h-3.5 text-[#FF4D24]" />
+                      <Key className="w-3.5 h-3.5 text-[#FF4D24]" />
                       <span>Đã có mã khôi phục? Nhập thủ công</span>
                     </button>
                   </div>
@@ -1632,7 +1883,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     </div>
                   </div>
                   <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                    Vui lòng nhập hoặc dán mã Token khôi phục đã được gửi đến email của bạn để thiết lập mật khẩu mới.
+                    Vui lòng nhập hoặc dán mã Token khôi phục đã được gửi đến email của bạn nhằm mục đích thiết lập tài khoản.
                   </p>
                 </div>
 
@@ -1769,15 +2020,15 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     </div>
                     <div>
                       <h2 className="text-base sm:text-lg font-black text-[#111111] tracking-tight font-sans">
-                        Thông tin tài khoản
+                        Đặt lại mật khẩu
                       </h2>
                       <p className="text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider">
-                        ACCOUNT SECURITY PORTAL
+                        RESET PASSWORD PORTAL
                       </p>
                     </div>
                   </div>
                   <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                    Xác minh thông tin tài khoản và thiết lập cấu hình bảo mật ERP.
+                    Thiết lập mật khẩu mới cho tài khoản của bạn để hoàn tất quá trình khôi phục.
                   </p>
                 </div>
 
@@ -1827,341 +2078,181 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       </button>
                     </div>
                   </div>
-                ) : recoveryUser ? (
-                  <div className="space-y-4">
-                    {/* User Info Portal Card */}
-                    <div className="bg-gradient-to-b from-slate-50/90 to-slate-100/40 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-200/70 rounded-2xl p-3.5 space-y-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.02)]">
-                      <div className="flex items-center gap-3 border-b border-slate-200/60 pb-2.5">
-                        {recoveryUser.avatarUrl ? (
-                          <img
-                            src={recoveryUser.avatarUrl}
-                            alt="Avatar"
-                            className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-sm"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-slate-100 to-slate-200 flex items-center justify-center text-slate-700 font-bold font-mono text-xs border border-t-white border-b-slate-300/80 border-x-slate-200 shadow-inner">
-                            {recoveryUser.fullName ? recoveryUser.fullName.charAt(0) : (recoveryUser.username ? recoveryUser.username.charAt(0) : "U")}
-                          </div>
+                ) : (
+                  <form
+                    onSubmit={handleResetPassword}
+                    noValidate
+                    className="flex flex-col gap-3.5"
+                  >
+                    <div className="flex flex-col gap-1.5 text-left">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="reset-new-password">
+                        Mật khẩu mới
+                      </label>
+                      <div 
+                        className="relative"
+                        onMouseEnter={() => setHoveredField("newPassword")}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <HoverMorphIcon
+                          defaultIcon={MorphLock}
+                          hoverIcon={MorphKeyRound}
+                          isHovered={focusedField === "newPassword" || hoveredField === "newPassword" || Boolean(recoveryNewPassword)}
+                          size={16}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                            fieldErrors["newPassword"] ? "text-red-500" : focusedField === "newPassword" ? "text-[#FF4D24]" : "text-slate-400"
+                          }`}
+                        />
+                        <input
+                          id="reset-new-password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                          value={recoveryNewPassword}
+                          onChange={(e) => {
+                            setRecoveryNewPassword(e.target.value);
+                            if (fieldErrors["newPassword"]) {
+                              setFieldErrors(prev => ({ ...prev, newPassword: "" }));
+                            }
+                          }}
+                          onFocus={() => setFocusedField("newPassword")}
+                          onBlur={() => setFocusedField(null)}
+                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
+                            fieldErrors["newPassword"]
+                              ? "border-red-500 focus:ring-red-500/15"
+                              : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
+                          } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1 transition-colors"
+                        >
+                          <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} size={16} />
+                        </button>
+                      </div>
+                      <AnimatePresence>
+                        {fieldErrors["newPassword"] && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1"
+                          >
+                            <AlertCircle className="w-3 h-3 inline shrink-0 text-red-500" />
+                            <span>{fieldErrors["newPassword"]}</span>
+                          </motion.p>
                         )}
-                        <div className="text-left min-w-0">
-                          <h3 className="text-xs font-black text-slate-900 font-sans leading-tight truncate">
-                            {recoveryUser.fullName || "Người dùng hệ thống"}
-                          </h3>
-                          <span className="text-[10px] text-slate-400 font-bold font-mono tracking-wider truncate block">
-                            Email: {recoveryUser.email || "Chưa thiết lập"}
-                          </span>
-                        </div>
-                        <div className="ml-auto flex flex-col items-end gap-1 shrink-0">
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                            Đã xác thực
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Detailed Contact List */}
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                        <div className="text-left min-w-0">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">Địa chỉ Email</span>
-                          <span className="font-semibold text-slate-700 truncate block text-[11px]">{recoveryUser.email || "Chưa thiết lập"}</span>
-                        </div>
-                        <div className="text-left min-w-0">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">Số điện thoại</span>
-                          <span className="font-semibold text-slate-700 block text-[11px]">{recoveryUser.numberPhone || "Chưa thiết lập"}</span>
-                        </div>
-                      </div>
+                      </AnimatePresence>
                     </div>
 
-                    {/* Available Actions */}
-                    <div className="space-y-3">
-                      {/* Action 1: Change username (Expandable style) */}
-                      <div className="border-t border-t-white border-b border-b-slate-200/90 border-x border-x-slate-200/80 rounded-2xl bg-gradient-to-b from-white to-slate-50/30 overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all duration-300">
-                        {/* Header Trigger */}
+                    <div className="flex flex-col gap-1.5 text-left">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="reset-confirm-new-password">
+                        Xác nhận mật khẩu mới
+                      </label>
+                      <div 
+                        className="relative"
+                        onMouseEnter={() => setHoveredField("confirmPassword")}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <HoverMorphIcon
+                          defaultIcon={MorphLock}
+                          hoverIcon={MorphKeyRound}
+                          isHovered={focusedField === "confirmPassword" || hoveredField === "confirmPassword" || Boolean(recoveryConfirmPassword)}
+                          size={16}
+                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                            fieldErrors["confirmPassword"] ? "text-red-500" : focusedField === "confirmPassword" ? "text-[#FF4D24]" : "text-slate-400"
+                          }`}
+                        />
+                        <input
+                          id="reset-confirm-new-password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Nhập lại mật khẩu mới"
+                          value={recoveryConfirmPassword}
+                          onChange={(e) => {
+                            setRecoveryConfirmPassword(e.target.value);
+                            if (fieldErrors["confirmPassword"]) {
+                              setFieldErrors(prev => ({ ...prev, confirmPassword: "" }));
+                            }
+                          }}
+                          onFocus={() => setFocusedField("confirmPassword")}
+                          onBlur={() => setFocusedField(null)}
+                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
+                            fieldErrors["confirmPassword"]
+                              ? "border-red-500 focus:ring-red-500/15"
+                              : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
+                          } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                        />
                         <button
                           type="button"
-                          onClick={() => setIsUsernameChangeExpanded(!isUsernameChangeExpanded)}
-                          className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-50/60 transition-colors cursor-pointer"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1 transition-colors"
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center shadow-inner">
-                              <User className="w-4 h-4 text-indigo-600" />
-                            </div>
-                            <div>
-                              <h4 className="text-xs font-black text-slate-900 font-sans">Đổi tên đăng nhập (Username)</h4>
-                              <p className="text-[10px] text-slate-400 mt-0.5">Cập nhật tên định danh ERP của bạn</p>
-                            </div>
-                          </div>
-                          <div className="text-slate-400">
-                            {isUsernameChangeExpanded ? (
-                              <ChevronUp className="w-4 h-4" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )}
-                          </div>
+                          <MorphIcon icon={showConfirmPassword ? MorphEyeOff : MorphEye} size={16} />
                         </button>
-
-                        {/* Collapsible Form Body */}
-                        <AnimatePresence initial={false}>
-                          {isUsernameChangeExpanded && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: "auto", opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.2, ease: "easeInOut" }}
-                              className="overflow-hidden"
-                            >
-                              <form
-                                onSubmit={handleChangeUsername}
-                                noValidate
-                                className="px-3.5 pb-4 pt-1 flex flex-col gap-3.5 border-t border-slate-100"
-                              >
-                                <div className="flex flex-col gap-1.5 text-left">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="new-username-input">
-                                    Tên đăng nhập mới (New Username)
-                                  </label>
-                                  <div 
-                                    className="relative"
-                                    onMouseEnter={() => setHoveredField("newUsername")}
-                                    onMouseLeave={() => setHoveredField(null)}
-                                  >
-                                    <HoverMorphIcon
-                                      defaultIcon={MorphUser}
-                                      hoverIcon={MorphAtSign}
-                                      isHovered={focusedField === "newUsername" || hoveredField === "newUsername" || Boolean(recoveryNewUsername)}
-                                      size={16}
-                                      className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                                        fieldErrors["newUsername"] ? "text-red-500" : focusedField === "newUsername" ? "text-[#FF4D24]" : "text-slate-400"
-                                      }`}
-                                    />
-                                    <input
-                                      id="new-username-input"
-                                      type="text"
-                                      placeholder="Nhập tên đăng nhập mới (ví dụ: ann_new)"
-                                      value={recoveryNewUsername}
-                                      onChange={(e) => {
-                                        setRecoveryNewUsername(e.target.value);
-                                        if (fieldErrors["newUsername"]) {
-                                          setFieldErrors(prev => ({ ...prev, newUsername: "" }));
-                                        }
-                                      }}
-                                      onFocus={() => setFocusedField("newUsername")}
-                                      onBlur={() => setFocusedField(null)}
-                                      className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
-                                        fieldErrors["newUsername"]
-                                          ? "border-red-500 focus:ring-red-500/15"
-                                          : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
-                                      } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                                    />
-                                  </div>
-                                </div>
-
-                                <button
-                                  type="submit"
-                                  disabled={loading}
-                                  className={`relative w-full ${
-                                    loading
-                                      ? "bg-[#FF4D24]/10 border border-[#FF4D24]/30 text-[#FF4D24]"
-                                      : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
-                                  } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
-                                >
-                                  {loading ? (
-                                    <div className="flex items-center gap-2 text-[#FF4D24]">
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                      <span>Đang lưu tên đăng nhập...</span>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <span>Xác nhận đổi tên đăng nhập</span>
-                                      <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
-                                    </>
-                                  )}
-                                </button>
-                              </form>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
                       </div>
+                      <AnimatePresence>
+                        {fieldErrors["confirmPassword"] && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1"
+                          >
+                            <AlertCircle className="w-3 h-3 inline shrink-0 text-red-500" />
+                            <span>{fieldErrors["confirmPassword"]}</span>
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </div>
 
-                      {/* Action 2: Reset Password Form (Expandable Account Center style) */}
-                      <div className="border-t border-t-white border-b border-b-slate-200/90 border-x border-x-slate-200/80 rounded-2xl bg-gradient-to-b from-white to-slate-50/30 overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all duration-300">
-                        {/* Header Trigger */}
-                        <button
-                          type="button"
-                          onClick={() => setIsPasswordResetExpanded(!isPasswordResetExpanded)}
-                          className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-50/60 transition-colors cursor-pointer"
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.location.hash = "login";
+                          setRecoveryMode("NONE");
+                          setRecoveryToken("");
+                          setErrorMsg("");
+                          setSuccessMsg("");
+                        }}
+                        title="Quay lại trang Đăng nhập"
+                        aria-label="Quay lại trang Đăng nhập"
+                        className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0"
+                      >
+                        <ArrowLeft className="w-4 h-4 text-[#FF4D24] transition-transform duration-200 group-hover:-translate-x-0.5" />
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className={`relative flex-1 ${
+                          loading
+                            ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
+                            : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                        } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
+                      >
+                        {loading && <DynamicButtonShimmer />}
+                        <span 
+                          className="flex items-center justify-center gap-2 transition-all duration-200" 
+                          style={{ 
+                            opacity: loading ? 0 : 1,
+                            transform: loading ? "translateY(-6px) scale(0.96)" : "translateY(0px) scale(1)",
+                            pointerEvents: loading ? "none" : "auto"
+                          }}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100/80 flex items-center justify-center shadow-inner">
-                              <Lock className="w-4 h-4 text-[#FF4D24]" />
-                            </div>
-                            <div>
-                              <h4 className="text-xs font-black text-slate-900 font-sans">Mật khẩu và bảo mật</h4>
-                              <p className="text-[10px] text-slate-400 mt-0.5">Cập nhật mật khẩu bảo mật đăng nhập</p>
-                            </div>
-                          </div>
-                          <div className="text-slate-400">
-                            {isPasswordResetExpanded ? (
-                              <ChevronUp className="w-4 h-4" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )}
-                          </div>
-                        </button>
-
-                        {/* Collapsible Form Body */}
-                        <AnimatePresence initial={false}>
-                          {isPasswordResetExpanded && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: "auto", opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.2, ease: "easeInOut" }}
-                              className="overflow-hidden"
-                            >
-                              <form
-                                onSubmit={handleResetPassword}
-                                noValidate
-                                className="px-3.5 pb-4 pt-1 flex flex-col gap-3.5 border-t border-slate-100"
-                              >
-                                <div className="flex flex-col gap-1.5 text-left">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="new-password">
-                                    Mật khẩu mới
-                                  </label>
-                                  <div 
-                                    className="relative"
-                                    onMouseEnter={() => setHoveredField("newPassword")}
-                                    onMouseLeave={() => setHoveredField(null)}
-                                  >
-                                    <HoverMorphIcon
-                                      defaultIcon={MorphLock}
-                                      hoverIcon={MorphKeyRound}
-                                      isHovered={focusedField === "newPassword" || hoveredField === "newPassword" || Boolean(recoveryNewPassword)}
-                                      size={16}
-                                      className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                                        fieldErrors["newPassword"] ? "text-red-500" : focusedField === "newPassword" ? "text-[#FF4D24]" : "text-slate-400"
-                                      }`}
-                                    />
-                                    <input
-                                      id="new-password"
-                                      type={showPassword ? "text" : "password"}
-                                      placeholder="Tối thiểu 6 ký tự"
-                                      value={recoveryNewPassword}
-                                      onChange={(e) => {
-                                        setRecoveryNewPassword(e.target.value);
-                                        if (fieldErrors["newPassword"]) {
-                                          setFieldErrors(prev => ({ ...prev, newPassword: "" }));
-                                        }
-                                      }}
-                                      onFocus={() => setFocusedField("newPassword")}
-                                      onBlur={() => setFocusedField(null)}
-                                      className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
-                                        fieldErrors["newPassword"]
-                                          ? "border-red-500 focus:ring-red-500/15"
-                                          : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
-                                      } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowPassword(!showPassword)}
-                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1 transition-colors"
-                                    >
-                                      <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} size={16} />
-                                    </button>
-                                  </div>
-                                  <AnimatePresence>
-                                    {fieldErrors["newPassword"] && (
-                                      <motion.p
-                                        initial={{ opacity: 0, y: -4 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -4 }}
-                                        className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1"
-                                      >
-                                        <AlertCircle className="w-3 h-3 inline shrink-0 text-red-500" />
-                                        <span>{fieldErrors["newPassword"]}</span>
-                                      </motion.p>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-
-                                <div className="flex flex-col gap-1.5 text-left">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="confirm-new-password">
-                                    Xác nhận mật khẩu mới
-                                  </label>
-                                  <div 
-                                    className="relative"
-                                    onMouseEnter={() => setHoveredField("confirmPassword")}
-                                    onMouseLeave={() => setHoveredField(null)}
-                                  >
-                                    <HoverMorphIcon
-                                      defaultIcon={MorphLock}
-                                      hoverIcon={MorphKeyRound}
-                                      isHovered={focusedField === "confirmPassword" || hoveredField === "confirmPassword" || Boolean(recoveryConfirmPassword)}
-                                      size={16}
-                                      className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                                        fieldErrors["confirmPassword"] ? "text-red-500" : focusedField === "confirmPassword" ? "text-[#FF4D24]" : "text-slate-400"
-                                      }`}
-                                    />
-                                    <input
-                                      id="confirm-new-password"
-                                      type={showPassword ? "text" : "password"}
-                                      placeholder="Nhập lại mật khẩu mới"
-                                      value={recoveryConfirmPassword}
-                                      onChange={(e) => {
-                                        setRecoveryConfirmPassword(e.target.value);
-                                        if (fieldErrors["confirmPassword"]) {
-                                          setFieldErrors(prev => ({ ...prev, confirmPassword: "" }));
-                                        }
-                                      }}
-                                      onFocus={() => setFocusedField("confirmPassword")}
-                                      onBlur={() => setFocusedField(null)}
-                                      className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
-                                        fieldErrors["confirmPassword"]
-                                          ? "border-red-500 focus:ring-red-500/15"
-                                          : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
-                                      } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                                    />
-                                  </div>
-                                  <AnimatePresence>
-                                    {fieldErrors["confirmPassword"] && (
-                                      <motion.p
-                                        initial={{ opacity: 0, y: -4 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -4 }}
-                                        className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1"
-                                      >
-                                        <AlertCircle className="w-3 h-3 inline shrink-0 text-red-500" />
-                                        <span>{fieldErrors["confirmPassword"]}</span>
-                                      </motion.p>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-
-                                <button
-                                  type="submit"
-                                  disabled={loading}
-                                  className={`relative w-full ${
-                                    loading
-                                      ? "bg-[#FF4D24]/10 border border-[#FF4D24]/30 text-[#FF4D24]"
-                                      : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
-                                  } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
-                                >
-                                  {loading ? (
-                                    <div className="flex items-center gap-2 text-[#FF4D24]">
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                      <span>Đang cập nhật mật khẩu...</span>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <span>Xác nhận đổi mật khẩu</span>
-                                      <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
-                                    </>
-                                  )}
-                                </button>
-                              </form>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                          <span>Xác nhận đổi mật khẩu</span>
+                          <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
+                        </span>
+                        <span 
+                          className="absolute inset-0 flex items-center justify-center text-white transition-all duration-200" 
+                          style={{ 
+                            opacity: loading ? 1 : 0,
+                            transform: loading ? "translateY(0px) scale(1)" : "translateY(6px) scale(0.96)",
+                            pointerEvents: loading ? "auto" : "none"
+                          }}
+                        >
+                          <DynamicButtonLoader text="Đang cập nhật mật khẩu" />
+                        </span>
+                      </button>
                     </div>
 
                     <div className="pt-2 border-t border-slate-200/60 text-center">
@@ -2171,31 +2262,15 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                           window.location.hash = "login";
                           setRecoveryMode("NONE");
                           setRecoveryToken("");
-                          setRecoveryUser(null);
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="text-xs font-semibold text-slate-500 hover:text-[#FF4D24] transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 mx-auto py-0.5"
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 mx-auto py-0.5"
                       >
-                        <ArrowRight className="w-3.5 h-3.5 rotate-180" />
                         <span>Quay lại trang Đăng nhập</span>
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3.5 py-4 text-center">
-                    <p className="text-xs text-slate-500 font-medium">Không tìm thấy thông tin tài khoản khôi phục.</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        window.location.hash = "recovery";
-                        setRecoveryMode("SEND_LINK");
-                      }}
-                      className="text-xs font-bold text-[#FF4D24] hover:underline"
-                    >
-                      Quay lại gửi liên kết
-                    </button>
-                  </div>
+                  </form>
                 )}
               </motion.div>
             ) : isVerifyingMode ? (
@@ -2384,379 +2459,419 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="space-y-6"
+                className="space-y-4"
               >
                 {/* Tab Switcher: Sign In vs Sign Up */}
-                <div className="flex items-center p-1 bg-gradient-to-b from-slate-200/60 via-slate-200/40 to-slate-100/25 dark:from-zinc-900/60 dark:via-zinc-850/45 dark:to-zinc-800/35 rounded-xl mb-6 relative border border-t-slate-300/60 border-b-white/80 border-x-slate-200/50 dark:border-t-black/40 dark:border-b-white/10 dark:border-x-white/5 shadow-[inset_0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_3px_rgba(0,0,0,0.025),inset_0_-1px_1.5px_rgba(255,255,255,0.6),0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.3),inset_0_1px_3px_rgba(0,0,0,0.2),inset_0_-1px_0_rgba(255,255,255,0.05)]">
-                  <div
-                    className="absolute rounded-lg bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/[0.04] dark:border-white/10 pointer-events-none"
-                    style={{
-                      top: 4, bottom: 4,
-                      left: isSignUp ? "50%" : 4,
-                      right: isSignUp ? 4 : "50%",
-                      transition: "left 0.22s cubic-bezier(0.16, 1, 0.3, 1), right 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
-                    }}
-                  />
+                <div className="grid grid-cols-2 p-1 bg-gradient-to-b from-slate-200/60 via-slate-200/40 to-slate-100/25 dark:from-zinc-900/60 dark:via-zinc-850/45 dark:to-zinc-800/35 rounded-xl mb-4 relative border border-t-slate-300/60 border-b-white/80 border-x-slate-200/50 dark:border-t-black/40 dark:border-b-white/10 dark:border-x-white/5 shadow-[inset_0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_3px_rgba(0,0,0,0.025),inset_0_-1px_1.5px_rgba(255,255,255,0.6),0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.3),inset_0_1px_3px_rgba(0,0,0,0.2),inset_0_-1px_0_rgba(255,255,255,0.05)]">
                   <button
                     onClick={() => {
                       window.location.hash = "login";
                       setIsSignUp(false);
-
                       setErrorMsg("");
                       setSuccessMsg("");
                     }}
                     type="button"
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg relative z-10 cursor-pointer transition-colors duration-200 ${
+                    className={`py-2 text-xs font-bold rounded-lg relative z-10 cursor-pointer transition-colors duration-200 ${
                       !isSignUp ? "text-slate-950 dark:text-white" : "text-slate-500 hover:text-slate-700 dark:text-zinc-400"
                     }`}
                   >
-                    Đăng nhập
+                    {!isSignUp && (
+                      <motion.div
+                        layoutId="auth-active-tab-pill"
+                        className="absolute inset-0 rounded-lg bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/[0.04] dark:border-white/10"
+                        transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                      />
+                    )}
+                    <span className="relative z-10">Đăng nhập</span>
                   </button>
                   <button
                     onClick={() => {
                       window.location.hash = "register";
                       setIsSignUp(true);
-
                       setErrorMsg("");
                       setSuccessMsg("");
                     }}
                     type="button"
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg relative z-10 cursor-pointer transition-colors duration-200 ${
+                    className={`py-2 text-xs font-bold rounded-lg relative z-10 cursor-pointer transition-colors duration-200 ${
                       isSignUp ? "text-slate-950 dark:text-white" : "text-slate-500 hover:text-slate-700 dark:text-zinc-400"
                     }`}
                   >
-                    Đăng ký
+                    {isSignUp && (
+                      <motion.div
+                        layoutId="auth-active-tab-pill"
+                        className="absolute inset-0 rounded-lg bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/[0.04] dark:border-white/10"
+                        transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                      />
+                    )}
+                    <span className="relative z-10">Đăng ký</span>
                   </button>
                 </div>
 
-                <div className="min-h-[60px]">
-                  <h2 className="text-xl font-black text-[#111111] tracking-tight font-sans transition-opacity duration-300">
-                    {isSignUp ? "Tạo tài khoản mới" : "Chào mừng quay trở lại"}
-                  </h2>
-                  <p className="text-xs text-slate-500 font-medium mt-1 mb-3 transition-opacity duration-300">
-                    {isSignUp
-                      ? "Khởi tạo tài khoản Horizon Mobile để nhận ngay ngàn ưu đãi mua sắm điện thoại chính hãng."
-                      : "Đăng nhập tài khoản Horizon Mobile để quản lý giỏ hàng, đơn hàng và lịch sử mua sắm."
-                    }
-                  </p>
-                </div>
+                <AnimatePresence mode="wait" initial={false}>
+                  {isSignUp ? (
+                    <motion.div
+                      key="register-heading"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="mb-2"
+                    >
+                      <h2 className="text-xl font-black text-[#111111] tracking-tight font-sans">
+                        Tạo tài khoản mới
+                      </h2>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="login-heading"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      className="mb-2"
+                    >
+                      <h2 className="text-xl font-black text-[#111111] tracking-tight font-sans">
+                        Chào mừng quay trở lại
+                      </h2>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
 
                 {/* Primary Form */}
-                <form onSubmit={handleFormSubmit} noValidate className="flex flex-col gap-4">
+                <form onSubmit={handleFormSubmit} noValidate className="flex flex-col gap-3">
 
-                  {/* === ĐĂNG KÝ === */}
-                  <div style={{ display: isSignUp ? "flex" : "none" }} className="flex-col gap-4">
-                    {/* Tên đăng nhập */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-username">
-                        Tên đăng nhập
-                      </label>
-                      <div 
-                        className="relative"
-                        onMouseEnter={() => setHoveredField("su-username")}
-                        onMouseLeave={() => setHoveredField(null)}
+                  <AnimatePresence mode="wait" initial={false}>
+                    {isSignUp ? (
+                      <motion.div
+                        key="register-fields-container"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex flex-col gap-3"
                       >
-                        <HoverMorphIcon
-                          defaultIcon={MorphUser}
-                          hoverIcon={MorphAtSign}
-                          isHovered={focusedField === "su-username" || hoveredField === "su-username" || Boolean(username)}
-                          size={16}
-                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                            focusedField === "su-username" ? "text-[#FF4D24]" : "text-slate-400"
-                          }`}
-                        />
-                        <input
-                          id="su-username"
-                          type="text"
-                          placeholder="Nhập tên đăng nhập"
-                          value={username}
-                          onFocus={() => setFocusedField("su-username")}
-                          onBlur={() => setFocusedField(null)}
-                          onChange={(e) => {
-                            setUsername(e.target.value);
-                            if (fieldErrors["username"] || fieldErrors["name"]) {
-                              setFieldErrors(prev => ({ ...prev, username: "", name: "" }));
-                            }
-                          }}
-                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["username"] || fieldErrors["name"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                        />
-                      </div>
-                      {(fieldErrors["username"] || fieldErrors["name"]) && (
-                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["username"] || fieldErrors["name"]}</span>
-                        </p>
-                      )}
-                    </div>
+                        {/* Tên đăng nhập */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-username">
+                            Tên đăng nhập
+                          </label>
+                          <div 
+                            className="relative"
+                            onMouseEnter={() => setHoveredField("su-username")}
+                            onMouseLeave={() => setHoveredField(null)}
+                          >
+                            <HoverMorphIcon
+                              defaultIcon={MorphUser}
+                              hoverIcon={MorphAtSign}
+                              isHovered={focusedField === "su-username" || hoveredField === "su-username" || Boolean(username)}
+                              size={16}
+                              className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                focusedField === "su-username" ? "text-[#FF4D24]" : "text-slate-400"
+                              }`}
+                            />
+                            <input
+                              id="su-username"
+                              type="text"
+                              placeholder="Nhập tên đăng nhập"
+                              value={username}
+                              onFocus={() => setFocusedField("su-username")}
+                              onBlur={() => setFocusedField(null)}
+                              onChange={(e) => {
+                                setUsername(e.target.value);
+                                if (fieldErrors["username"] || fieldErrors["name"]) {
+                                  setFieldErrors(prev => ({ ...prev, username: "", name: "" }));
+                                }
+                              }}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["username"] || fieldErrors["name"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            />
+                          </div>
+                          {(fieldErrors["username"] || fieldErrors["name"]) && (
+                            <p className="text-[10px] text-red-500 font-medium font-sans mt-0.5 text-left flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["username"] || fieldErrors["name"]}</span>
+                            </p>
+                          )}
+                        </div>
 
-                    {/* Ho va ten */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-fullname">
-                        Họ và Tên đầy đủ
-                      </label>
-                      <div 
-                        className="relative"
-                        onMouseEnter={() => setHoveredField("su-fullname")}
-                        onMouseLeave={() => setHoveredField(null)}
+                        {/* Ho va ten */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-fullname">
+                            Họ và Tên đầy đủ
+                          </label>
+                          <div 
+                            className="relative"
+                            onMouseEnter={() => setHoveredField("su-fullname")}
+                            onMouseLeave={() => setHoveredField(null)}
+                          >
+                            <HoverMorphIcon
+                              defaultIcon={MorphCircleUser}
+                              hoverIcon={MorphIdCard}
+                              isHovered={focusedField === "su-fullname" || hoveredField === "su-fullname" || Boolean(fullName)}
+                              size={16}
+                              className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                focusedField === "su-fullname" ? "text-[#FF4D24]" : "text-slate-400"
+                              }`}
+                            />
+                            <input
+                              id="su-fullname"
+                              type="text"
+                              placeholder="Họ và tên đầy đủ"
+                              value={fullName}
+                              onFocus={() => setFocusedField("su-fullname")}
+                              onBlur={() => setFocusedField(null)}
+                              onChange={(e) => {
+                                setFullName(e.target.value);
+                                if (fieldErrors["fullName"]) setFieldErrors(prev => ({ ...prev, fullName: "" }));
+                              }}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["fullName"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            />
+                          </div>
+                          {fieldErrors["fullName"] && (
+                            <p className="text-[10px] text-red-500 font-medium font-sans mt-0.5 text-left flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["fullName"]}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Email */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-email">
+                            Địa chỉ Email
+                          </label>
+                          <div 
+                            className="relative"
+                            onMouseEnter={() => setHoveredField("su-email")}
+                            onMouseLeave={() => setHoveredField(null)}
+                          >
+                            <HoverMorphIcon
+                              defaultIcon={MorphMail}
+                              hoverIcon={MorphMailCheck}
+                              isHovered={focusedField === "su-email" || hoveredField === "su-email" || Boolean(email)}
+                              size={16}
+                              className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                focusedField === "su-email" ? "text-[#FF4D24]" : "text-slate-400"
+                              }`}
+                            />
+                            <input
+                              id="su-email"
+                              type="email"
+                              placeholder="Địa chỉ email"
+                              value={email}
+                              onFocus={() => setFocusedField("su-email")}
+                              onBlur={() => setFocusedField(null)}
+                              onChange={(e) => {
+                                setEmail(e.target.value);
+                                if (fieldErrors["email"]) setFieldErrors(prev => ({ ...prev, email: "" }));
+                              }}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            />
+                          </div>
+                          {fieldErrors["email"] && (
+                            <p className="text-[10px] text-red-500 font-medium font-sans mt-0.5 text-left flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["email"]}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Mat khau */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-password">
+                            Mật khẩu
+                          </label>
+                          <div 
+                            className="relative"
+                            onMouseEnter={() => setHoveredField("su-password")}
+                            onMouseLeave={() => setHoveredField(null)}
+                          >
+                            <HoverMorphIcon
+                              defaultIcon={MorphLock}
+                              hoverIcon={MorphKeyRound}
+                              isHovered={focusedField === "su-password" || hoveredField === "su-password" || Boolean(password)}
+                              size={16}
+                              className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                focusedField === "su-password" ? "text-[#FF4D24]" : "text-slate-400"
+                              }`}
+                            />
+                            <input
+                              id="su-password"
+                              type={showPassword ? "text" : "password"}
+                              placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                              value={password}
+                              onFocus={() => setFocusedField("su-password")}
+                              onBlur={() => setFocusedField(null)}
+                              onChange={(e) => {
+                                setPassword(e.target.value);
+                                if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
+                              }}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
+                              <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
+                            </button>
+                          </div>
+                          {fieldErrors["password"] && (
+                            <p className="text-[10px] text-red-500 font-medium font-sans mt-0.5 text-left flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["password"]}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Xác nhận mật khẩu */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-confirm">
+                            Xác nhận mật khẩu
+                          </label>
+                          <div 
+                            className="relative"
+                            onMouseEnter={() => setHoveredField("su-confirm")}
+                            onMouseLeave={() => setHoveredField(null)}
+                          >
+                            <HoverMorphIcon
+                              defaultIcon={MorphShieldCheck}
+                              hoverIcon={MorphCheckCheck}
+                              isHovered={focusedField === "su-confirm" || hoveredField === "su-confirm" || Boolean(confirmPassword)}
+                              size={16}
+                              className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                focusedField === "su-confirm" ? "text-[#FF4D24]" : "text-slate-400"
+                              }`}
+                            />
+                            <input
+                              id="su-confirm"
+                              type={showConfirmPassword ? "text" : "password"}
+                              placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                              value={confirmPassword}
+                              onFocus={() => setFocusedField("su-confirm")}
+                              onBlur={() => setFocusedField(null)}
+                              onChange={(e) => {
+                                setConfirmPassword(e.target.value);
+                                if (fieldErrors["confirmPassword"]) setFieldErrors(prev => ({ ...prev, confirmPassword: "" }));
+                              }}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["confirmPassword"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            />
+                            <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
+                              <MorphIcon icon={showConfirmPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
+                            </button>
+                          </div>
+                          {fieldErrors["confirmPassword"] && (
+                            <p className="text-[10px] text-red-500 font-medium font-sans mt-0.5 text-left flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["confirmPassword"]}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Terms */}
+                        <div className="flex items-center gap-2.5 mt-0.5 text-left">
+                          <input id="su-terms" type="checkbox" checked={agreeToTerms} onChange={(e) => setAgreeToTerms(e.target.checked)} className="w-4 h-4 accent-[#FF4D24] border-slate-300 rounded cursor-pointer shrink-0" />
+                          <label htmlFor="su-terms" className="text-[10.5px] text-slate-500 leading-normal font-sans">
+                            Tôi đồng ý với{" "}
+                            <a href="#terms" onClick={(e) => { e.preventDefault(); onNavigate("terms"); }} className="text-[#FF4D24] font-bold hover:underline">Điều khoản Dịch vụ</a>
+                            {" "}và{" "}
+                            <a href="#privacy" onClick={(e) => { e.preventDefault(); onNavigate("terms"); }} className="text-[#FF4D24] font-bold hover:underline">Chính sách Bảo mật</a>
+                            {" "}của Horizon Mobile.
+                          </label>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="login-fields-container"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        className="flex flex-col gap-3"
                       >
-                        <HoverMorphIcon
-                          defaultIcon={MorphCircleUser}
-                          hoverIcon={MorphIdCard}
-                          isHovered={focusedField === "su-fullname" || hoveredField === "su-fullname" || Boolean(fullName)}
-                          size={16}
-                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                            focusedField === "su-fullname" ? "text-[#FF4D24]" : "text-slate-400"
-                          }`}
-                        />
-                        <input
-                          id="su-fullname"
-                          type="text"
-                          placeholder="Họ và tên đầy đủ"
-                          value={fullName}
-                          onFocus={() => setFocusedField("su-fullname")}
-                          onBlur={() => setFocusedField(null)}
-                          onChange={(e) => {
-                            setFullName(e.target.value);
-                            if (fieldErrors["fullName"]) setFieldErrors(prev => ({ ...prev, fullName: "" }));
-                          }}
-                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["fullName"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                        />
-                      </div>
-                      {fieldErrors["fullName"] && (
-                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["fullName"]}</span>
-                        </p>
-                      )}
-                    </div>
+                        {/* Email hoac Username */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="li-email">
+                            Tên đăng nhập hoặc Email
+                          </label>
+                          <div 
+                            className="relative"
+                            onMouseEnter={() => setHoveredField("li-email")}
+                            onMouseLeave={() => setHoveredField(null)}
+                          >
+                            <HoverMorphIcon
+                              defaultIcon={MorphCircleUser}
+                              hoverIcon={MorphAtSign}
+                              isHovered={focusedField === "li-email" || hoveredField === "li-email" || Boolean(email)}
+                              size={16}
+                              className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                focusedField === "li-email" ? "text-[#FF4D24]" : "text-slate-400"
+                              }`}
+                            />
+                            <input
+                              id="li-email"
+                              type="text"
+                              placeholder="Email hoặc tên đăng nhập"
+                              value={email}
+                              onFocus={() => setFocusedField("li-email")}
+                              onBlur={() => setFocusedField(null)}
+                              onChange={(e) => {
+                                setEmail(e.target.value);
+                                if (fieldErrors["email"] || fieldErrors["usernameOrEmail"]) {
+                                  setFieldErrors(prev => ({ ...prev, email: "", usernameOrEmail: "" }));
+                                }
+                              }}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] || fieldErrors["usernameOrEmail"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            />
+                          </div>
+                          {(fieldErrors["email"] || fieldErrors["usernameOrEmail"]) && (
+                            <p className="text-[10px] text-red-500 font-medium font-sans mt-0.5 text-left flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["email"] || fieldErrors["usernameOrEmail"]}</span>
+                            </p>
+                          )}
+                        </div>
 
-                    {/* Email */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-email">
-                        Địa chỉ Email
-                      </label>
-                      <div 
-                        className="relative"
-                        onMouseEnter={() => setHoveredField("su-email")}
-                        onMouseLeave={() => setHoveredField(null)}
-                      >
-                        <HoverMorphIcon
-                          defaultIcon={MorphMail}
-                          hoverIcon={MorphMailCheck}
-                          isHovered={focusedField === "su-email" || hoveredField === "su-email" || Boolean(email)}
-                          size={16}
-                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                            focusedField === "su-email" ? "text-[#FF4D24]" : "text-slate-400"
-                          }`}
-                        />
-                        <input
-                          id="su-email"
-                          type="email"
-                          placeholder="Địa chỉ email"
-                          value={email}
-                          onFocus={() => setFocusedField("su-email")}
-                          onBlur={() => setFocusedField(null)}
-                          onChange={(e) => {
-                            setEmail(e.target.value);
-                            if (fieldErrors["email"]) setFieldErrors(prev => ({ ...prev, email: "" }));
-                          }}
-                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                        />
-                      </div>
-                      {fieldErrors["email"] && (
-                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["email"]}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Mat khau */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-password">
-                        Mật khẩu
-                      </label>
-                      <div 
-                        className="relative"
-                        onMouseEnter={() => setHoveredField("su-password")}
-                        onMouseLeave={() => setHoveredField(null)}
-                      >
-                        <HoverMorphIcon
-                          defaultIcon={MorphLock}
-                          hoverIcon={MorphKeyRound}
-                          isHovered={focusedField === "su-password" || hoveredField === "su-password" || Boolean(password)}
-                          size={16}
-                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                            focusedField === "su-password" ? "text-[#FF4D24]" : "text-slate-400"
-                          }`}
-                        />
-                        <input
-                          id="su-password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-                          value={password}
-                          onFocus={() => setFocusedField("su-password")}
-                          onBlur={() => setFocusedField(null)}
-                          onChange={(e) => {
-                            setPassword(e.target.value);
-                            if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
-                          }}
-                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                        />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
-                          <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
-                        </button>
-                      </div>
-                      {fieldErrors["password"] && (
-                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["password"]}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Xác nhận mật khẩu */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-confirm">
-                        Xác nhận mật khẩu
-                      </label>
-                      <div 
-                        className="relative"
-                        onMouseEnter={() => setHoveredField("su-confirm")}
-                        onMouseLeave={() => setHoveredField(null)}
-                      >
-                        <HoverMorphIcon
-                          defaultIcon={MorphShieldCheck}
-                          hoverIcon={MorphCheckCheck}
-                          isHovered={focusedField === "su-confirm" || hoveredField === "su-confirm" || Boolean(confirmPassword)}
-                          size={16}
-                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                            focusedField === "su-confirm" ? "text-[#FF4D24]" : "text-slate-400"
-                          }`}
-                        />
-                        <input
-                          id="su-confirm"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-                          value={confirmPassword}
-                          onFocus={() => setFocusedField("su-confirm")}
-                          onBlur={() => setFocusedField(null)}
-                          onChange={(e) => {
-                            setConfirmPassword(e.target.value);
-                            if (fieldErrors["confirmPassword"]) setFieldErrors(prev => ({ ...prev, confirmPassword: "" }));
-                          }}
-                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["confirmPassword"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                        />
-                      </div>
-                      {fieldErrors["confirmPassword"] && (
-                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["confirmPassword"]}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Terms */}
-                    <div className="flex items-center gap-2.5 mt-1 text-left">
-                      <input id="su-terms" type="checkbox" checked={agreeToTerms} onChange={(e) => setAgreeToTerms(e.target.checked)} className="w-4 h-4 accent-[#FF4D24] border-slate-300 rounded cursor-pointer shrink-0" />
-                      <label htmlFor="su-terms" className="text-[10.5px] text-slate-500 leading-normal font-sans">
-                        Tôi đồng ý với{" "}
-                        <a href="#terms" onClick={(e) => { e.preventDefault(); onNavigate("terms"); }} className="text-[#FF4D24] font-bold hover:underline">Điều khoản Dịch vụ</a>
-                        {" "}và{" "}
-                        <a href="#privacy" onClick={(e) => { e.preventDefault(); onNavigate("terms"); }} className="text-[#FF4D24] font-bold hover:underline">Chính sách Bảo mật</a>
-                        {" "}của Horizon Mobile.
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* === DANG NHAP === */}
-                  <div style={{ display: isSignUp ? "none" : "flex" }} className="flex-col gap-4">
-                    {/* Email hoac Username */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="li-email">
-                        Tên đăng nhập hoặc Email
-                      </label>
-                      <div 
-                        className="relative"
-                        onMouseEnter={() => setHoveredField("li-email")}
-                        onMouseLeave={() => setHoveredField(null)}
-                      >
-                        <HoverMorphIcon
-                          defaultIcon={MorphCircleUser}
-                          hoverIcon={MorphAtSign}
-                          isHovered={focusedField === "li-email" || hoveredField === "li-email" || Boolean(email)}
-                          size={16}
-                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                            focusedField === "li-email" ? "text-[#FF4D24]" : "text-slate-400"
-                          }`}
-                        />
-                        <input
-                          id="li-email"
-                          type="text"
-                          placeholder="Email hoặc tên đăng nhập"
-                          value={email}
-                          onFocus={() => setFocusedField("li-email")}
-                          onBlur={() => setFocusedField(null)}
-                          onChange={(e) => {
-                            setEmail(e.target.value);
-                            if (fieldErrors["email"] || fieldErrors["usernameOrEmail"]) {
-                              setFieldErrors(prev => ({ ...prev, email: "", usernameOrEmail: "" }));
-                            }
-                          }}
-                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] || fieldErrors["usernameOrEmail"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                        />
-                      </div>
-                      {(fieldErrors["email"] || fieldErrors["usernameOrEmail"]) && (
-                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["email"] || fieldErrors["usernameOrEmail"]}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Mat khau */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="li-password">
-                          Mật khẩu
-                        </label>
-                        <button type="button" onClick={() => { window.location.hash = "recovery"; setRecoveryMode("SEND_LINK"); setErrorMsg(""); setSuccessMsg(""); if (email && email.includes("@")) setRecoveryEmail(email); }} className="text-[10px] font-bold text-[#FF4D24] hover:underline cursor-pointer">
-                          Quên thông tin tài khoản?
-                        </button>
-                      </div>
-                      <div 
-                        className="relative"
-                        onMouseEnter={() => setHoveredField("li-password")}
-                        onMouseLeave={() => setHoveredField(null)}
-                      >
-                        <HoverMorphIcon
-                          defaultIcon={MorphLock}
-                          hoverIcon={MorphKeyRound}
-                          isHovered={focusedField === "li-password" || hoveredField === "li-password" || Boolean(password)}
-                          size={16}
-                          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
-                            focusedField === "li-password" ? "text-[#FF4D24]" : "text-slate-400"
-                          }`}
-                        />
-                        <input
-                          id="li-password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-                          value={password}
-                          onFocus={() => setFocusedField("li-password")}
-                          onBlur={() => setFocusedField(null)}
-                          onChange={(e) => {
-                            setPassword(e.target.value);
-                            if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
-                          }}
-                          className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
-                        />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
-                          <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
-                        </button>
-                      </div>
-                      {fieldErrors["password"] && (
-                        <p className="text-[10px] text-red-500 font-medium font-sans mt-1 text-left flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["password"]}</span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                        {/* Mat khau */}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="li-password">
+                              Mật khẩu
+                            </label>
+                            <button type="button" onClick={() => { window.location.hash = "recovery"; setRecoveryMode("SEND_LINK"); setErrorMsg(""); setSuccessMsg(""); if (email && email.includes("@")) setRecoveryEmail(email); }} className="text-[10px] font-bold text-[#FF4D24] hover:underline cursor-pointer">
+                              Quên thông tin tài khoản?
+                            </button>
+                          </div>
+                          <div 
+                            className="relative"
+                            onMouseEnter={() => setHoveredField("li-password")}
+                            onMouseLeave={() => setHoveredField(null)}
+                          >
+                            <HoverMorphIcon
+                              defaultIcon={MorphLock}
+                              hoverIcon={MorphKeyRound}
+                              isHovered={focusedField === "li-password" || hoveredField === "li-password" || Boolean(password)}
+                              size={16}
+                              className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 ${
+                                focusedField === "li-password" ? "text-[#FF4D24]" : "text-slate-400"
+                              }`}
+                            />
+                            <input
+                              id="li-password"
+                              type={showPassword ? "text" : "password"}
+                              placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                              value={password}
+                              onFocus={() => setFocusedField("li-password")}
+                              onBlur={() => setFocusedField(null)}
+                              onChange={(e) => {
+                                setPassword(e.target.value);
+                                if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
+                              }}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
+                              <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
+                            </button>
+                          </div>
+                          {fieldErrors["password"] && (
+                            <p className="text-[10px] text-red-500 font-medium font-sans mt-0.5 text-left flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["password"]}</span>
+                            </p>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Submit */}
                   <button
@@ -2793,9 +2908,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   </button>
                 </form>
 
-
                 {/* Social login divider */}
-                <div className="relative my-6 select-none">
+                <div className="relative my-3.5 select-none">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-slate-200/80"></div>
                   </div>
@@ -2805,7 +2919,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 </div>
 
                 {/* Social login buttons */}
-                <div className="grid grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => handleSocialLogin("Google")}
                     className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border-t border-t-white border-b border-b-slate-300/40 border-x border-x-white/70 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer"
@@ -2828,7 +2942,6 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     <span>GitHub</span>
                   </button>
                 </div>
-
 
 
 
@@ -2898,20 +3011,34 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                         <p className="text-[11px] text-red-600 leading-relaxed font-medium px-1">{verifyOverlayMsg}</p>
                       </div>
                       <div className="py-1 px-2.5 bg-red-50/50 border border-[#FF4D24]/10 rounded-lg text-[9px] text-[#FF4D24] font-bold font-mono inline-block">
-                        Quay lại đăng ký sau {verifyOverlayTimeLeft} giây...
+                        Chuyển hướng sau {verifyOverlayTimeLeft} giây...
                       </div>
-                      <button
-                        onClick={() => {
-                          setShowVerifyOverlay(false);
-                          setIsSignUp(true);
-                          window.location.hash = "register";
-                          setErrorMsg(verifyOverlayMsg);
-                        }}
-                        className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-4 rounded-xl font-sans text-xs font-black shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <span>QUAY LẠI ĐĂNG KÝ</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex flex-col gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            setShowVerifyOverlay(false);
+                            window.location.hash = "resend-verification";
+                            setRecoveryMode("RESEND_VERIFICATION");
+                            setIsSignUp(false);
+                            setIsVerifyingMode(false);
+                          }}
+                          className="w-full bg-[#FF4D24] hover:bg-[#E03D16] text-white py-2.5 px-4 rounded-xl font-sans text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>GỬI LẠI MÃ XÁC THỰC</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowVerifyOverlay(false);
+                            setIsSignUp(false);
+                            window.location.hash = "login";
+                            setErrorMsg(verifyOverlayMsg);
+                          }}
+                          className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-4 rounded-xl font-sans text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <span>QUAY LẠI ĐĂNG NHẬP</span>
+                        </button>
+                      </div>
                     </>
                   )}
                 </motion.div>
@@ -2919,7 +3046,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
             )}
           </AnimatePresence>
 
-        </div>
+        </motion.div>
 
 
 

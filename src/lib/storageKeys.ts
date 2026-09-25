@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   REFRESH_TOKENS_MAP: "refresh_tokens_map",
   DEVICE_ID: "device_id",
   USE_API_PROXY: "use_api_proxy",
+  API_BASE_URL: "api_base_url",
 
   CART_ITEMS: "cart_items",
   GUEST_ID: "guest_id",

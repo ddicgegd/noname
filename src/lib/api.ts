@@ -7,15 +7,47 @@ import { extractBackendMessage } from "./responseExtractor";
 import { STORAGE_KEYS } from "./storageKeys";
 
 export function getApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    try {
+      const customUrl = localStorage.getItem("horizon_api_base_url") || localStorage.getItem(STORAGE_KEYS.API_BASE_URL);
+      if (customUrl && customUrl.trim().length > 0) {
+        return customUrl.trim();
+      }
+    } catch {}
+  }
   return ((import.meta as any).env?.VITE_API_BASE_URL as string) || "http://localhost:8080";
 }
 
+export function setApiBaseUrl(url: string): void {
+  if (typeof window !== "undefined") {
+    try {
+      const trimmed = url.trim();
+      if (!trimmed || trimmed === "http://localhost:8080" || trimmed === "") {
+        localStorage.removeItem("horizon_api_base_url");
+        localStorage.removeItem(STORAGE_KEYS.API_BASE_URL);
+      } else {
+        localStorage.setItem("horizon_api_base_url", trimmed);
+        localStorage.setItem(STORAGE_KEYS.API_BASE_URL, trimmed);
+      }
+    } catch {}
+  }
+}
+
 export function isProxyEnabled(): boolean {
+  if (typeof window !== "undefined") {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.USE_API_PROXY) === "true";
+    } catch {}
+  }
   return false;
 }
 
-export function setProxyEnabled(_enabled: boolean): void {
-  localStorage.setItem(STORAGE_KEYS.USE_API_PROXY, "false");
+export function setProxyEnabled(enabled: boolean): void {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_KEYS.USE_API_PROXY, enabled ? "true" : "false");
+    } catch {}
+  }
 }
 
 export interface DeviceInfo {
@@ -259,7 +291,8 @@ export async function apiRequest<T = any>(
   const targetUrl = `${baseUrl.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
 
   const headers = new Headers(options.headers);
-  if (!headers.has("Content-Type")) {
+  // Do NOT set Content-Type if body is FormData (let browser set multipart boundary)
+  if (!headers.has("Content-Type") && !(typeof FormData !== "undefined" && options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 

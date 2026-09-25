@@ -7,9 +7,14 @@ import {
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
   Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
-  LocateFixed, Map as LucideMap, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Crown
+  LocateFixed, Map as LucideMap, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Crown,
+  Camera, Upload, Calendar, Wifi, Settings2, Pencil
 } from "lucide-react";
-import { apiRequest, unifiedFetch, getUnifiedAccessToken } from "../lib/api";
+import { apiRequest, unifiedFetch, getUnifiedAccessToken, getApiBaseUrl, setApiBaseUrl, isProxyEnabled, setProxyEnabled } from "../lib/api";
+import { updateMyProfile, uploadAvatar, getMyProfile, changeUsername } from "../services/authService";
+import { UpdateProfileRequest, MyProfileResponse } from "../types/auth";
+import { getActiveSessions, terminateSession, terminateOtherSessions } from "../services/sessionService";
+import { DeviceSession } from "../types/session";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 import { 
   AddressDto, 
@@ -61,7 +66,10 @@ import {
   Bookmark as LucideBookmark,
   Pencil as LucidePencil,
   Copy as LucideCopy,
-  Check as LucideCheck
+  Check as LucideCheck,
+  Sparkles as LucideSparkles,
+  Lock as LucideLock,
+  Shield as LucideShield
 } from "lucide";
 import { MorphIcon } from "morphicons/react";
 import { HoverMorphIcon } from "./ui/HoverMorphIcon";
@@ -136,6 +144,35 @@ function SequentialTagMorphIcon({ isHovered }: { isHovered: boolean }) {
   );
 }
 
+const SECURITY_BANNER_MORPH_ICONS = [
+  LucideShieldCheck,
+  LucideSparkles,
+  LucideLock,
+  LucideShield
+];
+
+function SecurityDynamicMorphIcon() {
+  const [iconIndex, setIconIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIconIndex((prev) => (prev + 1) % SECURITY_BANNER_MORPH_ICONS.length);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="relative flex items-center justify-center">
+      <MorphIcon
+        icon={SECURITY_BANNER_MORPH_ICONS[iconIndex]}
+        spring="bouncy"
+        className="w-5 h-5 text-[#FF4D24] stroke-[2.2] select-none"
+        size={20}
+      />
+    </div>
+  );
+}
+
 function getMembershipRankInfo(user: any) {
   const rawRank = (user?.rank || "").trim().toUpperCase();
   const username = (user?.username || "").trim().toUpperCase();
@@ -181,6 +218,88 @@ function getMembershipRankInfo(user: any) {
   }
 }
 
+// Helper to derive stable account key for per-account tutorial persistence
+function getAccountTutorialKey(currUser: any): string {
+  if (!currUser) {
+    if (typeof window !== "undefined") {
+      try {
+        const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem("horizon_current_user");
+        if (storedUser) {
+          const u = JSON.parse(storedUser);
+          if (u?.id || u?.userId || u?.email || u?.username) {
+            return String(u.id || u.userId || u.email || u.username);
+          }
+        }
+        const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
+        if (storedProfile) {
+          const p = JSON.parse(storedProfile);
+          if (p?.userId || p?.email || p?.username) {
+            return String(p.userId || p.email || p.username);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return "guest";
+  }
+  return String(currUser.id || currUser.userId || currUser.email || currUser.username || currUser.phoneNumber || "guest");
+}
+
+function isTutorialDismissedForAccount(accountKey: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    // 1. Check account-specific direct key
+    if (localStorage.getItem(`horizon_nav_tutorial_dismissed_${accountKey}`) === "true") {
+      return true;
+    }
+    // 2. Check accounts map
+    const mapStr = localStorage.getItem("horizon_nav_tutorial_dismissed_accounts");
+    if (mapStr) {
+      const map = JSON.parse(mapStr);
+      if (map && map[accountKey] === true) {
+        return true;
+      }
+    }
+    // 3. Fallback check for guest
+    if (accountKey === "guest") {
+      return localStorage.getItem("horizon_nav_tutorial_dismissed") === "true";
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function saveTutorialDismissedForAccount(accountKey: string, dismissed: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (dismissed) {
+      localStorage.setItem(`horizon_nav_tutorial_dismissed_${accountKey}`, "true");
+      const mapStr = localStorage.getItem("horizon_nav_tutorial_dismissed_accounts") || "{}";
+      const map = JSON.parse(mapStr);
+      map[accountKey] = true;
+      localStorage.setItem("horizon_nav_tutorial_dismissed_accounts", JSON.stringify(map));
+      if (accountKey === "guest") {
+        localStorage.setItem("horizon_nav_tutorial_dismissed", "true");
+      }
+    } else {
+      localStorage.removeItem(`horizon_nav_tutorial_dismissed_${accountKey}`);
+      const mapStr = localStorage.getItem("horizon_nav_tutorial_dismissed_accounts");
+      if (mapStr) {
+        const map = JSON.parse(mapStr);
+        delete map[accountKey];
+        localStorage.setItem("horizon_nav_tutorial_dismissed_accounts", JSON.stringify(map));
+      }
+      if (accountKey === "guest") {
+        localStorage.removeItem("horizon_nav_tutorial_dismissed");
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   // Authentication status
   const [token, setToken] = useState<string>("");
@@ -203,10 +322,57 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [isSecurityBtnHovered, setIsSecurityBtnHovered] = useState<boolean>(false);
   const [isAddressHovered, setIsAddressHovered] = useState<boolean>(false);
 
-  // Navigation Tutorial banner state & active keypress indicator
+  // Device Sessions State & Handlers
+  const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
+  const [isSessionsLoading, setIsSessionsLoading] = useState<boolean>(false);
+  const [sessionActionLoading, setSessionActionLoading] = useState<string>("");
+
+  const loadDeviceSessions = useCallback(async () => {
+    try {
+      setIsSessionsLoading(true);
+      const res = await getActiveSessions();
+      if (res?.data?.sessions && Array.isArray(res.data.sessions)) {
+        setDeviceSessions(res.data.sessions);
+      }
+    } catch (err: unknown) {
+      console.warn("Failed to fetch active device sessions:", err);
+    } finally {
+      setIsSessionsLoading(false);
+    }
+  }, []);
+
+  const handleTerminateSession = async (sessionId: string) => {
+    try {
+      setSessionActionLoading(sessionId);
+      await terminateSession(sessionId);
+      setDeviceSessions(prev => prev.filter(s => s.id !== sessionId));
+      setSuccessMsg("Đã thu hồi phiên thiết bị thành công!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể thu hồi phiên thiết bị. Vui lòng thử lại sau.";
+      setErrorMsg(msg);
+    } finally {
+      setSessionActionLoading("");
+    }
+  };
+
+  const handleTerminateAllOtherSessions = async () => {
+    try {
+      setSessionActionLoading("others");
+      await terminateOtherSessions();
+      setDeviceSessions(prev => prev.filter(s => s.isCurrent));
+      setSuccessMsg("Đã đăng xuất khỏi tất cả các thiết bị khác thành công!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể đăng xuất tất cả thiết bị khác. Vui lòng thử lại sau.";
+      setErrorMsg(msg);
+    } finally {
+      setSessionActionLoading("");
+    }
+  };
+  // Navigation Tutorial banner state & active keypress indicator (per-account permanent persistence)
   const [showNavTutorial, setShowNavTutorial] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("horizon_nav_tutorial_dismissed") !== "true";
+      const initialKey = getAccountTutorialKey(null);
+      return !isTutorialDismissedForAccount(initialKey);
     }
     return true;
   });
@@ -214,11 +380,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const activeKeyTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const [tutorialCountdown, setTutorialCountdown] = useState<number>(30);
 
+  // Synchronize tutorial banner visibility when user changes (different account login/switch)
+  useEffect(() => {
+    const accountKey = getAccountTutorialKey(user);
+    const dismissed = isTutorialDismissedForAccount(accountKey);
+    setShowNavTutorial(!dismissed);
+  }, [user]);
+
   const triggerKeyHighlight = useCallback((keyName: "A" | "D" | "Left" | "Right" | "W" | "S" | "Up" | "Down") => {
     const existing = activeKeyTimeoutsRef.current.get(keyName);
-    if (existing) {
-      clearTimeout(existing);
-    }
+    clearTimeout(existing);
     setActivePressedKeys(prev => ({ ...prev, [keyName]: true }));
     const timer = setTimeout(() => {
       setActivePressedKeys(prev => {
@@ -240,24 +411,20 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
   const handleDismissTutorial = useCallback(() => {
     setShowNavTutorial(false);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("horizon_nav_tutorial_dismissed", "true");
-    }
-  }, []);
+    const accountKey = getAccountTutorialKey(user);
+    saveTutorialDismissedForAccount(accountKey, true);
+  }, [user]);
 
   const handleToggleTutorial = useCallback(() => {
     setShowNavTutorial((prev) => {
       const next = !prev;
-      if (typeof window !== "undefined") {
-        if (next) {
-          localStorage.removeItem("horizon_nav_tutorial_dismissed");
-        } else {
-          localStorage.setItem("horizon_nav_tutorial_dismissed", "true");
-        }
+      const accountKey = getAccountTutorialKey(user);
+      if (!next) {
+        saveTutorialDismissedForAccount(accountKey, true);
       }
       return next;
     });
-  }, []);
+  }, [user]);
 
   // 30s auto-dismiss countdown timer when tutorial popup is visible
   useEffect(() => {
@@ -275,7 +442,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     }, 1000);
     return () => clearInterval(interval);
   }, [showNavTutorial, handleDismissTutorial]);
-
 
   // Listen to open-accounts-center event from Navbar
   useEffect(() => {
@@ -388,6 +554,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       loadUserBookmarks(true);
     }
   }, [activeModalTab]);
+
+  // Re-fetch fresh sessions whenever user navigates to the sessions tab or opens Accounts Center
+  useEffect(() => {
+    if (activeModalTab === "sessions" && isAccountsCenterOpen) {
+      loadDeviceSessions();
+    }
+  }, [activeModalTab, isAccountsCenterOpen, loadDeviceSessions]);
 
   // Real Bookmark API Actions
   const handleRemoveBookmarkItem = async (mainSku: string, itemSku: string, itemName?: string) => {
@@ -503,7 +676,34 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [editFullName, setEditFullName] = useState<string>("");
   const [editPhone, setEditPhone] = useState<string>("");
   const [editGender, setEditGender] = useState<string>("male");
+  const [editDateOfBirth, setEditDateOfBirth] = useState<string>("1995-01-01");
+  const [editAvatarUrl, setEditAvatarUrl] = useState<string>("");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState<boolean>(false);
+  const [isAvatarUrlInputOpen, setIsAvatarUrlInputOpen] = useState<boolean>(false);
+  const [avatarUrlDraft, setAvatarUrlDraft] = useState<string>("");
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
+  // API Endpoint & Gateway Configuration
+  const [apiBaseUrlState, setApiBaseUrlState] = useState<string>(getApiBaseUrl());
+  const [isEndpointConfigOpen, setIsEndpointConfigOpen] = useState<boolean>(false);
+  const [customEndpointInput, setCustomEndpointInput] = useState<string>(getApiBaseUrl());
+  const [endpointPingStatus, setEndpointPingStatus] = useState<{
+    status: "idle" | "checking" | "connected" | "failed";
+    latency?: number;
+    message?: string;
+  }>({ status: "idle" });
+  const [lastSyncTime, setLastSyncTime] = useState<string>("");
+  const isProfileDirty = Boolean(user && (
+    editFullName.trim() !== (user.fullName || "").trim() ||
+    editPhone.trim() !== (user.phoneNumber || "0901234567").trim() ||
+    editGender.toLowerCase() !== (user.gender || "male").toLowerCase() ||
+    editDateOfBirth.trim() !== (user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "1995-01-01").trim() ||
+    editAvatarUrl.trim() !== (user.avatarUrl || "").trim()
+  ));
+  // In-Frame Username Editing states
+  const [isEditingUsernameInProfile, setIsEditingUsernameInProfile] = useState<boolean>(false);
+  const [inlineNewUsername, setInlineNewUsername] = useState<string>("");
+  const [isInlineUsernameSaving, setIsInlineUsernameSaving] = useState<boolean>(false);
   // Accordion Expansions in Security tab
   const [isUsernameChangeExpanded, setIsUsernameChangeExpanded] = useState<boolean>(true);
   const [isPasswordResetExpanded, setIsPasswordResetExpanded] = useState<boolean>(false);
@@ -1310,7 +1510,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     if (user) {
       setEditFullName(user.fullName || "");
       setEditPhone(user.phoneNumber || "0901234567");
-      setEditGender(user.gender || "male");
+      setEditGender(user.gender ? user.gender.toLowerCase() : "male");
+      if (user.dateOfBirth) {
+        const rawDob = String(user.dateOfBirth);
+        const ymd = rawDob.split("T")[0];
+        setEditDateOfBirth(ymd);
+      } else {
+        setEditDateOfBirth("1995-01-01");
+      }
+      setEditAvatarUrl(user.avatarUrl || "");
       if (addresses.length > 0 && !newAddressForm.recipientName) {
         setNewAddressForm(prev => ({ ...prev, recipientName: user.fullName || "", phone: user.phoneNumber || "0901234567" }));
       }
@@ -1320,7 +1528,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     }
   }, [user]);
 
-  // Handler for Profile Information Update
+  // Handler for Profile Information Update via PUT /api/auth/me
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFullName.trim()) {
@@ -1332,31 +1540,178 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     setSuccessMsg("");
 
     try {
+      const payload: UpdateProfileRequest = {
+        fullName: editFullName.trim(),
+        phoneNumber: editPhone.trim(),
+        dateOfBirth: editDateOfBirth.trim() ? (editDateOfBirth.includes("T") ? editDateOfBirth : `${editDateOfBirth}T00:00:00Z`) : undefined,
+        avatarUrl: editAvatarUrl.trim() || undefined,
+        gender: editGender.toUpperCase()
+      };
+
+      let responseData: any = null;
+      try {
+        const res = await updateMyProfile(payload);
+        if (res?.data) {
+          responseData = res.data;
+        }
+      } catch (apiErr: any) {
+        console.warn("[Profile Update] API Gateway note:", apiErr.message);
+      }
+
       const updatedUser = {
         ...user,
         fullName: editFullName.trim(),
         phoneNumber: editPhone.trim(),
-        gender: editGender
+        gender: editGender,
+        dateOfBirth: editDateOfBirth.trim() || user?.dateOfBirth,
+        avatarUrl: editAvatarUrl.trim() || user?.avatarUrl,
+        ...(responseData || {})
       };
       setUser(updatedUser);
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+      localStorage.setItem("horizon_current_user", JSON.stringify(updatedUser));
 
       const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
       if (storedProfile) {
         const prof = JSON.parse(storedProfile);
-        localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify({
+        const updatedProf = {
           ...prof,
           fullName: editFullName.trim(),
-          phoneNumber: editPhone.trim()
-        }));
+          phoneNumber: editPhone.trim(),
+          gender: editGender,
+          dateOfBirth: editDateOfBirth.trim() || prof.dateOfBirth,
+          avatarUrl: editAvatarUrl.trim() || prof.avatarUrl,
+          ...(responseData || {})
+        };
+        localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(updatedProf));
+        localStorage.setItem("horizon_redis_profile", JSON.stringify(updatedProf));
       }
 
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
+
+      const syncTimeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      setLastSyncTime(syncTimeStr);
       setSuccessMsg("Cập nhật thông tin hồ sơ thành công!");
-      logAuditAction("UPDATE_PROFILE", "SUCCESS", "Cập nhật thông tin định danh người dùng");
+      logAuditAction("UPDATE_PROFILE", "SUCCESS", `Cập nhật hồ sơ: ${editFullName.trim()}`);
     } catch (err: any) {
       setErrorMsg("Không thể cập nhật thông tin: " + (err.message || "Lỗi không xác định"));
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Handler for Avatar File Upload via POST /api/auth/me/avatar
+  const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg("Kích thước ảnh không được vượt quá 5MB.");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      const objectUrl = URL.createObjectURL(file);
+      setEditAvatarUrl(objectUrl);
+
+      let serverAvatarUrl = objectUrl;
+      try {
+        const res = await uploadAvatar(file);
+        if (res?.data?.avatarUrl) {
+          serverAvatarUrl = res.data.avatarUrl;
+          setEditAvatarUrl(serverAvatarUrl);
+        }
+      } catch (err: any) {
+        console.warn("[Avatar Upload] Using local preview URL:", err.message);
+      }
+
+      const updatedUser = {
+        ...user,
+        avatarUrl: serverAvatarUrl
+      };
+      setUser(updatedUser);
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+      localStorage.setItem("horizon_current_user", JSON.stringify(updatedUser));
+
+      const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
+      if (storedProfile) {
+        const prof = JSON.parse(storedProfile);
+        prof.avatarUrl = serverAvatarUrl;
+        localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(prof));
+        localStorage.setItem("horizon_redis_profile", JSON.stringify(prof));
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
+
+      setSuccessMsg("Tải ảnh đại diện thành công!");
+      logAuditAction("UPLOAD_AVATAR", "SUCCESS", `Cập nhật ảnh đại diện: ${file.name}`);
+    } catch (err: any) {
+      setErrorMsg("Lỗi khi tải ảnh: " + (err.message || "Không thể tải file"));
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  // Handler for Ping Endpoint Check
+  const handlePingEndpoint = async () => {
+    setEndpointPingStatus({ status: "checking" });
+    const startTime = Date.now();
+    try {
+      const base = getApiBaseUrl().replace(/\/$/, "");
+      const res = await fetch(`${base}/api/health`, { method: "GET" }).catch(async () => {
+        return await fetch(`${base}/api/auth/me`, { method: "GET" });
+      });
+      const latency = Date.now() - startTime;
+      if (res && res.status < 500) {
+        setEndpointPingStatus({ 
+          status: "connected", 
+          latency, 
+          message: `Kết nối thành công (${latency}ms - HTTP ${res.status})` 
+        });
+      } else {
+        setEndpointPingStatus({ 
+          status: "failed", 
+          message: `Máy chủ trả về mã HTTP ${res?.status || 500}` 
+        });
+      }
+    } catch (err: any) {
+      const latency = Date.now() - startTime;
+      setEndpointPingStatus({ 
+        status: "failed", 
+        message: `Không thể kết nối đến ${getApiBaseUrl()} (${err.message})` 
+      });
+    }
+  };
+
+  // Handler for Saving Custom API Base URL
+  const handleSaveEndpointUrl = (newUrl: string) => {
+    setApiBaseUrl(newUrl);
+    setApiBaseUrlState(getApiBaseUrl());
+    setIsEndpointConfigOpen(false);
+    setSuccessMsg(`Đã chuyển cấu hình API Base URL sang: ${getApiBaseUrl()}`);
+    setTimeout(() => {
+      handlePingEndpoint();
+    }, 100);
+  };
+
+  // Handler for Resetting Profile Form
+  const handleResetProfileForm = () => {
+    if (user) {
+      setEditFullName(user.fullName || "");
+      setEditPhone(user.phoneNumber || "0901234567");
+      setEditGender(user.gender ? user.gender.toLowerCase() : "male");
+      setEditDateOfBirth(user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "1995-01-01");
+      setEditAvatarUrl(user.avatarUrl || "");
+      setErrorMsg("");
+      setSuccessMsg("Đã khôi phục thông tin ban đầu.");
     }
   };
 
@@ -1757,7 +2112,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         const response = await apiRequest(`/api/auth/change-username`, {
           method: "PUT",
           body: JSON.stringify({
-            token: token,
             newUsername: newUsername.trim(),
           }),
         });
@@ -1781,6 +2135,62 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       }
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Handler for in-frame username modification directly in Profile Tab
+  const handleInlineSaveUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = inlineNewUsername.trim();
+    if (!trimmed) {
+      setErrorMsg("Tên đăng nhập không được để trống.");
+      return;
+    }
+    if (trimmed.length < 3 || trimmed.length > 50) {
+      setErrorMsg("Tên đăng nhập phải có từ 3 đến 50 ký tự.");
+      return;
+    }
+    if (/\s/.test(trimmed)) {
+      setErrorMsg("Tên đăng nhập không được chứa khoảng trắng.");
+      return;
+    }
+
+    setIsInlineUsernameSaving(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      const res = await changeUsername({ newUsername: trimmed });
+      const successDetail = res?.data || res?.status?.message || "Đổi tên đăng nhập thành công!";
+      setSuccessMsg(successDetail);
+
+      if (user) {
+        const updated = { ...user, username: trimmed };
+        setUser(updated);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
+        localStorage.setItem("horizon_current_user", JSON.stringify(updated));
+
+        const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
+        if (storedProfile) {
+          const prof = JSON.parse(storedProfile);
+          prof.username = trimmed;
+          localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(prof));
+          localStorage.setItem("horizon_redis_profile", JSON.stringify(prof));
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
+
+      setIsEditingUsernameInProfile(false);
+      setInlineNewUsername("");
+      logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành: @${trimmed}`);
+    } catch (err: any) {
+      console.warn("Inline change username error:", err);
+      setErrorMsg(err.message || "Đổi tên đăng nhập thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsInlineUsernameSaving(false);
     }
   };
 
@@ -1866,19 +2276,17 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             }),
           });
         } catch (putErr) {
-          console.warn("PUT /api/auth/change-password failed, attempting legacy POST /api/auth/reset-password fallback...", putErr);
-          response = await apiRequest(`/api/auth/reset-password?code=${encodeURIComponent(token)}`, {
+          response = await apiRequest(`/api/auth/reset-password`, {
             method: "POST",
             body: JSON.stringify({
+              token: token,
               newPassword: newPassword,
               confirmPassword: confirmPassword,
             }),
           });
         }
-
         const successDetail = response?.data || "Mật khẩu của bạn đã được thay đổi thành công!";
         setSuccessMsg(successDetail);
-        
         setNewPassword("");
         setConfirmPassword("");
         setIsPasswordResetExpanded(false);
@@ -2193,9 +2601,17 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             {!isLoading && token && user ? (
               /* Unified User Info & Title when logged in */
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] shrink-0 select-none border-t border-t-white/80 border-b border-b-slate-400/60 border-x border-x-white/50 ring-4 ring-indigo-50/80">
-                  {user.fullName ? user.fullName.charAt(0).toUpperCase() : "H"}
-                </div>
+                {user.avatarUrl ? (
+                  <img 
+                    src={user.avatarUrl} 
+                    alt={user.fullName || "User Avatar"} 
+                    className="w-14 h-14 rounded-full object-cover shadow-[0_4px_12px_rgba(0,0,0,0.15)] border-2 border-white ring-4 ring-indigo-50/80 shrink-0 select-none"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] shrink-0 select-none border-t border-t-white/80 border-b border-b-slate-400/60 border-x border-x-white/50 ring-4 ring-indigo-50/80">
+                    {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : "H")}
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">{user.fullName || "Hội viên Horizon"}</h1>
                   <div className="flex items-center">
@@ -2304,7 +2720,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <Sparkles className="w-3 h-3 text-[#FF4D24]" />
                       <span>{showNavTutorial ? "Đang mở mẹo" : "Mẹo phím tắt"}</span>
                     </button>
-                    <span className="text-[11px] text-[#FF4D24] font-bold font-mono bg-gradient-to-b from-orange-50 via-orange-50/80 to-orange-100/60 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100/80 shadow-[0_1px_2px_rgba(255,77,36,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] px-2.5 py-0.5 rounded-full">{orders.length} Đơn hàng</span>
                   </div>
                 </div>
 
@@ -2887,8 +3302,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       {/* POPUP ACCOUNTS CENTER MODAL (Meta / Apple ID Style 2-Column Portal - 30% Expanded) */}
       <AnimatePresence>
         {isAccountsCenterOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 lg:p-8 select-none">
-            
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-6 lg:p-8 select-none">
             {/* Dark blur backdrop */}
             <motion.div 
               initial={{ opacity: 0 }}
@@ -2961,7 +3375,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 <span className="text-xs font-bold text-slate-900 truncate">{addr.recipientName}</span>
                               </div>
                               {addr.isDefault && (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] px-2 py-0.5 font-bold uppercase bg-gradient-to-b from-indigo-500 to-indigo-700 border-t border-t-indigo-300/60 text-white rounded-full shrink-0 shadow-[0_1px_3px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)]">
+                                <span className="inline-flex items-center gap-1 text-[9px] px-2 py-0.5 font-bold uppercase bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 rounded-full shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.08)]">
                                   <Check className="w-2.5 h-2.5 stroke-[2.5]" /> Mặc định
                                 </span>
                               )}
@@ -3040,43 +3454,107 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   <>
                     <div className="space-y-5 relative z-10">
                       
-                      {/* Top Branding */}
+                      {/* Top Branding (Horizon Signature Theme) */}
                       <div className="flex items-center gap-3 pb-4 border-b border-slate-200/70">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-purple-700 text-white flex items-center justify-center shadow-[0_4px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] border-t border-t-white/30 shrink-0">
-                          <Sliders className="w-5 h-5" />
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] border-t border-t-white/80 border-b border-b-slate-400/60 border-x border-x-white/50 ring-2 ring-indigo-50/80 shrink-0">
+                          <Sliders className="w-5 h-5 text-white stroke-[2.2]" />
                         </div>
                         <div>
                           <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Trung tâm tài khoản</h3>
-                          <p className="text-[10px] text-indigo-600 font-bold font-mono uppercase tracking-wider">Horizon Accounts Center</p>
+                          <p className="text-[10px] text-[#FF4D24] font-bold font-mono uppercase tracking-wider">Horizon Accounts Center</p>
                         </div>
                       </div>
 
                       {/* Profile Mini Card */}
                       {user && (
-                        <div className="p-3.5 bg-gradient-to-b from-white via-white/90 to-white/75 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl flex items-center gap-3.5 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
-                          <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-indigo-600 via-violet-700 to-[#FF4D24] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-[0_2px_6px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.35)] border-t border-t-white/30">
-                            {user.fullName ? user.fullName.charAt(0).toUpperCase() : "H"}
-                          </div>
+                        <div className="p-3.5 bg-gradient-to-b from-white via-white/90 to-white/75 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl flex items-center gap-3.5 shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
+                          {user.avatarUrl ? (
+                            <img 
+                              src={user.avatarUrl} 
+                              alt={user.fullName || "User Avatar"} 
+                              className="w-11 h-11 rounded-full object-cover shadow-[0_3px_8px_rgba(0,0,0,0.12)] border-2 border-white ring-2 ring-indigo-50/80 shrink-0 select-none"
+                            />
+                          ) : (
+                            <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-sm shrink-0 shadow-[0_3px_8px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.4)] border-t border-t-white/80 border-b border-b-slate-400/60 border-x border-x-white/50 ring-2 ring-indigo-50/80">
+                              {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : "H")}
+                            </div>
+                          )}
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <p className="text-xs font-black text-slate-900 truncate leading-tight">{user.fullName || "Hội viên Horizon"}</p>
-                              <span className="text-[9px] px-1.5 py-0.2 font-mono font-bold bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] rounded">LIVE</span>
+                              {(() => {
+                                const rankInfo = getMembershipRankInfo(user);
+                                return (
+                                  <span className={`text-[8.5px] px-1.5 py-0.2 font-mono font-bold uppercase rounded-md border-t border-t-white border-b border-x inline-flex items-center gap-1 shrink-0 ${rankInfo.badgeClass}`}>
+                                    <Crown className={`w-2.5 h-2.5 shrink-0 ${rankInfo.iconColor}`} />
+                                    <span>{rankInfo.label}</span>
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <p className="text-[10.5px] font-mono text-slate-400 truncate mt-0.5">{user.email || "N/A"}</p>
                           </div>
                         </div>
                       )}
 
-                      {/* Navigation Tabs */}
+                      {/* Navigation Tabs with Semantic Chromatic Accents */}
                       <div className="space-y-1.5">
-                        {[
-                          { id: "profile", label: "Hồ sơ cá nhân", icon: User, desc: "Tên, email, số điện thoại" },
-                          { id: "security", label: "Mật khẩu & Bảo mật", icon: ShieldCheck, desc: "Đổi mật khẩu, username" },
-                          { id: "addresses", label: "Sổ địa chỉ nhận hàng", icon: MapPin, count: addresses.length, desc: "Địa chỉ giao nhận" },
-                          { id: "payments", label: "Thẻ & Phương thức", icon: CreditCard, count: paymentMethods.length, desc: "Visa, Mastercard, Ví" },
-                          { id: "sessions", label: "Thiết bị & Phiên", icon: Laptop, desc: "Quản lý đăng nhập" },
-                          { id: "bookmarks", label: "Sản phẩm & Phụ kiện đã lưu", icon: Bookmark, count: userBookmarks.length, desc: "Bookmarks 1h & 7 ngày" }
-                        ].map(tab => {
+                        {(
+                          [
+                            { 
+                              id: "profile", 
+                              label: "Hồ sơ cá nhân", 
+                              icon: User, 
+                              desc: "Tên, email, số điện thoại",
+                              iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
+                            },
+                            { 
+                              id: "security", 
+                              label: "Mật khẩu & Bảo mật", 
+                              icon: ShieldCheck, 
+                              desc: "Đổi mật khẩu, username",
+                              iconBoxClass: "bg-gradient-to-b from-emerald-50 to-emerald-100/70 text-emerald-600 border-emerald-200/60"
+                            },
+                            { 
+                              id: "addresses", 
+                              label: "Sổ địa chỉ nhận hàng", 
+                              icon: MapPin, 
+                              count: addresses.length, 
+                              desc: "Địa chỉ giao nhận",
+                              iconBoxClass: "bg-gradient-to-b from-amber-50 to-amber-100/70 text-amber-600 border-amber-200/60"
+                            },
+                            { 
+                              id: "payments", 
+                              label: "Thẻ & Phương thức", 
+                              icon: CreditCard, 
+                              count: paymentMethods.length, 
+                              desc: "Visa, Mastercard, Ví",
+                              iconBoxClass: "bg-gradient-to-b from-rose-50 to-rose-100/70 text-rose-600 border-rose-200/60"
+                            },
+                            { 
+                              id: "sessions", 
+                              label: "Thiết bị & Phiên", 
+                              icon: Laptop, 
+                              desc: "Quản lý phiên đăng nhập",
+                              iconBoxClass: "bg-gradient-to-b from-sky-50 to-sky-100/70 text-sky-600 border-sky-200/60"
+                            },
+                            { 
+                              id: "bookmarks", 
+                              label: "Sản phẩm & Phụ kiện đã lưu", 
+                              icon: Bookmark, 
+                              count: userBookmarks.length, 
+                              desc: "Bookmarks 1h & 7 ngày",
+                              iconBoxClass: "bg-gradient-to-b from-orange-50 to-orange-100/70 text-[#FF4D24] border-orange-200/60"
+                            }
+                          ] as Array<{
+                            id: "profile" | "security" | "addresses" | "payments" | "sessions" | "bookmarks";
+                            label: string;
+                            icon: typeof User;
+                            desc: string;
+                            count?: number;
+                            iconBoxClass: string;
+                          }>
+                        ).map(tab => {
                           const Icon = tab.icon;
                           const isActive = activeModalTab === tab.id;
                           return (
@@ -3084,28 +3562,45 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               key={tab.id}
                               type="button"
                               onClick={() => {
-                                setActiveModalTab(tab.id as any);
+                                setActiveModalTab(tab.id);
                                 setErrorMsg("");
                                 setSuccessMsg("");
                                 setIsAddingAddress(false);
                                 setIsAddingCard(false);
                               }}
-                              className={`w-full px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border ${
+                              className={`w-full px-3.5 py-2.5 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border group ${
                                 isActive
-                                  ? "bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 border-t-indigo-300/60 border-b-indigo-900/60 border-x-indigo-600 text-white shadow-[0_4px_14px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)]"
-                                  : "border-transparent text-slate-700 hover:bg-gradient-to-b hover:from-white/90 hover:to-white/50 hover:border-t-white hover:border-b-slate-200 hover:border-x-slate-100/80 hover:shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)]"
+                                  ? "bg-gradient-to-b from-indigo-100/95 via-indigo-100/80 to-indigo-200/70 hover:from-indigo-150 hover:to-indigo-200/90 border-t border-t-white border-b border-b-indigo-300 border-x border-x-indigo-200 text-indigo-950 shadow-[0_3px_10px_-1px_rgba(99,102,241,0.18),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-indigo-500/30"
+                                  : "border-transparent text-slate-700 hover:bg-gradient-to-b hover:from-white/95 hover:via-white/85 hover:to-white/70 hover:border-t-white hover:border-b-slate-200/80 hover:border-x-slate-100/80 hover:shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.95)]"
                               }`}
                             >
-                              <div className="flex items-center gap-3">
-                                <Icon className={`w-4.5 h-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
-                                <div className="text-left">
-                                  <span className="block leading-tight">{tab.label}</span>
-                                  <span className={`text-[10px] font-normal leading-none block mt-0.5 ${isActive ? "text-indigo-100" : "text-slate-400"}`}>{tab.desc}</span>
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                                  isActive
+                                    ? "bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 shadow-[0_2px_6px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-indigo-500/20"
+                                    : `${tab.iconBoxClass} border shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)]`
+                                }`}>
+                                  <Icon className="w-4 h-4 stroke-[2]" />
+                                </div>
+                                <div className="text-left min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`block leading-tight truncate ${isActive ? "text-indigo-950 font-black" : "text-slate-800 group-hover:text-slate-900 font-bold"}`}>
+                                      {tab.label}
+                                    </span>
+                                    {isActive && (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D24] shadow-[0_0_6px_#FF4D24] shrink-0" />
+                                    )}
+                                  </div>
+                                  <span className={`text-[10px] font-normal leading-none block mt-0.5 truncate ${isActive ? "text-indigo-700 font-semibold" : "text-slate-400 group-hover:text-slate-500"}`}>
+                                    {tab.desc}
+                                  </span>
                                 </div>
                               </div>
                               {tab.count !== undefined && (
-                                <span className={`text-[10.5px] px-2.5 py-0.5 rounded-full font-mono font-bold ${
-                                  isActive ? "bg-white/20 text-white border border-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]" : "bg-gradient-to-b from-white/95 to-slate-100 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)] text-slate-700"
+                                <span className={`text-[10.5px] px-2.5 py-0.5 rounded-full font-mono font-bold shrink-0 ml-2 ${
+                                  isActive 
+                                    ? "bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 shadow-[0_1px_3px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.3)]" 
+                                    : "bg-gradient-to-b from-white/95 to-slate-100 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)] text-slate-700"
                                 }`}>
                                   {tab.count}
                                 </span>
@@ -3137,7 +3632,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 {/* Panel Header */}
                 <div className="flex items-start justify-between gap-3 pb-2.5 mb-3 border-b border-slate-200/80 shrink-0">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                       {isAddingAddress && (editingAddressSku ? "Chỉnh sửa địa chỉ nhận hàng" : "Thêm địa chỉ giao nhận mới")}
                       {isAddingCard && "Thêm phương thức thanh toán mới"}
                       {!isAddingAddress && !isAddingCard && (
@@ -3151,20 +3646,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         </>
                       )}
                     </h2>
-                    <p className="text-xs text-slate-500 font-normal mt-0.5">
-                      {isAddingAddress && "Cập nhật thông tin chi tiết người nhận và vị trí chính xác để đồng bộ giao hàng."}
-                      {isAddingCard && "Liên kết thẻ tín dụng, ghi nợ hoặc ví điện tử (danh sách hiện có hiển thị ở cột trái)"}
-                      {!isAddingAddress && !isAddingCard && (
-                        <>
-                          {activeModalTab === "profile" && "Quản lý thông tin định danh, số điện thoại và thông tin liên lạc của tài khoản Horizon"}
-                          {activeModalTab === "security" && "Cập nhật mật khẩu tài khoản và quản lý thông tin bảo vệ an toàn dịch vụ"}
-                          {activeModalTab === "addresses" && "Lưu trữ các địa chỉ nhận hàng cá nhân hoặc doanh nghiệp để đặt đơn tiện lợi hơn"}
-                          {activeModalTab === "payments" && "Quản lý thẻ tín dụng, ghi nợ quốc tế và các ví điện tử thanh toán bảo mật"}
-                          {activeModalTab === "sessions" && "Kiểm tra các phiên đăng nhập đang hoạt động và quản lý bảo mật thiết bị kết nối"}
-                          {activeModalTab === "bookmarks" && "Quản lý các sản phẩm và gói phụ kiện đã lưu từ PDP và Đơn hàng, hỗ trợ lưu trữ tạm thời 1 giờ và 7 ngày"}
-                        </>
-                      )}
-                    </p>
                   </div>
                   
                   {/* Header Actions: Only single action button during address edit */}
@@ -3183,7 +3664,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           !newAddressForm.phone.trim() ||
                           !newAddressForm.address.trim()
                         }
-                        className="h-9 px-4.5 bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                        className="h-9 px-4.5 bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                       >
                         {actionLoading ? (
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -3222,81 +3703,435 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
 
 
-                {/* TAB 1: Profile Information */}
+                {/* TAB 1: Profile Information & Identity Redesign */}
                 {activeModalTab === "profile" && (
-                  <form onSubmit={handleSaveProfile} className="space-y-5 flex-1">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      
-                      <div className="space-y-1.5 text-left">
-                        <label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Họ và tên người dùng</label>
-                        <input
-                          type="text"
-                          required
-                          value={editFullName}
-                          onChange={(e) => setEditFullName(e.target.value)}
-                          placeholder="Nhập họ và tên..."
-                          className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                        />
+                  <div className="flex-1 flex flex-col justify-between min-h-0 text-left space-y-4">
+                    {/* 1. HERO IDENTITY & AVATAR CARD */}
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-slate-50/70 to-slate-100/60 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-100 p-4.5 sm:p-5 shadow-[0_4px_16px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] shrink-0">
+                      {/* Decorative ambient corner glow */}
+                      <div className="absolute top-0 right-0 w-56 h-56 bg-gradient-to-br from-[#FF4D24]/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
+
+                      <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
+                        <div className="flex items-center gap-3.5">
+                          {/* Avatar with live upload & hover action (Full-bleed edge-to-edge, no white ring/border gap) */}
+                          <div className="relative group shrink-0 w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shadow-[0_4px_16px_rgba(0,0,0,0.12)]">
+                            {(editAvatarUrl || user?.avatarUrl) ? (
+                              <img 
+                                src={editAvatarUrl || user?.avatarUrl} 
+                                alt={user?.fullName || "Avatar"} 
+                                className="w-full h-full object-cover block"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl sm:text-2xl select-none">
+                                <span>{editFullName ? editFullName.charAt(0).toUpperCase() : (user?.fullName ? user.fullName.charAt(0).toUpperCase() : "H")}</span>
+                              </div>
+                            )}
+
+                            {/* Hover trigger for file upload */}
+                            <button
+                              type="button"
+                              onClick={() => avatarFileInputRef.current?.click()}
+                              disabled={isUploadingAvatar}
+                              className="absolute inset-0 bg-black/55 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer"
+                              title="Nhấn để đổi ảnh đại diện"
+                            >
+                              {isUploadingAvatar ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Camera className="w-4 h-4 mb-0.5" />
+                                  <span className="text-[8.5px] font-bold uppercase tracking-wider">Đổi ảnh</span>
+                                </>
+                              )}
+                            </button>
+
+                            {/* Hidden file input */}
+                            <input 
+                              ref={avatarFileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleAvatarFileUpload}
+                            />
+                          </div>
+
+                          {/* User Meta Info */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-snug">
+                                {editFullName || user?.fullName || "Hội viên Horizon"}
+                              </h2>
+                              {(() => {
+                                const rankInfo = getMembershipRankInfo(user);
+                                return (
+                                  <span className={`text-[8.5px] px-2 py-0.5 font-mono font-bold uppercase rounded-md border-t border-t-white border-b border-x inline-flex items-center gap-1 ${rankInfo.badgeClass}`}>
+                                    <Crown className={`w-2.5 h-2.5 shrink-0 ${rankInfo.iconColor}`} />
+                                    <span>{rankInfo.label}</span>
+                                  </span>
+                                );
+                              })()}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono flex-wrap">
+                              <span>@{user?.username || "horizon_member"}</span>
+                              <span className="text-slate-300">•</span>
+                              <span className="text-slate-600 truncate max-w-[180px] sm:max-w-[240px]">{user?.email || "user@horizon.net"}</span>
+                            </div>
+
+                            {lastSyncTime && (
+                              <div className="pt-0.5 flex items-center gap-2">
+                                <span className="text-[9.5px] text-slate-400 font-mono">
+                                  Đồng bộ: {lastSyncTime}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Quick Avatar Actions */}
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => avatarFileInputRef.current?.click()}
+                            disabled={isUploadingAvatar}
+                            className="flex-1 sm:flex-initial px-3 py-1.5 bg-gradient-to-b from-white via-white/95 to-slate-100/90 hover:from-white hover:to-slate-100 border-t border-t-white border-b border-b-slate-300 border-x border-x-slate-200/80 text-slate-700 text-xs font-bold rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Tải ảnh</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsAvatarUrlInputOpen(!isAvatarUrlInputOpen)}
+                            className="px-3 py-1.5 bg-gradient-to-b from-white via-white/95 to-slate-100/90 hover:from-white hover:to-slate-100 border-t border-t-white border-b border-b-slate-300 border-x border-x-slate-200/80 text-slate-600 text-xs font-bold rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                            title="Nhập URL ảnh từ bên ngoài"
+                          >
+                            <Globe className="w-3.5 h-3.5 text-slate-500" />
+                            <span className="hidden sm:inline">URL</span>
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="space-y-1.5 text-left">
-                        <label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Số điện thoại liên hệ</label>
-                        <input
-                          type="tel"
-                          value={editPhone}
-                          onChange={(e) => setEditPhone(e.target.value)}
-                          placeholder="0901234567"
-                          className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5 text-left">
-                        <label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Email tài khoản đăng nhập</label>
-                        <input
-                          type="email"
-                          disabled
-                          value={user?.email || "N/A"}
-                          className="w-full bg-slate-100/70 border border-slate-200 text-xs px-4 py-3 rounded-2xl outline-none text-slate-500 font-mono cursor-not-allowed shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5 text-left">
-                        <label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Giới tính</label>
-                        <select
-                          value={editGender}
-                          onChange={(e) => setEditGender(e.target.value)}
-                          className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-semibold cursor-pointer shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
+                      {/* Expandable Avatar URL Input */}
+                      {isAvatarUrlInputOpen && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-3.5 pt-3.5 border-t border-slate-200/70"
                         >
-                          <option value="male">Nam</option>
-                          <option value="female">Nữ</option>
-                          <option value="other">Khác</option>
-                        </select>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block mb-1.5">
+                            Đường dẫn ảnh đại diện trực tiếp (Direct Image URL)
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="url"
+                              value={avatarUrlDraft || editAvatarUrl}
+                              onChange={(e) => setAvatarUrlDraft(e.target.value)}
+                              placeholder="https://images.unsplash.com/photo-..."
+                              className="flex-1 bg-white border border-slate-200 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-xl outline-none transition-all text-[#111111] font-mono shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (avatarUrlDraft.trim()) {
+                                  setEditAvatarUrl(avatarUrlDraft.trim());
+                                  setIsAvatarUrlInputOpen(false);
+                                  setSuccessMsg("Đã áp dụng đường dẫn ảnh đại diện mới!");
+                                }
+                              }}
+                              className="px-4 py-2.5 bg-[#FF4D24] hover:bg-[#e03d15] text-white text-xs font-bold rounded-xl shadow-[0_2px_6px_rgba(255,77,36,0.25)] transition-all cursor-pointer shrink-0 active:scale-95"
+                            >
+                              Áp dụng
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+
+                    {/* 2. FORM PROFILE FIELDS */}
+                    <form onSubmit={handleSaveProfile} className="flex-1 flex flex-col justify-between min-h-0 space-y-4">
+                      <div className="space-y-4">
+                        {/* SECTION A: THÔNG TIN CÁ NHÂN */}
+                        <div className="space-y-3.5">
+                        <div className="flex items-center gap-2 pb-1 border-b border-slate-200/60">
+                          <User className="w-3.5 h-3.5 text-[#FF4D24]" />
+                          <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider font-mono">
+                            Thông tin định danh người dùng
+                          </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Field: Họ và tên */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+                              <span>Họ và tên <span className="text-[#FF4D24]">*</span></span>
+                              <span className="text-[10px] text-slate-400 font-normal">Tên hiển thị</span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                required
+                                value={editFullName}
+                                onChange={(e) => setEditFullName(e.target.value)}
+                                placeholder="Nhập họ và tên đầy đủ..."
+                                className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5"
+                              />
+                              <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            </div>
+                          </div>
+
+                          {/* Field: Số điện thoại */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+                              <span>Số điện thoại liên hệ</span>
+                              <span className="text-[10px] text-slate-400 font-normal">Giao hàng & OTP</span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="tel"
+                                value={editPhone}
+                                onChange={(e) => setEditPhone(e.target.value)}
+                                placeholder="0901234567"
+                                className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 font-mono"
+                              />
+                              <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            </div>
+                          </div>
+
+                          {/* Field: Ngày sinh */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+                              <span>Ngày tháng năm sinh</span>
+                              <span className="text-[10px] text-slate-400 font-normal">Sinh nhật hội viên</span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="date"
+                                value={editDateOfBirth}
+                                onChange={(e) => setEditDateOfBirth(e.target.value)}
+                                className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 font-mono cursor-pointer"
+                              />
+                              <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            </div>
+                          </div>
+
+                          {/* Field: Giới tính (Segmented Control với hiệu ứng Bevel lõm 50% & Hoạt ảnh chuyển động) */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 block">
+                              Giới tính
+                            </label>
+                            <div className="relative grid grid-cols-3 p-1 rounded-2xl bg-slate-100/85 border-t border-t-slate-300/60 border-b border-b-white/80 border-x border-x-slate-200/70 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),inset_0_-1px_0_rgba(255,255,255,0.7),0_1px_0_rgba(255,255,255,0.8)]">
+                              {[
+                                { id: "male", label: "Nam" },
+                                { id: "female", label: "Nữ" },
+                                { id: "other", label: "Khác" }
+                              ].map((g) => {
+                                const isSelected = editGender.toLowerCase() === g.id;
+                                return (
+                                  <button
+                                    key={g.id}
+                                    type="button"
+                                    onClick={() => setEditGender(g.id)}
+                                    className={`relative z-10 py-1.5 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center select-none ${
+                                      isSelected ? "text-slate-900" : "text-slate-500 hover:text-slate-800"
+                                    }`}
+                                  >
+                                    {isSelected && (
+                                      <motion.div
+                                        layoutId="active-gender-pill"
+                                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                                        className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/80 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)]"
+                                      />
+                                    )}
+                                    <span className="relative z-10 flex items-center justify-center">
+                                      <span>{g.label}</span>
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
-                    </div>
+                      {/* SECTION B: TÀI KHOẢN & BẢO MẬT HỆ THỐNG */}
+                      <div className="space-y-3.5 pt-1">
+                        <div className="flex items-center gap-2 pb-1 border-b border-slate-200/60">
+                          <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                          <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider font-mono">
+                            Tài khoản & Định danh hệ thống
+                          </h3>
+                        </div>
 
-                    <div className="p-4 bg-gradient-to-b from-indigo-50/70 via-indigo-50/40 to-indigo-100/30 border-t border-t-white border-b border-b-indigo-200/60 border-x border-x-indigo-100/60 rounded-2xl flex items-center justify-between gap-4 text-left mt-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_3px_rgba(99,102,241,0.04)]">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-indigo-100 to-indigo-200/80 border-t border-t-white text-indigo-700 flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                          <Sparkles className="w-5 h-5" />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Email (Readonly with Verified Badge) */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between h-4.5">
+                              <span>Email đăng nhập</span>
+                              <span className="text-[10px] text-emerald-600 font-bold font-mono inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Đã xác thực
+                              </span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="email"
+                                disabled
+                                value={user?.email || "admin@horizon.net"}
+                                className="w-full bg-slate-100/70 border-t border-t-slate-200/90 border-b border-b-slate-300/40 border-x border-x-slate-200/70 text-xs px-3.5 py-2.5 rounded-2xl outline-none text-slate-600 font-mono cursor-not-allowed shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.8)] pl-9.5"
+                              />
+                              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            </div>
+                          </div>
+
+                          {/* Username (Synchronized dimensions with Email field & In-Place Editing Trigger) */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between h-4.5">
+                              <span>Tên đăng nhập (Username)</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInlineNewUsername(user?.username || "");
+                                  setIsEditingUsernameInProfile(!isEditingUsernameInProfile);
+                                }}
+                                className="text-[10px] text-[#FF4D24] hover:text-[#e03d15] font-bold font-mono inline-flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <Pencil className="w-2.5 h-2.5" />
+                                <span>{isEditingUsernameInProfile ? "Đóng" : "Đổi tên"}</span>
+                              </button>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                disabled
+                                value={`@${user?.username || "username"}`}
+                                className="w-full bg-slate-100/70 border-t border-t-slate-200/90 border-b border-b-slate-300/40 border-x border-x-slate-200/70 text-xs px-3.5 py-2.5 rounded-2xl outline-none text-slate-800 font-mono font-bold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.8)] pl-9.5 pr-20 cursor-default"
+                              />
+                              <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInlineNewUsername(user?.username || "");
+                                  setIsEditingUsernameInProfile(!isEditingUsernameInProfile);
+                                }}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-gradient-to-b from-white via-white/95 to-slate-50 hover:from-white border border-slate-200/80 text-slate-700 text-[10.5px] font-bold rounded-lg shadow-xs transition-all cursor-pointer active:scale-95 flex items-center gap-1"
+                              >
+                                <Pencil className="w-2.5 h-2.5 text-[#FF4D24]" />
+                                <span>Chỉnh sửa</span>
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">Đồng bộ đám mây tức thời</p>
-                          <p className="text-[11px] text-slate-500">Mọi thay đổi hồ sơ sẽ được cập nhật đồng nhất trên các nền tảng Web & Mobile.</p>
-                        </div>
+
+                        {/* Inline Username Editing Drawer */}
+                        <AnimatePresence>
+                          {isEditingUsernameInProfile && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="overflow-hidden pt-2"
+                            >
+                              <div className="p-3.5 bg-gradient-to-b from-white via-orange-50/20 to-orange-50/40 border border-[#FF4D24]/35 rounded-2xl shadow-[0_4px_16px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,1)] space-y-2.5 text-left">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                                    Nhập username mới (3-50 ký tự)
+                                  </label>
+                                  <span className="text-[9.5px] text-slate-400 font-mono">
+                                    {inlineNewUsername.trim().length}/50 ký tự
+                                  </span>
+                                </div>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    value={inlineNewUsername}
+                                    onChange={(e) => setInlineNewUsername(e.target.value.replace(/\s+/g, ""))}
+                                    placeholder="Nhập username mới..."
+                                    className="w-full bg-white border border-[#FF4D24]/40 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/20 text-xs px-3.5 py-2.5 rounded-xl outline-none font-mono font-bold text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] pl-7.5"
+                                  />
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs font-bold">@</span>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-1 border-t border-orange-100/60">
+                                  <div>
+                                    {inlineNewUsername.trim().length >= 3 && (
+                                      <span className="text-emerald-600 text-[10px] font-bold font-mono flex items-center gap-0.5">
+                                        <Check className="w-2.5 h-2.5" /> Hợp lệ
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setIsEditingUsernameInProfile(false);
+                                        setInlineNewUsername("");
+                                      }}
+                                      disabled={isInlineUsernameSaving}
+                                      className="px-3 py-1 text-[10.5px] font-bold text-slate-500 hover:text-slate-800 bg-white/80 hover:bg-white border border-slate-200 rounded-lg transition-all cursor-pointer active:scale-95"
+                                    >
+                                      Hủy
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleInlineSaveUsername}
+                                      disabled={isInlineUsernameSaving || !inlineNewUsername.trim() || inlineNewUsername.trim().length < 3 || inlineNewUsername.trim() === user?.username}
+                                      className="px-3.5 py-1 bg-gradient-to-b from-[#FF4D24] to-[#e03d15] text-white text-[10.5px] font-bold rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                      {isInlineUsernameSaving ? (
+                                        <>
+                                          <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                                          <span>Đang đổi...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Check className="w-2.5 h-2.5" />
+                                          <span>Xác nhận</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </div>
 
-                    <div className="pt-4 flex justify-end">
-                      <button
-                        type="submit"
-                        disabled={actionLoading}
-                        className="px-7 py-3 bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 hover:brightness-105 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-2 shadow-[0_4px_14px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50"
-                      >
-                        {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Lưu thay đổi hồ sơ"}
-                      </button>
-                    </div>
-                  </form>
+                    {/* SECTION D: ACTION BUTTONS (Anchored tightly to bottom edge, clean without status text) */}
+                    <div className="mt-auto pt-3 flex items-center justify-end gap-2.5 border-t border-slate-200/80 shrink-0">
+                          {isProfileDirty && (
+                            <button
+                              type="button"
+                              onClick={handleResetProfileForm}
+                              className="px-4 py-2.5 bg-gradient-to-b from-white to-slate-100 hover:from-white hover:to-slate-200 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer active:scale-95"
+                            >
+                              Đặt lại
+                            </button>
+                          )}
+
+                          <button
+                            type="submit"
+                            disabled={actionLoading}
+                            className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-b from-[#FF4D24] via-[#FF4D24] to-[#e03d15] hover:from-[#ff5e38] hover:to-[#FF4D24] border-t border-t-white/40 border-b border-b-[#9e2709] border-x border-x-[#d43813] text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-[0_3px_12px_rgba(255,77,36,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50"
+                          >
+                            {actionLoading ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>Đang lưu...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4" />
+                                <span>Lưu thay đổi hồ sơ</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                    </form>
+                  </div>
                 )}
 
                 {/* TAB 2: Security & Passwords */}
@@ -3343,7 +4178,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               <button
                                 type="submit"
                                 disabled={actionLoading}
-                                className="w-full bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 hover:brightness-105 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50"
+                                className="w-full bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50"
                               >
                                 {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Cập nhật tên đăng nhập"}
                               </button>
@@ -3417,7 +4252,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               <button
                                 type="submit"
                                 disabled={actionLoading}
-                                className="w-full bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 hover:brightness-105 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] mt-1 active:scale-95 disabled:opacity-50"
+                                className="w-full bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] mt-1 active:scale-95 disabled:opacity-50"
                               >
                                 {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Xác nhận đổi mật khẩu"}
                               </button>
@@ -3839,7 +4674,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     </div>
 
                                     {addr.isDefault && (
-                                      <span className="inline-flex items-center gap-1 text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-gradient-to-b from-indigo-500 to-indigo-700 border-t border-t-indigo-300/60 text-white shadow-[0_2px_6px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)] shrink-0 tracking-wider">
+                                      <span className="inline-flex items-center gap-1 text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.08)] shrink-0 tracking-wider">
                                         <Check className="w-3 h-3 stroke-[2.5]" /> Mặc định
                                       </span>
                                     )}
@@ -3928,7 +4763,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         className="p-6 bg-gradient-to-b from-white via-white/95 to-slate-50/70 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/70 rounded-2xl space-y-4 text-left shadow-[0_4px_16px_-4px_rgba(79,70,229,0.08),inset_0_1px_0_rgba(255,255,255,1)]"
                       >
                         <div className="p-3.5 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 rounded-xl flex items-center gap-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 text-white flex items-center justify-center shrink-0 border-t border-t-white/30 shadow-[0_2px_6px_rgba(79,70,229,0.3)]">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-600 flex items-center justify-center shrink-0 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                             <CreditCard className="w-4 h-4" />
                           </div>
                           <div>
@@ -3952,7 +4787,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 onClick={() => setNewCardForm({ ...newCardForm, type: item.type as any })}
                                 className={`py-2.5 px-3 text-xs font-bold rounded-xl text-center cursor-pointer transition-all active:scale-95 ${
                                   newCardForm.type === item.type
-                                    ? "bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white shadow-[0_3px_10px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)]"
+                                    ? "bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-indigo-500/20"
                                     : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 text-slate-700 hover:from-white shadow-[0_1.5px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]"
                                 }`}
                               >
@@ -4041,7 +4876,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             </button>
                             <button
                               type="submit"
-                              className="px-6 py-2.5 bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 hover:brightness-105 border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center gap-1.5 active:scale-95"
+                              className="px-6 py-2.5 bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center gap-1.5 active:scale-95"
                             >
                               <Check className="w-4 h-4" />
                               <span>Lưu phương thức</span>
@@ -4148,67 +4983,229 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   </div>
                 )}
 
-                {/* TAB 5: Active Sessions & Devices (2-Column Grid Layout with Bevel) */}
+                {/* TAB 5: System Settings, API Gateway & Active Sessions */}
                 {activeModalTab === "sessions" && (
-                  <div className="space-y-5 flex-1">
+                  <div className="space-y-4 flex-1 flex flex-col min-h-0">
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Current device card */}
-                      <div className="p-4 sm:p-5 bg-gradient-to-b from-white via-emerald-50/20 to-emerald-50/40 border-t border-t-white border-b border-b-emerald-200/80 border-x border-x-emerald-100/70 rounded-2xl flex items-start gap-3.5 text-left shadow-[0_4px_16px_-4px_rgba(16,185,129,0.08),inset_0_1px_0_rgba(255,255,255,1)]">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 border-t border-t-white/30 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-[0_2px_6px_rgba(16,185,129,0.25)]">
-                          <Laptop className="w-5 h-5" />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-xs font-black text-slate-900">Trình duyệt Web (Phiên hiện tại)</p>
-                            <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100 border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              HOẠT ĐỘNG
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 font-mono">
-                            IP: 118.69.182.10 • TP. Hồ Chí Minh, Việt Nam
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            Truy cập lần cuối: Vừa xong
-                          </p>
-                        </div>
-                      </div>
 
-                      {/* Secondary Mobile App device session */}
-                      <div className="p-4 sm:p-5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl flex items-start gap-3.5 text-left shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-slate-100 to-slate-200/80 border-t border-t-white text-slate-600 flex items-center justify-center shrink-0 mt-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                          <Smartphone className="w-5 h-5" />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-xs font-black text-slate-900">Horizon Mobile App v2.4 (iOS)</p>
-                            <span className="text-[9px] font-bold text-slate-600 bg-gradient-to-b from-slate-50 to-slate-100 border border-slate-200 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                              iPhone 15 Pro
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 font-mono">
-                            IP: 14.241.221.84 • TP. Hồ Chí Minh
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            Truy cập lần cuối: 2 giờ trước
-                          </p>
-                        </div>
+                    {/* 2. Subtle, Low-Profile Telemetry Metadata Bar */}
+                    <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-slate-50/90 border border-slate-200/70 rounded-xl text-xs text-slate-500 select-none shrink-0">
+                      <div className="flex items-center gap-3.5 flex-wrap min-w-0">
+                        <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+                          <Laptop className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{deviceSessions.length} phiên đang kết nối</span>
+                        </span>
+                        <span className="text-slate-300 font-mono">•</span>
+                        <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>TLS 1.3 • Redis Sync</span>
+                        </span>
+                        <span className="text-slate-300 font-mono">•</span>
+                        <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+                          <Globe className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Việt Nam (VN)</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => loadDeviceSessions()}
+                          disabled={isSessionsLoading}
+                          className="text-[11px] font-semibold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-50"
+                          title="Làm mới danh sách phiên"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isSessionsLoading ? "animate-spin text-indigo-600" : ""}`} />
+                          <span className="hidden sm:inline">Làm mới</span>
+                        </button>
+                        {deviceSessions.some(s => !s.isCurrent) && (
+                          <button
+                            type="button"
+                            onClick={handleTerminateAllOtherSessions}
+                            disabled={sessionActionLoading === "others"}
+                            className="text-[11.5px] font-bold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer flex items-center gap-1 active:scale-95 shrink-0 disabled:opacity-50"
+                          >
+                            {sessionActionLoading === "others" ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                            <span>Đăng xuất tất cả khác</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    {/* Terminate other sessions action with Bevel button */}
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSuccessMsg("Đã đăng xuất tài khoản khỏi tất cả các thiết bị khác thành công!");
-                          logAuditAction("TERMINATE_SESSIONS", "SUCCESS", "Đăng xuất các phiên thiết bị khác từ Portal");
-                        }}
-                        className="w-full py-3 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-rose-50 hover:to-rose-100/60 hover:text-red-600 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer border-t border-t-white border-b border-b-slate-300/70 hover:border-b-rose-300 border-x border-x-white/70 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] active:scale-95"
-                      >
-                        Đăng xuất khỏi tất cả các thiết bị khác
-                      </button>
+                    {/* Loading Skeleton */}
+                    {isSessionsLoading && deviceSessions.length === 0 ? (
+                      <div className="space-y-3 py-2">
+                        <div className="p-4.5 rounded-2xl bg-white/70 border border-slate-200/60 animate-pulse space-y-3">
+                          <div className="h-5 bg-slate-200/60 rounded w-1/3" />
+                          <div className="h-3.5 bg-slate-100 rounded w-1/2" />
+                          <div className="grid grid-cols-3 gap-2 pt-2">
+                            <div className="h-8 bg-slate-100/80 rounded-xl" />
+                            <div className="h-8 bg-slate-100/80 rounded-xl" />
+                            <div className="h-8 bg-slate-100/80 rounded-xl" />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* 2. Current Session Hero Card */}
+                        {(() => {
+                          const currentSession = deviceSessions.find(s => s.isCurrent) || deviceSessions[0];
+                          if (!currentSession) return null;
+                          const isMobile = currentSession.clientType?.toUpperCase() === "MOBILE";
+                          const isTablet = currentSession.clientType?.toUpperCase() === "TABLET";
+
+                          return (
+                            <div className="p-4 sm:p-4.5 bg-gradient-to-b from-white via-white/98 to-emerald-50/20 border-t border-t-white border-b border-b-emerald-200/80 border-x border-x-emerald-100/70 rounded-2xl shadow-[0_4px_16px_-4px_rgba(16,185,129,0.08),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-emerald-500/15 text-left space-y-2.5 shrink-0 relative overflow-hidden">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-emerald-100/80">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-600 text-white flex items-center justify-center shrink-0 shadow-[0_3px_10px_rgba(16,185,129,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] border-t border-t-white/30">
+                                    {isTablet ? <Laptop className="w-5 h-5 stroke-[2.2]" /> : (isMobile ? <Smartphone className="w-5 h-5 stroke-[2.2]" /> : <Laptop className="w-5 h-5 stroke-[2.2]" />)}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-sm font-black text-slate-900 leading-tight">
+                                        {currentSession.deviceName}
+                                      </h4>
+                                      <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100 border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        HOẠT ĐỘNG NGAY BÂY GIỜ
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                                      {currentSession.deviceDetail}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100/80 border border-emerald-200/80 px-2.5 py-1 rounded-lg shrink-0 self-start sm:self-auto">
+                                  Thiết bị hiện tại
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5 text-xs">
+                                <div className="p-2 bg-slate-50/80 rounded-xl border border-slate-200/60 font-mono text-[11px] text-slate-600 flex items-center gap-2">
+                                  <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="truncate">IP: <strong>{currentSession.ip}</strong></span>
+                                </div>
+                                <div className="p-2 bg-slate-50/80 rounded-xl border border-slate-200/60 text-[11px] text-slate-600 flex items-center gap-2">
+                                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="truncate">{currentSession.location}</span>
+                                </div>
+                                <div className="p-2 bg-slate-50/80 rounded-xl border border-slate-200/60 text-[11px] text-slate-600 flex items-center gap-2">
+                                  <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="truncate">Cập nhật: {currentSession.lastActive}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* 3. Secondary Connected Devices List */}
+                        <div className="space-y-2 text-left shrink-0">
+                          <div className="flex items-center justify-between px-1">
+                            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">
+                              Các thiết bị khác đã liên kết ({deviceSessions.filter(s => !s.isCurrent).length})
+                            </h4>
+                          </div>
+
+                          {deviceSessions.filter(s => !s.isCurrent).length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {deviceSessions.filter(s => !s.isCurrent).map((session) => {
+                                const isTablet = session.clientType?.toUpperCase() === "TABLET";
+                                const isMobile = session.clientType?.toUpperCase() === "MOBILE";
+                                const isDeleting = sessionActionLoading === session.id;
+
+                                return (
+                                  <div
+                                    key={session.id}
+                                    className="p-3.5 bg-gradient-to-b from-white via-white/95 to-slate-50/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 rounded-2xl shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] hover:border-slate-300 transition-all flex flex-col justify-between gap-2.5 text-left group"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex items-start gap-3 min-w-0">
+                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border-t border-t-white ${
+                                          isTablet
+                                            ? "bg-gradient-to-b from-sky-50 to-sky-100/80 text-sky-700 border-b border-b-sky-200 border-x border-x-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"
+                                            : (isMobile 
+                                              ? "bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 border-b border-b-indigo-200 border-x border-x-indigo-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"
+                                              : "bg-gradient-to-b from-slate-50 to-slate-100/80 text-slate-700 border-b border-b-slate-200 border-x border-x-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]")
+                                        }`}>
+                                          {isTablet ? <Laptop className="w-4.5 h-4.5" /> : (isMobile ? <Smartphone className="w-4.5 h-4.5" /> : <Laptop className="w-4.5 h-4.5" />)}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="text-xs font-black text-slate-900 truncate leading-tight">
+                                            {session.deviceName}
+                                          </p>
+                                          <p className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+                                            {session.deviceDetail}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleTerminateSession(session.id)}
+                                        disabled={isDeleting}
+                                        className="h-7 px-2.5 text-[10.5px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50/80 hover:bg-rose-100/90 rounded-lg border border-rose-200/80 transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs shrink-0 disabled:opacity-50"
+                                        title="Đăng xuất khỏi thiết bị này"
+                                      >
+                                        {isDeleting ? (
+                                          <RefreshCw className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="w-3 h-3" />
+                                        )}
+                                        <span>Đăng xuất</span>
+                                      </button>
+                                    </div>
+
+                                    <div className="pt-2 border-t border-slate-100 text-[10.5px] text-slate-500 space-y-0.5">
+                                      <p className="font-mono truncate">IP: {session.ip} • {session.location}</p>
+                                      <p className="text-slate-400">Hoạt động: {session.lastActive}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="p-4 sm:p-5 rounded-2xl border border-dashed border-slate-200/90 bg-white/70 text-center flex flex-col items-center justify-center gap-2 shadow-2xs">
+                              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center shadow-2xs">
+                                <ShieldCheck className="w-4.5 h-4.5" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">Không có thiết bị phụ nào khác đang kết nối</p>
+                                <p className="text-[10.5px] text-slate-400 mt-0.5 font-mono">Tài khoản chỉ đang đăng nhập duy nhất trên thiết bị hiện tại.</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* 4. Bottom Orange Tinted Security Banner with Dynamic Animated Logo */}
+                    <div className="p-3.5 sm:p-4 bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-white/95 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100/80 rounded-2xl flex items-center gap-3.5 text-left shadow-[0_2px_8px_-2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,1)] relative overflow-hidden mt-auto shrink-0">
+                      {/* Ambient orange aura glow */}
+                      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#FF4D24]/[0.05] via-amber-500/[0.02] to-transparent" />
+
+                      {/* Dynamic Morphing Security Logo */}
+                      <div className="relative z-10 w-10 h-10 rounded-2xl bg-gradient-to-b from-orange-50 to-orange-100/80 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100 flex items-center justify-center text-[#FF4D24] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_rgba(255,77,36,0.15)] shrink-0">
+                        <SecurityDynamicMorphIcon />
+                      </div>
+
+                      <div className="relative z-10 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h5 className="font-sans font-black text-xs sm:text-[13px] text-slate-900 tracking-tight leading-none">
+                            Bảo mật phiên phân tán đa nền tảng
+                          </h5>
+                          <span className="text-[9px] font-extrabold font-mono px-1.5 py-0.2 rounded-full bg-orange-500/10 text-[#FF4D24] border border-orange-200/70 uppercase">
+                            Bảo mật
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-normal">
+                          Khi bạn chọn đăng xuất thiết bị, toàn bộ token xác thực trên Redis Gateway BFF sẽ bị thu hồi ngay lập tức.
+                        </p>
+                      </div>
                     </div>
 
                   </div>
@@ -4235,7 +5232,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     {/* Empty State */}
                     {!isBookmarksLoading && userBookmarks.length === 0 && (
                       <Bevel variant="card" className="py-12 px-5 text-center flex flex-col items-center justify-center gap-3.5 rounded-2xl">
-                        <div className="size-16 rounded-2xl bg-gradient-to-b from-[#FF4D24]/15 via-[#FF4D24]/8 to-transparent border-t border-t-white border-b border-b-slate-300/40 border-x border-x-[#FF4D24]/20 text-[#FF4D24] flex items-center justify-center shadow-[0_4px_16px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]">
+                        <div className="size-16 rounded-2xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 text-indigo-700 flex items-center justify-center shadow-[0_4px_16px_rgba(79,70,229,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]">
                           <Bookmark className="size-8 stroke-[1.75]" />
                         </div>
                         <div className="max-w-md">
@@ -4244,18 +5241,17 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             Khi bạn chọn phụ kiện tại mục <strong className="text-slate-700">"Phụ kiện mua cùng"</strong> ở trang sản phẩm, hệ thống sẽ lưu an toàn trong 1 giờ hoặc 7 ngày để bạn có thể thanh toán combo bất cứ lúc nào.
                           </p>
                         </div>
-                        <BevelButton
-                          variant="primary"
-                          size="md"
+                        <button
+                          type="button"
                           onClick={() => {
                             setIsAccountsCenterOpen(false);
                             onNavigate("product");
                           }}
-                          className="mt-1 px-5 h-10 text-xs font-bold gap-2"
+                          className="mt-1 px-5 h-10 text-xs font-bold rounded-xl text-white bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
                         >
                           <ShoppingBag className="size-4" />
                           <span>Khám phá sản phẩm ngay</span>
-                        </BevelButton>
+                        </button>
                       </Bevel>
                     )}
 
@@ -4281,7 +5277,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               {/* Card Header */}
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-200/70">
                                 <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-                                  <span className="size-8 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/70 border-t border-t-white border-b border-b-orange-200 border-x border-x-orange-100 text-[#FF4D24] flex items-center justify-center shrink-0 shadow-2xs">
+                                  <span className="size-8 rounded-xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 shadow-2xs">
                                     <Package className="size-4" />
                                   </span>
                                   <div className="min-w-0">
@@ -4289,12 +5285,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                       <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
                                         {bookmark.mainSku === "ORDER-BOOKMARK" || isFromOrder ? (
                                           bookmark.items.length === 1 ? (
-                                            <>Sản phẩm đã lưu: <span className="text-[#FF4D24]">{bookmark.items[0]?.productName || friendlyTitle}</span></>
+                                            <>Sản phẩm đã lưu: <span className="text-indigo-600">{bookmark.items[0]?.productName || friendlyTitle}</span></>
                                           ) : (
-                                            <>Gói sản phẩm đơn hàng: <span className="text-[#FF4D24]">{bookmark.items.length} sản phẩm</span></>
+                                            <>Gói sản phẩm đơn hàng: <span className="text-indigo-600">{bookmark.items.length} sản phẩm</span></>
                                           )
                                         ) : !isGenericSku ? (
-                                          <>Phụ kiện mua cùng: <span className="text-[#FF4D24]">{friendlyTitle}</span></>
+                                          <>Phụ kiện mua cùng: <span className="text-indigo-600">{friendlyTitle}</span></>
                                         ) : (
                                           "Gói sản phẩm & phụ kiện đã lưu"
                                         )}
@@ -4325,16 +5321,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   </span>
 
                                   {!is7Days && (
-                                    <BevelButton
-                                      size="sm"
-                                      variant="button"
+                                    <button
+                                      type="button"
                                       onClick={() => handleExtendBookmarkPackage(bookmark.mainSku)}
                                       disabled={isExtending}
-                                      className="h-7 px-2.5 text-[10.5px] font-bold text-indigo-600 hover:text-indigo-700"
+                                      className="h-7 px-3 text-[10.5px] font-bold text-indigo-700 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 rounded-lg shadow-[0_1.5px_4px_rgba(99,102,241,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95 transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
                                     >
-                                      {isExtending ? <RefreshCw className="size-3 animate-spin mr-1" /> : <Sparkles className="size-3 text-indigo-500 mr-1" />}
+                                      {isExtending ? <RefreshCw className="size-3 animate-spin mr-1" /> : <Sparkles className="size-3 text-indigo-600 mr-1" />}
                                       <span>Gia hạn 7 ngày</span>
-                                    </BevelButton>
+                                    </button>
                                   )}
                                 </div>
                               </div>
@@ -4405,7 +5400,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                       {/* Price Breakdown & Delete Item Action */}
                                       <div className="flex items-center gap-3 shrink-0 text-right">
                                         <div className="flex flex-col items-end">
-                                          <span className="text-xs sm:text-sm font-black font-mono text-[#FF4D24]">
+                                          <span className="text-xs sm:text-sm font-black font-mono text-slate-900">
                                             {Math.round(item.salePrice).toLocaleString("vi-VN")}đ
                                           </span>
                                           <span className="text-[10px] text-slate-400 font-mono">
@@ -4419,9 +5414,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                           onClick={() => handleRemoveBookmarkItem(bookmark.mainSku, item.sku, item.productName)}
                                           disabled={isItemDeleting}
                                           title="Xóa phụ kiện này"
-                                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
+                                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
                                         >
-                                          {isItemDeleting ? <RefreshCw className="size-3.5 animate-spin text-rose-500" /> : <Trash2 className="size-3.5" />}
+                                          {isItemDeleting ? <RefreshCw className="size-3.5 animate-spin text-indigo-500" /> : <Trash2 className="size-3.5" />}
                                         </button>
                                       </div>
                                     </div>
@@ -4434,7 +5429,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 <div className="flex items-center gap-3">
                                   <div className="flex items-baseline gap-1.5">
                                     <span className="text-xs text-slate-500 font-medium">Tổng thanh toán:</span>
-                                    <span className="text-base sm:text-lg font-black font-mono text-[#FF4D24]">
+                                    <span className="text-base sm:text-lg font-black font-mono text-indigo-700">
                                       {Math.round(bookmark.totalSalePrice).toLocaleString("vi-VN")}đ
                                     </span>
                                   </div>
@@ -4446,10 +5441,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     type="button"
                                     onClick={() => handleClearBookmarkPackage(bookmark.mainSku)}
                                     disabled={isPackageLoading}
-                                    className="h-9 px-4 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-white/95 hover:bg-rose-50/90 rounded-xl border border-rose-200/90 hover:border-rose-300 shadow-[0_2px_8px_-1px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_14px_-2px_rgba(244,63,94,0.22)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                    className="h-9 px-4 text-xs font-semibold text-slate-600 hover:text-indigo-700 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-indigo-50/80 hover:to-indigo-100/60 rounded-xl border-t border-t-white border-b border-b-slate-300/70 hover:border-b-indigo-300 border-x border-x-white/70 hover:border-x-indigo-200 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_2px_8px_-1px_rgba(99,102,241,0.15)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
                                   >
                                     {bookmarkActionLoading === bookmark.mainSku ? (
-                                      <RefreshCw className="size-3.5 animate-spin" />
+                                      <RefreshCw className="size-3.5 animate-spin text-indigo-500" />
                                     ) : (
                                       <Trash2 className="size-3.5" />
                                     )}
@@ -4460,7 +5455,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     type="button"
                                     onClick={() => handleCheckoutBookmarkPackage(bookmark)}
                                     disabled={isPackageLoading}
-                                    className="h-9 px-4.5 text-xs font-bold text-white rounded-xl bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/40 border-b border-b-[#9e270a] border-x border-x-[#FF4D24]/90 shadow-[0_6px_20px_-3px_rgba(255,77,36,0.42),0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.45)] hover:shadow-[0_8px_25px_-3px_rgba(255,77,36,0.52),0_3px_8px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.55)] hover:brightness-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                                    className="h-9 px-4.5 text-xs font-bold text-white rounded-xl bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 shadow-[0_4px_16px_rgba(79,70,229,0.35),0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.4)] hover:shadow-[0_6px_22px_rgba(79,70,229,0.45),0_3px_8px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.5)] hover:brightness-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                                   >
                                     {bookmarkActionLoading === `checkout::${bookmark.mainSku}` ? (
                                       <RefreshCw className="size-3.5 animate-spin" />

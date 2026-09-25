@@ -1,4 +1,4 @@
-# AGENT OPERATING CONTRACT & STRICT DIRECTIVES (AGENTS.md)
+# AGENT OPERATING CONTRACT & STRICT DIRECTIVES (AGENTS.md / GEMINI.md)
 
 > **CRITICAL PROTOCOL — ZERO TOLERANCE FOR DEVIATION**
 > All directives below are non-negotiable hard constraints. You MUST NOT ignore, bypass, forget, or override any directive or context defined in this document under any circumstance. Speculation, hallucination, or actions outside explicit user scope are strictly prohibited.
@@ -43,6 +43,7 @@
 
 ### 1.9. "FIX IS REPAIR, NOT REDESIGN" — LOCALIZED DEFECT REMEDIATION
 - **LOCALIZED FIX ONLY**: When tasked with fixing or debugging, identify the exact defect location and repair ONLY that defect. "Fix" means localized remediation; NEVER alter existing layout structures, redesign components, or add/remove surrounding elements unless a major architectural flaw exists and the user explicitly requests a redesign.
+- **REFACTOR EXCLUSION**: When the user explicitly requests a refactor or new feature, cleanly remove dead code, normalize imports/helpers (`@/lib/utils`), and refactor to clean Shadcn composition rather than layering defensive monkey-patches.
 - **ABSOLUTE FIDELITY TO REFERENCE SAMPLES (NO SPECULATIVE EFFECTS)**: When the user provides an image, reference code, or design pattern, adhere strictly to its exact nature. NEVER invent unrequested effects, SVG blur/glow filters, solid replacements for dashed strokes, or speculative box shadows that break layout hierarchy.
 - **ZERO UI REGRESSION**: All fixes must preserve existing layout dimensions, container paddings, and display hierarchy. New styles or animations must never introduce boundary clipping (`overflow-hidden` truncation), edge bleeding, or occlusion of neighboring elements.
 
@@ -72,9 +73,9 @@
 2. **UI Component & Style Boundaries**: NEVER introduce unsolicited UI components, error modals, arbitrary palette changes, or layout wrappers without explicit confirmation.
 3. **Strict Page-Level Scope**: Confine all UI modifications strictly to the designated page/component. Do not modify global themes or adjacent pages.
 4. **Context-Aware Design Standards**: Infer design patterns directly from neighboring components and maintain visual consistency across the entire page.
-5. **Mandatory `design-taste-frontend` Skill**:
-   - For all frontend UI development, redesigns, landing pages, or styling tasks, ALWAYS activate and follow `.agents/skills/design-taste-frontend/SKILL.md`.
-   - Apply Brief Inference (page kind, vibe, audience, brand assets) and enforce anti-slop aesthetics.
+5. **Mandatory Design & Component Skills (`design-taste-frontend` & `shadcn`)**:
+   - For all frontend UI, redesigns, landing pages, styling, or component composition, ALWAYS activate and follow `.agents/skills/design-taste-frontend/SKILL.md` and `.agents/skills/shadcn/SKILL.md`.
+   - Strictly enforce Shadcn rules: Use semantic color tokens (`bg-primary`, `text-muted-foreground`, `border-border`), layout with `flex gap-*` / `grid gap-*` (NEVER `space-y-*` / `space-x-*`), and always use `cn()` from `@/lib/utils`.
 6. **Defect-Targeted Fix Constraint**: Confine all UI repairs strictly to the minimal defect site. Preserve full hierarchy, padding, margin, and adjacent component layouts intact.
 7. **Master-Detail Synchronous State Alignment (Filter Tabs & Item Selection)**:
    - In 2-column or Master-Detail layouts with tab/tag filtering: Switching tabs MUST update both the filter criteria AND synchronously select the first valid matching item (`setSelectedId(firstValidId)`) in the same event handler pass.
@@ -84,6 +85,12 @@
    - Ensure `useEffect` dependencies and state setters never trigger runaway cascading re-renders (`Maximum update depth exceeded`).
 9. **Zero-Redundant Network on Client Filtering**:
    - Filter pill clicks and keyboard navigation (`A`/`D`/Arrows) over an already loaded in-memory dataset MUST filter locally in memory (0ms). NEVER trigger unsolicited background network syncs on every click/keystroke that race against local state.
+
+10. **Shadcn Motion & Micro-Interactions Standard**:
+   - **State-Driven Primitive Transitions**: Component state animations (Dialog, Sheet, Dropdown, Popover, Collapsible) MUST bind to component lifecycle / data attributes (`data-[state=open|closed]`, `data-[side]`) or `AnimatePresence`.
+   - **Zero-Layout-Shift (GPU-Accelerated)**: Animate ONLY GPU-friendly properties (`transform`, `opacity`, `scale`, `filter`). NEVER animate layout-triggering properties (`width`, `height`, `top`, `left`, `margin`, `padding`) that cause reflow or frame drops.
+   - **Natural Physics & Polish**: Use spring-based physics (`motion/react`, `framer-motion`, or CSS spring easing) for button presses, hover lifts, drawer swipes, and tab transitions instead of robotic linear curves.
+   - **Accessibility**: Respect `prefers-reduced-motion` via `motion-reduce:` utilities on all motion-enhanced components.
 
 ---
 
@@ -103,4 +110,3 @@
 6. **Real Backend Evidence Constraint (No Mock-Only Success Claims)**:
    - When verifying API endpoints before UI integration, the agent MUST execute requests directly against the live backend (port 8080) covering positive, negative, missing parameter, and edge cases.
    - Local mock tests MUST ONLY be reported as "mock fallback verification" and NEVER conflated with real backend verification.
-

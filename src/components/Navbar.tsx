@@ -11,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Separator } from "@/components/ui/separator";
 import { Bevel, BevelDivider } from "@/components/ui/bevel";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
+import { getUnifiedAccessToken } from "@/lib/api";
+import { getMe } from "@/services/authService";
 import { createAuthAction, savePendingAction } from "@/lib/authAction";
 import { addToCart as apiAddToCart, removeCartItem as apiRemoveCartItem, updateCartItemQuantity as apiUpdateCartQuantity } from "@/services/cartService";
 import { useChainedSpringList } from "@/hooks/useChainedSpringList";
@@ -389,6 +391,7 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let isMounted = true;
     const readUser = () => {
       try {
         const stored = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem("horizon_current_user");
@@ -401,10 +404,72 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
         setLoggedInUser(null);
       }
     };
+
+    const syncUserProfile = async () => {
+      const token = getUnifiedAccessToken();
+      if (!token) return;
+
+      try {
+        const res = await getMe();
+        if (!isMounted) return;
+
+        const profileData = res?.data;
+        if (profileData) {
+          setLoggedInUser((prev: any) => {
+            const updated = {
+              ...(prev || {}),
+              ...profileData,
+              fullName: profileData.fullName || prev?.fullName || "",
+              username: profileData.username || prev?.username || "",
+              email: profileData.email || prev?.email || "",
+              avatarUrl: profileData.avatarUrl || prev?.avatarUrl || "",
+              rank: profileData.rank || prev?.rank || "MEMBER",
+            };
+            try {
+              localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
+              localStorage.setItem("horizon_current_user", JSON.stringify(updated));
+            } catch (_) {}
+            return updated;
+          });
+        }
+      } catch (err) {
+        console.warn("[Navbar] syncUserProfile error:", err);
+      }
+    };
+
     readUser();
+    syncUserProfile();
+
     window.addEventListener("storage", readUser);
-    return () => window.removeEventListener("storage", readUser);
+    window.addEventListener("user-auth-change", readUser);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("storage", readUser);
+      window.removeEventListener("user-auth-change", readUser);
+    };
   }, [currentPage, showAccountMenu]);
+
+  const displayName = useMemo(() => {
+    if (!loggedInUser) return "Đăng nhập";
+    const rawFullName = loggedInUser.fullName?.trim();
+    if (rawFullName && !rawFullName.includes("@")) {
+      return rawFullName;
+    }
+    const rawUsername = loggedInUser.username?.trim();
+    if (rawUsername && !rawUsername.includes("@")) {
+      return rawUsername;
+    }
+    if (rawFullName) {
+      return rawFullName;
+    }
+    return rawUsername || "Người dùng";
+  }, [loggedInUser]);
+
+  const avatarInitial = useMemo(() => {
+    if (!loggedInUser) return "U";
+    const name = displayName !== "Đăng nhập" ? displayName : (loggedInUser.fullName || loggedInUser.username || "U");
+    return name.trim().charAt(0).toUpperCase() || "U";
+  }, [loggedInUser, displayName]);
   const [showProductMegaMenu, setShowProductMegaMenu] = useState(false);
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -2154,6 +2219,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             id="navbar-account-button"
             onClick={() => {
               if (!loggedInUser) {
+                window.location.hash = "login";
                 onNavigate("auth");
                 return;
               }
@@ -2177,7 +2243,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                   <img src={loggedInUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   <span className="font-black text-xs text-[#FF4D24]">
-                    {(loggedInUser.fullName ?? loggedInUser.username ?? "U")[0].toUpperCase()}
+                    {avatarInitial}
                   </span>
                 )
               ) : (
@@ -2185,7 +2251,7 @@ const resolveProductMetadata = (skuOrName: string) => {
               )}
             </div>
             <span className={`font-semibold text-sm text-inherit tracking-tight transition-all duration-300 truncate ${isSearchExpanded ? 'max-w-[80px] sm:max-w-[110px] md:max-w-[140px]' : 'max-w-[130px] sm:max-w-[180px]'}`}>
-              {loggedInUser ? (loggedInUser.fullName.length > 0 ? loggedInUser.fullName : `@${loggedInUser.username}`) : "Đăng nhập"}
+              {displayName}
             </span>
           </button>
 
@@ -2208,14 +2274,14 @@ const resolveProductMetadata = (skuOrName: string) => {
                     {loggedInUser?.avatarUrl ? (
                       <img src={loggedInUser.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt="Avatar" />
                     ) : (
-                      (loggedInUser?.fullName || loggedInUser?.username || "U")[0].toUpperCase()
+                      avatarInitial
                     )}
                   </div>
 
                   <div className="flex flex-col min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="font-bold text-neutral-800 text-xs sm:text-[13px] truncate">
-                        {loggedInUser?.fullName || `@${loggedInUser?.username}` || "Người dùng"}
+                        {displayName}
                       </span>
                       <span className="text-[8px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
                         {loggedInUser?.rank || "MEMBER"}
@@ -2334,7 +2400,8 @@ const resolveProductMetadata = (skuOrName: string) => {
                       localStorage.removeItem("horizon_access_token");
                       localStorage.removeItem("horizon_refresh_token");
                       setLoggedInUser(null);
-                      window.location.hash = "register";
+                      window.dispatchEvent(new Event("user-auth-change"));
+                      window.location.hash = "login";
                       onNavigate("auth");
                     }}
                     className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50/80 rounded-xl transition-all duration-150 cursor-pointer text-left"

@@ -7,6 +7,7 @@ export interface TypeWritterProps {
   onComplete?: () => void;
   className?: string;
   style?: React.CSSProperties;
+  cursorColor?: string;
 }
 
 export function TypeWritter({
@@ -15,6 +16,7 @@ export function TypeWritter({
   onComplete,
   className,
   style,
+  cursorColor = '#FF4D24',
 }: TypeWritterProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [isFinished, setIsFinished] = useState(false);
@@ -44,7 +46,7 @@ export function TypeWritter({
     <div
       className={className}
       style={{
-        fontFamily: "'Cascadia Code', 'Fira Code', 'Consolas', monospace",
+        fontFamily: "'Geist Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace",
         fontSize: 12.5,
         lineHeight: 1.6,
         color: '#1e293b',
@@ -59,10 +61,11 @@ export function TypeWritter({
         <span
           style={{
             display: 'inline-block',
-            width: 7,
-            height: 14,
-            backgroundColor: '#c084fc',
+            width: 6,
+            height: 13,
+            backgroundColor: cursorColor,
             marginLeft: 2,
+            borderRadius: 1,
             animation: 'blink 0.8s infinite',
             verticalAlign: 'middle',
           }}
