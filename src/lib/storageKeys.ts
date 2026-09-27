@@ -7,8 +7,6 @@ export const STORAGE_KEYS = {
   USER_PROFILE: "user_profile",
   REFRESH_TOKENS_MAP: "refresh_tokens_map",
   DEVICE_ID: "device_id",
-  USE_API_PROXY: "use_api_proxy",
-  API_BASE_URL: "api_base_url",
 
   CART_ITEMS: "cart_items",
   GUEST_ID: "guest_id",
@@ -25,7 +23,6 @@ export const STORAGE_KEYS = {
   LAST_REGISTRATION_USERNAME: "last_registration_username",
   LAST_REGISTRATION_PASSWORD: "last_registration_password",
   LAST_REGISTRATION_MESSAGE: "last_registration_message",
-  VERIFY_API_PATH: "verify_api_path",
   RECOVERY_USER_ROLES: "recovery_user_roles",
   PENDING_AUTH_ACTION: "pending_auth_action"
 } as const;

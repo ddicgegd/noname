@@ -19,7 +19,7 @@ import {
 import { MorphIcon } from "morphicons/react";
 import { HoverMorphIcon } from "./ui/HoverMorphIcon";
 import { useToast } from "./ui/Toast";
-import { apiRequest, isProxyEnabled, getApiBaseUrl } from "../lib/api";
+import { apiRequest, getApiBaseUrl } from "../lib/api";
 import { extractBackendMessage, sanitizeErrorMessage } from "../lib/responseExtractor";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 import { ApiResponse } from "../types/api";
@@ -260,12 +260,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   }, [lastRegEmail]);
   const [verificationTokenInput, setVerificationTokenInput] = useState("");
   const apiBaseUrl = getApiBaseUrl();
-  const [verifyApiPath, setVerifyApiPath] = useState(() => localStorage.getItem(STORAGE_KEYS.VERIFY_API_PATH) || localStorage.getItem("horizon_verify_api_path") || "/api/auth/verify-email");
-  const [verifyMethod, setVerifyMethod] = useState<"GET" | "POST">("GET");
+
   const [isVerifyingRequest, setIsVerifyingRequest] = useState(false);
   const [verificationLogs, setVerificationLogs] = useState<string[]>([]);
   const [verificationResultState, setVerificationResultState] = useState<"SUCCESS" | "FAILED" | null>(null);
-  const [showApiSettings, setShowApiSettings] = useState(false);
+
 
   // Countdown timer for email verification (15 minutes TTL = 900s)
   const [timeLeft, setTimeLeft] = useState<number>(900);
@@ -346,9 +345,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     }
   };
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.VERIFY_API_PATH, verifyApiPath);
-  }, [verifyApiPath]);
+
 
   // Helper to validate the recovery/reset token with the backend
   const validateRecoveryToken = async (token: string) => {
@@ -974,21 +971,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
               let actualUsername = finalUsername;
               if (accessJWT) {
                 try {
-                  const meRes = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/auth/me`, {
-                    method: "GET",
-                    headers: {
-                      "Authorization": `Bearer ${accessJWT}`,
-                      "Accept": "application/json"
-                    }
+                  const meJson = await apiRequest("/api/auth/me", {
+                    headers: { "Authorization": `Bearer ${accessJWT}` }
                   });
-                  if (meRes.ok) {
-                    const meJson = await meRes.json();
-                    if (meJson?.data?.fullName) {
-                      userFullName = meJson.data.fullName;
-                    }
-                    if (meJson?.data?.username) {
-                      actualUsername = meJson.data.username;
-                    }
+                  if (meJson?.data?.fullName) {
+                    userFullName = meJson.data.fullName;
+                  }
+                  if (meJson?.data?.username) {
+                    actualUsername = meJson.data.username;
                   }
                 } catch (_) {}
               }
@@ -1328,21 +1318,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
             let actualUsername = finalUsername;
             if (accessJWT) {
               try {
-                const meRes = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/auth/me`, {
-                  method: "GET",
-                  headers: {
-                    "Authorization": `Bearer ${accessJWT}`,
-                    "Accept": "application/json"
-                  }
+                const meJson = await apiRequest("/api/auth/me", {
+                  headers: { "Authorization": `Bearer ${accessJWT}` }
                 });
-                if (meRes.ok) {
-                  const meJson = await meRes.json();
-                  if (meJson?.data?.fullName) {
-                    userFullName = meJson.data.fullName;
-                  }
-                  if (meJson?.data?.username) {
-                    actualUsername = meJson.data.username;
-                  }
+                if (meJson?.data?.fullName) {
+                  userFullName = meJson.data.fullName;
+                }
+                if (meJson?.data?.username) {
+                  actualUsername = meJson.data.username;
                 }
               } catch (_) {}
             }

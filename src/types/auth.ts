@@ -70,7 +70,18 @@ export interface ChangePasswordRequest {
 
 export interface ChangeUsernameRequest {
   newUsername: string;
-  token?: string;
+}
+
+export interface UpdateCredentialsRequest {
+  newUsername?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+export interface CredentialStatusResponse {
+  status: "ACTIVE" | "PENDING" | "EXPIRED" | "INACTIVE";
+  remainingSeconds?: number;
+  expiresAt?: string;
 }
 
 export interface RefreshTokenRequest {
@@ -81,7 +92,7 @@ export interface RefreshTokenRequest {
 export interface UpdateProfileRequest {
   fullName?: string;
   phoneNumber?: string;
-  dateOfBirth?: string;
+  dateOfBirth?: string; // Format: yyyy-MM-dd
   avatarUrl?: string;
   gender?: string;
 }
@@ -92,7 +103,8 @@ export interface MyProfileResponse {
   email?: string;
   fullName?: string;
   phoneNumber?: string;
-  dateOfBirth?: string;
+  usernameCooldownUntil?: string | null; // "yyyy-MM-dd HH:mm:ss" or null
+  dateOfBirth?: string; // Format: yyyy-MM-dd
   avatarUrl?: string;
   gender?: string;
   rank?: string;

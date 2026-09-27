@@ -176,11 +176,12 @@ async function startServer() {
   const MyProfileResponseType = new GraphQLObjectType({
     name: "MyProfileResponseType",
     fields: {
-      id: { type: GraphQLInt },
+      id: { type: GraphQLString },
       username: { type: GraphQLString },
       fullName: { type: GraphQLString },
       email: { type: GraphQLString },
       phoneNumber: { type: GraphQLString },
+      usernameCooldownUntil: { type: GraphQLString },
       avatarUrl: { type: GraphQLString },
       dateOfBirth: { type: GraphQLString },
       gender: { type: GenderType },
@@ -363,40 +364,97 @@ async function startServer() {
       };
     }
     if (apiPath === "/api/auth/me") {
-      if (method === "PUT") {
-        const bodyObj = typeof body === "string" ? JSON.parse(body) : (body || {});
-        return {
-          status: { code: 200, message: "Cập nhật thông tin hồ sơ thành công" },
-          data: {
-            id: 1,
-            username: "horizon_admin",
-            fullName: bodyObj?.fullName || "Horizon Administrator",
-            email: "admin@horizon.net",
-            phoneNumber: bodyObj?.phoneNumber || "0971791373",
-            avatarUrl: bodyObj?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-            dateOfBirth: bodyObj?.dateOfBirth || "1995-01-01",
-            gender: bodyObj?.gender || "MALE",
-            rank: "GOLD",
-            status: "ACTIVE",
-            roles: ["ROLE_ADMIN", "ROLE_USER"]
-          }
+      if (!globalThis._mockUserProfile || typeof globalThis._mockUserProfile.id === "number" || globalThis._mockUserProfile.hideBirthYear !== undefined) {
+        globalThis._mockUserProfile = {
+          id: "100",
+          username: "alex_developer",
+          fullName: "Alex Developer",
+          email: "alex@example.com",
+          phoneNumber: "0901234567",
+          usernameCooldownUntil: null,
+          dateOfBirth: "1998-09-26",
+          avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+          gender: "MALE",
+          rank: "PLATINUM",
+          status: "ACTIVE",
+          roles: ["ROLE_USER"],
+          dobUpdatedAt: undefined
         };
       }
+
+      // Check if usernameCooldownUntil has expired
+      if (globalThis._mockUserProfile.usernameCooldownUntil) {
+        const cooldownTime = new Date(globalThis._mockUserProfile.usernameCooldownUntil.replace(" ", "T")).getTime();
+        if (!isNaN(cooldownTime) && cooldownTime <= Date.now()) {
+          globalThis._mockUserProfile.usernameCooldownUntil = null;
+        }
+      }
+
+      if (method === "PUT") {
+        const bodyObj = typeof body === "string" ? JSON.parse(body) : (body || {});
+
+        if (bodyObj.dateOfBirth) {
+          const dobPattern = /^\d{4}-\d{2}-\d{2}$/;
+          if (!dobPattern.test(bodyObj.dateOfBirth)) {
+            return {
+              status: { code: 400, message: "Ngày sinh không hợp lệ hoặc độ tuổi phải từ 10 đến 120 tuổi." },
+              data: null
+            };
+          }
+
+          const [y, m, d] = bodyObj.dateOfBirth.split("-").map(Number);
+          const now = new Date();
+          const birthDate = new Date(y, m - 1, d);
+          const curYear = now.getFullYear();
+          const curMonth = now.getMonth() + 1;
+          const curDay = now.getDate();
+
+          let age = curYear - y;
+          if (curMonth < m || (curMonth === m && curDay < d)) {
+            age--;
+          }
+
+          if (birthDate.getTime() > now.getTime() || age < 10 || age > 120) {
+            return {
+              status: { code: 400, message: "Ngày sinh không hợp lệ hoặc độ tuổi phải từ 10 đến 120 tuổi." },
+              data: null
+            };
+          }
+
+          if (globalThis._mockUserProfile.dobUpdatedAt && globalThis._mockUserProfile.dateOfBirth !== bodyObj.dateOfBirth) {
+            const lastUpdated = new Date(globalThis._mockUserProfile.dobUpdatedAt).getTime();
+            const cooldownPeriod = 365 * 24 * 60 * 60 * 1000;
+            if (now.getTime() - lastUpdated < cooldownPeriod) {
+              return {
+                status: {
+                  code: 401,
+                  message: "Bạn chỉ được phép cập nhật ngày sinh tối đa 1 lần mỗi năm. Vui lòng liên hệ CSKH nếu cần hỗ trợ."
+                },
+                data: null
+              };
+            }
+          }
+
+          if (globalThis._mockUserProfile.dateOfBirth !== bodyObj.dateOfBirth) {
+            globalThis._mockUserProfile.dobUpdatedAt = new Date().toISOString();
+          }
+          globalThis._mockUserProfile.dateOfBirth = bodyObj.dateOfBirth;
+        }
+
+        if (bodyObj.fullName !== undefined) globalThis._mockUserProfile.fullName = bodyObj.fullName;
+        if (bodyObj.phoneNumber !== undefined) globalThis._mockUserProfile.phoneNumber = bodyObj.phoneNumber;
+        if (bodyObj.avatarUrl !== undefined) globalThis._mockUserProfile.avatarUrl = bodyObj.avatarUrl;
+        if (bodyObj.gender !== undefined) globalThis._mockUserProfile.gender = bodyObj.gender;
+
+        return {
+          status: { code: 200, message: "Cập nhật thông tin hồ sơ thành công" },
+          data: { ...globalThis._mockUserProfile }
+        };
+      }
+
       return {
         status: { code: 200, message: "Success" },
-        data: {
-          id: 1,
-          username: "horizon_admin",
-          fullName: "Horizon Administrator",
-          email: "admin@horizon.net",
-          phoneNumber: "0971791373",
-          avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-          dateOfBirth: "1995-01-01",
-          gender: "MALE",
-          rank: "GOLD",
-          status: "ACTIVE",
-          roles: ["ROLE_ADMIN", "ROLE_USER"]
-        }
+        data: { ...globalThis._mockUserProfile }
       };
     }
     if (apiPath === "/api/auth/me/avatar" && method === "POST") {
@@ -411,6 +469,72 @@ async function startServer() {
           rank: "GOLD",
           status: "ACTIVE"
         }
+      };
+    }
+    if (apiPath.startsWith("/api/auth/credential-change/activate")) {
+      const token = queryParams.get("token") || "";
+      if (!token) {
+        return {
+          status: { code: 400, message: "Token is required" },
+          data: null
+        };
+      }
+      (globalThis as any)._mockCredentialGrant = {
+        status: "ACTIVE",
+        remainingSeconds: 300,
+        expiresAt: new Date(Date.now() + 300000).toISOString()
+      };
+      return {
+        status: {
+          code: 200,
+          message: "Kích hoạt quyền đổi thông tin thành công. Bạn có 5 phút để cập nhật."
+        },
+        data: "Kích hoạt thành công"
+      };
+    }
+
+    if (apiPath.startsWith("/api/auth/credential-change/status")) {
+      const grant = (globalThis as any)._mockCredentialGrant;
+      if (grant && grant.status === "ACTIVE" && new Date(grant.expiresAt).getTime() > Date.now()) {
+        const remaining = Math.max(0, Math.round((new Date(grant.expiresAt).getTime() - Date.now()) / 1000));
+        return {
+          status: { code: 200, message: "Success" },
+          data: {
+            status: "ACTIVE",
+            remainingSeconds: remaining,
+            expiresAt: grant.expiresAt
+          }
+        };
+      }
+      return {
+        status: { code: 401, message: "Phiên xác thực chưa được kích hoạt hoặc đã hết hạn." },
+        data: null
+      };
+    }
+
+    if (apiPath.startsWith("/api/auth/credential-change/request") && method === "POST") {
+      (globalThis as any)._mockCredentialGrant = {
+        status: "PENDING",
+        remainingSeconds: 0,
+        expiresAt: new Date(Date.now() + 300000).toISOString()
+      };
+      return {
+        status: {
+          code: 200,
+          message: "Liên kết xác thực thay đổi thông tin đăng nhập đã được gửi đến email của bạn."
+        },
+        data: null
+      };
+    }
+
+    if (apiPath.startsWith("/api/auth/update-credentials") && method === "PUT") {
+      (globalThis as any)._mockCredentialGrant = null;
+      return {
+        status: {
+          code: 200,
+          message: "Cập nhật thông tin đăng nhập thành công. Vui lòng đăng nhập lại."
+        },
+        data: null
       };
     }
     if (apiPath.startsWith("/api/auth/verify-email")) {
@@ -470,10 +594,84 @@ async function startServer() {
       };
     }
 
-    if (apiPath.startsWith("/api/auth/change-username")) {
+    if (apiPath.startsWith("/api/auth/check-username") || apiPath.startsWith("/api/v1/auth/check-username")) {
+      const username = (queryParams.get("username") || (typeof body === "string" ? JSON.parse(body || "{}")?.username : body?.username) || "").trim();
+      if (!username || username.length < 3 || username.length > 50 || username.includes("@") || !/^[a-zA-Z0-9_]+$/.test(username)) {
+        return {
+          status: { code: 400, message: "Tên đăng nhập không hợp lệ (3-50 ký tự, không chứa ký tự @ hoặc dấu cách)." },
+          data: { available: false, reason: "INVALID_FORMAT" }
+        };
+      }
+      const RESERVED_TAKEN = ["admin", "root", "system", "moderator", "ddicg", "existing_user"];
+      const isCurrent = globalThis._mockUserProfile?.username && username.toLowerCase() === globalThis._mockUserProfile.username.toLowerCase();
+      if (isCurrent) {
+        return {
+          status: { code: 400, message: "Tên đăng nhập mới trùng với tên hiện tại." },
+          data: { available: false, reason: "SAME_AS_CURRENT" }
+        };
+      }
+      if (RESERVED_TAKEN.includes(username.toLowerCase())) {
+        return {
+          status: { code: 409, message: "Tên đăng nhập mới đã tồn tại trên hệ thống." },
+          data: { available: false, reason: "ALREADY_EXISTS" }
+        };
+      }
+      return {
+        status: { code: 200, message: "Tên đăng nhập khả dụng." },
+        data: { available: true }
+      };
+    }
+
+    if (apiPath.startsWith("/api/auth/change-username") && method === "PUT") {
+      const bodyObj = typeof body === "string" ? JSON.parse(body) : (body || {});
+      const newUsername = (bodyObj.newUsername || "").trim();
+
+      if (!newUsername || newUsername.length < 3 || newUsername.length > 50 || newUsername.includes("@") || !/^[a-zA-Z0-9_]+$/.test(newUsername)) {
+        return {
+          status: { code: 400, message: "Tên đăng nhập mới phải từ 3 đến 50 ký tự, không chứa ký tự @." },
+          data: null
+        };
+      }
+
+      // Check Cooldown (30 days)
+      if (globalThis._mockUserProfile?.usernameCooldownUntil) {
+        const cooldownTime = new Date(globalThis._mockUserProfile.usernameCooldownUntil.replace(" ", "T")).getTime();
+        if (!isNaN(cooldownTime) && cooldownTime > Date.now()) {
+          return {
+            status: {
+              code: 401,
+              message: "Bạn chỉ được đổi tên đăng nhập tối đa 1 lần mỗi tháng. Vui lòng quay lại sau."
+            },
+            data: null
+          };
+        }
+      }
+
+      // Check Duplicate / Taken Username
+      const RESERVED_TAKEN = ["admin", "root", "system", "moderator", "ddicg", "existing_user"];
+      if (RESERVED_TAKEN.includes(newUsername.toLowerCase()) || (globalThis._mockUserProfile?.username && newUsername.toLowerCase() === globalThis._mockUserProfile.username.toLowerCase())) {
+        return {
+          status: {
+            code: 401,
+            message: "Tên đăng nhập mới đã tồn tại trên hệ thống."
+          },
+          data: null
+        };
+      }
+
+      // Set Cooldown 30 days
+      const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const formattedCd = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
+
+      if (globalThis._mockUserProfile) {
+        globalThis._mockUserProfile.username = newUsername;
+        globalThis._mockUserProfile.usernameCooldownUntil = formattedCd;
+      }
+
       return {
         status: { code: 200, message: "Đổi tên đăng nhập thành công. Vui lòng đăng nhập lại." },
-        message: "Đổi tên đăng nhập thành công. Vui lòng đăng nhập lại."
+        data: null
       };
     }
 
@@ -798,6 +996,19 @@ async function startServer() {
       try {
         return JSON.parse(text);
       } catch (e) {
+        if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+          const titleMatch = text.match(/<title>([^<]+)<\/title>/i);
+          const pMatch = text.match(/<p[^>]*class="[^"]*text-slate-500[^"]*"[^>]*>([^<]+)<\/p>/i) || text.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+          const message = pMatch ? pMatch[1].trim() : (titleMatch ? titleMatch[1].replace(/—.*$/, "").trim() : "Liên kết xác thực không hợp lệ hoặc đã hết hạn.");
+          const isSuccess = text.includes("icon-ring-success") || text.includes("thành công") || text.includes("kích hoạt thành công");
+          return {
+            status: {
+              code: isSuccess ? 200 : 401,
+              message: message
+            },
+            data: null
+          };
+        }
         if (statusCode === 401) throw new Error("Unauthorized");
         throw new Error(`Failed to parse response (status ${statusCode})`);
       }
@@ -2399,6 +2610,24 @@ async function startServer() {
   // --- REAL / MOCK AUTH BACKEND PROXY (REST endpoints for /api/auth/*) ---
   app.all(["/api/auth*", "/api/v1/auth*"], async (req, res) => {
     try {
+      // Browser direct click interception: If user clicked link from email directly in browser (Document navigation without application/json)
+      const acceptHeader = (req.headers.accept || "") as string;
+      const isDocumentNav = req.headers["sec-fetch-dest"] === "document" || req.headers["sec-fetch-mode"] === "navigate";
+      if (
+        req.method === "GET" &&
+        !acceptHeader.includes("application/json") &&
+        (isDocumentNav || acceptHeader.includes("text/html")) &&
+        (req.path.includes("/credential-change/activate") || req.path.includes("/verify-email") || req.path.includes("/validate-reset-token"))
+      ) {
+        const token = req.query.token || "";
+        const actionType = req.path.includes("/credential-change")
+          ? "credential-change"
+          : req.path.includes("/verify-email")
+          ? "verify-email"
+          : "reset-password";
+        return res.redirect(`/email-response?type=${actionType}&token=${encodeURIComponent(String(token))}`);
+      }
+
       const response = await callApiGateway(req.originalUrl || req.url, {
         method: req.method,
         body: req.body,

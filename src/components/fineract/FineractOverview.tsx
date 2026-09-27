@@ -368,7 +368,7 @@ export default function FineractOverview({
               <div className="text-slate-400 flex items-center justify-between">
                 <span>Chế độ:</span>
                 <span className="text-sky-400 font-sans text-xs">
-                  {activeHealth?.mode === "live" ? "Live Proxy (/api/proxy)" : "Mock Fallback Store"}
+                  {activeHealth?.mode === "live" ? "Live Backend (Spring Boot Port 8080)" : "Mock Fallback Store"}
                 </span>
               </div>
             </div>

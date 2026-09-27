@@ -105,9 +105,6 @@ function getBookmarkHeaders(): Record<string, string> {
 }
 
 function getBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    return "/api/bookmarks";
-  }
   const base = getApiBaseUrl().replace(/\/$/, "");
   return `${base}/api/bookmarks`;
 }

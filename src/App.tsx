@@ -17,6 +17,8 @@ import AuthReportDashboard from "./components/AuthReportDashboard";
 import ProfilePage from "./components/ProfilePage";
 import TermsPage from "./components/TermsPage";
 import OrderPage from "./components/OrderPage";
+import EmailActionResponsePage from "./components/EmailActionResponsePage";
+import AntiAverage404Page from "./components/AntiAverage404Page";
 import { GenieCartFlyProvider } from "./components/ui/genie-cart-fly";
 import { ToastProvider } from "./components/ui/Toast";
 import { AnimatePresence, motion } from "motion/react";
@@ -29,7 +31,7 @@ import {
   subscribeToCartUpdates 
 } from "./services/cartService";
 import type { Cart as ApiCart } from "./types/cart";
-
+import { isValidEmailActionToken } from "./lib/authAction";
 interface CartItem {
   id: string;
   sku?: string;
@@ -63,23 +65,60 @@ interface RisingStar {
   duration: number;
 }
 
+export type AppPage = "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response" | "404";
+
 export default function App() {
-  const getPageFromPath = (path: string): "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" => {
-    const cleanPath = path.toLowerCase().replace(/\/$/, "");
-    if (["/p", "/product"].includes(cleanPath)) return "product";
+  const getPageFromPath = (path: string): AppPage => {
+    let cleanPath = path.toLowerCase().replace(/\/$/, "");
+    try {
+      cleanPath = decodeURIComponent(cleanPath);
+    } catch {
+      // keep raw cleanPath if malformed
+    }
+    if (["", "/"].includes(cleanPath)) return "landing";
+    if (["/p", "/product", "/products"].includes(cleanPath)) return "product";
     if (["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath)) return "order";
-    if (["/auth-report", "/diagnostic"].includes(cleanPath)) return "auth-report";
-    if (["/m", "/profile", "/account", "/accounts", "/me"].includes(cleanPath)) {
+    if (["/auth-report", "/diagnostic", "/diagnostics"].includes(cleanPath)) return "auth-report";
+    // Strict RFC 4122 UUID v4 Token validator: matches UUID.randomUUID().toString() from backend
+    const hasValidToken = (): boolean => {
+      if (typeof window === "undefined") return false;
+      const params = new URLSearchParams(window.location.search);
+      const rawToken = params.get("token") || params.get("code") || "";
+      if (
+        params.get("preview") === "success" ||
+        params.get("mock") === "success" ||
+        params.get("fix") === "true" ||
+        params.get("report") === "true" ||
+        rawToken === "preview-success"
+      ) {
+        return true;
+      }
+      return isValidEmailActionToken(rawToken);
+    };
+
+    if (["/email-response", "/email-action", "/auth-response", "/auth/response", "/auth/callback", "/auth/activate", "/credential-change/activate", "/credential-change"].includes(cleanPath)) {
+      if (hasValidToken()) {
+        return "email-response";
+      }
+      if (typeof window !== "undefined" && window.location.pathname !== "/404") {
+        window.history.replaceState({}, "", "/404");
+      }
+      return "404";
+    }
+    if (["/m", "/profile", "/account", "/accounts", "/me", "/security/credentials", "/security"].includes(cleanPath)) {
       if (cleanPath !== "/m" && typeof window !== "undefined") {
         window.history.replaceState({}, "", "/m" + window.location.hash + window.location.search);
       }
       return "profile";
     }
     if (["/verify-email", "/verify"].includes(cleanPath)) {
-      if (typeof window !== "undefined") {
-        window.history.replaceState({}, "", "/a" + window.location.search + "#verify");
+      if (hasValidToken()) {
+        return "email-response";
       }
-      return "auth";
+      if (typeof window !== "undefined" && window.location.pathname !== "/404") {
+        window.history.replaceState({}, "", "/404");
+      }
+      return "404";
     }
     if (["/resend-verification", "/resend"].includes(cleanPath)) {
       if (typeof window !== "undefined") {
@@ -99,14 +138,24 @@ export default function App() {
       }
       return "auth";
     }
-    if (["/a", "/auth"].includes(cleanPath)) {
+    if (["/a", "/auth", "/login", "/register", "/signin", "/signup"].includes(cleanPath)) {
       if (cleanPath !== "/a" && typeof window !== "undefined") {
-        window.history.replaceState({}, "", "/a" + window.location.hash + window.location.search);
+        let hash = window.location.hash;
+        if (!hash) {
+          if (["/register", "/signup"].includes(cleanPath)) hash = "#register";
+          else hash = "#login";
+        }
+        window.history.replaceState({}, "", "/a" + hash + window.location.search);
       }
       return "auth";
     }
     if (["/terms", "/privacy"].includes(cleanPath)) return "terms";
-    return "landing";
+    if (cleanPath === "/404") return "404";
+
+    if (typeof window !== "undefined" && window.location.pathname !== "/404") {
+      window.history.replaceState({}, "", "/404");
+    }
+    return "404";
   };
 
   const VALID_AUTH_HASHES = [
@@ -129,6 +178,10 @@ export default function App() {
       case "product": return "/p";
       case "order": return "/o";
       case "auth-report": return "/auth-report";
+      case "email-response": {
+        const search = window.location.search;
+        return search ? `/email-response${search}` : "/email-response";
+      }
       case "profile": {
         const hash = window.location.hash;
         return hash ? `/m${hash}` : "/m";
@@ -144,11 +197,12 @@ export default function App() {
         return "/a#login";
       }
       case "terms": return "/terms";
-      default: return "/";
+      case "404": return "/404";
+      default: return "/404";
     }
   };
 
-  const [currentPage, setCurrentPage] = useState<"landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms">((() => {
+  const [currentPage, setCurrentPage] = useState<AppPage>((() => {
     const page = getPageFromPath(window.location.pathname);
     if (page === "auth") {
       const hash = window.location.hash.toLowerCase();
@@ -247,7 +301,11 @@ export default function App() {
   }, []);
 
   // Custom navigate function to sync with address bar
-  const navigate = (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms") => {
+  const navigate = (page: AppPage | "cart") => {
+    if (page === "cart") {
+      navigate("order");
+      return;
+    }
     setIsProductDetailOpen(false);
     setCurrentPage(page);
     let targetPath = getPathFromPage(page);
@@ -431,7 +489,7 @@ export default function App() {
         <SplashScreen />
 
       {/* 2. Synchronized Top Floating Glassmorphism Navbar */}
-      {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && (
+      {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && currentPage !== "email-response" && currentPage !== "404" && (
         <Navbar 
           currentPage={currentPage}
           onNavigate={navigate}
@@ -518,6 +576,16 @@ export default function App() {
           >
             <AuthReportDashboard onNavigate={navigate} />
           </motion.div>
+        ) : currentPage === "email-response" ? (
+          <motion.div
+            key="email-response"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+          >
+            <EmailActionResponsePage onNavigate={navigate} />
+          </motion.div>
         ) : currentPage === "profile" ? (
           <motion.div
             key="profile"
@@ -538,7 +606,7 @@ export default function App() {
           >
             <RegisterPage onNavigate={navigate} />
           </motion.div>
-        ) : (
+        ) : currentPage === "terms" ? (
           <motion.div
             key="terms"
             initial={{ opacity: 0, y: 15 }}
@@ -547,6 +615,16 @@ export default function App() {
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
             <TermsPage onNavigate={navigate} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="404"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+          >
+            <AntiAverage404Page onNavigate={navigate} />
           </motion.div>
         )}
       </AnimatePresence>

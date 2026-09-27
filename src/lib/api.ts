@@ -6,50 +6,37 @@ import { ApiResponse } from "../types/api";
 import { extractBackendMessage } from "./responseExtractor";
 import { STORAGE_KEYS } from "./storageKeys";
 
+/**
+ * Lấy API Base URL chuẩn hóa từ biến môi trường VITE_API_BASE_URL hoặc mặc định localhost:8080.
+ * Tuyệt đối không đọc từ localStorage để tránh bị cướp quyền gọi API bởi các tunnel ngrok chết.
+ */
 export function getApiBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    try {
-      const customUrl = localStorage.getItem("horizon_api_base_url") || localStorage.getItem(STORAGE_KEYS.API_BASE_URL);
-      if (customUrl && customUrl.trim().length > 0) {
-        return customUrl.trim();
-      }
-    } catch {}
-  }
   return ((import.meta as any).env?.VITE_API_BASE_URL as string) || "http://localhost:8080";
 }
 
-export function setApiBaseUrl(url: string): void {
-  if (typeof window !== "undefined") {
-    try {
-      const trimmed = url.trim();
-      if (!trimmed || trimmed === "http://localhost:8080" || trimmed === "") {
-        localStorage.removeItem("horizon_api_base_url");
-        localStorage.removeItem(STORAGE_KEYS.API_BASE_URL);
-      } else {
-        localStorage.setItem("horizon_api_base_url", trimmed);
-        localStorage.setItem(STORAGE_KEYS.API_BASE_URL, trimmed);
-      }
-    } catch {}
-  }
+/**
+ * Tự động quét và loại bỏ các cấu hình lạ / ngrok chết tồn dư trong localStorage
+ */
+export function sanitizeLegacyStorageConfigurations(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const legacyKeys = [
+      "horizon_api_base_url",
+      "api_base_url",
+      "use_api_proxy",
+      "horizon_verify_api_path",
+      "verify_api_path"
+    ];
+    for (const key of legacyKeys) {
+      localStorage.removeItem(key);
+    }
+  } catch (_) {}
 }
 
-export function isProxyEnabled(): boolean {
-  if (typeof window !== "undefined") {
-    try {
-      return localStorage.getItem(STORAGE_KEYS.USE_API_PROXY) === "true";
-    } catch {}
-  }
-  return false;
+// Tự động thực thi dọn dẹp khi tải thư viện API trên trình duyệt
+if (typeof window !== "undefined") {
+  sanitizeLegacyStorageConfigurations();
 }
-
-export function setProxyEnabled(enabled: boolean): void {
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.setItem(STORAGE_KEYS.USE_API_PROXY, enabled ? "true" : "false");
-    } catch {}
-  }
-}
-
 export interface DeviceInfo {
   screenWidth: number;
   screenHeight: number;
@@ -252,8 +239,9 @@ export async function unifiedFetch(
     headers
   });
 
-  // Check for 401 Unauthorized
-  if (response.status === 401 && !isAuthEndpoint) {
+  // Check for 401 Unauthorized (exclude credential-change/status which returns 401 when session is not yet active)
+  const isStatusCheckEndpoint = urlString.includes("/api/auth/credential-change/status");
+  if (response.status === 401 && !isAuthEndpoint && !isStatusCheckEndpoint) {
     console.warn(`[Auth] Phát hiện 401 từ ${urlString}. Đang thực hiện Refresh Token...`);
     try {
       const newAccessToken = await executeRefreshToken();
@@ -291,11 +279,14 @@ export async function apiRequest<T = any>(
   const targetUrl = `${baseUrl.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
 
   const headers = new Headers(options.headers);
-  // Do NOT set Content-Type if body is FormData (let browser set multipart boundary)
-  if (!headers.has("Content-Type") && !(typeof FormData !== "undefined" && options.body instanceof FormData)) {
+  const method = (options.method || "GET").toUpperCase();
+  // Do NOT set Content-Type on GET/HEAD requests to prevent unnecessary CORS preflight
+  if (method !== "GET" && method !== "HEAD" && !headers.has("Content-Type") && !(typeof FormData !== "undefined" && options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
-
+  if (!headers.has("Accept")) {
+    headers.set("Accept", "application/json, text/html;q=0.9, */*;q=0.8");
+  }
   try {
     const response = await unifiedFetch(targetUrl, {
       ...options,
@@ -357,7 +348,35 @@ export async function apiRequest<T = any>(
       }
       throw err;
     }
+    const contentType = response.headers.get("Content-Type") || "";
+    if (contentType.includes("text/html")) {
+      const htmlText = await response.text();
+      const isSuccess =
+        htmlText.includes("icon-ring-success") ||
+        htmlText.includes("thành công") ||
+        htmlText.includes("Kích hoạt thành công") ||
+        htmlText.includes("Quyền đổi thông tin đăng nhập đã được cấp") ||
+        htmlText.includes("Quyền thay đổi đã kích hoạt");
 
+      if (!isSuccess) {
+        const errorMatch = htmlText.match(/<p[^>]*class="[^"]*text-slate-500[^"]*"[^>]*>([^<]+)<\/p>/i) || htmlText.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+        const errorMsg = errorMatch ? errorMatch[1].replace(/<[^>]+>/g, "").trim() : "Liên kết xác thực không hợp lệ hoặc đã hết hạn.";
+        const err: any = new Error(errorMsg);
+        err.status = 401;
+        err.data = {
+          status: { code: 401, message: errorMsg },
+          message: errorMsg
+        };
+        throw err;
+      }
+
+      const successMsg = "Kích hoạt quyền thay đổi thành công! Bạn có 5 phút để hoàn tất cập nhật tên đăng nhập hoặc mật khẩu.";
+      return {
+        status: { code: 200, message: successMsg },
+        data: successMsg,
+        message: successMsg
+      } as T;
+    }
     return await response.json();
   } catch (error) {
     console.warn(

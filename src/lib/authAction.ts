@@ -2,11 +2,27 @@
 
 import { STORAGE_KEYS } from "./storageKeys";
 
+/**
+ * Strict RFC 4122 UUID v4 Token Validator for Email Action Links
+ * (Verification, Recovery, Credential Change)
+ *
+ * Backend Spec:
+ * `String rawToken = UUID.randomUUID().toString();`
+ * Format: 8-4-4-4-12 hexadecimal digits (exactly 36 characters)
+ * Example: "c8f2b15a-7140-4209-8438-fb14c33d0a21"
+ */
+export const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isValidEmailActionToken(token: string | null | undefined): boolean {
+  if (!token) return false;
+  const clean = token.trim().replace(/\.+$/, "");
+  return UUID_V4_REGEX.test(clean);
+}
+
 export interface UserSession {
   token: string;
   user?: Record<string, any> | null;
 }
-
 export interface PendingActionData<T = any> {
   actionId: string;
   returnUrl?: string;

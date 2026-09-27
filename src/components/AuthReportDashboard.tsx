@@ -531,9 +531,7 @@ export default function AuthReportDashboard({ onNavigate }: AuthReportDashboardP
     try {
       if (meQueryType === "rest") {
         const targetUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/auth/me`;
-        const proxyUrl = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
-        
-        const res = await fetch(proxyUrl, {
+        const res = await fetch(targetUrl, {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${token}`,

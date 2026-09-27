@@ -20,8 +20,7 @@ import {
 } from "../types/fineract";
 import { fineractMockStore } from "../lib/fineractMockStore";
 import { extractFineractError } from "../lib/fineractErrorExtractor";
-import { getUnifiedAccessToken, getApiBaseUrl } from "../lib/api";
-import { STORAGE_KEYS } from "../lib/storageKeys";
+import { getUnifiedAccessToken, getApiBaseUrl, unifiedFetch } from "../lib/api";
 
 export const FINERACT_MODE_STORAGE_KEY = "fineract_service_mode";
 
@@ -38,44 +37,7 @@ function simulateLatency(minMs = 30, maxMs = 75): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, delay));
 }
 
-/**
- * Ensure an active Bearer JWT token exists for communicating with Spring Boot ERP Gateway.
- * If user hasn't explicitly logged in, auto-authenticates with dev credentials.
- */
-async function ensureAuthToken(): Promise<string> {
-  const existing = getUnifiedAccessToken();
-  if (existing) return existing;
 
-  try {
-    const loginUrl = "http://localhost:8080/api/auth/login";
-    const proxyEndpoint = `/api/proxy?url=${encodeURIComponent(loginUrl)}`;
-    const res = await fetch(proxyEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({
-        usernameOrEmail: "ADMIN@gmail.com",
-        password: "admin",
-        deviceInfo: {
-          deviceId: "dev-fineract-auto",
-          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "Antigravity/Dev",
-          platform: "Linux",
-          timeZone: "Asia/Ho_Chi_Minh"
-        }
-      })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const accessToken = data?.data?.accessToken;
-      if (accessToken && isLocalStorageAvailable()) {
-        localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-        return accessToken;
-      }
-    }
-  } catch (err) {
-    console.warn("[FineractService] Auto-auth attempt failed:", err);
-  }
-  return "";
-}
 
 export class FineractService implements IFineractService {
   private mode: "live" | "mock" = "live";
@@ -109,11 +71,7 @@ export class FineractService implements IFineractService {
   }
 
   public getErpBaseUrl(): string {
-    const apiBase = getApiBaseUrl();
-    if (apiBase && !apiBase.includes("localhost:8080")) {
-      return `${apiBase.replace(/\/$/, "")}/api/v1/erp`;
-    }
-    return this.erpBaseUrl;
+    return `${getApiBaseUrl().replace(/\/$/, "")}/api/v1/erp`;
   }
 
   // ==========================================================================
@@ -123,41 +81,26 @@ export class FineractService implements IFineractService {
   private async callProxy<T = any>(
     path: string,
     method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
-    body?: any,
-    retryCount = 0
+    body?: any
   ): Promise<T> {
     const cleanPath = path.startsWith("/") ? path : `/${path}`;
     const targetUrl = `${this.getErpBaseUrl()}${cleanPath}`;
-    const proxyEndpoint = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
 
     const headers: Record<string, string> = {
       "Accept": "application/json",
       "Content-Type": "application/json"
     };
 
-    let token = getUnifiedAccessToken();
-    if (!token) {
-      token = await ensureAuthToken();
-    }
+    const token = getUnifiedAccessToken();
     if (token) {
       headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
     }
 
-    const response = await fetch(proxyEndpoint, {
+    const response = await unifiedFetch(targetUrl, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined
     });
-
-    if ((response.status === 401 || response.status === 403) && retryCount === 0) {
-      console.warn(`[FineractService] Received ${response.status} from ${targetUrl}, attempting auto re-auth...`);
-      if (isLocalStorageAvailable()) {
-        localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-      }
-      await ensureAuthToken();
-      return this.callProxy<T>(path, method, body, 1);
-    }
-
     const responseText = await response.text();
     let responseData: any;
     try {

@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, PackageOpen, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame, ShieldCheck, Bookmark } from "lucide-react";
+import { User, LogOut, Settings, CreditCard, ShoppingCart, Trash2, Search, TrendingUp, Home, Package, PackageOpen, X, Check, Plus, Minus, ShoppingBag, ChevronDown, ChevronRight, CornerDownLeft, ArrowUpRight, ArrowRight, Sparkles, Flame, ShieldCheck, Bookmark, MailCheck } from "lucide-react";
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -54,8 +54,8 @@ export interface GroupedCartItem {
 }
 
 interface NavbarProps {
-  currentPage: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms";
-  onNavigate: (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms") => void;
+  currentPage: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response";
+  onNavigate: (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response") => void;
   cartItems: CartItem[];
   onRemoveCartItem?: (id: string | string[]) => void;
   onAddToCart?: (itemName: string, itemPrice: string) => void;
@@ -2353,6 +2353,20 @@ const resolveProductMetadata = (skuOrName: string) => {
                   >
                     <ShieldCheck size={15} className={`transition-colors shrink-0 ${currentPage === "auth-report" ? "text-[#FF4D24]" : "text-neutral-400 group-hover:text-neutral-700"}`} />
                     <span className={currentPage === "auth-report" ? "font-bold text-[#FF4D24]" : ""}>Báo cáo Xác thực</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      onNavigate("email-response");
+                    }}
+                    className={`group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer text-left ${
+                      currentPage === "email-response"
+                        ? "text-[#FF4D24] bg-orange-50/70"
+                        : "text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70"
+                    }`}
+                  >
+                    <MailCheck size={15} className={`transition-colors shrink-0 ${currentPage === "email-response" ? "text-[#FF4D24]" : "text-neutral-400 group-hover:text-neutral-700"}`} />
+                    <span className={currentPage === "email-response" ? "font-bold text-[#FF4D24]" : ""}>Phản hồi Email (Actions)</span>
                   </button>
 
                   <button 

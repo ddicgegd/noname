@@ -1,18 +1,30 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   User, Lock, Mail, ChevronDown, ChevronUp, CheckCircle, 
-  Eye, EyeOff, AlertCircle, RefreshCw, ArrowRight, ArrowLeft, Phone,
+  Eye, EyeOff, AlertCircle, RefreshCw, Loader2, ArrowRight, ArrowLeft, Phone,
   Shield, Check, X, Sliders, ShoppingBag, ClipboardList, Truck, Package, PackageOpen, 
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
-  Smartphone, Laptop, Globe, Key, Building2, Home, Sparkles, Wallet, ExternalLink,
+  Smartphone, Laptop, Globe, Key, Keyboard, Building2, Home, Sparkles, Wallet, ExternalLink,
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
   LocateFixed, Map as LucideMap, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Crown,
-  Camera, Upload, Calendar, Wifi, Settings2, Pencil
+  Camera, Upload, Calendar, Wifi, Settings2, Pencil, ShieldAlert, Cake, PartyPopper
 } from "lucide-react";
-import { apiRequest, unifiedFetch, getUnifiedAccessToken, getApiBaseUrl, setApiBaseUrl, isProxyEnabled, setProxyEnabled } from "../lib/api";
-import { updateMyProfile, uploadAvatar, getMyProfile, changeUsername } from "../services/authService";
-import { UpdateProfileRequest, MyProfileResponse } from "../types/auth";
+import { BirthdayDatePicker } from "./ui/BirthdayDatePicker";
+import { useToast } from "./ui/Toast";
+import { apiRequest, unifiedFetch, getUnifiedAccessToken, getApiBaseUrl } from "../lib/api";
+import { 
+  updateMyProfile, 
+  uploadAvatar, 
+  getMyProfile, 
+  changeUsername, 
+  checkUsername,
+  requestCredentialChange,
+  getCredentialChangeStatus,
+  activateCredentialChange,
+  updateCredentials
+} from "../services/authService";
+import { UpdateProfileRequest, MyProfileResponse, UpdateCredentialsRequest, CredentialStatusResponse } from "../types/auth";
 import { getActiveSessions, terminateSession, terminateOtherSessions } from "../services/sessionService";
 import { DeviceSession } from "../types/session";
 import { STORAGE_KEYS } from "../lib/storageKeys";
@@ -89,7 +101,7 @@ export const STATUS_FILTER_OPTIONS = [
 export type StatusFilterType = (typeof STATUS_FILTER_OPTIONS)[number]["id"];
 
 interface ProfilePageProps {
-  onNavigate: (page: "landing" | "product" | "order" | "cart" | "auth" | "auth-report" | "profile" | "terms") => void;
+  onNavigate: (page: "landing" | "product" | "order" | "cart" | "auth" | "auth-report" | "profile" | "terms" | "email-response") => void;
 }
 
 export interface PaymentMethodItem {
@@ -301,6 +313,7 @@ function saveTutorialDismissedForAccount(accountKey: string, dismissed: boolean)
 }
 
 export default function ProfilePage({ onNavigate }: ProfilePageProps) {
+  const { showToast } = useToast();
   // Authentication status
   const [token, setToken] = useState<string>("");
   const [user, setUser] = useState<any>(null);
@@ -676,38 +689,757 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [editFullName, setEditFullName] = useState<string>("");
   const [editPhone, setEditPhone] = useState<string>("");
   const [editGender, setEditGender] = useState<string>("male");
-  const [editDateOfBirth, setEditDateOfBirth] = useState<string>("1995-01-01");
+  const [editDateOfBirth, setEditDateOfBirth] = useState<string>("1998-09-26");
   const [editAvatarUrl, setEditAvatarUrl] = useState<string>("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState<boolean>(false);
-  const [isAvatarUrlInputOpen, setIsAvatarUrlInputOpen] = useState<boolean>(false);
-  const [avatarUrlDraft, setAvatarUrlDraft] = useState<string>("");
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
-  // API Endpoint & Gateway Configuration
-  const [apiBaseUrlState, setApiBaseUrlState] = useState<string>(getApiBaseUrl());
-  const [isEndpointConfigOpen, setIsEndpointConfigOpen] = useState<boolean>(false);
-  const [customEndpointInput, setCustomEndpointInput] = useState<string>(getApiBaseUrl());
-  const [endpointPingStatus, setEndpointPingStatus] = useState<{
-    status: "idle" | "checking" | "connected" | "failed";
-    latency?: number;
-    message?: string;
-  }>({ status: "idle" });
+
   const [lastSyncTime, setLastSyncTime] = useState<string>("");
+  // In-Place Username Editing State (Triggered by Pencil next to @username in Hero Banner)
+  const [isInlineUsernameOpen, setIsInlineUsernameOpen] = useState<boolean>(false);
+  const [inlineUsername, setInlineUsername] = useState<string>(user?.username || "");
+  const [isInlineUserEdited, setIsInlineUserEdited] = useState<boolean>(false);
+  const [inlineCheckStatus, setInlineCheckStatus] = useState<"idle" | "checking" | "success" | "warning" | "error">("idle");
+  const [inlineUsernameError, setInlineUsernameError] = useState<string>("");
+  const [inlineUsernameSuccess, setInlineUsernameSuccess] = useState<string>("");
+  const [isInlineUsernameSaving, setIsInlineUsernameSaving] = useState<boolean>(false);
+  const [inlinePassword, setInlinePassword] = useState<string>("");
+  const [inlineConfirmPassword, setInlineConfirmPassword] = useState<string>("");
+  const [showInlinePassword, setShowInlinePassword] = useState<boolean>(false);
+  const [showInlineConfirmPassword, setShowInlineConfirmPassword] = useState<boolean>(false);
+  const [isHeaderShieldHovered, setIsHeaderShieldHovered] = useState<boolean>(false);
+  const [isOpeningDrawer, setIsOpeningDrawer] = useState<boolean>(false);
+  // Credential Change 5-Minute Grant Session & Polling State (ADR-002)
+  const [credentialGrant, setCredentialGrant] = useState<{
+    isActive: boolean;
+    remainingSeconds: number;
+    expiresAt?: string;
+  }>({ isActive: false, remainingSeconds: 0 });
+  const [isRequestingCredentialChange, setIsRequestingCredentialChange] = useState<boolean>(false);
+  const [hasPendingCredentialRequest, setHasPendingCredentialRequest] = useState<boolean>(false);
+  const [isUsernameSaving, setIsUsernameSaving] = useState<boolean>(false);
+  const [isPasswordSaving, setIsPasswordSaving] = useState<boolean>(false);
+  const lastCheckedUsernameRef = useRef<string>("");
   const isProfileDirty = Boolean(user && (
     editFullName.trim() !== (user.fullName || "").trim() ||
     editPhone.trim() !== (user.phoneNumber || "0901234567").trim() ||
     editGender.toLowerCase() !== (user.gender || "male").toLowerCase() ||
-    editDateOfBirth.trim() !== (user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "1995-01-01").trim() ||
-    editAvatarUrl.trim() !== (user.avatarUrl || "").trim()
+    editDateOfBirth.trim() !== (user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "1998-09-26").trim() ||
+    editAvatarUrl.trim() !== (user.avatarUrl || "").trim() ||
+    (isInlineUserEdited && inlineUsername.trim() !== (user.username || "").trim()) ||
+    Boolean(inlinePassword.trim() || inlineConfirmPassword.trim())
   ));
-  // In-Frame Username Editing states
-  const [isEditingUsernameInProfile, setIsEditingUsernameInProfile] = useState<boolean>(false);
-  const [inlineNewUsername, setInlineNewUsername] = useState<string>("");
-  const [isInlineUsernameSaving, setIsInlineUsernameSaving] = useState<boolean>(false);
+  // Username validation helper adhering to IAM_EXISTING_USERNAME_ENDPOINT_REPORT.md
+  // Reserved / Taken usernames to check uniqueness before calling API
+  const RESERVED_TAKEN_USERNAMES = ["admin", "root", "system", "moderator", "ddicg", "existing_user"];
+
+  // Username Cooldown State & Handlers (30-day IAM Cooldown Tracking)
+  const getUsernameCooldownKey = useCallback((u: any) => {
+    const id = u?.id || u?.username || u?.email || "default_user";
+    return `horizon_username_cooldown_${id}`;
+  }, []);
+
+  const checkUsernameCooldown = useCallback((u: any) => {
+    if (typeof window === "undefined") return null;
+
+    let untilMs: number | null = null;
+    if (u?.usernameCooldownUntil) {
+      const normalized = typeof u.usernameCooldownUntil === "string"
+        ? u.usernameCooldownUntil.replace(" ", "T")
+        : u.usernameCooldownUntil;
+      const parsed = Date.parse(normalized);
+      if (!isNaN(parsed) && parsed > 0) {
+        untilMs = parsed;
+      }
+    }
+
+    if (!untilMs) {
+      const key = getUsernameCooldownKey(u);
+      const storedTimestamp = localStorage.getItem(key) || u?.lastUsernameChangedAt;
+      if (storedTimestamp) {
+        const lastChanged = Number(storedTimestamp);
+        if (!isNaN(lastChanged) && lastChanged > 0) {
+          const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+          untilMs = lastChanged + COOLDOWN_MS;
+        }
+      }
+    }
+
+    if (!untilMs) return null;
+
+    const remainingMs = untilMs - Date.now();
+    if (remainingMs <= 0) {
+      const key = getUsernameCooldownKey(u);
+      localStorage.removeItem(key);
+      return null;
+    }
+
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const days = Math.floor(totalSeconds / (3600 * 24));
+    const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const formatted = days > 0
+      ? `${days} ngày ${hours} giờ`
+      : hours > 0
+        ? `${hours}h ${minutes}m ${seconds}s`
+        : `${minutes}m ${seconds}s`;
+
+    return {
+      isActive: true,
+      untilMs,
+      untilDateStr: u?.usernameCooldownUntil || new Date(untilMs).toLocaleString("vi-VN"),
+      days,
+      hours,
+      minutes,
+      seconds,
+      formatted,
+      shortFormatted: days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}m`
+    };
+  }, [getUsernameCooldownKey]);
+
+  const [cooldownRemaining, setCooldownRemaining] = useState<{
+    isActive: boolean;
+    untilMs?: number;
+    untilDateStr?: string;
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+    formatted: string;
+    shortFormatted: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const updateCooldown = () => {
+      const remaining = checkUsernameCooldown(user);
+      setCooldownRemaining(remaining);
+    };
+
+    updateCooldown();
+    const interval = setInterval(updateCooldown, 1000);
+    return () => clearInterval(interval);
+  }, [user, checkUsernameCooldown]);
+
+  // Username validation helper adhering to IAM_EXISTING_USERNAME_ENDPOINT_REPORT.md & API spec v1.2.3
+  const validateUsernameFormat = useCallback((raw: string, currentUsername?: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return { valid: false, message: "Tên đăng nhập không được để trống.", type: "empty" };
+    }
+    if (trimmed.includes("@")) {
+      return { valid: false, message: "Tên đăng nhập không được chứa ký tự '@'.", type: "at_symbol" };
+    }
+    if (/\s/.test(trimmed)) {
+      return { valid: false, message: "Tên đăng nhập không được chứa khoảng trắng.", type: "space" };
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      return { valid: false, message: "Tên đăng nhập chỉ được chứa chữ cái, chữ số và dấu gạch dưới (_).", type: "special_char" };
+    }
+    if (trimmed.length < 3) {
+      return { valid: false, message: `Độ dài tối thiểu 3 ký tự (còn thiếu ${3 - trimmed.length} ký tự).`, type: "min_length" };
+    }
+    if (trimmed.length > 50) {
+      return { valid: false, message: "Độ dài tối đa 50 ký tự.", type: "max_length" };
+    }
+    if (currentUsername && trimmed.toLowerCase() === currentUsername.toLowerCase()) {
+      return { valid: false, message: "Tên đăng nhập mới trùng với tên hiện tại.", type: "same_username" };
+    }
+    if (RESERVED_TAKEN_USERNAMES.includes(trimmed.toLowerCase())) {
+      return { valid: false, message: "Tên đăng nhập mới đã tồn tại trên hệ thống.", type: "duplicate" };
+    }
+    return { valid: true, message: "Tên đăng nhập hợp lệ và sẵn sàng cập nhật.", type: "valid" };
+  }, []);
+
+  // Default inline username to current user username
+  useEffect(() => {
+    if (user?.username && !isInlineUserEdited) {
+      setInlineUsername(user.username);
+    }
+  }, [user?.username, isInlineUserEdited]);
+
+  // 0.5s Debounce auto check username availability with status icon and popup notifications
+  useEffect(() => {
+    if (!isInlineUsernameOpen || !isInlineUserEdited) {
+      return;
+    }
+
+    const trimmed = inlineUsername.trim();
+    if (trimmed === lastCheckedUsernameRef.current) {
+      return;
+    }
+
+    setInlineCheckStatus("checking");
+
+    const timer = setTimeout(async () => {
+      lastCheckedUsernameRef.current = trimmed;
+
+      if (!trimmed) {
+        setInlineCheckStatus("error");
+        const msg = "Tên đăng nhập không được để trống.";
+        setInlineUsernameError(msg);
+        setInlineUsernameSuccess("");
+        showToast(msg, "error");
+        return;
+      }
+
+      if (user?.username && trimmed.toLowerCase() === user.username.toLowerCase()) {
+        setInlineCheckStatus("warning");
+        const msg = "Tên đăng nhập mới trùng với tên hiện tại.";
+        setInlineUsernameError(msg);
+        setInlineUsernameSuccess("");
+        showToast(msg, "warning");
+        return;
+      }
+
+      if (trimmed.length < 3) {
+        setInlineCheckStatus("error");
+        const msg = `Độ dài tối thiểu 3 ký tự (còn thiếu ${3 - trimmed.length} ký tự).`;
+        setInlineUsernameError(msg);
+        setInlineUsernameSuccess("");
+        showToast(msg, "error");
+        return;
+      }
+
+      if (trimmed.length > 50) {
+        setInlineCheckStatus("error");
+        const msg = "Độ dài tối đa 50 ký tự.";
+        setInlineUsernameError(msg);
+        setInlineUsernameSuccess("");
+        showToast(msg, "error");
+        return;
+      }
+
+      if (trimmed.includes("@")) {
+        setInlineCheckStatus("error");
+        const msg = "Tên đăng nhập không được chứa ký tự '@'.";
+        setInlineUsernameError(msg);
+        setInlineUsernameSuccess("");
+        showToast(msg, "error");
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+        setInlineCheckStatus("error");
+        const msg = "Tên đăng nhập chỉ được chứa chữ cái, chữ số và dấu gạch dưới (_).";
+        setInlineUsernameError(msg);
+        setInlineUsernameSuccess("");
+        showToast(msg, "error");
+        return;
+      }
+
+      try {
+        const res = await checkUsername(trimmed);
+        if (res?.data?.available || res?.status?.code === 200) {
+          setInlineCheckStatus("success");
+          setInlineUsernameError("");
+          const successText = `Tên đăng nhập @${trimmed} khả dụng!`;
+          setInlineUsernameSuccess(successText);
+          showToast(successText, "success");
+        } else {
+          setInlineCheckStatus("error");
+          const errMsg = res?.status?.message || "Tên đăng nhập không khả dụng.";
+          setInlineUsernameError(errMsg);
+          setInlineUsernameSuccess("");
+          showToast(errMsg, "error");
+        }
+      } catch (err: any) {
+        setInlineCheckStatus("error");
+        let msg = err?.message || "Tên đăng nhập không khả dụng hoặc đã tồn tại.";
+        if (msg.includes("already exists") || msg.includes("tồn tại") || msg.includes("ALREADY_EXISTS")) {
+          msg = "Tên đăng nhập mới đã tồn tại trên hệ thống.";
+        }
+        setInlineUsernameError(msg);
+        setInlineUsernameSuccess("");
+        showToast(msg, "error");
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [inlineUsername, isInlineUsernameOpen, isInlineUserEdited, user?.username, showToast]);
+
+
+  // Compute Birthday Celebration Flags & Countdown purely from dateOfBirth
+  const birthdayInfo = useMemo(() => {
+    if (!user?.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(String(user.dateOfBirth).split("T")[0])) {
+      return { isBirthdayToday: false, isBirthdayMonth: false, daysUntilBirthday: null };
+    }
+    const dobStr = String(user.dateOfBirth).split("T")[0];
+    const [, m, d] = dobStr.split("-").map(Number);
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth() + 1;
+    const curDay = now.getDate();
+
+    const isToday = curMonth === m && curDay === d;
+    const isMonth = curMonth === m;
+
+    let nextBday = new Date(curYear, m - 1, d);
+    const today = new Date(curYear, curMonth - 1, curDay);
+    if (nextBday.getTime() < today.getTime()) {
+      nextBday = new Date(curYear + 1, m - 1, d);
+    }
+    const diffDays = Math.round((nextBday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return { isBirthdayToday: isToday, isBirthdayMonth: isMonth, daysUntilBirthday: diffDays };
+  }, [user?.dateOfBirth]);
+
+  // Check Credential Change Active Permission (ADR-002: GET /api/auth/credential-change/status)
+  const checkActiveCredentialStatus = useCallback(async () => {
+    try {
+      const res = await getCredentialChangeStatus();
+      if (res?.status?.code === 200 && res.data?.status === "ACTIVE") {
+        const remaining = typeof res.data.remainingSeconds === "number" ? res.data.remainingSeconds : 300;
+        setCredentialGrant({
+          isActive: true,
+          remainingSeconds: remaining,
+          expiresAt: res.data.expiresAt
+        });
+        // Feedback #2: Luôn mở giao diện nếu backend phản hồi active
+        setIsInlineUsernameOpen(true);
+        setHasPendingCredentialRequest(false);
+        return true;
+      } else {
+        setCredentialGrant(prev => prev.isActive ? { isActive: false, remainingSeconds: 0 } : prev);
+        return false;
+      }
+    } catch (err) {
+      console.warn("[Auth] Check credential status error:", err);
+      return false;
+    }
+  }, []);
+
+  // Check if URL has credential activation token on mount (from email link e.g. /security/credentials?token=xyz or /m?token=xyz)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tokenParam = params.get("token");
+    if (tokenParam && tokenParam.trim()) {
+      (async () => {
+        try {
+          const res = await activateCredentialChange(tokenParam.trim());
+          const msg = res?.status?.message || "Kích hoạt quyền đổi thông tin thành công. Bạn có 5 phút để cập nhật.";
+          showToast(msg, "success");
+          // Clean up URL search params without page reload
+          const url = new URL(window.location.href);
+          url.searchParams.delete("token");
+          window.history.replaceState({}, "", url.pathname + url.hash);
+          // Immediately check active status to open drawer
+          await checkActiveCredentialStatus();
+        } catch (err: any) {
+          const errMsg = err?.message || err?.data?.status?.message || "Kích hoạt phiên đổi thông tin thất bại hoặc liên kết đã hết hạn.";
+          showToast(errMsg, "error");
+        }
+      })();
+    }
+  }, [checkActiveCredentialStatus, showToast]);
+
+  // Check credential status on mount
+  useEffect(() => {
+    checkActiveCredentialStatus();
+  }, [checkActiveCredentialStatus]);
+
+  // Polling for credential status when pending or waiting for email activation
+  useEffect(() => {
+    if (credentialGrant.isActive) return;
+
+    // Fast polling every 3s if user clicked "Gửi yêu cầu thay đổi" or background check every 8s
+    const pollInterval = hasPendingCredentialRequest ? 3000 : 8000;
+    const timer = setInterval(async () => {
+      await checkActiveCredentialStatus();
+    }, pollInterval);
+
+    return () => clearInterval(timer);
+  }, [credentialGrant.isActive, hasPendingCredentialRequest, checkActiveCredentialStatus]);
+
+  // Client-side 1-second countdown timer when credential grant is ACTIVE
+  useEffect(() => {
+    if (!credentialGrant.isActive || credentialGrant.remainingSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      setCredentialGrant(prev => {
+        if (!prev.isActive || prev.remainingSeconds <= 1) {
+          clearInterval(timer);
+          setIsInlineUsernameOpen(false);
+          setInlinePassword("");
+          setInlineConfirmPassword("");
+          setIsInlineUserEdited(false);
+          showToast("Phiên thay đổi thông tin đã hết hạn (5 phút). Chức năng đã tự động đóng.", "info");
+          checkActiveCredentialStatus(); // Re-verify with backend when reaching 0
+          return { isActive: false, remainingSeconds: 0 };
+        }
+        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [credentialGrant.isActive, credentialGrant.remainingSeconds, checkActiveCredentialStatus, showToast]);
+
+  // Auto collapse/close credential change drawer when grant expires or becomes inactive
+  useEffect(() => {
+    if (isInlineUsernameOpen && !credentialGrant.isActive && credentialGrant.remainingSeconds === 0) {
+      setIsInlineUsernameOpen(false);
+      setInlinePassword("");
+      setInlineConfirmPassword("");
+      setIsInlineUserEdited(false);
+      if (user?.username) {
+        setInlineUsername(user.username);
+      }
+    }
+  }, [credentialGrant.isActive, credentialGrant.remainingSeconds, isInlineUsernameOpen, user?.username]);
+
+  // Handler for Requesting Credential Change Email (POST /api/auth/credential-change/request)
+  const handleRequestCredentialChange = async () => {
+    if (isRequestingCredentialChange) return;
+
+    setIsRequestingCredentialChange(true);
+    setIsOpeningDrawer(true);
+    setIsHeaderShieldHovered(true);
+
+    try {
+      const res = await requestCredentialChange();
+      const successMsg = res?.status?.message || `Liên kết xác thực thay đổi thông tin đăng nhập đã được gửi đến ${user?.email || "email của bạn"}. Vui lòng kiểm tra hộp thư.`;
+      showToast(successMsg, "success");
+      setHasPendingCredentialRequest(true);
+      // Immediately poll status
+      await checkActiveCredentialStatus();
+    } catch (err: any) {
+      console.warn("[Auth] Request credential change failed:", err);
+      const is429 = err?.status === 429 || err?.data?.status?.code === 429;
+      const errMsg = err?.data?.status?.message || err?.message || "Không thể gửi yêu cầu thay đổi.";
+      if (is429) {
+        showToast(errMsg || "Yêu cầu xác thực trước đó của bạn vẫn đang có hiệu lực. Vui lòng kiểm tra hộp thư hoặc thử lại sau.", "warning");
+        setHasPendingCredentialRequest(true);
+        await checkActiveCredentialStatus();
+      } else {
+        showToast(errMsg, "error");
+      }
+    } finally {
+      setIsRequestingCredentialChange(false);
+      setTimeout(() => {
+        setIsOpeningDrawer(false);
+      }, 500);
+    }
+  };
+  // Handler 1: Update Username Only (API Call 1: PUT /api/auth/update-credentials { newUsername })
+  const handleUpdateUsername = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmedUser = inlineUsername.trim();
+    if (!isCredentialUserChanged) return;
+
+    if (!credentialGrant.isActive) {
+      showToast("Phiên đổi thông tin chưa được kích hoạt hoặc đã hết hạn. Vui lòng gửi email xác thực.", "warning");
+      return;
+    }
+    if (cooldownRemaining?.isActive) {
+      showToast(`Tài khoản đang trong thời hạn giãn cách 30 ngày. Còn lại: ${cooldownRemaining.formatted}.`, "error");
+      return;
+    }
+    const val = validateUsernameFormat(trimmedUser, user?.username);
+    if (!val.valid) {
+      showToast(val.message, "error");
+      return;
+    }
+
+    setIsUsernameSaving(true);
+    try {
+      const res = await updateCredentials({ newUsername: trimmedUser });
+      const successMessage = res?.status?.message || `Đổi tên đăng nhập thành công: @${trimmedUser}.`;
+      showToast(successMessage, "success");
+
+      // Set 30-day cooldown
+      const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const formattedCd = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
+      const cooldownKey = getUsernameCooldownKey(user);
+      localStorage.setItem(cooldownKey, String(Date.now()));
+
+      if (user) {
+        const updated = { ...user, username: trimmedUser, usernameCooldownUntil: formattedCd };
+        setUser(updated);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
+        localStorage.setItem("horizon_current_user", JSON.stringify(updated));
+      }
+      setCooldownRemaining(checkUsernameCooldown({ ...user, usernameCooldownUntil: formattedCd }));
+      logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành công: @${trimmedUser}`);
+
+      // Single-use grant: revoke active status on UI
+      setCredentialGrant({ isActive: false, remainingSeconds: 0 });
+      setTimeout(() => {
+        setIsInlineUsernameOpen(false);
+      }, 1500);
+    } catch (err: any) {
+      let message = err?.data?.status?.message || err?.message || "Cập nhật tên đăng nhập thất bại.";
+      if (message.includes("tồn tại") || message.includes("already exists")) {
+        message = "Tên đăng nhập mới đã tồn tại trên hệ thống.";
+      }
+      showToast(message, "error");
+      logAuditAction("CHANGE_USERNAME", "FAILED", `Thất bại: ${message}`);
+    } finally {
+      setIsUsernameSaving(false);
+    }
+  };
+
+  // Handler 2: Update Password Only (API Call 2: PUT /api/auth/update-credentials { newPassword, confirmPassword })
+  const handleUpdatePassword = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!isCredentialPassEntered) return;
+
+    if (!credentialGrant.isActive) {
+      showToast("Phiên đổi thông tin chưa được kích hoạt hoặc đã hết hạn. Vui lòng gửi email xác thực.", "warning");
+      return;
+    }
+    if (inlinePassword.length < 6) {
+      showToast("Mật khẩu mới phải từ 6 ký tự trở lên.", "error");
+      return;
+    }
+    if (inlinePassword !== inlineConfirmPassword) {
+      showToast("Mật khẩu xác nhận không khớp.", "error");
+      return;
+    }
+
+    setIsPasswordSaving(true);
+    try {
+      const res = await updateCredentials({
+        newPassword: inlinePassword,
+        confirmPassword: inlineConfirmPassword
+      });
+      const successMessage = res?.status?.message || "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.";
+      showToast(successMessage, "success");
+
+      setInlinePassword("");
+      setInlineConfirmPassword("");
+      setShowInlinePassword(false);
+      setShowInlineConfirmPassword(false);
+
+      // Single-use grant: revoke active status on UI
+      setCredentialGrant({ isActive: false, remainingSeconds: 0 });
+      logAuditAction("RESET_PASSWORD", "SUCCESS", "Đổi mật khẩu thành công");
+      setTimeout(() => {
+        setIsInlineUsernameOpen(false);
+      }, 1500);
+    } catch (err: any) {
+      const message = err?.data?.status?.message || err?.message || "Cập nhật mật khẩu thất bại.";
+      showToast(message, "error");
+      logAuditAction("RESET_PASSWORD", "FAILED", `Thất bại: ${message}`);
+    } finally {
+      setIsPasswordSaving(false);
+    }
+  };
+
+  // Handler for Unified Credential Update (PUT /api/auth/update-credentials)
+  const handleUpdateCredentials = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    const trimmedUser = inlineUsername.trim();
+    const isUserChanged = isInlineUserEdited && trimmedUser !== (user?.username || "");
+    const isPassEntered = Boolean(inlinePassword.trim() || inlineConfirmPassword.trim());
+
+    if (!isUserChanged && !isPassEntered) {
+      return;
+    }
+
+    if (!credentialGrant.isActive) {
+      const msg = "Phiên đổi thông tin chưa được kích hoạt hoặc đã hết hạn. Vui lòng gửi email xác thực.";
+      setInlineUsernameError(msg);
+      showToast(msg, "warning");
+      return;
+    }
+
+    if (isUserChanged) {
+      if (cooldownRemaining?.isActive) {
+        const cdMsg = `Tài khoản đang trong thời hạn giãn cách 30 ngày. Bạn có thể đổi lại sau: ${cooldownRemaining.formatted}.`;
+        setInlineUsernameError(cdMsg);
+        showToast(cdMsg, "error");
+        return;
+      }
+      const val = validateUsernameFormat(trimmedUser, user?.username);
+      if (!val.valid) {
+        setInlineUsernameError(val.message);
+        showToast(val.message, "error");
+        return;
+      }
+    }
+
+    if (isPassEntered) {
+      if (inlinePassword.length < 6) {
+        const passMsg = "Mật khẩu mới phải từ 6 ký tự trở lên.";
+        setInlineUsernameError(passMsg);
+        showToast(passMsg, "error");
+        return;
+      }
+      if (inlinePassword !== inlineConfirmPassword) {
+        const matchMsg = "Mật khẩu xác nhận không khớp.";
+        setInlineUsernameError(matchMsg);
+        showToast(matchMsg, "error");
+        return;
+      }
+    }
+
+    setIsInlineUsernameSaving(true);
+    setInlineUsernameError("");
+    setInlineUsernameSuccess("");
+
+    try {
+      const payload: UpdateCredentialsRequest = {};
+      if (isUserChanged) {
+        payload.newUsername = trimmedUser;
+      }
+      if (isPassEntered) {
+        payload.newPassword = inlinePassword;
+        payload.confirmPassword = inlineConfirmPassword;
+      }
+
+      const res = await updateCredentials(payload);
+      const successMessage = res?.status?.message || "Cập nhật thông tin đăng nhập thành công. Vui lòng đăng nhập lại.";
+
+      setInlineUsernameSuccess(successMessage);
+      showToast(successMessage, "success");
+
+      // Clear password inputs
+      setInlinePassword("");
+      setInlineConfirmPassword("");
+      setShowInlinePassword(false);
+      setShowInlineConfirmPassword(false);
+
+      // Single-use grant: revoke active status on UI
+      setCredentialGrant({ isActive: false, remainingSeconds: 0 });
+
+      // If username changed, update local user state & set 30-day cooldown
+      if (isUserChanged) {
+        const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const formattedCd = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
+        const cooldownKey = getUsernameCooldownKey(user);
+        localStorage.setItem(cooldownKey, String(Date.now()));
+
+        if (user) {
+          const updated = { ...user, username: trimmedUser, usernameCooldownUntil: formattedCd };
+          setUser(updated);
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
+          localStorage.setItem("horizon_current_user", JSON.stringify(updated));
+
+          const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
+          if (storedProfile) {
+            try {
+              const prof = JSON.parse(storedProfile);
+              prof.username = trimmedUser;
+              prof.usernameCooldownUntil = formattedCd;
+              localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(prof));
+              localStorage.setItem("horizon_redis_profile", JSON.stringify(prof));
+            } catch {}
+          }
+        }
+        setCooldownRemaining(checkUsernameCooldown({ ...user, usernameCooldownUntil: formattedCd }));
+        logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành công: @${trimmedUser}`);
+      }
+
+      if (isPassEntered) {
+        logAuditAction("RESET_PASSWORD", "SUCCESS", "Đổi mật khẩu thành công qua API update-credentials");
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
+
+      // Close drawer after 2.5s
+      setTimeout(() => {
+        setIsInlineUsernameOpen(false);
+        setInlineUsernameSuccess("");
+      }, 2500);
+    } catch (err: any) {
+      console.warn("[Auth] Update credentials error:", err);
+      let message = err?.data?.status?.message || err?.message || "Cập nhật thông tin xác thực thất bại.";
+      
+      if (message.includes("tồn tại") || message.includes("already exists") || message.includes("ALREADY_EXISTS")) {
+        message = "Tên đăng nhập mới đã tồn tại trên hệ thống.";
+      } else if (message.includes("tháng") || message.includes("cooldown") || message.includes("30 ngày")) {
+        message = "Bạn chỉ được đổi tên đăng nhập tối đa 1 lần mỗi tháng. Vui lòng quay lại sau.";
+        const cooldownKey = getUsernameCooldownKey(user);
+        if (!localStorage.getItem(cooldownKey)) {
+          localStorage.setItem(cooldownKey, String(Date.now()));
+        }
+        setCooldownRemaining(checkUsernameCooldown(user));
+      } else if (message.includes("chưa được kích hoạt") || message.includes("hết hạn") || message.includes("INVALID_CREDENTIALS")) {
+        message = "Bạn chưa xác thực qua email hoặc phiên đổi thông tin đã hết hạn.";
+        setCredentialGrant({ isActive: false, remainingSeconds: 0 });
+      }
+
+      setInlineUsernameError(message);
+      setInlineCheckStatus("error");
+      showToast(message, "error");
+      logAuditAction("CHANGE_CREDENTIALS", "FAILED", `Thất bại: ${message}`);
+    } finally {
+       setIsInlineUsernameSaving(false);
+     }
+   };
+
+  const handleSaveInlineCredentials = handleUpdateCredentials;
+
+  // Derived state for Credential Change form validation (ADR-002 & UI validation)
+  const isCredentialUserChanged = isInlineUserEdited && inlineUsername.trim() !== (user?.username || "");
+  const isCredentialPassEntered = Boolean(inlinePassword.trim() || inlineConfirmPassword.trim());
+
+  const isCredentialUsernameFormatValid = inlineUsername.trim().length >= 3 &&
+    inlineUsername.trim().length <= 50 &&
+    !inlineUsername.trim().includes("@") &&
+    /^[a-zA-Z0-9_]+$/.test(inlineUsername.trim());
+
+  const isCredentialUsernameValid = !isCredentialUserChanged || (
+    !cooldownRemaining?.isActive &&
+    isCredentialUsernameFormatValid &&
+    inlineCheckStatus !== "error"
+  );
+
+  const isCredentialPasswordValid = !isCredentialPassEntered || (
+    inlinePassword.length >= 6 &&
+    inlinePassword === inlineConfirmPassword
+  );
+
+  const hasCredentialAtLeastOneChange = (isCredentialUserChanged && isCredentialUsernameValid) || (isCredentialPassEntered && isCredentialPasswordValid);
+
+  const isCredentialFormValid = credentialGrant.isActive &&
+    !isInlineUsernameSaving &&
+    isCredentialUsernameValid &&
+    isCredentialPasswordValid &&
+    hasCredentialAtLeastOneChange;
+
+  const credentialButtonTooltip = !credentialGrant.isActive
+    ? "Chưa kích hoạt quyền thay đổi (vui lòng gửi email xác thực)"
+    : cooldownRemaining?.isActive && isCredentialUserChanged
+      ? "Tài khoản đang trong thời hạn giãn cách đổi tên 30 ngày"
+      : isCredentialPassEntered && inlinePassword.length < 6
+        ? "Mật khẩu mới phải từ 6 ký tự trở lên"
+        : isCredentialPassEntered && inlinePassword !== inlineConfirmPassword
+          ? "Mật khẩu xác nhận không trùng khớp"
+          : !hasCredentialAtLeastOneChange
+            ? "Vui lòng nhập tên đăng nhập mới hoặc mật khẩu mới"
+            : "Xác nhận cập nhật thông tin đăng nhập";
+
+  const usernameButtonTooltip = !credentialGrant.isActive
+    ? "Chưa kích hoạt quyền thay đổi (vui lòng gửi email xác thực)"
+    : cooldownRemaining?.isActive && isCredentialUserChanged
+      ? `Tài khoản đang trong thời hạn giãn cách 30 ngày (còn lại: ${cooldownRemaining.formatted})`
+      : !isCredentialUserChanged
+        ? "Tên đăng nhập chưa thay đổi"
+        : !isCredentialUsernameFormatValid
+          ? "Tên đăng nhập không đúng định dạng (3-50 ký tự, không chứa @)"
+          : "Xác nhận đổi tên đăng nhập (API 1)";
+
+  const passwordButtonTooltip = !credentialGrant.isActive
+    ? "Chưa kích hoạt quyền thay đổi (vui lòng gửi email xác thực)"
+    : !isCredentialPassEntered
+      ? "Vui lòng nhập mật khẩu mới và xác nhận mật khẩu"
+      : inlinePassword.length < 6
+        ? "Mật khẩu mới phải từ 6 ký tự trở lên"
+        : inlinePassword !== inlineConfirmPassword
+          ? "Mật khẩu xác nhận không trùng khớp"
+          : "Xác nhận đổi mật khẩu (API 2)";
+
   // Accordion Expansions in Security tab
   const [isUsernameChangeExpanded, setIsUsernameChangeExpanded] = useState<boolean>(true);
   const [isPasswordResetExpanded, setIsPasswordResetExpanded] = useState<boolean>(false);
-
   // Input states
   const [newUsername, setNewUsername] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
@@ -1292,21 +2024,25 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     setSuccessMsg("");
 
     try {
-      const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
-      const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem("horizon_current_user");
-
-      let currentToken = "";
-      let localUser = null;
-
-      if (storedProfile) {
-        const prof = JSON.parse(storedProfile);
-        currentToken = prof.accessToken || "";
+      const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || 
+                         localStorage.getItem("horizon_current_user") ||
+                         localStorage.getItem("currentUser") ||
+                         localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || 
+                         localStorage.getItem("horizon_redis_profile");
+      const currentToken = getUnifiedAccessToken();
+      if (currentToken) {
         setToken(currentToken);
       }
 
+      let localUser = null;
       if (storedUser) {
-        localUser = JSON.parse(storedUser);
-        setUser(localUser);
+        try {
+          const parsed = JSON.parse(storedUser);
+          if (parsed && typeof parsed === "object") {
+            localUser = parsed.user || parsed;
+            setUser(localUser);
+          }
+        } catch {}
       }
 
       // Initialize real order history from cache & GraphQL Gateway
@@ -1337,125 +2073,65 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       // Cho phép hiển thị giao diện ngay lập tức thay vì bắt người dùng chờ API
       setIsLoading(false);
 
-      if (!currentToken) {
-        return;
-      }
-
-      // Xác thực ngầm qua GraphQL Gateway (Non-blocking background validation & fetch)
-      unifiedFetch("/graphql", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${currentToken}`
-        },
-        body: JSON.stringify({
-          query: `
-            query {
-              me {
-                status {
-                  code
-                  message
-                }
-                data {
-                  id
-                  username
-                  fullName
-                  email
-                  phoneNumber
-                  avatarUrl
-                  gender
-                  rank
-                  status
-                  roles
-                }
-              }
-            }
-          `
-        })
-      })
-      .then(res => res.json())
-      .then(resJson => {
-        const meData = resJson?.data?.me;
-        if (meData && meData.status?.code === 200 && meData.data) {
-          const fetchedUser = meData.data;
-          setUser(fetchedUser);
-          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(fetchedUser));
-          
-          if (storedProfile) {
-            const prof = JSON.parse(storedProfile);
-            localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify({
-              ...prof,
-              email: fetchedUser.email || prof.email,
-              userId: fetchedUser.id || prof.userId
-            }));
-          }
-        } else {
-          console.warn("GraphQL me query did not return success, trying legacy API...", meData);
-          return apiRequest(`/api/auth/validate-reset-token?token=${encodeURIComponent(currentToken)}`, {
-            method: "GET"
-          }).then((response) => {
-            const isSuccess = response && (
-              response.status === "success" ||
-              (response.status && typeof response.status === "object" && (
-                response.status.message === "Success" ||
-                response.status.message === "success" ||
-                response.status.code === 200 ||
-                response.status.code === "200"
-              )) ||
-              response.data
-            );
-
-            if (isSuccess && response.data) {
-              const fetchedUser = response.data;
-              setUser(fetchedUser);
-              localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(fetchedUser));
-              
-              if (storedProfile) {
-                const prof = JSON.parse(storedProfile);
-                localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify({
-                  ...prof,
-                  email: fetchedUser.email || prof.email,
-                  userId: fetchedUser.id || prof.userId
-                }));
-              }
-            }
-          });
-        }
-      })
-      .catch((err) => {
-        console.warn("Could not fetch profile live from GraphQL gateway in background, trying legacy API:", err);
-        apiRequest(`/api/auth/validate-reset-token?token=${encodeURIComponent(currentToken)}`, {
-          method: "GET"
-        }).then((response) => {
-          const isSuccess = response && (
-            response.status === "success" ||
-            (response.status && typeof response.status === "object" && (
-              response.status.message === "Success" ||
-              response.status.message === "success" ||
-              response.status.code === 200 ||
-              response.status.code === "200"
-            )) ||
-            response.data
-          );
-
-          if (isSuccess && response.data) {
+      // Đồng bộ thông tin profile trực tiếp từ getMyProfile / GraphQL me
+      getMyProfile()
+        .then((response) => {
+          if (response && response.data) {
             const fetchedUser = response.data;
             setUser(fetchedUser);
             localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(fetchedUser));
-            
-            if (storedProfile) {
-              const prof = JSON.parse(storedProfile);
-              localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify({
-                ...prof,
-                email: fetchedUser.email || prof.email,
-                userId: fetchedUser.id || prof.userId
-              }));
-            }
+            localStorage.setItem("horizon_current_user", JSON.stringify(fetchedUser));
           }
-        }).catch((restErr) => {
-          console.warn("Legacy background REST validation also failed:", restErr);
+        })
+        .catch((err) => {
+          console.warn("REST getMyProfile failed, trying GraphQL me in background...", err);
+          if (currentToken) {
+            unifiedFetch("/graphql", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${currentToken}`
+              },
+              body: JSON.stringify({
+                query: `
+                  query {
+                    me {
+                      status {
+                        code
+                        message
+                      }
+                      data {
+                        id
+                        username
+                        fullName
+                        email
+                        avatarUrl
+                        usernameCooldownUntil
+                        dateOfBirth
+                        gender
+                        rank
+                        status
+                        roles
+                    }
+                  }
+                `
+              })
+            })
+            .then(res => res.json())
+            .then(resJson => {
+              const meData = resJson?.data?.me;
+              if (meData && meData.status?.code === 200 && meData.data) {
+                const fetchedUser = meData.data;
+                setUser(fetchedUser);
+                localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(fetchedUser));
+                localStorage.setItem("horizon_current_user", JSON.stringify(fetchedUser));
+              }
+            })
+            .catch(gqlErr => {
+              console.warn("GraphQL me query also failed:", gqlErr);
+            });
+          }
         });
-      });
       // Initialize saved addresses via addressService
       try {
         const loadedAddresses = await getMyAddresses();
@@ -1516,7 +2192,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         const ymd = rawDob.split("T")[0];
         setEditDateOfBirth(ymd);
       } else {
-        setEditDateOfBirth("1995-01-01");
+        setEditDateOfBirth("1998-09-26");
       }
       setEditAvatarUrl(user.avatarUrl || "");
       if (addresses.length > 0 && !newAddressForm.recipientName) {
@@ -1535,15 +2211,61 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setErrorMsg("Họ và tên không được để trống.");
       return;
     }
+
+    const trimmedUser = inlineUsername.trim();
+    const isUserChanged = isInlineUserEdited && trimmedUser !== (user?.username || "");
+    const isPassEntered = Boolean(inlinePassword.trim() || inlineConfirmPassword.trim());
+
+    if (isUserChanged) {
+      if (cooldownRemaining?.isActive) {
+        setErrorMsg(`Tài khoản đang trong thời hạn giãn cách 30 ngày. Bạn có thể đổi lại tên đăng nhập sau: ${cooldownRemaining.formatted}.`);
+        return;
+      }
+      const val = validateUsernameFormat(trimmedUser, user?.username);
+      if (!val.valid) {
+        setErrorMsg(val.message);
+        return;
+      }
+    }
+
+    if (isPassEntered) {
+      if (inlinePassword.length < 6) {
+        setErrorMsg("Mật khẩu mới phải từ 6 ký tự trở lên.");
+        return;
+      }
+      if (inlinePassword !== inlineConfirmPassword) {
+        setErrorMsg("Mật khẩu xác nhận không khớp.");
+        return;
+      }
+    }
+
+    if (editDateOfBirth.trim()) {
+      const parts = editDateOfBirth.trim().split("-").map(Number);
+      if (parts.length === 3 && !parts.some(isNaN)) {
+        const [y, m, d] = parts;
+        const today = new Date();
+        let age = today.getFullYear() - y;
+        const monthDiff = today.getMonth() + 1 - m;
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d)) {
+          age--;
+        }
+        if (age < 13) {
+          setErrorMsg("Hội viên phải từ 13 tuổi trở lên.");
+          return;
+        }
+      }
+    }
+
     setActionLoading(true);
     setErrorMsg("");
     setSuccessMsg("");
 
     try {
+      const cleanDob = editDateOfBirth.trim() ? editDateOfBirth.trim().split("T")[0] : undefined;
       const payload: UpdateProfileRequest = {
         fullName: editFullName.trim(),
         phoneNumber: editPhone.trim(),
-        dateOfBirth: editDateOfBirth.trim() ? (editDateOfBirth.includes("T") ? editDateOfBirth : `${editDateOfBirth}T00:00:00Z`) : undefined,
+        dateOfBirth: cleanDob,
         avatarUrl: editAvatarUrl.trim() || undefined,
         gender: editGender.toUpperCase()
       };
@@ -1558,13 +2280,77 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         console.warn("[Profile Update] API Gateway note:", apiErr.message);
       }
 
+      // Handle username update if requested
+      let updatedUsername = user?.username;
+      let updatedCooldownUntil = user?.usernameCooldownUntil;
+      if (isUserChanged) {
+        try {
+          await changeUsername({ newUsername: trimmedUser });
+          updatedUsername = trimmedUser;
+          const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          const pad = (n: number) => String(n).padStart(2, "0");
+          updatedCooldownUntil = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
+          const cooldownKey = getUsernameCooldownKey(user);
+          localStorage.setItem(cooldownKey, String(Date.now()));
+          logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành công: @${trimmedUser}`);
+        } catch (uErr: any) {
+          console.warn("Change username warning:", uErr);
+        }
+      }
+
+      // Handle password update if requested
+      if (isPassEntered) {
+        try {
+          await unifiedFetch("/graphql", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              query: `
+                mutation ChangePassword($newPassword: String!, $confirmPassword: String!, $token: String) {
+                  changePassword(newPassword: $newPassword, confirmPassword: $confirmPassword, token: $token) {
+                    status {
+                      code
+                      message
+                    }
+                    message
+                  }
+                }
+              `,
+              variables: {
+                newPassword: inlinePassword,
+                confirmPassword: inlineConfirmPassword,
+                token: token
+              }
+            })
+          });
+          logAuditAction("RESET_PASSWORD", "SUCCESS", "Đổi mật khẩu thành công qua GraphQL Gateway");
+        } catch (pErr) {
+          try {
+            await apiRequest(`/api/auth/change-password`, {
+              method: "PUT",
+              body: JSON.stringify({
+                token: token,
+                newPassword: inlinePassword,
+                confirmPassword: inlineConfirmPassword,
+              }),
+            });
+            logAuditAction("RESET_PASSWORD", "SUCCESS", "Đổi mật khẩu thành công qua REST fallback");
+          } catch (_) {}
+        }
+      }
+
       const updatedUser = {
         ...user,
         fullName: editFullName.trim(),
         phoneNumber: editPhone.trim(),
         gender: editGender,
-        dateOfBirth: editDateOfBirth.trim() || user?.dateOfBirth,
+        dateOfBirth: cleanDob || user?.dateOfBirth,
         avatarUrl: editAvatarUrl.trim() || user?.avatarUrl,
+        username: updatedUsername,
+        usernameCooldownUntil: updatedCooldownUntil,
         ...(responseData || {})
       };
       setUser(updatedUser);
@@ -1579,13 +2365,23 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           fullName: editFullName.trim(),
           phoneNumber: editPhone.trim(),
           gender: editGender,
-          dateOfBirth: editDateOfBirth.trim() || prof.dateOfBirth,
+          dateOfBirth: cleanDob || prof.dateOfBirth,
           avatarUrl: editAvatarUrl.trim() || prof.avatarUrl,
+          username: updatedUsername,
+          usernameCooldownUntil: updatedCooldownUntil,
           ...(responseData || {})
         };
         localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(updatedProf));
         localStorage.setItem("horizon_redis_profile", JSON.stringify(updatedProf));
       }
+
+      if (isUserChanged) {
+        setCooldownRemaining(checkUsernameCooldown({ ...user, usernameCooldownUntil: updatedCooldownUntil }));
+      }
+
+      setInlinePassword("");
+      setInlineConfirmPassword("");
+      setIsInlineUsernameOpen(false);
 
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("storage"));
@@ -1601,6 +2397,66 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setActionLoading(false);
     }
   };
+
+  // Handler for Immediate Birthday Update via PUT /api/auth/me (Triggered on OK in Birthday Popup)
+  const handleSaveBirthdayImmediate = async (dateIso: string) => {
+    try {
+      const cleanDob = dateIso.trim() ? dateIso.trim().split("T")[0] : undefined;
+      const payload: UpdateProfileRequest = {
+        fullName: editFullName.trim() || user?.fullName || "Hội viên",
+        phoneNumber: editPhone.trim() || user?.phoneNumber || "0901234567",
+        dateOfBirth: cleanDob,
+        avatarUrl: editAvatarUrl.trim() || user?.avatarUrl || undefined,
+        gender: (editGender || user?.gender || "male").toUpperCase()
+      };
+
+      let responseData: any = null;
+      try {
+        const res = await updateMyProfile(payload);
+        if (res?.data) {
+          responseData = res.data;
+        }
+      } catch (apiErr: any) {
+        console.warn("[Birthday Immediate Update] API Gateway note:", apiErr.message);
+      }
+
+      const updatedUser = {
+        ...user,
+        dateOfBirth: cleanDob || user?.dateOfBirth,
+        ...(responseData || {})
+      };
+      setUser(updatedUser);
+      setEditDateOfBirth(cleanDob || "1998-09-26");
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+      localStorage.setItem("horizon_current_user", JSON.stringify(updatedUser));
+
+      const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
+      if (storedProfile) {
+        const prof = JSON.parse(storedProfile);
+        const updatedProf = {
+          ...prof,
+          dateOfBirth: cleanDob || prof.dateOfBirth,
+          ...(responseData || {})
+        };
+        localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(updatedProf));
+        localStorage.setItem("horizon_redis_profile", JSON.stringify(updatedProf));
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
+
+      const syncTimeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      setLastSyncTime(syncTimeStr);
+      setSuccessMsg("Đã cập nhật ngày sinh thành công!");
+      setErrorMsg("");
+      logAuditAction("UPDATE_BIRTHDAY", "SUCCESS", `Cập nhật ngày sinh: ${cleanDob}`);
+    } catch (err: any) {
+      setErrorMsg("Không thể cập nhật ngày sinh: " + (err.message || "Lỗi không xác định"));
+    }
+  };
+
+
 
   // Handler for Avatar File Upload via POST /api/auth/me/avatar
   const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1660,47 +2516,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     }
   };
 
-  // Handler for Ping Endpoint Check
-  const handlePingEndpoint = async () => {
-    setEndpointPingStatus({ status: "checking" });
-    const startTime = Date.now();
-    try {
-      const base = getApiBaseUrl().replace(/\/$/, "");
-      const res = await fetch(`${base}/api/health`, { method: "GET" }).catch(async () => {
-        return await fetch(`${base}/api/auth/me`, { method: "GET" });
-      });
-      const latency = Date.now() - startTime;
-      if (res && res.status < 500) {
-        setEndpointPingStatus({ 
-          status: "connected", 
-          latency, 
-          message: `Kết nối thành công (${latency}ms - HTTP ${res.status})` 
-        });
-      } else {
-        setEndpointPingStatus({ 
-          status: "failed", 
-          message: `Máy chủ trả về mã HTTP ${res?.status || 500}` 
-        });
-      }
-    } catch (err: any) {
-      const latency = Date.now() - startTime;
-      setEndpointPingStatus({ 
-        status: "failed", 
-        message: `Không thể kết nối đến ${getApiBaseUrl()} (${err.message})` 
-      });
-    }
-  };
 
-  // Handler for Saving Custom API Base URL
-  const handleSaveEndpointUrl = (newUrl: string) => {
-    setApiBaseUrl(newUrl);
-    setApiBaseUrlState(getApiBaseUrl());
-    setIsEndpointConfigOpen(false);
-    setSuccessMsg(`Đã chuyển cấu hình API Base URL sang: ${getApiBaseUrl()}`);
-    setTimeout(() => {
-      handlePingEndpoint();
-    }, 100);
-  };
 
   // Handler for Resetting Profile Form
   const handleResetProfileForm = () => {
@@ -1708,9 +2524,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setEditFullName(user.fullName || "");
       setEditPhone(user.phoneNumber || "0901234567");
       setEditGender(user.gender ? user.gender.toLowerCase() : "male");
-      setEditDateOfBirth(user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "1995-01-01");
+      setEditDateOfBirth(user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "1998-09-26");
       setEditAvatarUrl(user.avatarUrl || "");
-      setErrorMsg("");
       setSuccessMsg("Đã khôi phục thông tin ban đầu.");
     }
   };
@@ -2044,8 +2859,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   // Handler for username modification
   const handleChangeUsername = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername || !newUsername.trim()) {
-      setErrorMsg("Tên đăng nhập mới không được để trống.");
+
+    if (cooldownRemaining?.isActive) {
+      setErrorMsg(`Tài khoản đang trong thời hạn giãn cách 30 ngày. Bạn có thể đổi lại sau: ${cooldownRemaining.formatted}.`);
+      return;
+    }
+
+    const trimmed = newUsername.trim();
+    const val = validateUsernameFormat(trimmed, user?.username);
+    if (!val.valid) {
+      setErrorMsg(val.message);
       return;
     }
 
@@ -2054,143 +2877,48 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     setSuccessMsg("");
 
     try {
-      // Gọi GraphQL Mutation changeUsername qua BFF Gateway
-      const gqlResponse = await unifiedFetch("/graphql", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          query: `
-            mutation ChangeUsername($newUsername: String!, $token: String) {
-              changeUsername(newUsername: $newUsername, token: $token) {
-                status {
-                  code
-                  message
-                }
-                message
-              }
-            }
-          `,
-          variables: {
-            newUsername: newUsername.trim(),
-            token: token
-          }
-        })
-      });
-
-      const resJson = await gqlResponse.json();
-      const mutationResult = resJson?.data?.changeUsername;
-
-      if (resJson.errors && resJson.errors.length > 0) {
-        throw new Error(resJson.errors[0].message || "GraphQL mutation error");
-      }
-
-      if (mutationResult?.status?.code !== 200) {
-        throw new Error(mutationResult?.message || "Đổi tên đăng nhập thất bại từ Gateway.");
-      }
-
-      const successDetail = mutationResult?.message || "Tên đăng nhập đã được thay đổi thành công!";
-      setSuccessMsg(successDetail);
-      
-      // Update local and component state
-      if (user) {
-        const updated = { ...user, username: newUsername.trim() };
-        setUser(updated);
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
-      }
-
-      setNewUsername("");
-      setIsUsernameChangeExpanded(false);
-
-      // Add audit log
-      logAuditAction("CHANGE_USERNAME", "SUCCESS", "Đổi tên đăng nhập thành công qua GraphQL Gateway");
-    } catch (err: any) {
-      console.warn("GraphQL changeUsername failed, trying legacy REST API fallback...", err);
-      try {
-        const response = await apiRequest(`/api/auth/change-username`, {
-          method: "PUT",
-          body: JSON.stringify({
-            newUsername: newUsername.trim(),
-          }),
-        });
-
-        const successDetail = response?.data || "Tên đăng nhập đã được thay đổi thành công!";
-        setSuccessMsg(successDetail);
-        
-        if (user) {
-          const updated = { ...user, username: newUsername.trim() };
-          setUser(updated);
-          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
-        }
-
-        setNewUsername("");
-        setIsUsernameChangeExpanded(false);
-        logAuditAction("CHANGE_USERNAME", "SUCCESS", "Đổi tên đăng nhập thành công qua REST fallback");
-      } catch (fallbackErr: any) {
-        console.error("REST fallback also failed:", fallbackErr);
-        setErrorMsg(fallbackErr.message || "Đổi tên đăng nhập thất bại. Vui lòng thử lại.");
-        logAuditAction("CHANGE_USERNAME", "FAILED", `Đổi tên đăng nhập thất bại: ${fallbackErr.message}`);
-      }
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Handler for in-frame username modification directly in Profile Tab
-  const handleInlineSaveUsername = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = inlineNewUsername.trim();
-    if (!trimmed) {
-      setErrorMsg("Tên đăng nhập không được để trống.");
-      return;
-    }
-    if (trimmed.length < 3 || trimmed.length > 50) {
-      setErrorMsg("Tên đăng nhập phải có từ 3 đến 50 ký tự.");
-      return;
-    }
-    if (/\s/.test(trimmed)) {
-      setErrorMsg("Tên đăng nhập không được chứa khoảng trắng.");
-      return;
-    }
-
-    setIsInlineUsernameSaving(true);
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    try {
-      const res = await changeUsername({ newUsername: trimmed });
-      const successDetail = res?.data || res?.status?.message || "Đổi tên đăng nhập thành công!";
+      const response = await changeUsername({ newUsername: trimmed });
+      const successDetail = response?.data || response?.status?.message || "Đổi tên đăng nhập thành công. Vui lòng đăng nhập lại.";
       setSuccessMsg(successDetail);
 
+      const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const formattedCd = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
+      const cooldownKey = getUsernameCooldownKey(user);
+      localStorage.setItem(cooldownKey, String(Date.now()));
+
       if (user) {
-        const updated = { ...user, username: trimmed };
+        const updated = { ...user, username: trimmed, usernameCooldownUntil: formattedCd };
         setUser(updated);
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
         localStorage.setItem("horizon_current_user", JSON.stringify(updated));
-
-        const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
-        if (storedProfile) {
-          const prof = JSON.parse(storedProfile);
-          prof.username = trimmed;
-          localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(prof));
-          localStorage.setItem("horizon_redis_profile", JSON.stringify(prof));
-        }
       }
 
+      setCooldownRemaining(checkUsernameCooldown({ ...user, usernameCooldownUntil: formattedCd }));
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("storage"));
       }
 
-      setIsEditingUsernameInProfile(false);
-      setInlineNewUsername("");
-      logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành: @${trimmed}`);
+      setNewUsername("");
+      setIsUsernameChangeExpanded(false);
+      logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành công: @${trimmed}`);
     } catch (err: any) {
-      console.warn("Inline change username error:", err);
-      setErrorMsg(err.message || "Đổi tên đăng nhập thất bại. Vui lòng thử lại.");
+      console.warn("changeUsername API call failed:", err);
+      let message = err instanceof Error ? err.message : "Đổi tên đăng nhập thất bại. Vui lòng thử lại.";
+      if (message.includes("tồn tại") || message.includes("already exists") || message.includes("INVALID_CREDENTIALS")) {
+        message = "Tên đăng nhập mới đã tồn tại trên hệ thống.";
+      } else if (message.includes("tháng") || message.includes("cooldown") || message.includes("30 ngày")) {
+        message = "Bạn chỉ được đổi tên đăng nhập tối đa 1 lần mỗi tháng. Vui lòng quay lại sau.";
+        const cooldownKey = getUsernameCooldownKey(user);
+        if (!localStorage.getItem(cooldownKey)) {
+          localStorage.setItem(cooldownKey, String(Date.now()));
+        }
+        setCooldownRemaining(checkUsernameCooldown(user));
+      }
+      setErrorMsg(message);
+      logAuditAction("CHANGE_USERNAME", "FAILED", `Thất bại: ${message}`);
     } finally {
-      setIsInlineUsernameSaving(false);
+      setActionLoading(false);
     }
   };
 
@@ -2437,18 +3165,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               {/* Popup Header */}
               <div className="relative z-10 flex items-start justify-between gap-3 mb-3.5">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-orange-50 to-orange-100/80 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100 flex items-center justify-center text-[#FF4D24] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_rgba(255,77,36,0.15)] shrink-0">
-                    <Sparkles className="w-5 h-5 stroke-[2.2]" />
+                  <div className="w-10 h-10 rounded-2xl bg-orange-500/[0.08] dark:bg-orange-500/10 border border-orange-200/60 dark:border-white/10 flex items-center justify-center text-orange-500 dark:text-orange-400 shrink-0">
+                    <Keyboard className="w-5 h-5 stroke-[1.6]" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-sans font-black text-sm text-slate-900 dark:text-white tracking-tight leading-none">
-                        Thông báo: Mẹo điều hướng
-                      </h4>
-                      <span className="text-[9.5px] font-extrabold font-mono px-2 py-0.5 rounded-full bg-orange-500/10 text-[#FF4D24] border border-orange-200/70 uppercase">
-                        Tutorial
-                      </span>
-                    </div>
+                    <h4 className="font-sans font-black text-sm text-slate-900 dark:text-white tracking-tight leading-none">
+                      Thông báo: Mẹo điều hướng
+                    </h4>
                     <p className="text-[11.5px] text-slate-500 dark:text-slate-400 font-medium mt-1 leading-tight">
                       Thao tác bàn phím siêu tốc trên cổng tài khoản
                     </p>
@@ -2717,7 +3440,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       }`}
                       title={showNavTutorial ? "Đóng hướng dẫn phím tắt" : "Mở popup hướng dẫn phím tắt"}
                     >
-                      <Sparkles className="w-3 h-3 text-[#FF4D24]" />
+                      <Keyboard className="w-3 h-3 text-[#FF4D24]" />
                       <span>{showNavTutorial ? "Đang mở mẹo" : "Mẹo phím tắt"}</span>
                     </button>
                   </div>
@@ -3465,37 +4188,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         </div>
                       </div>
 
-                      {/* Profile Mini Card */}
-                      {user && (
-                        <div className="p-3.5 bg-gradient-to-b from-white via-white/90 to-white/75 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl flex items-center gap-3.5 shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
-                          {user.avatarUrl ? (
-                            <img 
-                              src={user.avatarUrl} 
-                              alt={user.fullName || "User Avatar"} 
-                              className="w-11 h-11 rounded-full object-cover shadow-[0_3px_8px_rgba(0,0,0,0.12)] border-2 border-white ring-2 ring-indigo-50/80 shrink-0 select-none"
-                            />
-                          ) : (
-                            <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-sm shrink-0 shadow-[0_3px_8px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.4)] border-t border-t-white/80 border-b border-b-slate-400/60 border-x border-x-white/50 ring-2 ring-indigo-50/80">
-                              {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : "H")}
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="text-xs font-black text-slate-900 truncate leading-tight">{user.fullName || "Hội viên Horizon"}</p>
-                              {(() => {
-                                const rankInfo = getMembershipRankInfo(user);
-                                return (
-                                  <span className={`text-[8.5px] px-1.5 py-0.2 font-mono font-bold uppercase rounded-md border-t border-t-white border-b border-x inline-flex items-center gap-1 shrink-0 ${rankInfo.badgeClass}`}>
-                                    <Crown className={`w-2.5 h-2.5 shrink-0 ${rankInfo.iconColor}`} />
-                                    <span>{rankInfo.label}</span>
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                            <p className="text-[10.5px] font-mono text-slate-400 truncate mt-0.5">{user.email || "N/A"}</p>
-                          </div>
-                        </div>
-                      )}
 
                       {/* Navigation Tabs with Semantic Chromatic Accents */}
                       <div className="space-y-1.5">
@@ -3513,7 +4205,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               label: "Mật khẩu & Bảo mật", 
                               icon: ShieldCheck, 
                               desc: "Đổi mật khẩu, username",
-                              iconBoxClass: "bg-gradient-to-b from-emerald-50 to-emerald-100/70 text-emerald-600 border-emerald-200/60"
+                              iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
                             },
                             { 
                               id: "addresses", 
@@ -3521,7 +4213,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               icon: MapPin, 
                               count: addresses.length, 
                               desc: "Địa chỉ giao nhận",
-                              iconBoxClass: "bg-gradient-to-b from-amber-50 to-amber-100/70 text-amber-600 border-amber-200/60"
+                              iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
                             },
                             { 
                               id: "payments", 
@@ -3529,14 +4221,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               icon: CreditCard, 
                               count: paymentMethods.length, 
                               desc: "Visa, Mastercard, Ví",
-                              iconBoxClass: "bg-gradient-to-b from-rose-50 to-rose-100/70 text-rose-600 border-rose-200/60"
+                              iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
                             },
                             { 
                               id: "sessions", 
                               label: "Thiết bị & Phiên", 
                               icon: Laptop, 
                               desc: "Quản lý phiên đăng nhập",
-                              iconBoxClass: "bg-gradient-to-b from-sky-50 to-sky-100/70 text-sky-600 border-sky-200/60"
+                              iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
                             },
                             { 
                               id: "bookmarks", 
@@ -3544,7 +4236,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               icon: Bookmark, 
                               count: userBookmarks.length, 
                               desc: "Bookmarks 1h & 7 ngày",
-                              iconBoxClass: "bg-gradient-to-b from-orange-50 to-orange-100/70 text-[#FF4D24] border-orange-200/60"
+                              iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
                             }
                           ] as Array<{
                             id: "profile" | "security" | "addresses" | "payments" | "sessions" | "bookmarks";
@@ -3587,9 +4279,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     <span className={`block leading-tight truncate ${isActive ? "text-indigo-950 font-black" : "text-slate-800 group-hover:text-slate-900 font-bold"}`}>
                                       {tab.label}
                                     </span>
-                                    {isActive && (
-                                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D24] shadow-[0_0_6px_#FF4D24] shrink-0" />
-                                    )}
                                   </div>
                                   <span className={`text-[10px] font-normal leading-none block mt-0.5 truncate ${isActive ? "text-indigo-700 font-semibold" : "text-slate-400 group-hover:text-slate-500"}`}>
                                     {tab.desc}
@@ -3705,7 +4394,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                 {/* TAB 1: Profile Information & Identity Redesign */}
                 {activeModalTab === "profile" && (
-                  <div className="flex-1 flex flex-col justify-between min-h-0 text-left space-y-4">
+                  <div className="space-y-4 flex-1 flex flex-col min-h-0 text-left">
                     {/* 1. HERO IDENTITY & AVATAR CARD */}
                     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-slate-50/70 to-slate-100/60 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-100 p-4.5 sm:p-5 shadow-[0_4px_16px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] shrink-0">
                       {/* Decorative ambient corner glow */}
@@ -3713,8 +4402,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                       <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
                         <div className="flex items-center gap-3.5">
-                          {/* Avatar with live upload & hover action (Full-bleed edge-to-edge, no white ring/border gap) */}
-                          <div className="relative group shrink-0 w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shadow-[0_4px_16px_rgba(0,0,0,0.12)]">
+                          {/* Avatar with live upload & hover action */}
+                          <div className="relative group shrink-0 w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shadow-[0_8px_20px_-4px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.3)] border-t border-t-white/80 border-b border-b-slate-400/40 border-x border-x-white/50 ring-2 ring-slate-900/5">
                             {(editAvatarUrl || user?.avatarUrl) ? (
                               <img 
                                 src={editAvatarUrl || user?.avatarUrl} 
@@ -3732,15 +4421,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               type="button"
                               onClick={() => avatarFileInputRef.current?.click()}
                               disabled={isUploadingAvatar}
-                              className="absolute inset-0 bg-black/55 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer"
+                              className="absolute inset-0 bg-black/65 opacity-0 hover:opacity-100 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-white cursor-pointer active:scale-95 rounded-2xl"
                               title="Nhấn để đổi ảnh đại diện"
                             >
                               {isUploadingAvatar ? (
                                 <RefreshCw className="w-4 h-4 animate-spin" />
                               ) : (
                                 <>
-                                  <Camera className="w-4 h-4 mb-0.5" />
-                                  <span className="text-[8.5px] font-bold uppercase tracking-wider">Đổi ảnh</span>
+                                  <Camera className="w-4 h-4 mb-0.5 drop-shadow-xs" />
+                                  <span className="text-[8.5px] font-bold uppercase tracking-wider drop-shadow-xs">Đổi ảnh</span>
                                 </>
                               )}
                             </button>
@@ -3773,7 +4462,46 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             </div>
 
                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono flex-wrap">
-                              <span>@{user?.username || "horizon_member"}</span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <span>@{user?.username || "horizon_member"}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsInlineUsernameOpen(prev => !prev);
+                                    if (!isInlineUsernameOpen) {
+                                      setInlineUsername(user?.username || "");
+                                      setIsInlineUserEdited(false);
+                                      setInlineCheckStatus("idle");
+                                      setInlinePassword("");
+                                      setInlineConfirmPassword("");
+                                      setShowInlinePassword(false);
+                                      setShowInlineConfirmPassword(false);
+                                      setInlineUsernameError("");
+                                      setInlineUsernameSuccess("");
+                                      lastCheckedUsernameRef.current = "";
+                                    }
+                                  }}
+                                  title={isInlineUsernameOpen ? "Đóng chỉnh sửa username" : (cooldownRemaining?.isActive ? `Đổi lại sau: ${cooldownRemaining.formatted}` : "Đổi tên đăng nhập (Username)")}
+                                  className={`p-1 transition-all cursor-pointer inline-flex items-center justify-center rounded-lg active:scale-95 ${
+                                    isInlineUsernameOpen
+                                      ? "bg-[#FF4D24] text-white shadow-xs"
+                                      : cooldownRemaining?.isActive
+                                        ? "text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+                                        : "text-slate-400 hover:text-[#FF4D24] hover:bg-orange-50"
+                                  }`}
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                              </span>
+                              {cooldownRemaining?.isActive && (
+                                <span
+                                  className="text-[9.5px] font-bold font-mono px-2 py-0.5 bg-gradient-to-b from-amber-50 to-amber-100/70 text-amber-800 border border-amber-200/80 rounded-md inline-flex items-center gap-1 shadow-2xs"
+                                  title={`Tài khoản đang trong thời gian giãn cách 30 ngày. Đổi lại sau: ${cooldownRemaining.formatted}`}
+                                >
+                                  <Clock className="w-2.5 h-2.5 text-amber-600 animate-pulse" />
+                                  <span>Đổi lại sau: <span className="font-extrabold">{cooldownRemaining.formatted}</span></span>
+                                </span>
+                              )}
                               <span className="text-slate-300">•</span>
                               <span className="text-slate-600 truncate max-w-[180px] sm:max-w-[240px]">{user?.email || "user@horizon.net"}</span>
                             </div>
@@ -3788,348 +4516,406 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           </div>
                         </div>
 
-                        {/* Quick Avatar Actions */}
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                          <button
-                            type="button"
-                            onClick={() => avatarFileInputRef.current?.click()}
-                            disabled={isUploadingAvatar}
-                            className="flex-1 sm:flex-initial px-3 py-1.5 bg-gradient-to-b from-white via-white/95 to-slate-100/90 hover:from-white hover:to-slate-100 border-t border-t-white border-b border-b-slate-300 border-x border-x-slate-200/80 text-slate-700 text-xs font-bold rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                          >
-                            <Upload className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Tải ảnh</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setIsAvatarUrlInputOpen(!isAvatarUrlInputOpen)}
-                            className="px-3 py-1.5 bg-gradient-to-b from-white via-white/95 to-slate-100/90 hover:from-white hover:to-slate-100 border-t border-t-white border-b border-b-slate-300 border-x border-x-slate-200/80 text-slate-600 text-xs font-bold rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                            title="Nhập URL ảnh từ bên ngoài"
-                          >
-                            <Globe className="w-3.5 h-3.5 text-slate-500" />
-                            <span className="hidden sm:inline">URL</span>
-                          </button>
-                        </div>
                       </div>
-
-                      {/* Expandable Avatar URL Input */}
-                      {isAvatarUrlInputOpen && (
-                        <motion.div 
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-3.5 pt-3.5 border-t border-slate-200/70"
-                        >
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block mb-1.5">
-                            Đường dẫn ảnh đại diện trực tiếp (Direct Image URL)
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="url"
-                              value={avatarUrlDraft || editAvatarUrl}
-                              onChange={(e) => setAvatarUrlDraft(e.target.value)}
-                              placeholder="https://images.unsplash.com/photo-..."
-                              className="flex-1 bg-white border border-slate-200 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-xl outline-none transition-all text-[#111111] font-mono shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (avatarUrlDraft.trim()) {
-                                  setEditAvatarUrl(avatarUrlDraft.trim());
-                                  setIsAvatarUrlInputOpen(false);
-                                  setSuccessMsg("Đã áp dụng đường dẫn ảnh đại diện mới!");
-                                }
-                              }}
-                              className="px-4 py-2.5 bg-[#FF4D24] hover:bg-[#e03d15] text-white text-xs font-bold rounded-xl shadow-[0_2px_6px_rgba(255,77,36,0.25)] transition-all cursor-pointer shrink-0 active:scale-95"
-                            >
-                              Áp dụng
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
                     </div>
 
-                    {/* 2. FORM PROFILE FIELDS */}
-                    <form onSubmit={handleSaveProfile} className="flex-1 flex flex-col justify-between min-h-0 space-y-4">
-                      <div className="space-y-4">
-                        {/* SECTION A: THÔNG TIN CÁ NHÂN */}
-                        <div className="space-y-3.5">
-                        <div className="flex items-center gap-2 pb-1 border-b border-slate-200/60">
+
+                    {/* 2. FORM PROFILE FIELDS (With In-Place Animated Username Drawer) */}
+                    <form onSubmit={handleSaveProfile} className="bg-gradient-to-b from-white via-white/95 to-slate-50/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-3xl p-4 sm:p-5 shadow-[0_3px_10px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] space-y-4">
+                      
+                      {/* INLINE USERNAME EDITING DRAWER (GPU-Accelerated 120 FPS High Performance Transition) */}
+                      <div
+                        className={`grid transition-[grid-template-rows,opacity,margin] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[grid-template-rows,opacity] ${
+                          isInlineUsernameOpen
+                            ? "grid-rows-[1fr] opacity-100 mb-2 pointer-events-auto"
+                            : "grid-rows-[0fr] opacity-0 mb-0 pointer-events-none"
+                        }`}
+                      >
+                        <div className="overflow-hidden min-h-0">
+                          <div className="space-y-3 pb-3 px-1.5 pt-1 border-b border-slate-200/60">
+                            {/* Header of Drawer */}
+                            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
+                              <div className="flex items-center gap-2">
+                                <Shield className="w-3.5 h-3.5 text-[#FF4D24]" />
+                                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider font-mono">
+                                  Cập nhật thông tin đăng nhập
+                                </h3>
+                                {credentialGrant.isActive && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-amber-500 animate-pulse" />
+                                    Còn lại: {Math.floor(credentialGrant.remainingSeconds / 60)}:
+                                    {String(credentialGrant.remainingSeconds % 60).padStart(2, "0")}
+                                  </span>
+                                )}
+                                {!credentialGrant.isActive && hasPendingCredentialRequest && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20 flex items-center gap-1">
+                                      <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                      Đang chờ email...
+                                    </span>
+                                    <a
+                                      href="/credential-change/activate?preview=success"
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-[10px] font-mono text-indigo-600 hover:text-indigo-800 underline flex items-center gap-0.5"
+                                      title="Xem trang xác thực thành công & hướng fix"
+                                    >
+                                      <span>(Xem trang xác thực)</span>
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* 1. Phần Đổi Tên Đăng Nhập (API Call 1: PUT /api/auth/update-credentials) */}
+                            <div className="space-y-2 bg-slate-50/70 rounded-2xl p-3 border border-slate-200/70">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-black text-slate-700 flex items-center gap-1.5 font-mono tracking-wider">
+                                  <span className="w-4 h-4 rounded-md bg-[#FF4D24]/10 text-[#FF4D24] flex items-center justify-center text-[10px] font-bold">1</span>
+                                  <span>ĐỔI TÊN ĐĂNG NHẬP</span>
+                                </label>
+
+                                <button
+                                  type="button"
+                                  onClick={handleUpdateUsername}
+                                  disabled={!credentialGrant.isActive || !isCredentialUserChanged || !isCredentialUsernameValid || isUsernameSaving}
+                                  title={usernameButtonTooltip}
+                                  className={`h-7 px-3.5 rounded-xl select-none text-[11px] font-bold font-mono transition-all flex items-center gap-1.5 ${
+                                    credentialGrant.isActive && isCredentialUserChanged && isCredentialUsernameValid
+                                      ? "bg-gradient-to-b from-[#FF5A30] to-[#E53B12] hover:from-[#FF653C] hover:to-[#D4340C] active:scale-95 text-white border border-[#D4340C] border-t-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_2px_rgba(0,0,0,0.12)] cursor-pointer"
+                                      : "bg-slate-100 text-slate-400 border border-slate-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] opacity-60 cursor-not-allowed"
+                                  }`}
+                                >
+                                  {isUsernameSaving ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin stroke-[2.8]" />
+                                  ) : (
+                                    <Check className="w-3.5 h-3.5 stroke-[2.8]" />
+                                  )}
+                                  <span>Lưu tên</span>
+                                </button>
+                              </div>
+
+                              <div className="relative">
+                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xs select-none">
+                                  @
+                                </span>
+                                <input
+                                  autoFocus={isInlineUsernameOpen}
+                                  maxLength={50}
+                                  value={inlineUsername}
+                                  placeholder="username_moi"
+                                  onChange={(e) => {
+                                    const cleaned = e.target.value.replace(/[^a-zA-Z0-9_]/g, "");
+                                    setInlineUsername(cleaned);
+                                    setIsInlineUserEdited(true);
+                                  }}
+                                  disabled={Boolean(cooldownRemaining?.isActive || isUsernameSaving)}
+                                  className={`w-full bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-xl outline-none transition-all text-[#111111] font-mono font-bold pl-8 pr-10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] ${
+                                    inlineCheckStatus === "error"
+                                      ? "border-red-400! ring-2 ring-red-400/20"
+                                      : inlineCheckStatus === "success"
+                                        ? "border-emerald-400! ring-2 ring-emerald-400/20"
+                                        : inlineCheckStatus === "warning"
+                                          ? "border-amber-400! ring-2 ring-amber-400/20"
+                                          : ""
+                                  }`}
+                                />
+
+                                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                                  {inlineCheckStatus === "checking" && (
+                                    <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                                  )}
+                                  {inlineCheckStatus === "success" && (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                  )}
+                                  {inlineCheckStatus === "warning" && (
+                                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                                  )}
+                                  {inlineCheckStatus === "error" && (
+                                    <AlertCircle className="w-4 h-4 text-red-500" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 2. Phần Đổi Mật Khẩu (API Call 2: PUT /api/auth/update-credentials) */}
+                            <div className="space-y-2.5 bg-slate-50/70 rounded-2xl p-3 border border-slate-200/70">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-black text-slate-700 flex items-center gap-1.5 font-mono tracking-wider">
+                                  <span className="w-4 h-4 rounded-md bg-[#FF4D24]/10 text-[#FF4D24] flex items-center justify-center text-[10px] font-bold">2</span>
+                                  <span>ĐỔI MẬT KHẨU</span>
+                                </label>
+
+                                <button
+                                  type="button"
+                                  onClick={handleUpdatePassword}
+                                  disabled={!credentialGrant.isActive || !isCredentialPassEntered || !isCredentialPasswordValid || isPasswordSaving}
+                                  title={passwordButtonTooltip}
+                                  className={`h-7 px-3.5 rounded-xl select-none text-[11px] font-bold font-mono transition-all flex items-center gap-1.5 ${
+                                    credentialGrant.isActive && isCredentialPassEntered && isCredentialPasswordValid
+                                      ? "bg-gradient-to-b from-[#FF5A30] to-[#E53B12] hover:from-[#FF653C] hover:to-[#D4340C] active:scale-95 text-white border border-[#D4340C] border-t-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_2px_rgba(0,0,0,0.12)] cursor-pointer"
+                                      : "bg-slate-100 text-slate-400 border border-slate-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] opacity-60 cursor-not-allowed"
+                                  }`}
+                                >
+                                  {isPasswordSaving ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin stroke-[2.8]" />
+                                  ) : (
+                                    <Check className="w-3.5 h-3.5 stroke-[2.8]" />
+                                  )}
+                                  <span>Lưu mật khẩu</span>
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {/* Password Field */}
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold text-slate-600 block">
+                                    Mật khẩu mới
+                                  </span>
+                                  <div className="relative">
+                                    <input
+                                      type={showInlinePassword ? "text" : "password"}
+                                      placeholder="Tối thiểu 6 ký tự..."
+                                      value={inlinePassword}
+                                      onChange={(e) => setInlinePassword(e.target.value)}
+                                      disabled={isPasswordSaving}
+                                      className="w-full bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-xl outline-none transition-all text-[#111111] font-semibold pl-9 pr-9.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)]"
+                                    />
+                                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowInlinePassword(!showInlinePassword)}
+                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 transition-colors"
+                                      title={showInlinePassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                                    >
+                                      {showInlinePassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Confirm Password Field */}
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-slate-600">
+                                      Xác nhận mật khẩu
+                                    </span>
+                                    {inlineConfirmPassword && inlinePassword && (
+                                      <span className={inlinePassword === inlineConfirmPassword ? "text-emerald-600 font-bold font-mono text-[9.5px]" : "text-red-500 font-bold font-mono text-[9.5px]"}>
+                                        {inlinePassword === inlineConfirmPassword ? "✓ Khớp" : "✕ Chưa khớp"}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="relative">
+                                    <input
+                                      type={showInlineConfirmPassword ? "text" : "password"}
+                                      placeholder="Nhập lại mật khẩu..."
+                                      value={inlineConfirmPassword}
+                                      onChange={(e) => setInlineConfirmPassword(e.target.value)}
+                                      disabled={isPasswordSaving}
+                                      className={`w-full bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-xl outline-none transition-all text-[#111111] font-semibold pl-9 pr-9.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] ${
+                                        inlineConfirmPassword && inlinePassword && inlinePassword !== inlineConfirmPassword
+                                          ? "border-red-400! ring-2 ring-red-400/20"
+                                          : inlineConfirmPassword && inlinePassword && inlinePassword === inlineConfirmPassword
+                                            ? "border-emerald-400! ring-2 ring-emerald-400/20"
+                                            : ""
+                                      }`}
+                                    />
+                                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowInlineConfirmPassword(!showInlineConfirmPassword)}
+                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 transition-colors"
+                                      title={showInlineConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                                    >
+                                      {showInlineConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                        <div className="flex items-center gap-2">
                           <User className="w-3.5 h-3.5 text-[#FF4D24]" />
                           <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider font-mono">
                             Thông tin định danh người dùng
                           </h3>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {/* Field: Họ và tên */}
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
-                              <span>Họ và tên <span className="text-[#FF4D24]">*</span></span>
-                              <span className="text-[10px] text-slate-400 font-normal">Tên hiển thị</span>
-                            </label>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                required
-                                value={editFullName}
-                                onChange={(e) => setEditFullName(e.target.value)}
-                                placeholder="Nhập họ và tên đầy đủ..."
-                                className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5"
-                              />
-                              <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                            </div>
-                          </div>
-
-                          {/* Field: Số điện thoại */}
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
-                              <span>Số điện thoại liên hệ</span>
-                              <span className="text-[10px] text-slate-400 font-normal">Giao hàng & OTP</span>
-                            </label>
-                            <div className="relative">
-                              <input
-                                type="tel"
-                                value={editPhone}
-                                onChange={(e) => setEditPhone(e.target.value)}
-                                placeholder="0901234567"
-                                className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 font-mono"
-                              />
-                              <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                            </div>
-                          </div>
-
-                          {/* Field: Ngày sinh */}
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
-                              <span>Ngày tháng năm sinh</span>
-                              <span className="text-[10px] text-slate-400 font-normal">Sinh nhật hội viên</span>
-                            </label>
-                            <div className="relative">
-                              <input
-                                type="date"
-                                value={editDateOfBirth}
-                                onChange={(e) => setEditDateOfBirth(e.target.value)}
-                                className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 font-mono cursor-pointer"
-                              />
-                              <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                            </div>
-                          </div>
-
-                          {/* Field: Giới tính (Segmented Control với hiệu ứng Bevel lõm 50% & Hoạt ảnh chuyển động) */}
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 block">
-                              Giới tính
-                            </label>
-                            <div className="relative grid grid-cols-3 p-1 rounded-2xl bg-slate-100/85 border-t border-t-slate-300/60 border-b border-b-white/80 border-x border-x-slate-200/70 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),inset_0_-1px_0_rgba(255,255,255,0.7),0_1px_0_rgba(255,255,255,0.8)]">
-                              {[
-                                { id: "male", label: "Nam" },
-                                { id: "female", label: "Nữ" },
-                                { id: "other", label: "Khác" }
-                              ].map((g) => {
-                                const isSelected = editGender.toLowerCase() === g.id;
-                                return (
-                                  <button
-                                    key={g.id}
-                                    type="button"
-                                    onClick={() => setEditGender(g.id)}
-                                    className={`relative z-10 py-1.5 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center select-none ${
-                                      isSelected ? "text-slate-900" : "text-slate-500 hover:text-slate-800"
-                                    }`}
-                                  >
-                                    {isSelected && (
-                                      <motion.div
-                                        layoutId="active-gender-pill"
-                                        transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                                        className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/80 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)]"
-                                      />
-                                    )}
-                                    <span className="relative z-10 flex items-center justify-center">
-                                      <span>{g.label}</span>
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* SECTION B: TÀI KHOẢN & BẢO MẬT HỆ THỐNG */}
-                      <div className="space-y-3.5 pt-1">
-                        <div className="flex items-center gap-2 pb-1 border-b border-slate-200/60">
-                          <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-                          <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider font-mono">
-                            Tài khoản & Định danh hệ thống
-                          </h3>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {/* Email (Readonly with Verified Badge) */}
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between h-4.5">
-                              <span>Email đăng nhập</span>
-                              <span className="text-[10px] text-emerald-600 font-bold font-mono inline-flex items-center gap-1">
-                                <CheckCircle2 className="w-2.5 h-2.5" /> Đã xác thực
-                              </span>
-                            </label>
-                            <div className="relative">
-                              <input
-                                type="email"
-                                disabled
-                                value={user?.email || "admin@horizon.net"}
-                                className="w-full bg-slate-100/70 border-t border-t-slate-200/90 border-b border-b-slate-300/40 border-x border-x-slate-200/70 text-xs px-3.5 py-2.5 rounded-2xl outline-none text-slate-600 font-mono cursor-not-allowed shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.8)] pl-9.5"
-                              />
-                              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                            </div>
-                          </div>
-
-                          {/* Username (Synchronized dimensions with Email field & In-Place Editing Trigger) */}
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between h-4.5">
-                              <span>Tên đăng nhập (Username)</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setInlineNewUsername(user?.username || "");
-                                  setIsEditingUsernameInProfile(!isEditingUsernameInProfile);
-                                }}
-                                className="text-[10px] text-[#FF4D24] hover:text-[#e03d15] font-bold font-mono inline-flex items-center gap-1 cursor-pointer transition-colors"
-                              >
-                                <Pencil className="w-2.5 h-2.5" />
-                                <span>{isEditingUsernameInProfile ? "Đóng" : "Đổi tên"}</span>
-                              </button>
-                            </label>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                disabled
-                                value={`@${user?.username || "username"}`}
-                                className="w-full bg-slate-100/70 border-t border-t-slate-200/90 border-b border-b-slate-300/40 border-x border-x-slate-200/70 text-xs px-3.5 py-2.5 rounded-2xl outline-none text-slate-800 font-mono font-bold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.8)] pl-9.5 pr-20 cursor-default"
-                              />
-                              <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setInlineNewUsername(user?.username || "");
-                                  setIsEditingUsernameInProfile(!isEditingUsernameInProfile);
-                                }}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-gradient-to-b from-white via-white/95 to-slate-50 hover:from-white border border-slate-200/80 text-slate-700 text-[10.5px] font-bold rounded-lg shadow-xs transition-all cursor-pointer active:scale-95 flex items-center gap-1"
-                              >
-                                <Pencil className="w-2.5 h-2.5 text-[#FF4D24]" />
-                                <span>Chỉnh sửa</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Inline Username Editing Drawer */}
-                        <AnimatePresence>
-                          {isEditingUsernameInProfile && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="overflow-hidden pt-2"
-                            >
-                              <div className="p-3.5 bg-gradient-to-b from-white via-orange-50/20 to-orange-50/40 border border-[#FF4D24]/35 rounded-2xl shadow-[0_4px_16px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,1)] space-y-2.5 text-left">
-                                <div className="flex items-center justify-between">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
-                                    Nhập username mới (3-50 ký tự)
-                                  </label>
-                                  <span className="text-[9.5px] text-slate-400 font-mono">
-                                    {inlineNewUsername.trim().length}/50 ký tự
-                                  </span>
-                                </div>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    autoFocus
-                                    value={inlineNewUsername}
-                                    onChange={(e) => setInlineNewUsername(e.target.value.replace(/\s+/g, ""))}
-                                    placeholder="Nhập username mới..."
-                                    className="w-full bg-white border border-[#FF4D24]/40 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/20 text-xs px-3.5 py-2.5 rounded-xl outline-none font-mono font-bold text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] pl-7.5"
-                                  />
-                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs font-bold">@</span>
-                                </div>
-
-                                <div className="flex items-center justify-between pt-1 border-t border-orange-100/60">
-                                  <div>
-                                    {inlineNewUsername.trim().length >= 3 && (
-                                      <span className="text-emerald-600 text-[10px] font-bold font-mono flex items-center gap-0.5">
-                                        <Check className="w-2.5 h-2.5" /> Hợp lệ
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setIsEditingUsernameInProfile(false);
-                                        setInlineNewUsername("");
-                                      }}
-                                      disabled={isInlineUsernameSaving}
-                                      className="px-3 py-1 text-[10.5px] font-bold text-slate-500 hover:text-slate-800 bg-white/80 hover:bg-white border border-slate-200 rounded-lg transition-all cursor-pointer active:scale-95"
-                                    >
-                                      Hủy
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleInlineSaveUsername}
-                                      disabled={isInlineUsernameSaving || !inlineNewUsername.trim() || inlineNewUsername.trim().length < 3 || inlineNewUsername.trim() === user?.username}
-                                      className="px-3.5 py-1 bg-gradient-to-b from-[#FF4D24] to-[#e03d15] text-white text-[10.5px] font-bold rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                      {isInlineUsernameSaving ? (
-                                        <>
-                                          <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                                          <span>Đang đổi...</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Check className="w-2.5 h-2.5" />
-                                          <span>Xác nhận</span>
-                                        </>
-                                      )}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-
-                    {/* SECTION D: ACTION BUTTONS (Anchored tightly to bottom edge, clean without status text) */}
-                    <div className="mt-auto pt-3 flex items-center justify-end gap-2.5 border-t border-slate-200/80 shrink-0">
-                          {isProfileDirty && (
-                            <button
-                              type="button"
-                              onClick={handleResetProfileForm}
-                              className="px-4 py-2.5 bg-gradient-to-b from-white to-slate-100 hover:from-white hover:to-slate-200 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer active:scale-95"
-                            >
-                              Đặt lại
-                            </button>
-                          )}
-
+                        {!isInlineUsernameOpen && (
                           <button
-                            type="submit"
-                            disabled={actionLoading}
-                            className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-b from-[#FF4D24] via-[#FF4D24] to-[#e03d15] hover:from-[#ff5e38] hover:to-[#FF4D24] border-t border-t-white/40 border-b border-b-[#9e2709] border-x border-x-[#d43813] text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-[0_3px_12px_rgba(255,77,36,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50"
+                            onClick={handleRequestCredentialChange}
+                            disabled={isRequestingCredentialChange}
+                            onMouseEnter={() => setIsHeaderShieldHovered(true)}
+                            onMouseLeave={() => setIsHeaderShieldHovered(false)}
+                            title="Đổi tên đăng nhập & Mật khẩu (Gửi email xác thực)"
+                            className={`relative w-[184px] h-[27px] bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 text-xs font-bold rounded-xl shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all flex items-center select-none overflow-hidden ${
+                              isRequestingCredentialChange ? "opacity-75 cursor-wait" : "cursor-pointer active:scale-95 shrink-0"
+                            }`}
                           >
-                            {actionLoading ? (
-                              <>
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                                <span>Đang lưu...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="w-4 h-4" />
-                                <span>Lưu thay đổi hồ sơ</span>
-                              </>
+                            {/* Dynamic Wave / Shimmer active ON CLICK or REQUESTING */}
+                            {(isOpeningDrawer || isRequestingCredentialChange) && (
+                              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl z-0">
+                                <motion.div
+                                  className="w-3/5 h-full bg-gradient-to-r from-transparent via-indigo-400/40 via-[#FF4D24]/50 via-white to-transparent -skew-x-20"
+                                  style={{ filter: "drop-shadow(0 0 8px rgba(255,77,36,0.6))" }}
+                                  initial={{ x: "-130%" }}
+                                  animate={{ x: "280%" }}
+                                  transition={{ duration: 0.5, ease: "easeInOut", repeat: isRequestingCredentialChange ? Infinity : 0 }}
+                                />
+                              </div>
                             )}
+
+                            {/* Icon pinned fixed to the left corner */}
+                            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 z-10 pointer-events-none flex items-center justify-center">
+                              {isRequestingCredentialChange ? (
+                                <Loader2 className="w-3.5 h-3.5 text-indigo-700 animate-spin" />
+                              ) : (
+                                <HoverMorphIcon
+                                  defaultIcon={LucideShield}
+                                  hoverIcon={LucidePencil}
+                                  isHovered={isHeaderShieldHovered}
+                                  size={13.5}
+                                  className="text-indigo-700"
+                                />
+                              )}
+                            </div>
+
+                            {/* Smooth CSS Text Crossfade Transition */}
+                            <div className="relative w-full h-full flex items-center justify-center pl-6 pr-1.5 pointer-events-none overflow-hidden">
+                              <span
+                                className={`text-[10px] font-mono font-bold text-center block whitespace-nowrap transition-all duration-250 ease-out ${
+                                  isHeaderShieldHovered || isRequestingCredentialChange
+                                    ? "opacity-0 -translate-y-2 pointer-events-none absolute"
+                                    : "opacity-100 translate-y-0"
+                                }`}
+                              >
+                                Bảo mật & Tên đăng nhập
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono font-bold text-center block whitespace-nowrap transition-all duration-250 ease-out ${
+                                  isHeaderShieldHovered || isRequestingCredentialChange
+                                    ? "opacity-100 translate-y-0"
+                                    : "opacity-0 translate-y-2 pointer-events-none absolute"
+                                }`}
+                              >
+                                {isRequestingCredentialChange ? "Đang gửi yêu cầu..." : "Gửi yêu cầu thay đổi"}
+                              </span>
+                            </div>
                           </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Field: Họ và tên */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-slate-600 block">
+                            Họ và tên
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              required
+                              value={editFullName}
+                              onChange={(e) => setEditFullName(e.target.value)}
+                              placeholder="Nhập họ và tên đầy đủ..."
+                              className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5"
+                            />
+                            <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
                         </div>
+
+                        {/* Field: Số điện thoại */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-slate-600 block">
+                            Số điện thoại liên hệ
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="tel"
+                              value={editPhone}
+                              onChange={(e) => setEditPhone(e.target.value)}
+                              placeholder="0901234567"
+                              className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 font-mono"
+                            />
+                            <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+                        </div>
+
+                        {/* Field: Ngày sinh */}
+                        <BirthdayDatePicker
+                          value={editDateOfBirth}
+                          onChange={(val) => setEditDateOfBirth(val)}
+                          onSaveImmediate={handleSaveBirthdayImmediate}
+                          disabled={actionLoading}
+                        />
+                        {/* Field: Giới tính */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-slate-600 block">
+                            Giới tính
+                          </label>
+                          <div className="relative grid grid-cols-3 p-1 rounded-2xl bg-slate-100/85 border-t border-t-slate-300/60 border-b border-b-white/80 border-x border-x-slate-200/70 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),inset_0_-1px_0_rgba(255,255,255,0.7),0_1px_0_rgba(255,255,255,0.8)]">
+                            {[
+                              { id: "male", label: "Nam" },
+                              { id: "female", label: "Nữ" },
+                              { id: "other", label: "Khác" }
+                            ].map((g) => {
+                              const isSelected = editGender.toLowerCase() === g.id;
+                              return (
+                                 <button
+                                  key={g.id}
+                                  type="button"
+                                  onClick={() => setEditGender(g.id)}
+                                  className={`relative z-10 py-1.5 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center select-none ${
+                                    isSelected ? "text-slate-900" : "text-slate-500 hover:text-slate-800"
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <motion.div
+                                      layoutId="active-gender-pill"
+                                      transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                                      className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/80 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)]"
+                                    />
+                                  )}
+                                  <span className="relative z-10 flex items-center justify-center">
+                                    <span>{g.label}</span>
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ACTION BUTTONS (Clean bottom alignment inside the card) */}
+                      <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-200/70">
+                        {isProfileDirty && (
+                          <button
+                            type="button"
+                            onClick={handleResetProfileForm}
+                            className="px-4 py-2.5 bg-gradient-to-b from-white to-slate-100 hover:from-white hover:to-slate-200 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer active:scale-95"
+                          >
+                            Đặt lại
+                          </button>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={actionLoading}
+                          className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-b from-[#FF552B] via-[#FF4D24] to-[#E83F16] hover:from-[#ff643c] hover:to-[#f0471f] border-t border-t-white/35 border-b border-b-black/25 border-x border-x-transparent text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-[0_2px_10px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.25),inset_0_-1px_0_rgba(0,0,0,0.12)] hover:shadow-[0_4px_16px_rgba(255,77,36,0.38),inset_0_1px_0_rgba(255,255,255,0.3)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                        >
+                          {actionLoading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin text-white" />
+                              <span>Đang lưu...</span>
+                            </>
+                          ) : (
+                            <span>Lưu thay đổi hồ sơ</span>
+                          )}
+                        </button>
+                      </div>
                     </form>
                   </div>
                 )}
@@ -4152,7 +4938,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             <span className="text-[11px] text-slate-400">Tên hiện tại: @{user?.username || "username"}</span>
                           </div>
                         </div>
-                        {isUsernameChangeExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                        <div className="flex items-center gap-2">
+                          {cooldownRemaining?.isActive && (
+                            <span className="text-[9.5px] font-bold font-mono px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/90 rounded-md inline-flex items-center gap-1 shadow-2xs">
+                              <Clock className="w-2.5 h-2.5 text-amber-600 animate-pulse" />
+                              <span>Đổi lại sau: {cooldownRemaining.shortFormatted}</span>
+                            </span>
+                          )}
+                          {isUsernameChangeExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                        </div>
                       </button>
 
                       <AnimatePresence initial={false}>
@@ -4164,24 +4958,110 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             className="overflow-hidden border-t border-slate-100"
                           >
                             <form onSubmit={handleChangeUsername} className="p-5 flex flex-col gap-3.5">
-                              <div className="flex flex-col gap-1.5">
-                                <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono text-left">Tên đăng nhập mới</label>
-                                <input
-                                  type="text"
-                                  required
-                                  placeholder="Nhập username mới..."
-                                  value={newUsername}
-                                  onChange={(e) => setNewUsername(e.target.value)}
-                                  className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-medium shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                                />
-                              </div>
-                              <button
-                                type="submit"
-                                disabled={actionLoading}
-                                className="w-full bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50"
-                              >
-                                {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Cập nhật tên đăng nhập"}
-                              </button>
+                              {/* Cooldown / Info Callout Banner */}
+                              {cooldownRemaining?.isActive ? (
+                                <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+                                  <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+                                  <div className="space-y-0.5">
+                                    <p className="font-bold text-[11.5px]">Tài khoản đang trong thời hạn giãn cách 30 ngày (IAM Cooldown)</p>
+                                    <p className="text-[11px] text-amber-800/90">
+                                      Bạn có thể đổi lại sau: <strong className="font-mono font-bold text-amber-950">{cooldownRemaining.untilDateStr}</strong> ({cooldownRemaining.formatted}).
+                                    </p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-start gap-2.5 text-xs text-slate-700">
+                                  <ShieldAlert className="w-4 h-4 text-[#FF4D24] shrink-0 mt-0.5" />
+                                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                                    Tên đăng nhập từ 3 đến 50 ký tự, không chứa ký tự '@' và chưa ai sử dụng. Sau khi đổi thành công sẽ kích hoạt hạn khóa 30 ngày.
+                                  </p>
+                                </div>
+                              )}
+
+                              {(() => {
+                                const secValidation = validateUsernameFormat(newUsername, user?.username);
+                                return (
+                                  <>
+                                    <div className="flex flex-col gap-1.5">
+                                      <div className="flex items-center justify-between">
+                                        <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono text-left">
+                                          Tên đăng nhập mới
+                                        </label>
+                                        <span className={`font-mono text-[10px] font-bold ${
+                                          newUsername.length > 50
+                                            ? "text-red-500 font-bold"
+                                            : newUsername.length >= 3
+                                              ? "text-emerald-600"
+                                              : "text-slate-400"
+                                        }`}>
+                                          {newUsername.length}/50 ký tự
+                                        </span>
+                                      </div>
+                                      <div className="relative">
+                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xs select-none">
+                                          @
+                                        </span>
+                                        <input
+                                          type="text"
+                                          maxLength={50}
+                                          disabled={Boolean(cooldownRemaining?.isActive || actionLoading)}
+                                          placeholder="Nhập tên đăng nhập mới..."
+                                          value={newUsername}
+                                          onChange={(e) => {
+                                            const cleaned = e.target.value.replace(/[^a-zA-Z0-9_]/g, "");
+                                            setNewUsername(cleaned);
+                                          }}
+                                          className={`w-full bg-slate-50/80 focus:bg-white border text-xs pl-8 pr-4 py-3 rounded-2xl outline-none transition-all font-mono font-bold text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] ${
+                                            newUsername.length > 0 && !secValidation.valid
+                                              ? "border-red-400 focus:ring-2 focus:ring-red-400/20"
+                                              : newUsername.length > 0 && secValidation.valid
+                                                ? "border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+                                                : "border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15"
+                                          }`}
+                                        />
+                                      </div>
+
+                                      {/* Live Validation message */}
+                                      {newUsername.length > 0 && secValidation.message && (
+                                        <div className="text-[10.5px] font-medium font-mono flex items-center gap-1.5 mt-0.5">
+                                          {secValidation.valid ? (
+                                            <span className="text-emerald-600 inline-flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80 font-bold">
+                                              <CheckCircle2 className="w-3 h-3" /> Tên đăng nhập hợp lệ và sẵn sàng cập nhật
+                                            </span>
+                                          ) : (
+                                            <span className="text-amber-600 inline-flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/80 font-bold">
+                                              <AlertCircle className="w-3 h-3 shrink-0" /> {secValidation.message}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <button
+                                      type="submit"
+                                      disabled={Boolean(cooldownRemaining?.isActive || !secValidation.valid || actionLoading)}
+                                      className="w-full bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                      {actionLoading ? (
+                                        <>
+                                          <RefreshCw className="w-4 h-4 animate-spin" />
+                                          <span>Đang kiểm tra & cập nhật...</span>
+                                        </>
+                                      ) : cooldownRemaining?.isActive ? (
+                                        <>
+                                          <Clock className="w-4 h-4" />
+                                          <span>Đổi lại sau ({cooldownRemaining.shortFormatted})</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Check className="w-4 h-4" />
+                                          <span>Cập nhật tên đăng nhập</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </>
+                                );
+                              })()}
                             </form>
                           </motion.div>
                         )}
