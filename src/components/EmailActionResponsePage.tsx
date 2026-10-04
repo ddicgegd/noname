@@ -149,6 +149,16 @@ export default function EmailActionResponsePage({
           countdownPrefix: "Tự động chuyển đến trang khôi phục"
         };
       }
+      if (urlParams.type === "oauth2-callback") {
+        return {
+          page: "auth" as const,
+          path: "/a#login",
+          hash: "#login",
+          buttonLabel: "Quay lại Đăng nhập",
+          centerpieceTooltip: "Chuyển đến trang đăng nhập",
+          countdownPrefix: "Tự động chuyển đến trang đăng nhập"
+        };
+      }
       return {
         page: "profile" as const,
         path: "/m#profile",
@@ -168,6 +178,16 @@ export default function EmailActionResponsePage({
         buttonLabel: "Đăng nhập ngay (/a#login)",
         centerpieceTooltip: "Chuyển đến trang đăng nhập (/a#login)",
         countdownPrefix: "Tự động chuyển đến trang đăng nhập"
+      };
+    }
+    if (urlParams.type === "oauth2-callback") {
+      return {
+        page: "profile" as const,
+        path: "/m#profile",
+        hash: "#profile",
+        buttonLabel: "Vào ứng dụng ngay",
+        centerpieceTooltip: "Chuyển đến hồ sơ cá nhân",
+        countdownPrefix: "Tự động chuyển đến ứng dụng"
       };
     }
     if (urlParams.type === "reset-password") {
@@ -257,13 +277,18 @@ export default function EmailActionResponsePage({
       if (actionType === "oauth2-callback") {
         const tokenRes = await exchangeOAuth2Ticket(cleanToken);
         response = tokenRes as unknown as ApiResponse;
-        const data = tokenRes.data as unknown as { accessToken?: string; refreshToken?: string };
-        if (data && data.accessToken) {
-          localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.accessToken);
-          if (data.refreshToken) {
-            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refreshToken);
+        const rawRes = tokenRes as unknown as Record<string, unknown>;
+        const rawData = (rawRes.data as Record<string, unknown> | undefined) || rawRes;
+        
+        const accessToken = (rawData.accessToken || rawData.access_token || "") as string;
+        const refreshToken = (rawData.refreshToken || rawData.refresh_token || "") as string;
+
+        if (accessToken) {
+          localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+          if (refreshToken) {
+            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
           }
-          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(tokenRes.data));
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(rawData));
           window.dispatchEvent(new Event("auth-changed"));
         }
       } else {
