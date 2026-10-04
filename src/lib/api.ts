@@ -7,11 +7,120 @@ import { extractBackendMessage } from "./responseExtractor";
 import { STORAGE_KEYS } from "./storageKeys";
 
 /**
- * Lấy API Base URL chuẩn hóa từ biến môi trường VITE_API_BASE_URL hoặc mặc định localhost:8080.
- * Tuyệt đối không đọc từ localStorage để tránh bị cướp quyền gọi API bởi các tunnel ngrok chết.
+ * Lấy API Base URL chuẩn hóa:
+ * 1. Đọc STORAGE_KEYS.CUSTOM_API_BASE_URL từ localStorage nếu đang ở môi trường trình duyệt.
+ * 2. Fallback về biến môi trường VITE_API_BASE_URL hoặc mặc định http://localhost:8080.
+ * Luôn cắt bỏ trailing slash (/).
  */
 export function getApiBaseUrl(): string {
-  return ((import.meta as any).env?.VITE_API_BASE_URL as string) || "http://localhost:8080";
+  if (typeof window !== "undefined") {
+    try {
+      const custom = localStorage.getItem(STORAGE_KEYS.CUSTOM_API_BASE_URL);
+      if (custom) {
+        const trimmed = custom.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+          return trimmed.replace(/\/+$/, "");
+        }
+      }
+    } catch {}
+  }
+
+  let envBaseUrl: string | undefined;
+  if (typeof import.meta === "object" && import.meta !== null && "env" in import.meta) {
+    const metaEnv = import.meta.env;
+    if (typeof metaEnv === "object" && metaEnv !== null && "VITE_API_BASE_URL" in metaEnv) {
+      const val = metaEnv.VITE_API_BASE_URL;
+      if (typeof val === "string") {
+        envBaseUrl = val;
+      }
+    }
+  }
+  const fallback = typeof envBaseUrl === "string" && envBaseUrl.trim() ? envBaseUrl.trim() : "http://localhost:8080";
+  return fallback.replace(/\/+$/, "");
+}
+
+/**
+ * Thiết lập URL máy chủ API tùy chỉnh, lưu vào localStorage và phát event đồng bộ.
+ */
+export function setApiBaseUrl(url: string): void {
+  const trimmed = url.trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error(`Invalid endpoint URL: ${trimmed}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Invalid endpoint URL: protocol must be http or https");
+  }
+  const normalized = trimmed.replace(/\/+$/, "");
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_KEYS.CUSTOM_API_BASE_URL, normalized);
+    } catch {}
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(
+      new CustomEvent("api-base-url-changed", { detail: { url: normalized } })
+    );
+  }
+}
+
+/**
+ * Đặt lại API Base URL về mặc định của hệ thống.
+ */
+export function resetApiBaseUrl(): void {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.CUSTOM_API_BASE_URL);
+    } catch {}
+    const defaultUrl = getApiBaseUrl();
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(
+      new CustomEvent("api-base-url-changed", { detail: { url: defaultUrl } })
+    );
+  }
+}
+
+export interface PingResult {
+  success: boolean;
+  latencyMs: number;
+  status?: number;
+  error?: string;
+}
+
+/**
+ * Đo độ trễ kết nối mạng tới endpoint chỉ định hoặc endpoint hiện tại.
+ */
+export async function pingEndpoint(targetUrl?: string): Promise<PingResult> {
+  const baseUrl = targetUrl && targetUrl.trim() ? targetUrl.trim().replace(/\/+$/, "") : getApiBaseUrl();
+  const pingUrl = `${baseUrl}/api/health`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+  const startTime = performance.now();
+
+  try {
+    const res = await fetch(pingUrl, {
+      method: "GET",
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    clearTimeout(timeoutId);
+    const latencyMs = Math.round(performance.now() - startTime);
+    return {
+      success: true,
+      latencyMs,
+      status: res.status,
+    };
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    const latencyMs = Math.round(performance.now() - startTime);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      latencyMs,
+      error: errorMsg,
+    };
+  }
 }
 
 /**

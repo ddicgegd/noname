@@ -23,7 +23,8 @@ export const STORAGE_KEYS = {
   LAST_REGISTRATION_PASSWORD: "last_registration_password",
   LAST_REGISTRATION_MESSAGE: "last_registration_message",
   RECOVERY_USER_ROLES: "recovery_user_roles",
-  PENDING_AUTH_ACTION: "pending_auth_action"
+  PENDING_AUTH_ACTION: "pending_auth_action",
+  CUSTOM_API_BASE_URL: "custom_api_base_url"
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
