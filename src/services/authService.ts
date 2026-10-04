@@ -48,6 +48,13 @@ export async function verifyEmail(token: string): Promise<ApiResponse<any>> {
   });
 }
 
+export async function exchangeOAuth2Ticket(ticket: string): Promise<ApiResponse<AuthDataResponse>> {
+  return await apiRequest<ApiResponse<AuthDataResponse>>("/api/auth/oauth2/token", {
+    method: "POST",
+    body: JSON.stringify({ ticket: ticket.trim() }),
+  });
+}
+
 export async function resendVerification(email: string): Promise<ApiResponse<any>> {
   return await apiRequest<ApiResponse<any>>("/api/auth/resend-verification", {
     method: "POST",

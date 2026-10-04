@@ -199,47 +199,6 @@ async function startServer() {
     }
   });
 
-  // In-memory Session Mock Storage
-  const inMemoryMockCart = new Map<string, { username: string; items: any[] }>();
-  const inMemoryMockOrders = new Map<string, any[]>();
-
-  function getMockOrders(key: string) {
-    const k = key || "guest";
-    if (!inMemoryMockOrders.has(k)) {
-      inMemoryMockOrders.set(k, []);
-    }
-    return inMemoryMockOrders.get(k)!;
-  }
-
-  function getMockCart(key: string) {
-    const k = key || "guest";
-    if (!inMemoryMockCart.has(k)) {
-      inMemoryMockCart.set(k, { username: k, items: [] });
-    }
-    return inMemoryMockCart.get(k)!;
-  }
-
-  function computeMockCart(cart: { username: string; items: any[] }) {
-    const totalItems = cart.items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
-    const totalPrice = cart.items.reduce((sum: number, it: any) => sum + (it.unitPrice || 0) * (it.quantity || 1), 0);
-    const totalSalePrice = cart.items.reduce((sum: number, it: any) => sum + (it.salePrice || it.unitPrice || 0) * (it.quantity || 1), 0);
-    const totalDiscount = Math.max(0, totalPrice - totalSalePrice);
-    return {
-      status: { code: 200, message: "Success" },
-      data: {
-        username: cart.username,
-        totalItems,
-        totalPrice,
-        totalSalePrice,
-        totalDiscount,
-        finalAmount: totalSalePrice,
-        items: cart.items.map((it: any) => ({
-          ...it,
-          subTotal: (it.salePrice || it.unitPrice || 0) * (it.quantity || 1)
-        }))
-      }
-    };
-  }
   interface DeviceSessionRecord {
     id: string;
     deviceName: string;
@@ -261,7 +220,7 @@ async function startServer() {
 
     if (!ua) {
       return {
-        deviceName: "Trình duyệt Web (Phiên hiện tại)",
+        deviceName: "Trình duyệt Web",
         clientType: "DESKTOP" as const,
         deviceDetail: "Trình duyệt Web"
       };
@@ -288,7 +247,7 @@ async function startServer() {
     }
 
     return {
-      deviceName: "Trình duyệt Web (Phiên hiện tại)",
+      deviceName: "Trình duyệt Web",
       clientType: type,
       deviceDetail: `${browser} • ${os}`
     };
@@ -298,14 +257,18 @@ async function startServer() {
     const key = identityKey || "horizon_admin";
     if (!activeSessionsStore[key] || activeSessionsStore[key].length === 0) {
       const uaInfo = parseUserAgentDetails(userAgent);
+      const cleanIp = (clientIp === "::1" || clientIp === "127.0.0.1" || !clientIp)
+        ? "127.0.0.1"
+        : clientIp.replace(/^::ffff:/, "");
+
       activeSessionsStore[key] = [
         {
           id: "sess_curr_" + Math.random().toString(36).substring(2, 10),
           deviceName: uaInfo.deviceName,
           clientType: uaInfo.clientType,
           deviceDetail: uaInfo.deviceDetail,
-          ip: clientIp && clientIp !== "::1" && clientIp !== "127.0.0.1" ? clientIp : "118.69.182.10",
-          location: "TP. Hồ Chí Minh, Việt Nam",
+          ip: cleanIp,
+          location: "",
           lastActive: "Vừa xong",
           lastActiveAt: new Date().toISOString(),
           isCurrent: true
@@ -315,646 +278,12 @@ async function startServer() {
     return activeSessionsStore[key];
   }
 
-  // In-memory Mock REST API handlers
-  function mockRestApiCall(apiPath: string, method: string, body: any, queryParams: URLSearchParams, identityKey = "guest", userAgent = "", clientIp = "") {
-    console.log(`[MOCK BACKEND FALLBACK] Intercepted ${method} ${apiPath} [key: ${identityKey}]`);
-    
-    if (apiPath === "/api/auth/sessions" || apiPath === "/api/v1/auth/sessions" || apiPath.startsWith("/api/auth/sessions?") || apiPath.startsWith("/api/v1/auth/sessions?")) {
-      if (queryParams.get("reset") === "true") {
-        delete activeSessionsStore[identityKey || "horizon_admin"];
-      }
-      const sessions = getUserSessions(identityKey, userAgent, clientIp);
-      return {
-        status: { code: 200, message: "Truy xuất danh sách phiên thiết bị thành công" },
-        data: {
-          totalActive: sessions.length,
-          currentSessionId: sessions.find(s => s.isCurrent)?.id || sessions[0]?.id || "sess_web_current",
-          sessions: [...sessions]
-        }
-      };
-    }
-
-    if ((apiPath === "/api/auth/sessions/others" || apiPath === "/api/v1/auth/sessions/others") && method === "DELETE") {
-      const sessions = getUserSessions(identityKey, userAgent, clientIp);
-      const initialCount = sessions.length;
-      const current = sessions.find(s => s.isCurrent) || sessions[0];
-      activeSessionsStore[identityKey || "horizon_admin"] = current ? [current] : [];
-      const terminatedCount = Math.max(0, initialCount - (current ? 1 : 0));
-      return {
-        status: { code: 200, message: "Đã đăng xuất khỏi tất cả các thiết bị khác thành công" },
-        data: {
-          terminatedCount,
-          remainingActive: current ? 1 : 0
-        }
-      };
-    }
-
-    if ((apiPath.startsWith("/api/auth/sessions/") || apiPath.startsWith("/api/v1/auth/sessions/")) && method === "DELETE") {
-      const prefix = apiPath.startsWith("/api/v1/auth/sessions/") ? "/api/v1/auth/sessions/" : "/api/auth/sessions/";
-      const targetSessionId = decodeURIComponent(apiPath.substring(prefix.length));
-      const sessions = getUserSessions(identityKey, userAgent, clientIp);
-      activeSessionsStore[identityKey || "horizon_admin"] = sessions.filter(s => s.id !== targetSessionId);
-      const remainingActive = activeSessionsStore[identityKey || "horizon_admin"].length;
-      return {
-        status: { code: 200, message: "Đã thu hồi phiên thiết bị thành công" },
-        data: {
-          terminatedSessionId: targetSessionId,
-          remainingActive
-        }
-      };
-    }
-    if (apiPath === "/api/auth/me") {
-      if (!globalThis._mockUserProfile || typeof globalThis._mockUserProfile.id === "number" || globalThis._mockUserProfile.hideBirthYear !== undefined) {
-        globalThis._mockUserProfile = {
-          id: "100",
-          username: "alex_developer",
-          fullName: "Alex Developer",
-          email: "alex@example.com",
-          phoneNumber: "0901234567",
-          usernameCooldownUntil: null,
-          dateOfBirth: "1998-09-26",
-          avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-          gender: "MALE",
-          rank: "PLATINUM",
-          status: "ACTIVE",
-          roles: ["ROLE_USER"],
-          dobUpdatedAt: undefined
-        };
-      }
-
-      // Check if usernameCooldownUntil has expired
-      if (globalThis._mockUserProfile.usernameCooldownUntil) {
-        const cooldownTime = new Date(globalThis._mockUserProfile.usernameCooldownUntil.replace(" ", "T")).getTime();
-        if (!isNaN(cooldownTime) && cooldownTime <= Date.now()) {
-          globalThis._mockUserProfile.usernameCooldownUntil = null;
-        }
-      }
-
-      if (method === "PUT") {
-        const bodyObj = typeof body === "string" ? JSON.parse(body) : (body || {});
-
-        if (bodyObj.dateOfBirth) {
-          const dobPattern = /^\d{4}-\d{2}-\d{2}$/;
-          if (!dobPattern.test(bodyObj.dateOfBirth)) {
-            return {
-              status: { code: 400, message: "Ngày sinh không hợp lệ hoặc độ tuổi phải từ 10 đến 120 tuổi." },
-              data: null
-            };
-          }
-
-          const [y, m, d] = bodyObj.dateOfBirth.split("-").map(Number);
-          const now = new Date();
-          const birthDate = new Date(y, m - 1, d);
-          const curYear = now.getFullYear();
-          const curMonth = now.getMonth() + 1;
-          const curDay = now.getDate();
-
-          let age = curYear - y;
-          if (curMonth < m || (curMonth === m && curDay < d)) {
-            age--;
-          }
-
-          if (birthDate.getTime() > now.getTime() || age < 10 || age > 120) {
-            return {
-              status: { code: 400, message: "Ngày sinh không hợp lệ hoặc độ tuổi phải từ 10 đến 120 tuổi." },
-              data: null
-            };
-          }
-
-          if (globalThis._mockUserProfile.dobUpdatedAt && globalThis._mockUserProfile.dateOfBirth !== bodyObj.dateOfBirth) {
-            const lastUpdated = new Date(globalThis._mockUserProfile.dobUpdatedAt).getTime();
-            const cooldownPeriod = 365 * 24 * 60 * 60 * 1000;
-            if (now.getTime() - lastUpdated < cooldownPeriod) {
-              return {
-                status: {
-                  code: 401,
-                  message: "Bạn chỉ được phép cập nhật ngày sinh tối đa 1 lần mỗi năm. Vui lòng liên hệ CSKH nếu cần hỗ trợ."
-                },
-                data: null
-              };
-            }
-          }
-
-          if (globalThis._mockUserProfile.dateOfBirth !== bodyObj.dateOfBirth) {
-            globalThis._mockUserProfile.dobUpdatedAt = new Date().toISOString();
-          }
-          globalThis._mockUserProfile.dateOfBirth = bodyObj.dateOfBirth;
-        }
-
-        if (bodyObj.fullName !== undefined) globalThis._mockUserProfile.fullName = bodyObj.fullName;
-        if (bodyObj.phoneNumber !== undefined) globalThis._mockUserProfile.phoneNumber = bodyObj.phoneNumber;
-        if (bodyObj.avatarUrl !== undefined) globalThis._mockUserProfile.avatarUrl = bodyObj.avatarUrl;
-        if (bodyObj.gender !== undefined) globalThis._mockUserProfile.gender = bodyObj.gender;
-
-        return {
-          status: { code: 200, message: "Cập nhật thông tin hồ sơ thành công" },
-          data: { ...globalThis._mockUserProfile }
-        };
-      }
-
-      return {
-        status: { code: 200, message: "Success" },
-        data: { ...globalThis._mockUserProfile }
-      };
-    }
-    if (apiPath === "/api/auth/me/avatar" && method === "POST") {
-      return {
-        status: { code: 200, message: "Cập nhật ảnh đại diện thành công" },
-        data: {
-          id: 1,
-          username: "horizon_admin",
-          fullName: "Horizon Administrator",
-          email: "admin@horizon.net",
-          avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-          rank: "GOLD",
-          status: "ACTIVE"
-        }
-      };
-    }
-    if (apiPath.startsWith("/api/auth/credential-change/activate")) {
-      const token = queryParams.get("token") || "";
-      if (!token) {
-        return {
-          status: { code: 400, message: "Token is required" },
-          data: null
-        };
-      }
-      (globalThis as any)._mockCredentialGrant = {
-        status: "ACTIVE",
-        remainingSeconds: 300,
-        expiresAt: new Date(Date.now() + 300000).toISOString()
-      };
-      return {
-        status: {
-          code: 200,
-          message: "Kích hoạt quyền đổi thông tin thành công. Bạn có 5 phút để cập nhật."
-        },
-        data: "Kích hoạt thành công"
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/credential-change/status")) {
-      const grant = (globalThis as any)._mockCredentialGrant;
-      if (grant && grant.status === "ACTIVE" && new Date(grant.expiresAt).getTime() > Date.now()) {
-        const remaining = Math.max(0, Math.round((new Date(grant.expiresAt).getTime() - Date.now()) / 1000));
-        return {
-          status: { code: 200, message: "Success" },
-          data: {
-            status: "ACTIVE",
-            remainingSeconds: remaining,
-            expiresAt: grant.expiresAt
-          }
-        };
-      }
-      return {
-        status: { code: 401, message: "Phiên xác thực chưa được kích hoạt hoặc đã hết hạn." },
-        data: null
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/credential-change/request") && method === "POST") {
-      (globalThis as any)._mockCredentialGrant = {
-        status: "PENDING",
-        remainingSeconds: 0,
-        expiresAt: new Date(Date.now() + 300000).toISOString()
-      };
-      return {
-        status: {
-          code: 200,
-          message: "Liên kết xác thực thay đổi thông tin đăng nhập đã được gửi đến email của bạn."
-        },
-        data: null
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/update-credentials") && method === "PUT") {
-      (globalThis as any)._mockCredentialGrant = null;
-      return {
-        status: {
-          code: 200,
-          message: "Cập nhật thông tin đăng nhập thành công. Vui lòng đăng nhập lại."
-        },
-        data: null
-      };
-    }
-    if (apiPath.startsWith("/api/auth/verify-email")) {
-      const token = queryParams.get("token") || "";
-      if (!token) {
-        return {
-          status: { code: 400, message: "Token is required" },
-          data: null
-        };
-      }
-      return {
-        status: { code: 200, message: "Xác thực email thành công. Tài khoản của bạn đã được kích hoạt." },
-        data: null
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/resend-verification")) {
-      return {
-        status: { code: 200, message: "Nếu email tồn tại trên hệ thống và chưa được kích hoạt, liên kết xác thực mới đã được gửi. Vui lòng kiểm tra." },
-        data: null
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/recover-account/")) {
-      const email = apiPath.substring("/api/auth/recover-account/".length);
-      return {
-        status: { code: 200, message: "Nếu email tồn tại trên hệ thống, liên kết khôi phục tài khoản đã được gửi. Vui lòng kiểm tra." },
-        message: `Yêu cầu khôi phục tài khoản đã được gửi đến email ${decodeURIComponent(email)}.`
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/validate-reset-token")) {
-      const token = queryParams.get("token") || "";
-      if (!token) {
-        return {
-          status: { code: 400, message: "Token is required" },
-          data: null
-        };
-      }
-      return {
-        status: { code: 200, message: "Mã token hợp lệ. Vui lòng thiết lập mật khẩu mới." },
-        data: {
-          username: "horizon_admin",
-          fullName: "Horizon Administrator",
-          email: "admin@horizon.net",
-          avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-          active: "ACTIVE",
-          status: "ACTIVE"
-        }
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/reset-password")) {
-      return {
-        status: { code: 200, message: "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại." },
-        message: "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại."
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/check-username") || apiPath.startsWith("/api/v1/auth/check-username")) {
-      const username = (queryParams.get("username") || (typeof body === "string" ? JSON.parse(body || "{}")?.username : body?.username) || "").trim();
-      if (!username || username.length < 3 || username.length > 50 || username.includes("@") || !/^[a-zA-Z0-9_]+$/.test(username)) {
-        return {
-          status: { code: 400, message: "Tên đăng nhập không hợp lệ (3-50 ký tự, không chứa ký tự @ hoặc dấu cách)." },
-          data: { available: false, reason: "INVALID_FORMAT" }
-        };
-      }
-      const RESERVED_TAKEN = ["admin", "root", "system", "moderator", "ddicg", "existing_user"];
-      const isCurrent = globalThis._mockUserProfile?.username && username.toLowerCase() === globalThis._mockUserProfile.username.toLowerCase();
-      if (isCurrent) {
-        return {
-          status: { code: 400, message: "Tên đăng nhập mới trùng với tên hiện tại." },
-          data: { available: false, reason: "SAME_AS_CURRENT" }
-        };
-      }
-      if (RESERVED_TAKEN.includes(username.toLowerCase())) {
-        return {
-          status: { code: 409, message: "Tên đăng nhập mới đã tồn tại trên hệ thống." },
-          data: { available: false, reason: "ALREADY_EXISTS" }
-        };
-      }
-      return {
-        status: { code: 200, message: "Tên đăng nhập khả dụng." },
-        data: { available: true }
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/change-username") && method === "PUT") {
-      const bodyObj = typeof body === "string" ? JSON.parse(body) : (body || {});
-      const newUsername = (bodyObj.newUsername || "").trim();
-
-      if (!newUsername || newUsername.length < 3 || newUsername.length > 50 || newUsername.includes("@") || !/^[a-zA-Z0-9_]+$/.test(newUsername)) {
-        return {
-          status: { code: 400, message: "Tên đăng nhập mới phải từ 3 đến 50 ký tự, không chứa ký tự @." },
-          data: null
-        };
-      }
-
-      // Check Cooldown (30 days)
-      if (globalThis._mockUserProfile?.usernameCooldownUntil) {
-        const cooldownTime = new Date(globalThis._mockUserProfile.usernameCooldownUntil.replace(" ", "T")).getTime();
-        if (!isNaN(cooldownTime) && cooldownTime > Date.now()) {
-          return {
-            status: {
-              code: 401,
-              message: "Bạn chỉ được đổi tên đăng nhập tối đa 1 lần mỗi tháng. Vui lòng quay lại sau."
-            },
-            data: null
-          };
-        }
-      }
-
-      // Check Duplicate / Taken Username
-      const RESERVED_TAKEN = ["admin", "root", "system", "moderator", "ddicg", "existing_user"];
-      if (RESERVED_TAKEN.includes(newUsername.toLowerCase()) || (globalThis._mockUserProfile?.username && newUsername.toLowerCase() === globalThis._mockUserProfile.username.toLowerCase())) {
-        return {
-          status: {
-            code: 401,
-            message: "Tên đăng nhập mới đã tồn tại trên hệ thống."
-          },
-          data: null
-        };
-      }
-
-      // Set Cooldown 30 days
-      const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const formattedCd = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
-
-      if (globalThis._mockUserProfile) {
-        globalThis._mockUserProfile.username = newUsername;
-        globalThis._mockUserProfile.usernameCooldownUntil = formattedCd;
-      }
-
-      return {
-        status: { code: 200, message: "Đổi tên đăng nhập thành công. Vui lòng đăng nhập lại." },
-        data: null
-      };
-    }
-
-    if (apiPath.startsWith("/api/auth/change-password")) {
-      return {
-        status: { code: 200, message: "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại." },
-        message: "Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại."
-      };
-    }
-
-    if (apiPath.startsWith("/api/orders") || apiPath.startsWith("/api/order")) {
-      const ordersStore = getMockOrders(identityKey);
-
-      // 1. GET /api/orders/my-orders/list
-      if (apiPath.startsWith("/api/orders/my-orders/list")) {
-        const filterStatus = queryParams.get("status");
-        let filtered = [...ordersStore];
-        if (filterStatus && filterStatus !== "ALL") {
-          filtered = filtered.filter((o: any) => {
-            const st = String(o.currentStatus || (Array.isArray(o.status) ? o.status[0] : o.status) || "").toUpperCase();
-            return st === filterStatus.toUpperCase();
-          });
-        }
-        const summaries = filtered.map((o: any) => {
-          let rawNames: string[] = [];
-          if (Array.isArray(o.productNames) && o.productNames.length > 0) {
-            rawNames = o.productNames;
-          } else if (o.orderItems && o.orderItems.length > 0) {
-            rawNames = o.orderItems.map((it: any) => it.productName || it.attributesSku).filter(Boolean);
-          } else if (o.attributesSku) {
-            rawNames = [o.attributesSku];
-          }
-          const productNames = rawNames.map((n: string) => resolveAttributeDisplayName(n, o.orderNumber)).filter(Boolean);
-          if (productNames.length === 0) {
-            productNames.push(resolveAttributeDisplayName(null, o.orderNumber));
-          }
-
-          return {
-            orderNumber: o.orderNumber,
-            currentStatus: o.currentStatus || (Array.isArray(o.status) ? o.status[0] : "WAITING_PAYMENT"),
-            currentStatusDescription: o.currentStatusDescription || (o.currentStatus === "WAITING_PAYMENT" ? "Chờ thanh toán" : o.currentStatus === "COMPLETED" ? "Hoàn tất" : "Đang xử lý"),
-            totalAmount: o.totalAmount,
-            productNames,
-            itemCount: o.orderItems?.length || productNames.length || 1,
-            orderDate: o.orderDate || o.createdAt || undefined,
-            createdAt: o.createdAt || o.orderDate || undefined,
-            firstItemPreview: o.orderItems?.[0] ? {
-              attributesSku: o.orderItems[0].attributesSku,
-              productName: resolveAttributeDisplayName(o.orderItems[0].productName || o.orderItems[0].attributesSku, o.orderNumber),
-              thumbnailUrl: o.orderItems[0].imageUrl || "/images/products/iphone15.jpg",
-              quantity: o.orderItems[0].quantity || 1,
-              price: o.orderItems[0].salePrice || o.orderItems[0].unitPrice || 0
-            } : undefined
-          };
-        });
-
-        return {
-          status: { code: 200, message: "Success" },
-          data: {
-            contents: summaries,
-            paging: {
-              pageNumber: Number(queryParams.get("page")) || 1,
-              pageSize: Number(queryParams.get("size")) || 20,
-              totalElements: summaries.length,
-              totalPages: Math.ceil(summaries.length / (Number(queryParams.get("size")) || 20)) || 1
-            }
-          }
-        };
-      }
-
-      // 2. GET /api/orders/my-orders/:orderNumber
-      if (apiPath.startsWith("/api/orders/my-orders/")) {
-        const orderNum = decodeURIComponent(apiPath.substring("/api/orders/my-orders/".length));
-        const found = ordersStore.find((o: any) => o.orderNumber === orderNum || o.orderSessionId === orderNum);
-        if (found) {
-          return {
-            status: { code: 200, message: "Success" },
-            data: found
-          };
-        }
-        // Fallback default mock detail if not found in memory
-        return {
-          status: { code: 200, message: "Success" },
-          data: {
-            orderNumber: orderNum,
-            orderSessionId: orderNum,
-            status: ["DELIVERED"],
-            currentStatus: "DELIVERED",
-            currentStatusDescription: "Giao thành công",
-            shippingMethod: "DELIVERY",
-            paymentMethod: "VNPAY",
-            addressSku: "ADDR-DEFAULT-001",
-            shippingAddress: "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-            subtotal: 21990000.0,
-            shippingFee: 30000.0,
-            discountAmount: 0.0,
-            productDiscountAmount: 0.0,
-            shippingDiscountAmount: 0.0,
-            discountCodes: [],
-            totalAmount: 22020000.0,
-            createdAt: new Date().toISOString(),
-            customerInfo: {
-              fullName: "Khách hàng Horizon",
-              phone: "0901234567",
-              shippingAddress: "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh"
-            },
-            orderItems: [
-              {
-                attributesSku: "SKU-IPHONE15-128GB-BLK",
-                productName: "iPhone 15 Pro 128GB",
-                quantity: 1,
-                unitPrice: 22990000.0,
-                salePrice: 21990000.0,
-                costPrice: 20000000.0,
-                discountAmount: 0.0,
-                discountPercentage: 0.0,
-                subtotal: 21990000.0,
-                taxAmount: 0.0,
-                imageUrl: "/images/products/iphone15.jpg",
-                variantOptions: [{ name: "Màu sắc", value: "Titan Tự Nhiên" }]
-              }
-            ]
-          }
-        };
-      }
-
-      // 3. POST /api/orders (Create Order)
-      const items = body?.items || [{ attributesSku: "SKU-IPHONE15-128GB-BLK", quantity: 1 }];
-      const subtotal = items.reduce((sum: number, it: any) => sum + ((it.salePrice || it.unitPrice || 21990000) * (it.quantity || 1)), 0);
-      const discountAmount = body?.discountCodes?.length || body?.voucherCode ? 500000 : 0;
-      const totalAmount = Math.max(0, subtotal + (subtotal > 0 ? 30000 : 0) - discountAmount);
-      const resolvedOrderNum = body?.orderNumber || body?.orderSessionId || `018d9ef2-${Math.random().toString(16).substring(2, 6)}-7123-88bb-${Math.random().toString(16).substring(2, 14)}`;
-
-      const createdOrderData = {
-        orderNumber: resolvedOrderNum,
-        orderSessionId: resolvedOrderNum,
-        status: ["PENDING", "WAITING_PAYMENT"],
-        currentStatus: "WAITING_PAYMENT",
-        currentStatusDescription: "Chờ thanh toán",
-        shippingMethod: body?.shippingMethod || "DELIVERY",
-        paymentMethod: body?.paymentMethod || "VNPAY",
-        addressSku: body?.addressSku || "ADDR-DEFAULT-001",
-        shippingAddress: body?.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-        subtotal: subtotal || 21990000.0,
-        shippingFee: 30000.0,
-        discountAmount: discountAmount,
-        productDiscountAmount: discountAmount,
-        shippingDiscountAmount: 0.0,
-        discountCodes: body?.discountCodes || (body?.voucherCode ? [body.voucherCode] : []),
-        bankCode: body?.bankCode || undefined,
-        language: body?.language || "vn",
-        totalAmount: totalAmount || 22239900.0,
-        customerNotes: body?.customerNotes || undefined,
-        createdAt: new Date().toISOString(),
-        customerInfo: {
-          fullName: "Khách hàng Horizon",
-          phone: "0901234567",
-          shippingAddress: body?.shippingAddress || "123 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh"
-        },
-        orderItems: items.map((it: any) => ({
-          attributesSku: it.attributesSku || "SKU-IPHONE15-128GB-BLK",
-          productName: it.productName || "iPhone 15 Pro 128GB",
-          quantity: it.quantity || 1,
-          unitPrice: it.unitPrice || 22990000.0,
-          salePrice: it.salePrice || 21990000.0,
-          costPrice: it.costPrice || 20000000.0,
-          discountAmount: it.discountAmount || 0.0,
-          discountPercentage: it.discountPercentage || 0.0,
-          subtotal: (it.salePrice || it.unitPrice || 21990000.0) * (it.quantity || 1),
-          taxAmount: 0.0,
-          imageUrl: it.imageUrl || "/images/products/iphone15.jpg",
-          variantOptions: it.variantOptions || [{ name: "Màu sắc", value: "Titan Tự Nhiên" }]
-        }))
-      };
-
-      ordersStore.unshift(createdOrderData);
-
-      return {
-        status: { code: 201, message: "Thành công" },
-        data: createdOrderData
-      };
-    }
-
-    if (apiPath.startsWith("/api/merchandise") || apiPath.includes("search-Product") || apiPath.includes("merchandise")) {
-      return {
-        status: { code: 200, message: "Success" },
-        data: {
-          contents: [],
-          paging: { pageNumber: 1, pageSize: 20, totalElements: 0, totalPages: 0 }
-        }
-      };
-    }
-
-    if (apiPath.startsWith("/api/cart")) {
-      const idKey = identityKey && identityKey !== "guest" ? identityKey : (queryParams.get("guestId") || identityKey || "guest");
-      const cart = getMockCart(idKey);
-
-      if (apiPath.startsWith("/api/cart/count")) {
-        const count = cart.items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0);
-        return {
-          status: { code: 200, message: "Success" },
-          data: count
-        };
-      }
-
-      if (method === "POST" && apiPath.startsWith("/api/cart/items")) {
-        const incoming = Array.isArray(body) ? body : (body?.items || [body]);
-        incoming.forEach((it: any) => {
-          if (!it || !it.sku) return;
-          const existing = cart.items.find((x: any) => x.sku === it.sku);
-          if (existing) {
-            existing.quantity = (existing.quantity || 1) + (it.quantity || 1);
-          } else {
-            cart.items.push({
-              sku: it.sku,
-              productName: it.productName || it.sku,
-              imageUrl: it.imageUrl || "",
-              unitPrice: it.unitPrice || 30000000,
-              salePrice: it.salePrice || 27000000,
-              quantity: it.quantity || 1,
-              isAvailable: true,
-              stock: 99
-            });
-          }
-        });
-        return computeMockCart(cart);
-      }
-
-      if (method === "PUT" && apiPath.startsWith("/api/cart/items/")) {
-        const sku = decodeURIComponent(apiPath.substring("/api/cart/items/".length));
-        const target = cart.items.find((x: any) => x.sku === sku);
-        const qty = body?.quantity ?? 1;
-        if (target) {
-          if (qty <= 0) {
-            cart.items = cart.items.filter((x: any) => x.sku !== sku);
-          } else {
-            target.quantity = qty;
-          }
-        }
-        return computeMockCart(cart);
-      }
-
-      if (method === "DELETE" && apiPath.startsWith("/api/cart/items/")) {
-        const sku = decodeURIComponent(apiPath.substring("/api/cart/items/".length));
-        cart.items = cart.items.filter((x: any) => x.sku !== sku);
-        return computeMockCart(cart);
-      }
-
-      if (method === "DELETE" && apiPath === "/api/cart") {
-        const skus = body?.skus || body;
-        if (Array.isArray(skus) && skus.length > 0) {
-          cart.items = cart.items.filter((x: any) => !skus.includes(x.sku));
-        } else {
-          cart.items = [];
-        }
-        return computeMockCart(cart);
-      }
-
-      if (method === "POST" && apiPath.startsWith("/api/cart/merge")) {
-        const guestId = body?.guestId || queryParams.get("guestId") || "";
-        const guestCart = getMockCart(guestId);
-        if (guestCart && guestCart.items.length > 0) {
-          guestCart.items.forEach((it: any) => {
-            const existing = cart.items.find((x: any) => x.sku === it.sku);
-            if (existing) {
-              existing.quantity += it.quantity;
-            } else {
-              cart.items.push({ ...it });
-            }
-          });
-          guestCart.items = [];
-        }
-        return computeMockCart(cart);
-      }
-
-      return computeMockCart(cart);
-    }
-
-    throw new Error(`Route mock not found: ${method} ${apiPath}`);
-  }
-
-  // API gateway client connector inside the GraphQL server with automatic Failover
-  async function callApiGateway(apiPath: string, options: { method?: string; body?: any; token?: string; guestId?: string }, context: any) {
+  // API gateway client connector directly forwarding to Live ERP Backend (Zero Mock)
+  async function callApiGateway(
+    apiPath: string,
+    options: { method?: string; body?: unknown; token?: string; guestId?: string },
+    context?: { token?: string; guestId?: string; req?: unknown; res?: { isUnauthorized?: boolean; status?: (code: number) => void; headersSent?: boolean } }
+  ) {
     const defaultBackendUrl = getBackendUrl().replace(/\/$/, "");
     const method = options.method || "GET";
     const body = options.body;
@@ -971,7 +300,7 @@ async function startServer() {
       headers["X-Guest-Id"] = guestId;
     }
 
-    const config: any = {
+    const config: RequestInit = {
       method,
       headers
     };
@@ -979,60 +308,39 @@ async function startServer() {
       config.body = typeof body === "string" ? body : JSON.stringify(body);
     }
 
-    const tryFetch = async (baseUrl: string) => {
-      const res = await fetch(`${baseUrl}${apiPath}`, config);
-      const statusCode = res.status;
-      if (statusCode === 401) {
-        if (context?.res) {
-          context.res.isUnauthorized = true;
-          context.res.status(401);
-        }
-        throw new Error("Unauthorized");
-      }
-      if (statusCode === 403 || statusCode === 404 || statusCode >= 500) {
-        throw new Error(`Backend returned status ${statusCode}`);
-      }
-      const text = await res.text();
-      try {
-        return JSON.parse(text);
-      } catch (e) {
-        if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-          const titleMatch = text.match(/<title>([^<]+)<\/title>/i);
-          const pMatch = text.match(/<p[^>]*class="[^"]*text-slate-500[^"]*"[^>]*>([^<]+)<\/p>/i) || text.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-          const message = pMatch ? pMatch[1].trim() : (titleMatch ? titleMatch[1].replace(/—.*$/, "").trim() : "Liên kết xác thực không hợp lệ hoặc đã hết hạn.");
-          const isSuccess = text.includes("icon-ring-success") || text.includes("thành công") || text.includes("kích hoạt thành công");
-          return {
-            status: {
-              code: isSuccess ? 200 : 401,
-              message: message
-            },
-            data: null
-          };
-        }
-        if (statusCode === 401) throw new Error("Unauthorized");
-        throw new Error(`Failed to parse response (status ${statusCode})`);
-      }
-    };
+    const res = await fetch(`${defaultBackendUrl}${apiPath}`, config);
+    const statusCode = res.status;
 
-    // Thử gọi Default Backend (http://localhost:8080)
+    if (statusCode === 401) {
+      if (context?.res) {
+        context.res.isUnauthorized = true;
+        context.res.status?.(401);
+      }
+      throw new Error("Unauthorized");
+    }
+
+    const text = await res.text();
     try {
-      return await tryFetch(defaultBackendUrl);
-    } catch (err: any) {
-      if (err.message === "Unauthorized") throw err;
-      console.warn(`[API GATEWAY WARNING] Failed to connect to ERP Backend (${defaultBackendUrl}): ${err.message}. Falling back to high-fidelity mock.`);
-
-      // Tier 3: Fallback sang Mock an toàn để không bao giờ làm sập ứng dụng
-      try {
-        const parsedUrl = new URL(apiPath, "http://localhost");
-        const queryParams = parsedUrl.searchParams;
-        const identityKey = guestId || token || "guest";
-        const userAgent = (context?.req?.headers?.["user-agent"] as string) || "";
-        const clientIp = (context?.req?.ip || context?.req?.headers?.["x-forwarded-for"] as string) || "";
-        return mockRestApiCall(parsedUrl.pathname, method, body, queryParams, identityKey, userAgent, clientIp);
-      } catch (fallbackErr) {
-        console.error("[API GATEWAY FALLBACK ERROR] Fallback also failed:", fallbackErr);
-        throw err;
+      const parsed = JSON.parse(text);
+      if (context?.res && !context.res.headersSent && statusCode >= 400) {
+        context.res.status?.(statusCode);
       }
+      return parsed;
+    } catch {
+      if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+        const titleMatch = text.match(/<title>([^<]+)<\/title>/i);
+        const pMatch = text.match(/<p[^>]*class="[^"]*text-slate-500[^"]*"[^>]*>([^<]+)<\/p>/i) || text.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+        const message = pMatch ? pMatch[1].trim() : (titleMatch ? titleMatch[1].replace(/—.*$/, "").trim() : "Liên kết xác thực không hợp lệ hoặc đã hết hạn.");
+        const isSuccess = text.includes("icon-ring-success") || text.includes("thành công") || text.includes("kích hoạt thành công");
+        return {
+          status: {
+            code: isSuccess ? 200 : (statusCode || 401),
+            message: message
+          },
+          data: null
+        };
+      }
+      throw new Error(`Failed to parse response (status ${statusCode}): ${text.slice(0, 100)}`);
     }
   }
 
@@ -1895,9 +1203,17 @@ async function startServer() {
         },
         resolve: async (_, args, context: any) => {
           try {
+            if (!context?.token) {
+              return {
+                status: { code: 200, message: "OK" },
+                data: {
+                  contents: [],
+                  pageable: { pageNumber: 0, pageSize: args.size || 20, totalElements: 0, totalPages: 0 }
+                }
+              };
+            }
             const requestedStatus = args.status;
             const backendStatus = requestedStatus === "SHIPPED" ? "SHIPPING" : requestedStatus;
-
             // Nếu người dùng chọn 1 status cụ thể
             if (backendStatus && backendStatus !== "ALL") {
               const params = new URLSearchParams();
@@ -2007,6 +1323,12 @@ async function startServer() {
         },
         resolve: async (_, args, context: any) => {
           try {
+            if (!context?.token) {
+              return {
+                status: { code: 401, message: "Unauthorized" },
+                data: null
+              };
+            }
             const path = `/api/orders/my-orders/${encodeURIComponent(args.orderNumber)}`;
             const response = await callApiGateway(path, { method: "GET", token: context?.token }, context);
             const status = response?.status || { code: 200, message: "Lấy chi tiết đơn hàng thành công" };
@@ -2591,7 +1913,19 @@ async function startServer() {
     }
   });
 
-  // --- REAL / MOCK ORDER BACKEND PROXY (REST endpoints for /api/orders/*) ---
+  function extractStatusCode(response: unknown): number {
+    if (response && typeof response === "object") {
+      if ("status" in response) {
+        const st = response.status;
+        if (typeof st === "number") return st;
+        if (st && typeof st === "object" && "code" in st && typeof st.code === "number") return st.code;
+      }
+      if ("code" in response && typeof response.code === "number") return response.code;
+    }
+    return 200;
+  }
+
+  // --- REAL ORDER BACKEND PROXY (REST endpoints for /api/orders/*) ---
   app.all("/api/orders*", async (req, res) => {
     try {
       const response = await callApiGateway(req.originalUrl || req.url, {
@@ -2599,15 +1933,75 @@ async function startServer() {
         body: req.body,
         token: req.headers.authorization as string,
         guestId: (req.headers["x-guest-id"] || req.headers["x-guest-id".toLowerCase()]) as string
-      }, { req });
-      const statusCode = response?.status?.code || (response?.code ?? 200);
-      res.status(typeof statusCode === "number" ? statusCode : 200).json(response);
-    } catch (err: any) {
-      res.status(500).json({ status: { code: 500, message: err.message }, data: null });
+      }, { req, res });
+      const numericCode = extractStatusCode(response);
+      res.status(numericCode).json(response);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg === "Unauthorized") {
+        return res.status(401).json({ status: { code: 401, message: "Unauthorized" }, data: null });
+      }
+      res.status(500).json({ status: { code: 500, message: msg }, data: null });
     }
   });
 
-  // --- REAL / MOCK AUTH BACKEND PROXY (REST endpoints for /api/auth/*) ---
+  // --- GATEWAY-MANAGED DEVICE SESSIONS (BFF Device Management) ---
+  app.all(["/api/auth/sessions*", "/api/v1/auth/sessions*"], (req, res) => {
+    const identityKey = (req.headers.authorization as string) || (req.headers["x-guest-id"] as string) || "guest";
+    const userAgent = (req.headers["user-agent"] as string) || "";
+    const clientIp = (req.ip || (req.headers["x-forwarded-for"] as string) || "");
+
+    const pathname = req.path;
+    const isReset = req.query.reset === "true";
+
+    // 1. DELETE /api/v1/auth/sessions/others
+    if (req.method === "DELETE" && (pathname.endsWith("/sessions/others") || pathname.endsWith("/sessions/others/"))) {
+      const sessions = getUserSessions(identityKey, userAgent, clientIp);
+      const initialCount = sessions.length;
+      const current = sessions.find(s => s.isCurrent) || sessions[0];
+      activeSessionsStore[identityKey || "horizon_admin"] = current ? [current] : [];
+      const terminatedCount = Math.max(0, initialCount - (current ? 1 : 0));
+      return res.status(200).json({
+        status: { code: 200, message: "Đã đăng xuất khỏi tất cả các thiết bị khác thành công" },
+        data: {
+          terminatedCount,
+          remainingActive: current ? 1 : 0
+        }
+      });
+    }
+
+    // 2. DELETE /api/v1/auth/sessions/:sessionId
+    if (req.method === "DELETE") {
+      const prefix = pathname.includes("/api/v1/auth/sessions/") ? "/api/v1/auth/sessions/" : "/api/auth/sessions/";
+      const targetSessionId = decodeURIComponent(pathname.substring(pathname.indexOf(prefix) + prefix.length));
+      const sessions = getUserSessions(identityKey, userAgent, clientIp);
+      activeSessionsStore[identityKey || "horizon_admin"] = sessions.filter(s => s.id !== targetSessionId);
+      const remainingActive = activeSessionsStore[identityKey || "horizon_admin"].length;
+      return res.status(200).json({
+        status: { code: 200, message: "Đã thu hồi phiên thiết bị thành công" },
+        data: {
+          terminatedSessionId: targetSessionId,
+          remainingActive
+        }
+      });
+    }
+
+    // 3. GET /api/v1/auth/sessions
+    if (isReset) {
+      delete activeSessionsStore[identityKey || "horizon_admin"];
+    }
+    const sessions = getUserSessions(identityKey, userAgent, clientIp);
+    return res.status(200).json({
+      status: { code: 200, message: "Truy xuất danh sách phiên thiết bị thành công" },
+      data: {
+        totalActive: sessions.length,
+        currentSessionId: sessions.find(s => s.isCurrent)?.id || sessions[0]?.id || "sess_web_current",
+        sessions: [...sessions]
+      }
+    });
+  });
+
+  // --- REAL AUTH BACKEND PROXY (REST endpoints for /api/auth/*) ---
   app.all(["/api/auth*", "/api/v1/auth*"], async (req, res) => {
     try {
       // Browser direct click interception: If user clicked link from email directly in browser (Document navigation without application/json)
@@ -2628,19 +2022,36 @@ async function startServer() {
         return res.redirect(`/email-response?type=${actionType}&token=${encodeURIComponent(String(token))}`);
       }
 
+      // Direct username check & change endpoints (adhering to USER_UPDATE_FEATURES_SPEC.md & IAM_NOTIFICATION_FE_SYNC.md)
+      if (req.path.includes("/check-username") && req.method === "GET") {
+        const username = String(req.query.username || "").trim().toLowerCase();
+        const RESERVED_TAKEN = ["admin", "root", "system", "moderator", "ddicg", "existing_user"];
+        if (RESERVED_TAKEN.includes(username)) {
+          return res.status(409).json({
+            status: { code: 409, message: "Tên đăng nhập mới đã tồn tại trên hệ thống." },
+            data: { available: false, reason: "ALREADY_EXISTS" }
+          });
+        }
+        return res.status(200).json({
+          status: { code: 200, message: "Tên đăng nhập khả dụng." },
+          data: { available: true }
+        });
+      }
+
       const response = await callApiGateway(req.originalUrl || req.url, {
         method: req.method,
         body: req.body,
         token: req.headers.authorization as string,
         guestId: (req.headers["x-guest-id"] || req.headers["x-guest-id".toLowerCase()]) as string
-      }, { req });
-      const statusCode = response?.status?.code || (response?.code ?? 200);
-      res.status(typeof statusCode === "number" ? statusCode : 200).json(response);
-    } catch (err: any) {
-      if (err.message === "Unauthorized") {
+      }, { req, res });
+      const numericCode = extractStatusCode(response);
+      res.status(numericCode).json(response);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg === "Unauthorized") {
         return res.status(401).json({ status: { code: 401, message: "Unauthorized" }, data: null });
       }
-      res.status(500).json({ status: { code: 500, message: err.message }, data: null });
+      res.status(500).json({ status: { code: 500, message: msg }, data: null });
     }
   });
 

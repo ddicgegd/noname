@@ -251,33 +251,7 @@ export async function getMyAddresses(): Promise<AddressDto[]> {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch (_) {}
   }
-
-  const defaultInitial: AddressDto[] = [
-    {
-      sku: "ADDR-01912A3B4C5D",
-      address: "Số 15 Lê Duẩn, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-      latitude: 10.782805,
-      longitude: 106.699814,
-      phoneNumber: "0901234567",
-      recipientName: "Ngô Ngọc Định",
-      isDefault: true,
-      type: "office",
-      createdAt: "2026-08-18T01:35:00"
-    },
-    {
-      sku: "ADDR-01912A3B8E9F",
-      address: "Căn hộ B12.08, Tòa Horizon Tower, 214 Trần Quang Khải, Phường Tân Định, Quận 1, TP. Hồ Chí Minh",
-      latitude: 10.791523,
-      longitude: 106.689211,
-      phoneNumber: "0901234567",
-      recipientName: "Ngô Ngọc Định",
-      isDefault: false,
-      type: "home",
-      createdAt: "2026-08-17T14:20:00"
-    }
-  ];
-  localStorage.setItem(STORAGE_KEYS.USER_ADDRESSES, JSON.stringify(defaultInitial));
-  return defaultInitial;
+  return [];
 }
 
 /**

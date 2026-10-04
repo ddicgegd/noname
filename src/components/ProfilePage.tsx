@@ -104,21 +104,12 @@ interface ProfilePageProps {
   onNavigate: (page: "landing" | "product" | "order" | "cart" | "auth" | "auth-report" | "profile" | "terms" | "email-response") => void;
 }
 
-export interface PaymentMethodItem {
-  id: string;
-  type: "visa" | "mastercard" | "jcb" | "momo";
-  cardNumber: string;
-  holderName: string;
-  expiryDate: string;
-  isDefault: boolean;
-}
 
 const SECURITY_TAG_ICONS = [
   LucideSliders,     // Mặc định: Quản lý bảo mật
   LucideUser,        // Tag 1: Hồ sơ cá nhân
   LucideShieldCheck, // Tag 2: Mật khẩu & Bảo mật
   LucideMapPin,      // Tag 3: Sổ địa chỉ nhận hàng
-  LucideCreditCard,  // Tag 4: Thẻ & Phương thức
   LucideLaptop,      // Tag 5: Thiết bị & Phiên
   LucideBookmark     // Tag 6: Phụ kiện đã lưu
 ];
@@ -328,7 +319,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
   // Accounts Center Modal Trigger State & Active Tab
   const [isAccountsCenterOpen, setIsAccountsCenterOpen] = useState<boolean>(false);
-  const [activeModalTab, setActiveModalTab] = useState<"profile" | "security" | "addresses" | "payments" | "sessions" | "bookmarks">("profile");
+  const [activeModalTab, setActiveModalTab] = useState<"profile" | "security" | "addresses" | "sessions" | "bookmarks">("profile");
   const [userBookmarks, setUserBookmarks] = useState<BookmarkData[]>([]);
   const [isBookmarksLoading, setIsBookmarksLoading] = useState<boolean>(false);
   const [bookmarkActionLoading, setBookmarkActionLoading] = useState<string>("");
@@ -480,7 +471,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     window.addEventListener("open-accounts-center", handleOpenAccountsCenter);
     window.addEventListener("close-accounts-center", handleCloseAccountsCenter);
 
-    const validTabs = ["profile", "security", "addresses", "payments", "sessions", "bookmarks"];
+    const validTabs = ["profile", "security", "addresses", "sessions", "bookmarks"];
     if (typeof window !== "undefined") {
       const hash = window.location.hash.replace("#", "");
       if (validTabs.includes(hash)) {
@@ -523,7 +514,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
     const handleHashChange = () => {
       const hash = window.location.hash.replace("#", "");
-      const validTabs = ["profile", "security", "addresses", "payments", "sessions", "bookmarks"];
+      const validTabs = ["profile", "security", "addresses", "sessions", "bookmarks"];
       if (validTabs.includes(hash)) {
         setActiveModalTab(hash as any);
         setIsAccountsCenterOpen(true);
@@ -1514,17 +1505,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     setTimeout(() => setCopiedLogId(null), 2000);
   };
 
-  // Saved Payment Methods State
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
-  const [isAddingCard, setIsAddingCard] = useState<boolean>(false);
-  const [newCardForm, setNewCardForm] = useState({
-    type: "visa" as "visa" | "mastercard" | "jcb" | "momo",
-    cardNumber: "",
-    holderName: "",
-    expiryDate: "",
-    cvv: "",
-    isDefault: false
-  });
 
   // Orders list, status filter, and active selected order for detail tracking view
   const [orders, setOrders] = useState<OrderItem[]>([]);
@@ -2141,39 +2121,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       }
 
       // Initialize saved payment methods
-      const storedPayments = localStorage.getItem(STORAGE_KEYS.USER_PAYMENT_METHODS) || localStorage.getItem("horizon_user_payment_methods");
-      if (storedPayments) {
-        setPaymentMethods(JSON.parse(storedPayments));
-      } else {
-        const initialPayments: PaymentMethodItem[] = [
-          {
-            id: "PAY-1",
-            type: "visa",
-            cardNumber: "•••• •••• •••• 8892",
-            holderName: "NGO NGOC DINH",
-            expiryDate: "09/29",
-            isDefault: true
-          },
-          {
-            id: "PAY-2",
-            type: "mastercard",
-            cardNumber: "•••• •••• •••• 4519",
-            holderName: "NGO NGOC DINH",
-            expiryDate: "11/28",
-            isDefault: false
-          },
-          {
-            id: "PAY-3",
-            type: "momo",
-            cardNumber: "0901 234 567",
-            holderName: "Ví MoMo E-Wallet",
-            expiryDate: "Đã liên kết",
-            isDefault: false
-          }
-        ];
-        localStorage.setItem(STORAGE_KEYS.USER_PAYMENT_METHODS, JSON.stringify(initialPayments));
-        setPaymentMethods(initialPayments);
-      }
     } catch (e) {
       console.error("Error loading profile:", e);
       setErrorMsg("Lỗi hệ thống khi tải thông tin tài khoản.");
@@ -2197,9 +2144,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setEditAvatarUrl(user.avatarUrl || "");
       if (addresses.length > 0 && !newAddressForm.recipientName) {
         setNewAddressForm(prev => ({ ...prev, recipientName: user.fullName || "", phone: user.phoneNumber || "0901234567" }));
-      }
-      if (paymentMethods.length > 0 && !newCardForm.holderName) {
-        setNewCardForm(prev => ({ ...prev, holderName: (user.fullName || "NGO NGOC DINH").toUpperCase() }));
       }
     }
   }, [user]);
@@ -2785,76 +2729,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     );
   };
 
-  // Handler for Payment Methods: Add Payment Method / Card
-  const handleAddPaymentMethod = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCardForm.cardNumber.trim() || !newCardForm.holderName.trim() || !newCardForm.expiryDate.trim()) {
-      setErrorMsg("Vui lòng nhập đầy đủ số thẻ, tên chủ thẻ và hạn sử dụng.");
-      return;
-    }
-
-    const cleanNumber = newCardForm.cardNumber.replace(/\s+/g, "");
-    const masked = cleanNumber.length >= 4 
-      ? `•••• •••• •••• ${cleanNumber.slice(-4)}`
-      : `•••• ${cleanNumber}`;
-
-    const newPayment: PaymentMethodItem = {
-      id: `PAY-${Date.now().toString().slice(-4)}`,
-      type: newCardForm.type,
-      cardNumber: masked,
-      holderName: newCardForm.holderName.trim().toUpperCase(),
-      expiryDate: newCardForm.expiryDate.trim(),
-      isDefault: newCardForm.isDefault || paymentMethods.length === 0
-    };
-
-    let updated = [...paymentMethods];
-    if (newPayment.isDefault) {
-      updated = updated.map(p => ({ ...p, isDefault: false }));
-    }
-    updated.unshift(newPayment);
-
-    setPaymentMethods(updated);
-    localStorage.setItem(STORAGE_KEYS.USER_PAYMENT_METHODS, JSON.stringify(updated));
-    setIsAddingCard(false);
-    setSuccessMsg("Đã liên kết phương thức thanh toán an toàn!");
-    setErrorMsg("");
-    setNewCardForm({
-      type: "visa",
-      cardNumber: "",
-      holderName: (user?.fullName || "NGO NGOC DINH").toUpperCase(),
-      expiryDate: "",
-      cvv: "",
-      isDefault: false
-    });
-  };
-
-  // Handler for Payment Methods: Set Default
-  const handleSetDefaultPayment = (id: string) => {
-    const updated = paymentMethods.map(p => ({
-      ...p,
-      isDefault: p.id === id
-    }));
-    setPaymentMethods(updated);
-    localStorage.setItem(STORAGE_KEYS.USER_PAYMENT_METHODS, JSON.stringify(updated));
-    setSuccessMsg("Đã đặt phương thức thanh toán làm mặc định!");
-    setErrorMsg("");
-  };
-
-  // Handler for Payment Methods: Delete
-  const handleDeletePayment = (id: string) => {
-    if (paymentMethods.length <= 1) {
-      setErrorMsg("Bạn cần duy trì ít nhất 1 phương thức thanh toán khả dụng.");
-      return;
-    }
-    const updated = paymentMethods.filter(p => p.id !== id);
-    if (!updated.some(p => p.isDefault) && updated.length > 0) {
-      updated[0].isDefault = true;
-    }
-    setPaymentMethods(updated);
-    localStorage.setItem(STORAGE_KEYS.USER_PAYMENT_METHODS, JSON.stringify(updated));
-    setSuccessMsg("Đã gỡ bỏ phương thức thanh toán.");
-    setErrorMsg("");
-  };
 
   // Handler for username modification
   const handleChangeUsername = async (e: React.FormEvent) => {
@@ -4048,7 +3922,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               <div className="w-full md:w-80 lg:w-[320px] bg-slate-50/90 border-b md:border-b-0 md:border-r border-slate-200/70 p-4 sm:p-4.5 flex flex-col justify-between shrink-0 text-left relative overflow-hidden">
                 {/* Ambient glow matching page deep indigo/violet theme in top-left */}
                 <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full bg-gradient-to-br from-indigo-600/15 via-violet-600/10 to-purple-700/8 blur-3xl pointer-events-none z-0" />
-                {((activeModalTab === "addresses" && isAddingAddress) || (activeModalTab === "payments" && isAddingCard)) ? (
+                {(activeModalTab === "addresses" && isAddingAddress) ? (
                   /* WHEN FORM IS OPEN: Show existing data list on the left side */
                   <div className="flex flex-col h-full relative z-10">
                     {/* Header with back button & count */}
@@ -4057,7 +3931,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         type="button"
                         onClick={() => {
                           setIsAddingAddress(false);
-                          setIsAddingCard(false);
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
@@ -4117,42 +3990,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         );
                       })}
 
-                      {activeModalTab === "payments" && paymentMethods.map(card => (
-                        <div 
-                          key={card.id}
-                          className={`p-3 rounded-xl text-left transition-all ${
-                            card.isDefault 
-                              ? "bg-gradient-to-b from-slate-850 via-slate-900 to-black text-white border-t border-t-slate-700/80 border-b border-b-black border-x border-x-slate-800/60 shadow-[0_3px_10px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]" 
-                              : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black border-t border-t-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] ${
-                              card.type === "visa" 
-                                ? "bg-blue-600 text-white" 
-                                : card.type === "mastercard" 
-                                  ? "bg-red-600 text-white" 
-                                  : card.type === "momo"
-                                    ? "bg-pink-600 text-white"
-                                    : "bg-emerald-600 text-white"
-                            }`}>
-                              {card.type.toUpperCase()}
-                            </span>
-                            {card.isDefault && (
-                              <span className="text-[9px] px-1.5 py-0.2 font-bold uppercase bg-white/20 text-white border border-white/30 rounded shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">
-                                Mặc định
-                              </span>
-                            )}
-                          </div>
-                          <p className={`text-xs font-mono font-bold tracking-wider ${card.isDefault ? "text-white" : "text-slate-800"}`}>
-                            {card.cardNumber}
-                          </p>
-                          <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1 font-mono">
-                            <span>{card.holderName}</span>
-                            <span>{card.expiryDate}</span>
-                          </div>
-                        </div>
-                      ))}
                     </div>
 
                     {/* Bottom action when form is open */}
@@ -4161,7 +3998,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         type="button"
                         onClick={() => {
                           setIsAddingAddress(false);
-                          setIsAddingCard(false);
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
@@ -4216,14 +4052,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
                             },
                             { 
-                              id: "payments", 
-                              label: "Thẻ & Phương thức", 
-                              icon: CreditCard, 
-                              count: paymentMethods.length, 
-                              desc: "Visa, Mastercard, Ví",
-                              iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
-                            },
-                            { 
                               id: "sessions", 
                               label: "Thiết bị & Phiên", 
                               icon: Laptop, 
@@ -4239,7 +4067,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
                             }
                           ] as Array<{
-                            id: "profile" | "security" | "addresses" | "payments" | "sessions" | "bookmarks";
+                            id: "profile" | "security" | "addresses" | "sessions" | "bookmarks";
                             label: string;
                             icon: typeof User;
                             desc: string;
@@ -4258,7 +4086,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 setErrorMsg("");
                                 setSuccessMsg("");
                                 setIsAddingAddress(false);
-                                setIsAddingCard(false);
                               }}
                               className={`w-full px-3.5 py-2.5 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border group ${
                                 isActive
@@ -4323,13 +4150,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   <div>
                     <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                       {isAddingAddress && (editingAddressSku ? "Chỉnh sửa địa chỉ nhận hàng" : "Thêm địa chỉ giao nhận mới")}
-                      {isAddingCard && "Thêm phương thức thanh toán mới"}
-                      {!isAddingAddress && !isAddingCard && (
+                      {!isAddingAddress && (
                         <>
                           {activeModalTab === "profile" && "Thông tin hồ sơ cá nhân"}
                           {activeModalTab === "security" && "Mật khẩu & Thiết lập bảo mật"}
                           {activeModalTab === "addresses" && "Quản lý sổ địa chỉ giao hàng"}
-                          {activeModalTab === "payments" && "Phương thức thanh toán & Quản lý thẻ"}
                           {activeModalTab === "sessions" && "Thiết bị & Phiên hoạt động"}
                           {activeModalTab === "bookmarks" && "Sản phẩm & Phụ kiện đã lưu (Bookmarks)"}
                         </>
@@ -4377,12 +4202,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         </BevelButton>
                       )}
                       <button 
-                        onClick={() => {
-                          if (isAddingCard) setIsAddingCard(false);
-                          else setIsAccountsCenterOpen(false);
-                        }}
+                        onClick={() => setIsAccountsCenterOpen(false)}
                         className="w-9 h-9 rounded-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center text-slate-500 hover:text-black transition-all cursor-pointer shrink-0 active:scale-95"
-                        title={isAddingCard ? "Đóng form" : "Đóng"}
+                        title="Đóng"
                       >
                         <X className="w-4.5 h-4.5" />
                       </button>
@@ -5631,237 +5453,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   </div>
                 )}
 
-                {/* TAB 4: Payment Methods & Cards */}
-                {activeModalTab === "payments" && (
-                  <div className="space-y-5 flex-1">
-                    {isAddingCard ? (
-                      /* FULL FORM VIEW WHEN ADDING PAYMENT CARD WITH 3D BEVEL */
-                      <motion.form
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        onSubmit={handleAddPaymentMethod}
-                        className="p-6 bg-gradient-to-b from-white via-white/95 to-slate-50/70 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/70 rounded-2xl space-y-4 text-left shadow-[0_4px_16px_-4px_rgba(79,70,229,0.08),inset_0_1px_0_rgba(255,255,255,1)]"
-                      >
-                        <div className="p-3.5 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 rounded-xl flex items-center gap-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-600 flex items-center justify-center shrink-0 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                            <CreditCard className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-indigo-950">Liên kết phương thức thanh toán mới</p>
-                            <p className="text-[11px] text-slate-500">Các phương thức đã lưu được hiển thị ở cột bên trái để bạn tiện theo dõi.</p>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Loại phương thức</label>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                            {[
-                              { type: "visa", label: "Visa" },
-                              { type: "mastercard", label: "Mastercard" },
-                              { type: "jcb", label: "JCB" },
-                              { type: "momo", label: "Ví MoMo" }
-                            ].map(item => (
-                              <button
-                                key={item.type}
-                                type="button"
-                                onClick={() => setNewCardForm({ ...newCardForm, type: item.type as any })}
-                                className={`py-2.5 px-3 text-xs font-bold rounded-xl text-center cursor-pointer transition-all active:scale-95 ${
-                                  newCardForm.type === item.type
-                                    ? "bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-indigo-500/20"
-                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 text-slate-700 hover:from-white shadow-[0_1.5px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)]"
-                                }`}
-                              >
-                                {item.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">
-                              {newCardForm.type === "momo" ? "Số điện thoại MoMo *" : "Số thẻ thanh toán *"}
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              placeholder={newCardForm.type === "momo" ? "090xxxxxxx" : "4111 2222 3333 4444"}
-                              value={newCardForm.cardNumber}
-                              onChange={(e) => setNewCardForm({ ...newCardForm, cardNumber: e.target.value })}
-                              className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Tên chủ thẻ (In hoa) *</label>
-                            <input
-                              type="text"
-                              required
-                              placeholder="NGO NGOC DINH"
-                              value={newCardForm.holderName}
-                              onChange={(e) => setNewCardForm({ ...newCardForm, holderName: e.target.value.toUpperCase() })}
-                              className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold uppercase text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                            />
-                          </div>
-                        </div>
-
-                        {newCardForm.type !== "momo" && (
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Hạn sử dụng (MM/YY) *</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="08/29"
-                                value={newCardForm.expiryDate}
-                                onChange={(e) => setNewCardForm({ ...newCardForm, expiryDate: e.target.value })}
-                                className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-center text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Mã bảo mật CVC/CVV *</label>
-                              <input
-                                type="password"
-                                maxLength={4}
-                                placeholder="•••"
-                                value={newCardForm.cvv}
-                                onChange={(e) => setNewCardForm({ ...newCardForm, cvv: e.target.value })}
-                                className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-3.5 py-3 rounded-xl outline-none transition-all font-mono font-bold text-center text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-200/70">
-                          <label className="flex items-center gap-2 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={newCardForm.isDefault}
-                              onChange={(e) => setNewCardForm({ ...newCardForm, isDefault: e.target.checked })}
-                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer"
-                            />
-                            <span className="text-xs text-slate-700 font-semibold">Đặt làm phương thức thanh toán chính</span>
-                          </label>
-                          
-                          <div className="flex items-center gap-2.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsAddingCard(false);
-                                setErrorMsg("");
-                                setSuccessMsg("");
-                              }}
-                              className="px-4 py-2.5 text-xs font-bold text-slate-600 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_1.5px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] rounded-xl transition-all cursor-pointer active:scale-95"
-                            >
-                              Hủy bỏ
-                            </button>
-                            <button
-                              type="submit"
-                              className="px-6 py-2.5 bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center gap-1.5 active:scale-95"
-                            >
-                              <Check className="w-4 h-4" />
-                              <span>Lưu phương thức</span>
-                            </button>
-                          </div>
-                        </div>
-                      </motion.form>
-                    ) : (
-                      /* DEFAULT VIEW: Header + 2-Column Grid of Payment Cards */
-                      <>
-                        <div className="flex items-center justify-between mb-3.5">
-                          <span className="text-xs font-bold text-slate-700">{paymentMethods.length} phương thức thanh toán</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsAddingCard(true);
-                              setErrorMsg("");
-                              setSuccessMsg("");
-                            }}
-                            className="px-4 py-2 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95"
-                          >
-                            <Plus className="w-4 h-4" />
-                            <span>Thêm thẻ / Ví mới</span>
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {paymentMethods.map((card) => (
-                            <div
-                              key={card.id}
-                              className={`p-4 sm:p-5 rounded-2xl text-left transition-all flex flex-col justify-between ${
-                                card.isDefault 
-                                  ? "bg-gradient-to-b from-slate-850 via-slate-900 to-black text-white border-t border-t-slate-700/80 border-b border-b-black border-x border-x-slate-800/60 shadow-[0_8px_24px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]" 
-                                  : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] hover:from-white"
-                              }`}
-                            >
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <div className={`px-2.5 py-1 rounded-lg font-black text-xs font-mono tracking-wider border-t border-t-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] ${
-                                    card.type === "visa" 
-                                      ? "bg-blue-600 text-white" 
-                                      : card.type === "mastercard" 
-                                        ? "bg-red-600 text-white" 
-                                        : card.type === "momo"
-                                          ? "bg-pink-600 text-white"
-                                          : "bg-emerald-600 text-white"
-                                  }`}>
-                                    {card.type.toUpperCase()}
-                                  </div>
-                                  {card.isDefault && (
-                                    <span className="text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-white/20 text-white border border-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
-                                      Mặc định
-                                    </span>
-                                  )}
-                                </div>
-
-                                <p className={`text-sm font-mono font-bold tracking-wider ${card.isDefault ? "text-white" : "text-slate-900"}`}>
-                                  {card.cardNumber}
-                                </p>
-
-                                <div className="flex items-center justify-between text-[11px] pt-1">
-                                  <span className={card.isDefault ? "text-slate-300 font-mono font-medium" : "text-slate-500 font-mono"}>
-                                    {card.holderName}
-                                  </span>
-                                  <span className={card.isDefault ? "text-slate-400 font-mono" : "text-slate-400 font-mono"}>
-                                    Hạn: {card.expiryDate}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className={`flex items-center justify-between pt-3 mt-3 border-t ${card.isDefault ? "border-slate-800" : "border-slate-100"}`}>
-                                {!card.isDefault ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSetDefaultPayment(card.id)}
-                                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer active:scale-95"
-                                  >
-                                    Đặt làm mặc định
-                                  </button>
-                                ) : (
-                                  <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                                    <Check className="w-3.5 h-3.5" /> Thẻ thanh toán chính
-                                  </span>
-                                )}
-                                
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeletePayment(card.id)}
-                                  className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer active:scale-95 ${
-                                    card.isDefault 
-                                      ? "text-slate-400 hover:text-red-400 hover:bg-white/10" 
-                                      : "text-slate-400 hover:text-red-600 hover:bg-rose-50"
-                                  }`}
-                                  title="Xóa thẻ"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
 
                 {/* TAB 5: System Settings, API Gateway & Active Sessions */}
                 {activeModalTab === "sessions" && (

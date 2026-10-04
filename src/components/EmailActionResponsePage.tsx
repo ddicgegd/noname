@@ -10,10 +10,11 @@ import {
 import { apiRequest } from "../lib/api";
 import { extractBackendMessage, sanitizeErrorMessage } from "../lib/responseExtractor";
 import { isValidEmailActionToken } from "../lib/authAction";
-import { getCredentialChangeStatus } from "../services/authService";
+import { getCredentialChangeStatus, exchangeOAuth2Ticket } from "../services/authService";
+import { STORAGE_KEYS } from "../lib/storageKeys";
 import { ApiResponse } from "../types/api";
 import { Button } from "./ui/button";
-export type EmailActionType = "credential-change" | "verify-email" | "reset-password" | "custom";
+export type EmailActionType = "credential-change" | "verify-email" | "reset-password" | "custom" | "oauth2-callback";
 
 export interface EmailActionResponsePageProps {
   onNavigate: (page: "landing" | "product" | "order" | "cart" | "auth" | "auth-report" | "profile" | "terms" | "email-response" | "404") => void;
@@ -47,7 +48,7 @@ export default function EmailActionResponsePage({
       params.get("mock") === "success" ||
       params.get("test") === "true" ||
       (params.get("token") || "").trim() === "preview-success";
-    const rawToken = params.get("token") || params.get("code") || defaultToken || (isPreview ? "c8f2b15a-7140-4209-8438-fb14c33d0a21" : "");
+    const rawToken = params.get("token") || params.get("code") || params.get("ticket") || defaultToken || (isPreview ? "c8f2b15a-7140-4209-8438-fb14c33d0a21" : "");
     const token = rawToken.trim().replace(/\.+$/, "");
 
     let rawType = params.get("type") || params.get("action") || "";
@@ -62,6 +63,8 @@ export default function EmailActionResponsePage({
         rawType = "reset-password";
       } else if (path.includes("success") || path.includes("verified")) {
         rawType = "custom";
+      } else if (path.includes("callback")) {
+        rawType = "oauth2-callback";
       } else {
         rawType = "credential-change";
       }
@@ -74,6 +77,8 @@ export default function EmailActionResponsePage({
         ? "reset-password"
         : rawType === "custom"
         ? "custom"
+        : rawType === "oauth2-callback"
+        ? "oauth2-callback"
         : "credential-change";
 
     return {
@@ -247,17 +252,33 @@ export default function EmailActionResponsePage({
 
     try {
       let endpoint = "";
-      if (actionType === "credential-change") {
-        endpoint = `/api/auth/credential-change/activate?token=${encodeURIComponent(cleanToken)}`;
-      } else if (actionType === "verify-email") {
-        endpoint = `/api/auth/verify-email?token=${encodeURIComponent(cleanToken)}`;
-      } else if (actionType === "reset-password") {
-        endpoint = `/api/auth/validate-reset-token?token=${encodeURIComponent(cleanToken)}`;
+      let response: ApiResponse | null = null;
+      
+      if (actionType === "oauth2-callback") {
+        const tokenRes = await exchangeOAuth2Ticket(cleanToken);
+        response = tokenRes as unknown as ApiResponse;
+        const data = tokenRes.data as unknown as { accessToken?: string; refreshToken?: string };
+        if (data && data.accessToken) {
+          localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.accessToken);
+          if (data.refreshToken) {
+            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refreshToken);
+          }
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(tokenRes.data));
+          window.dispatchEvent(new Event("auth-changed"));
+        }
       } else {
-        endpoint = `/api/auth/credential-change/activate?token=${encodeURIComponent(cleanToken)}`;
+        if (actionType === "credential-change") {
+          endpoint = `/api/auth/credential-change/activate?token=${encodeURIComponent(cleanToken)}`;
+        } else if (actionType === "verify-email") {
+          endpoint = `/api/auth/verify-email?token=${encodeURIComponent(cleanToken)}`;
+        } else if (actionType === "reset-password") {
+          endpoint = `/api/auth/validate-reset-token?token=${encodeURIComponent(cleanToken)}`;
+        } else {
+          endpoint = `/api/auth/credential-change/activate?token=${encodeURIComponent(cleanToken)}`;
+        }
+        response = await apiRequest<ApiResponse>(endpoint, { method: "GET" });
       }
 
-      const response = await apiRequest<ApiResponse>(endpoint, { method: "GET" });
       const code = response?.status?.code || 200;
       setHttpStatusCode(code);
 
@@ -265,6 +286,8 @@ export default function EmailActionResponsePage({
       const defaultSuccessMsg =
         actionType === "verify-email"
           ? "Tài khoản của bạn đã được xác thực thành công. Bạn có thể đăng nhập ngay bây giờ."
+          : actionType === "oauth2-callback"
+          ? "Đăng nhập với Google thành công! Hệ thống đang chuyển hướng..."
           : actionType === "credential-change"
           ? "Kích hoạt quyền thay đổi thành công! Bạn có 5 phút để hoàn tất cập nhật tên đăng nhập hoặc mật khẩu."
           : "Xác thực bảo mật thành công.";

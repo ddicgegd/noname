@@ -2384,20 +2384,6 @@ const resolveProductMetadata = (skuOrName: string) => {
                     <span>Thiết lập tài khoản</span>
                   </button>
 
-                  <button 
-                    onClick={() => {
-                      setShowAccountMenu(false);
-                      if (typeof window !== "undefined") {
-                        window.location.hash = "payments";
-                        window.dispatchEvent(new CustomEvent("open-accounts-center", { detail: { tab: "payments" } }));
-                      }
-                      onNavigate("profile");
-                    }}
-                    className="group w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100/70 rounded-xl transition-all duration-150 cursor-pointer text-left"
-                  >
-                    <CreditCard size={15} className="text-neutral-400 group-hover:text-neutral-700 transition-colors shrink-0" />
-                    <span>Gói đăng ký</span>
-                  </button>
 
                   <div className="my-1 border-t border-neutral-100" />
 

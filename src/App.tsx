@@ -83,7 +83,7 @@ export default function App() {
     const hasValidToken = (): boolean => {
       if (typeof window === "undefined") return false;
       const params = new URLSearchParams(window.location.search);
-      const rawToken = params.get("token") || params.get("code") || "";
+      const rawToken = params.get("token") || params.get("code") || params.get("ticket") || "";
       if (
         params.get("preview") === "success" ||
         params.get("mock") === "success" ||

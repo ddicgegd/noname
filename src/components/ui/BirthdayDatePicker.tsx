@@ -209,7 +209,7 @@ export function BirthdayDatePicker({
           type="text"
           value={typedInput}
           onChange={handleInputChange}
-          placeholder="DD/MM/YYYY (ví dụ: 26/09/1998)"
+          placeholder="DD/MM/YYYY"
           disabled={disabled}
           maxLength={10}
           className={cn(

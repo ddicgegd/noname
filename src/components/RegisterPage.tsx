@@ -1477,6 +1477,9 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
   const handleSocialLogin = (platform: "Google" | "GitHub") => {
     showToast(`Đang khởi tạo liên kết bảo mật với tài khoản ${platform}...`, "info");
+    if (platform === "Google") {
+      window.location.href = getApiBaseUrl() + "/api/auth/oauth2/authorize/google";
+    }
   };
 
   return (
