@@ -4,7 +4,7 @@
  * Aligned with DEVICE_SESSIONS_API_AND_UI_SPEC.md
  */
 
-import { unifiedFetch } from "../lib/api";
+import { getApiBaseUrl, unifiedFetch } from "../lib/api";
 import { ApiResponse } from "../types/api";
 import { 
   SessionListData, 
@@ -13,10 +13,34 @@ import {
 } from "../types/session";
 
 export async function getActiveSessions(): Promise<ApiResponse<SessionListData>> {
-  const res = await unifiedFetch("/api/v1/auth/sessions", {
-    method: "GET",
-    headers: { "Content-Type": "application/json" }
-  });
+  const baseUrl = getApiBaseUrl().replace(/\/+$/, "");
+  let res: Response;
+  try {
+    res = await unifiedFetch(`${baseUrl}/api/v1/auth/sessions`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!res.ok && res.status === 404 && typeof window !== "undefined" && !baseUrl.includes(window.location.host)) {
+      const fallbackRes = await unifiedFetch("/api/v1/auth/sessions", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (fallbackRes.ok) {
+        return await fallbackRes.json();
+      }
+    }
+  } catch (fetchErr) {
+    if (typeof window !== "undefined" && baseUrl && !baseUrl.includes(window.location.host)) {
+      const fallbackRes = await unifiedFetch("/api/v1/auth/sessions", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (fallbackRes.ok) {
+        return await fallbackRes.json();
+      }
+    }
+    throw fetchErr;
+  }
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
     throw new Error(errorData?.message || errorData?.status?.message || `Lỗi truy xuất phiên (${res.status})`);
@@ -25,10 +49,34 @@ export async function getActiveSessions(): Promise<ApiResponse<SessionListData>>
 }
 
 export async function terminateSession(sessionId: string): Promise<ApiResponse<TerminateSessionData>> {
-  const res = await unifiedFetch(`/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" }
-  });
+  const baseUrl = getApiBaseUrl().replace(/\/+$/, "");
+  let res: Response;
+  try {
+    res = await unifiedFetch(`${baseUrl}/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!res.ok && res.status === 404 && typeof window !== "undefined" && !baseUrl.includes(window.location.host)) {
+      const fallbackRes = await unifiedFetch(`/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (fallbackRes.ok) {
+        return await fallbackRes.json();
+      }
+    }
+  } catch (fetchErr) {
+    if (typeof window !== "undefined" && baseUrl && !baseUrl.includes(window.location.host)) {
+      const fallbackRes = await unifiedFetch(`/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (fallbackRes.ok) {
+        return await fallbackRes.json();
+      }
+    }
+    throw fetchErr;
+  }
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
     throw new Error(errorData?.message || errorData?.status?.message || `Lỗi thu hồi phiên (${res.status})`);
@@ -37,10 +85,34 @@ export async function terminateSession(sessionId: string): Promise<ApiResponse<T
 }
 
 export async function terminateOtherSessions(): Promise<ApiResponse<TerminateOtherSessionsData>> {
-  const res = await unifiedFetch("/api/v1/auth/sessions/others", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" }
-  });
+  const baseUrl = getApiBaseUrl().replace(/\/+$/, "");
+  let res: Response;
+  try {
+    res = await unifiedFetch(`${baseUrl}/api/v1/auth/sessions/others`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!res.ok && res.status === 404 && typeof window !== "undefined" && !baseUrl.includes(window.location.host)) {
+      const fallbackRes = await unifiedFetch("/api/v1/auth/sessions/others", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (fallbackRes.ok) {
+        return await fallbackRes.json();
+      }
+    }
+  } catch (fetchErr) {
+    if (typeof window !== "undefined" && baseUrl && !baseUrl.includes(window.location.host)) {
+      const fallbackRes = await unifiedFetch("/api/v1/auth/sessions/others", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (fallbackRes.ok) {
+        return await fallbackRes.json();
+      }
+    }
+    throw fetchErr;
+  }
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
     throw new Error(errorData?.message || errorData?.status?.message || `Lỗi đăng xuất các phiên khác (${res.status})`);

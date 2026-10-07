@@ -9,3 +9,5 @@ coverage/
 scratch/
 debug_outputs/
 
+
+.worktrees/

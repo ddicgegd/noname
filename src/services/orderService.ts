@@ -174,6 +174,10 @@ export interface UiDeliveryStep {
   time: string;
   completed: boolean;
   active: boolean;
+  simulated?: boolean;
+  confidenceRate?: number;
+  riskLevel?: string;
+  riskReason?: string;
 }
 
 export interface UiOrderItem {
@@ -894,4 +898,55 @@ export function saveCachedOrders(orders: UiOrderItem[]): void {
   } catch (err) {
     console.warn("Failed to cache orders:", err);
   }
+}
+
+/**
+ * Map backend REST OrderDetail DTO to UiOrderItem.
+ * Prioritizes backend-provided deliverySteps when present;
+ * falls back to legacy generateDeliveryStepsForOrder generator only when null/undefined.
+ */
+export function mapBackendOrderDetailToOrderItem(dto: {
+  orderNumber?: string;
+  currentStatus?: string;
+  deliverySteps?: Array<{
+    stepKey?: string;
+    title?: string;
+    diagnosticDescription?: string;
+    formattedTime?: string;
+    completed?: boolean;
+    active?: boolean;
+    simulated?: boolean;
+    confidenceRate?: number;
+    riskLevel?: string;
+    riskReason?: string;
+  }> | null;
+  [key: string]: unknown;
+}): UiOrderItem {
+  const steps: UiDeliveryStep[] = dto.deliverySteps
+    ? dto.deliverySteps.map((s) => ({
+        title: s.title ?? '',
+        desc: s.diagnosticDescription ?? '',
+        time: s.formattedTime ?? '',
+        completed: s.completed ?? false,
+        active: s.active ?? false,
+        simulated: s.simulated,
+        confidenceRate: s.confidenceRate,
+        riskLevel: s.riskLevel,
+        riskReason: s.riskReason,
+      }))
+    : generateDeliveryStepsForOrder(dto.currentStatus ?? '', undefined);
+
+  return {
+    id: (dto.orderNumber as string) ?? '',
+    name: (dto.orderNumber as string) ?? '',
+    price: '',
+    date: '',
+    status: 'processing',
+    statusText: dto.currentStatus ?? '',
+    deliverySteps: steps,
+    shippingAddress: '',
+    carrier: '',
+    trackingNumber: '',
+    rawOrder: dto as unknown as OrderDto,
+  };
 }

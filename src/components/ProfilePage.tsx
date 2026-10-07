@@ -9,7 +9,7 @@ import {
   ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
   LocateFixed, Map as LucideMap, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Crown,
   Camera, Upload, Calendar, Wifi, Settings2, Pencil, ShieldAlert, Cake, PartyPopper,
-  Server, RotateCcw
+  Server, RotateCcw, AlertTriangle
 } from "lucide-react";
 import { BirthdayDatePicker } from "./ui/BirthdayDatePicker";
 import { useToast } from "./ui/Toast";
@@ -17,15 +17,9 @@ import { apiRequest, unifiedFetch, getUnifiedAccessToken, getApiBaseUrl, setApiB
 import { 
   updateMyProfile, 
   uploadAvatar, 
-  getMyProfile, 
-  changeUsername, 
-  checkUsername,
-  requestCredentialChange,
-  getCredentialChangeStatus,
-  activateCredentialChange,
-  updateCredentials
+  getMyProfile
 } from "../services/authService";
-import { UpdateProfileRequest, MyProfileResponse, UpdateCredentialsRequest, CredentialStatusResponse } from "../types/auth";
+import { UpdateProfileRequest, MyProfileResponse } from "../types/auth";
 import { getActiveSessions, terminateSession, terminateOtherSessions } from "../services/sessionService";
 import { DeviceSession } from "../types/session";
 import { STORAGE_KEYS } from "../lib/storageKeys";
@@ -86,6 +80,7 @@ import {
 } from "lucide";
 import { MorphIcon } from "morphicons/react";
 import { HoverMorphIcon } from "./ui/HoverMorphIcon";
+import BeatLoader from "react-spinners/BeatLoader";
 
 
 export type OrderItem = UiOrderItem;
@@ -105,14 +100,12 @@ interface ProfilePageProps {
   onNavigate: (page: "landing" | "product" | "order" | "cart" | "auth" | "auth-report" | "profile" | "terms" | "email-response") => void;
 }
 
-
 const SECURITY_TAG_ICONS = [
-  LucideSliders,     // Mặc định: Quản lý bảo mật
-  LucideUser,        // Tag 1: Hồ sơ cá nhân
-  LucideShieldCheck, // Tag 2: Mật khẩu & Bảo mật
-  LucideMapPin,      // Tag 3: Sổ địa chỉ nhận hàng
-  LucideLaptop,      // Tag 5: Thiết bị & Phiên
-  LucideBookmark     // Tag 6: Phụ kiện đã lưu
+  LucideSliders,     // Mặc định: Thiết lập tài khoản
+  LucideUser,        // Tab 1: Hồ sơ cá nhân
+  LucideMapPin,      // Tab 2: Sổ địa chỉ nhận hàng
+  LucideLaptop,      // Tab 3: Thiết bị & Phiên
+  LucideBookmark     // Tab 4: Phụ kiện đã lưu
 ];
 
 function SequentialTagMorphIcon({ isHovered }: { isHovered: boolean }) {
@@ -320,7 +313,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
   // Accounts Center Modal Trigger State & Active Tab
   const [isAccountsCenterOpen, setIsAccountsCenterOpen] = useState<boolean>(false);
-  const [activeModalTab, setActiveModalTab] = useState<"profile" | "security" | "addresses" | "sessions" | "bookmarks">("profile");
+  const [activeModalTab, setActiveModalTab] = useState<"profile" | "addresses" | "sessions" | "bookmarks">("profile");
   const [userBookmarks, setUserBookmarks] = useState<BookmarkData[]>([]);
   const [isBookmarksLoading, setIsBookmarksLoading] = useState<boolean>(false);
   const [bookmarkActionLoading, setBookmarkActionLoading] = useState<string>("");
@@ -380,6 +373,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [isPinging, setIsPinging] = useState<boolean>(false);
   const [pingResult, setPingResult] = useState<PingResult | null>(null);
   const [endpointValidationError, setEndpointValidationError] = useState<string>("");
+  const [isEndpointDrawerOpen, setIsEndpointDrawerOpen] = useState<boolean>(false);
 
   // Synchronize endpoint state across tabs and windows
   useEffect(() => {
@@ -399,7 +393,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const handlePingTest = async (target?: string) => {
     try {
       setIsPinging(true);
-      const urlToPing = target || customInputUrl || apiEndpointUrl;
+      const urlToPing = target || apiEndpointUrl;
       const res = await pingEndpoint(urlToPing);
       setPingResult(res);
       if (res.success) {
@@ -427,9 +421,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     setEndpointValidationError("");
     try {
       setApiBaseUrl(trimmed);
-      setApiEndpointUrl(trimmed);
-      showToast(`Đã áp dụng API Endpoint mới: ${trimmed}`, "success");
-      await handlePingTest(trimmed);
+      const normalized = getApiBaseUrl();
+      setApiEndpointUrl(normalized);
+      setCustomInputUrl(normalized);
+      showToast(`Đã áp dụng API Endpoint mới: ${normalized}`, "success");
+      await handlePingTest(normalized);
       loadDeviceSessions();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Không thể áp dụng endpoint";
@@ -552,7 +548,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     window.addEventListener("open-accounts-center", handleOpenAccountsCenter);
     window.addEventListener("close-accounts-center", handleCloseAccountsCenter);
 
-    const validTabs = ["profile", "security", "addresses", "sessions", "bookmarks"];
+    const validTabs = ["profile", "addresses", "sessions", "bookmarks"];
     if (typeof window !== "undefined") {
       const hash = window.location.hash.replace("#", "");
       if (validTabs.includes(hash)) {
@@ -595,7 +591,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
     const handleHashChange = () => {
       const hash = window.location.hash.replace("#", "");
-      const validTabs = ["profile", "security", "addresses", "sessions", "bookmarks"];
+      const validTabs = ["profile", "addresses", "sessions", "bookmarks"];
       if (validTabs.includes(hash)) {
         setActiveModalTab(hash as any);
         setIsAccountsCenterOpen(true);
@@ -760,277 +756,21 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   // Profile Edit fields
   const [editFullName, setEditFullName] = useState<string>("");
   const [editPhone, setEditPhone] = useState<string>("");
-  const [editGender, setEditGender] = useState<string>("male");
-  const [editDateOfBirth, setEditDateOfBirth] = useState<string>("1998-09-26");
+  const [editGender, setEditGender] = useState<string>("");
+  const [editDateOfBirth, setEditDateOfBirth] = useState<string>("");
   const [editAvatarUrl, setEditAvatarUrl] = useState<string>("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState<boolean>(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
 
   const [lastSyncTime, setLastSyncTime] = useState<string>("");
-  // In-Place Username Editing State (Triggered by Pencil next to @username in Hero Banner)
-  const [isInlineUsernameOpen, setIsInlineUsernameOpen] = useState<boolean>(false);
-  const [inlineUsername, setInlineUsername] = useState<string>(user?.username || "");
-  const [isInlineUserEdited, setIsInlineUserEdited] = useState<boolean>(false);
-  const [inlineCheckStatus, setInlineCheckStatus] = useState<"idle" | "checking" | "success" | "warning" | "error">("idle");
-  const [inlineUsernameError, setInlineUsernameError] = useState<string>("");
-  const [inlineUsernameSuccess, setInlineUsernameSuccess] = useState<string>("");
-  const [isInlineUsernameSaving, setIsInlineUsernameSaving] = useState<boolean>(false);
-  const [inlinePassword, setInlinePassword] = useState<string>("");
-  const [inlineConfirmPassword, setInlineConfirmPassword] = useState<string>("");
-  const [showInlinePassword, setShowInlinePassword] = useState<boolean>(false);
-  const [showInlineConfirmPassword, setShowInlineConfirmPassword] = useState<boolean>(false);
-  const [isHeaderShieldHovered, setIsHeaderShieldHovered] = useState<boolean>(false);
-  const [isOpeningDrawer, setIsOpeningDrawer] = useState<boolean>(false);
-  // Credential Change 5-Minute Grant Session & Polling State (ADR-002)
-  const [credentialGrant, setCredentialGrant] = useState<{
-    isActive: boolean;
-    remainingSeconds: number;
-    expiresAt?: string;
-  }>({ isActive: false, remainingSeconds: 0 });
-  const [isRequestingCredentialChange, setIsRequestingCredentialChange] = useState<boolean>(false);
-  const [hasPendingCredentialRequest, setHasPendingCredentialRequest] = useState<boolean>(false);
-  const [isUsernameSaving, setIsUsernameSaving] = useState<boolean>(false);
-  const [isPasswordSaving, setIsPasswordSaving] = useState<boolean>(false);
-  const lastCheckedUsernameRef = useRef<string>("");
   const isProfileDirty = Boolean(user && (
     editFullName.trim() !== (user.fullName || "").trim() ||
-    editPhone.trim() !== (user.phoneNumber || "0901234567").trim() ||
-    editGender.toLowerCase() !== (user.gender || "male").toLowerCase() ||
-    editDateOfBirth.trim() !== (user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "1998-09-26").trim() ||
-    editAvatarUrl.trim() !== (user.avatarUrl || "").trim() ||
-    (isInlineUserEdited && inlineUsername.trim() !== (user.username || "").trim()) ||
-    Boolean(inlinePassword.trim() || inlineConfirmPassword.trim())
+    editPhone.trim() !== (user.phoneNumber || "").trim() ||
+    editGender.toLowerCase() !== (user.gender || "").toLowerCase() ||
+    editDateOfBirth.trim() !== (user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "").trim() ||
+    editAvatarUrl.trim() !== (user.avatarUrl || "").trim()
   ));
-  // Username validation helper adhering to IAM_EXISTING_USERNAME_ENDPOINT_REPORT.md
-  // Reserved / Taken usernames to check uniqueness before calling API
-  const RESERVED_TAKEN_USERNAMES = ["admin", "root", "system", "moderator", "ddicg", "existing_user"];
-
-  // Username Cooldown State & Handlers (30-day IAM Cooldown Tracking)
-  const getUsernameCooldownKey = useCallback((u: any) => {
-    const id = u?.id || u?.username || u?.email || "default_user";
-    return `horizon_username_cooldown_${id}`;
-  }, []);
-
-  const checkUsernameCooldown = useCallback((u: any) => {
-    if (typeof window === "undefined") return null;
-
-    let untilMs: number | null = null;
-    if (u?.usernameCooldownUntil) {
-      const normalized = typeof u.usernameCooldownUntil === "string"
-        ? u.usernameCooldownUntil.replace(" ", "T")
-        : u.usernameCooldownUntil;
-      const parsed = Date.parse(normalized);
-      if (!isNaN(parsed) && parsed > 0) {
-        untilMs = parsed;
-      }
-    }
-
-    if (!untilMs) {
-      const key = getUsernameCooldownKey(u);
-      const storedTimestamp = localStorage.getItem(key) || u?.lastUsernameChangedAt;
-      if (storedTimestamp) {
-        const lastChanged = Number(storedTimestamp);
-        if (!isNaN(lastChanged) && lastChanged > 0) {
-          const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
-          untilMs = lastChanged + COOLDOWN_MS;
-        }
-      }
-    }
-
-    if (!untilMs) return null;
-
-    const remainingMs = untilMs - Date.now();
-    if (remainingMs <= 0) {
-      const key = getUsernameCooldownKey(u);
-      localStorage.removeItem(key);
-      return null;
-    }
-
-    const totalSeconds = Math.floor(remainingMs / 1000);
-    const days = Math.floor(totalSeconds / (3600 * 24));
-    const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    const formatted = days > 0
-      ? `${days} ngày ${hours} giờ`
-      : hours > 0
-        ? `${hours}h ${minutes}m ${seconds}s`
-        : `${minutes}m ${seconds}s`;
-
-    return {
-      isActive: true,
-      untilMs,
-      untilDateStr: u?.usernameCooldownUntil || new Date(untilMs).toLocaleString("vi-VN"),
-      days,
-      hours,
-      minutes,
-      seconds,
-      formatted,
-      shortFormatted: days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}m`
-    };
-  }, [getUsernameCooldownKey]);
-
-  const [cooldownRemaining, setCooldownRemaining] = useState<{
-    isActive: boolean;
-    untilMs?: number;
-    untilDateStr?: string;
-    days: number;
-    hours: number;
-    minutes: number;
-    seconds: number;
-    formatted: string;
-    shortFormatted: string;
-  } | null>(null);
-
-  useEffect(() => {
-    const updateCooldown = () => {
-      const remaining = checkUsernameCooldown(user);
-      setCooldownRemaining(remaining);
-    };
-
-    updateCooldown();
-    const interval = setInterval(updateCooldown, 1000);
-    return () => clearInterval(interval);
-  }, [user, checkUsernameCooldown]);
-
-  // Username validation helper adhering to IAM_EXISTING_USERNAME_ENDPOINT_REPORT.md & API spec v1.2.3
-  const validateUsernameFormat = useCallback((raw: string, currentUsername?: string) => {
-    const trimmed = raw.trim();
-    if (!trimmed) {
-      return { valid: false, message: "Tên đăng nhập không được để trống.", type: "empty" };
-    }
-    if (trimmed.includes("@")) {
-      return { valid: false, message: "Tên đăng nhập không được chứa ký tự '@'.", type: "at_symbol" };
-    }
-    if (/\s/.test(trimmed)) {
-      return { valid: false, message: "Tên đăng nhập không được chứa khoảng trắng.", type: "space" };
-    }
-    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
-      return { valid: false, message: "Tên đăng nhập chỉ được chứa chữ cái, chữ số và dấu gạch dưới (_).", type: "special_char" };
-    }
-    if (trimmed.length < 3) {
-      return { valid: false, message: `Độ dài tối thiểu 3 ký tự (còn thiếu ${3 - trimmed.length} ký tự).`, type: "min_length" };
-    }
-    if (trimmed.length > 50) {
-      return { valid: false, message: "Độ dài tối đa 50 ký tự.", type: "max_length" };
-    }
-    if (currentUsername && trimmed.toLowerCase() === currentUsername.toLowerCase()) {
-      return { valid: false, message: "Tên đăng nhập mới trùng với tên hiện tại.", type: "same_username" };
-    }
-    if (RESERVED_TAKEN_USERNAMES.includes(trimmed.toLowerCase())) {
-      return { valid: false, message: "Tên đăng nhập mới đã tồn tại trên hệ thống.", type: "duplicate" };
-    }
-    return { valid: true, message: "Tên đăng nhập hợp lệ và sẵn sàng cập nhật.", type: "valid" };
-  }, []);
-
-  // Default inline username to current user username
-  useEffect(() => {
-    if (user?.username && !isInlineUserEdited) {
-      setInlineUsername(user.username);
-    }
-  }, [user?.username, isInlineUserEdited]);
-
-  // 0.5s Debounce auto check username availability with status icon and popup notifications
-  useEffect(() => {
-    if (!isInlineUsernameOpen || !isInlineUserEdited) {
-      return;
-    }
-
-    const trimmed = inlineUsername.trim();
-    if (trimmed === lastCheckedUsernameRef.current) {
-      return;
-    }
-
-    setInlineCheckStatus("checking");
-
-    const timer = setTimeout(async () => {
-      lastCheckedUsernameRef.current = trimmed;
-
-      if (!trimmed) {
-        setInlineCheckStatus("error");
-        const msg = "Tên đăng nhập không được để trống.";
-        setInlineUsernameError(msg);
-        setInlineUsernameSuccess("");
-        showToast(msg, "error");
-        return;
-      }
-
-      if (user?.username && trimmed.toLowerCase() === user.username.toLowerCase()) {
-        setInlineCheckStatus("warning");
-        const msg = "Tên đăng nhập mới trùng với tên hiện tại.";
-        setInlineUsernameError(msg);
-        setInlineUsernameSuccess("");
-        showToast(msg, "warning");
-        return;
-      }
-
-      if (trimmed.length < 3) {
-        setInlineCheckStatus("error");
-        const msg = `Độ dài tối thiểu 3 ký tự (còn thiếu ${3 - trimmed.length} ký tự).`;
-        setInlineUsernameError(msg);
-        setInlineUsernameSuccess("");
-        showToast(msg, "error");
-        return;
-      }
-
-      if (trimmed.length > 50) {
-        setInlineCheckStatus("error");
-        const msg = "Độ dài tối đa 50 ký tự.";
-        setInlineUsernameError(msg);
-        setInlineUsernameSuccess("");
-        showToast(msg, "error");
-        return;
-      }
-
-      if (trimmed.includes("@")) {
-        setInlineCheckStatus("error");
-        const msg = "Tên đăng nhập không được chứa ký tự '@'.";
-        setInlineUsernameError(msg);
-        setInlineUsernameSuccess("");
-        showToast(msg, "error");
-        return;
-      }
-
-      if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
-        setInlineCheckStatus("error");
-        const msg = "Tên đăng nhập chỉ được chứa chữ cái, chữ số và dấu gạch dưới (_).";
-        setInlineUsernameError(msg);
-        setInlineUsernameSuccess("");
-        showToast(msg, "error");
-        return;
-      }
-
-      try {
-        const res = await checkUsername(trimmed);
-        if (res?.data?.available || res?.status?.code === 200) {
-          setInlineCheckStatus("success");
-          setInlineUsernameError("");
-          const successText = `Tên đăng nhập @${trimmed} khả dụng!`;
-          setInlineUsernameSuccess(successText);
-          showToast(successText, "success");
-        } else {
-          setInlineCheckStatus("error");
-          const errMsg = res?.status?.message || "Tên đăng nhập không khả dụng.";
-          setInlineUsernameError(errMsg);
-          setInlineUsernameSuccess("");
-          showToast(errMsg, "error");
-        }
-      } catch (err: any) {
-        setInlineCheckStatus("error");
-        let msg = err?.message || "Tên đăng nhập không khả dụng hoặc đã tồn tại.";
-        if (msg.includes("already exists") || msg.includes("tồn tại") || msg.includes("ALREADY_EXISTS")) {
-          msg = "Tên đăng nhập mới đã tồn tại trên hệ thống.";
-        }
-        setInlineUsernameError(msg);
-        setInlineUsernameSuccess("");
-        showToast(msg, "error");
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [inlineUsername, isInlineUsernameOpen, isInlineUserEdited, user?.username, showToast]);
 
 
   // Compute Birthday Celebration Flags & Countdown purely from dateOfBirth
@@ -1057,467 +797,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     return { isBirthdayToday: isToday, isBirthdayMonth: isMonth, daysUntilBirthday: diffDays };
   }, [user?.dateOfBirth]);
 
-  // Check Credential Change Active Permission (ADR-002: GET /api/auth/credential-change/status)
-  const checkActiveCredentialStatus = useCallback(async () => {
-    try {
-      const res = await getCredentialChangeStatus();
-      if (res?.status?.code === 200 && res.data?.status === "ACTIVE") {
-        const remaining = typeof res.data.remainingSeconds === "number" ? res.data.remainingSeconds : 300;
-        setCredentialGrant({
-          isActive: true,
-          remainingSeconds: remaining,
-          expiresAt: res.data.expiresAt
-        });
-        // Feedback #2: Luôn mở giao diện nếu backend phản hồi active
-        setIsInlineUsernameOpen(true);
-        setHasPendingCredentialRequest(false);
-        return true;
-      } else {
-        setCredentialGrant(prev => prev.isActive ? { isActive: false, remainingSeconds: 0 } : prev);
-        return false;
-      }
-    } catch (err) {
-      console.warn("[Auth] Check credential status error:", err);
-      return false;
-    }
-  }, []);
-
-  // Check if URL has credential activation token on mount (from email link e.g. /security/credentials?token=xyz or /m?token=xyz)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const tokenParam = params.get("token");
-    if (tokenParam && tokenParam.trim()) {
-      (async () => {
-        try {
-          const res = await activateCredentialChange(tokenParam.trim());
-          const msg = res?.status?.message || "Kích hoạt quyền đổi thông tin thành công. Bạn có 5 phút để cập nhật.";
-          showToast(msg, "success");
-          // Clean up URL search params without page reload
-          const url = new URL(window.location.href);
-          url.searchParams.delete("token");
-          window.history.replaceState({}, "", url.pathname + url.hash);
-          // Immediately check active status to open drawer
-          await checkActiveCredentialStatus();
-        } catch (err: any) {
-          const errMsg = err?.message || err?.data?.status?.message || "Kích hoạt phiên đổi thông tin thất bại hoặc liên kết đã hết hạn.";
-          showToast(errMsg, "error");
-        }
-      })();
-    }
-  }, [checkActiveCredentialStatus, showToast]);
-
-  // Check credential status on mount
-  useEffect(() => {
-    checkActiveCredentialStatus();
-  }, [checkActiveCredentialStatus]);
-
-  // Polling for credential status when pending or waiting for email activation
-  useEffect(() => {
-    if (credentialGrant.isActive) return;
-
-    // Fast polling every 3s if user clicked "Gửi yêu cầu thay đổi" or background check every 8s
-    const pollInterval = hasPendingCredentialRequest ? 3000 : 8000;
-    const timer = setInterval(async () => {
-      await checkActiveCredentialStatus();
-    }, pollInterval);
-
-    return () => clearInterval(timer);
-  }, [credentialGrant.isActive, hasPendingCredentialRequest, checkActiveCredentialStatus]);
-
-  // Client-side 1-second countdown timer when credential grant is ACTIVE
-  useEffect(() => {
-    if (!credentialGrant.isActive || credentialGrant.remainingSeconds <= 0) return;
-
-    const timer = setInterval(() => {
-      setCredentialGrant(prev => {
-        if (!prev.isActive || prev.remainingSeconds <= 1) {
-          clearInterval(timer);
-          setIsInlineUsernameOpen(false);
-          setInlinePassword("");
-          setInlineConfirmPassword("");
-          setIsInlineUserEdited(false);
-          showToast("Phiên thay đổi thông tin đã hết hạn (5 phút). Chức năng đã tự động đóng.", "info");
-          checkActiveCredentialStatus(); // Re-verify with backend when reaching 0
-          return { isActive: false, remainingSeconds: 0 };
-        }
-        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [credentialGrant.isActive, credentialGrant.remainingSeconds, checkActiveCredentialStatus, showToast]);
-
-  // Auto collapse/close credential change drawer when grant expires or becomes inactive
-  useEffect(() => {
-    if (isInlineUsernameOpen && !credentialGrant.isActive && credentialGrant.remainingSeconds === 0) {
-      setIsInlineUsernameOpen(false);
-      setInlinePassword("");
-      setInlineConfirmPassword("");
-      setIsInlineUserEdited(false);
-      if (user?.username) {
-        setInlineUsername(user.username);
-      }
-    }
-  }, [credentialGrant.isActive, credentialGrant.remainingSeconds, isInlineUsernameOpen, user?.username]);
-
-  // Handler for Requesting Credential Change Email (POST /api/auth/credential-change/request)
-  const handleRequestCredentialChange = async () => {
-    if (isRequestingCredentialChange) return;
-
-    setIsRequestingCredentialChange(true);
-    setIsOpeningDrawer(true);
-    setIsHeaderShieldHovered(true);
-
-    try {
-      const res = await requestCredentialChange();
-      const successMsg = res?.status?.message || `Liên kết xác thực thay đổi thông tin đăng nhập đã được gửi đến ${user?.email || "email của bạn"}. Vui lòng kiểm tra hộp thư.`;
-      showToast(successMsg, "success");
-      setHasPendingCredentialRequest(true);
-      // Immediately poll status
-      await checkActiveCredentialStatus();
-    } catch (err: any) {
-      console.warn("[Auth] Request credential change failed:", err);
-      const is429 = err?.status === 429 || err?.data?.status?.code === 429;
-      const errMsg = err?.data?.status?.message || err?.message || "Không thể gửi yêu cầu thay đổi.";
-      if (is429) {
-        showToast(errMsg || "Yêu cầu xác thực trước đó của bạn vẫn đang có hiệu lực. Vui lòng kiểm tra hộp thư hoặc thử lại sau.", "warning");
-        setHasPendingCredentialRequest(true);
-        await checkActiveCredentialStatus();
-      } else {
-        showToast(errMsg, "error");
-      }
-    } finally {
-      setIsRequestingCredentialChange(false);
-      setTimeout(() => {
-        setIsOpeningDrawer(false);
-      }, 500);
-    }
-  };
-  // Handler 1: Update Username Only (API Call 1: PUT /api/auth/update-credentials { newUsername })
-  const handleUpdateUsername = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const trimmedUser = inlineUsername.trim();
-    if (!isCredentialUserChanged) return;
-
-    if (!credentialGrant.isActive) {
-      showToast("Phiên đổi thông tin chưa được kích hoạt hoặc đã hết hạn. Vui lòng gửi email xác thực.", "warning");
-      return;
-    }
-    if (cooldownRemaining?.isActive) {
-      showToast(`Tài khoản đang trong thời hạn giãn cách 30 ngày. Còn lại: ${cooldownRemaining.formatted}.`, "error");
-      return;
-    }
-    const val = validateUsernameFormat(trimmedUser, user?.username);
-    if (!val.valid) {
-      showToast(val.message, "error");
-      return;
-    }
-
-    setIsUsernameSaving(true);
-    try {
-      const res = await updateCredentials({ newUsername: trimmedUser });
-      const successMessage = res?.status?.message || `Đổi tên đăng nhập thành công: @${trimmedUser}.`;
-      showToast(successMessage, "success");
-
-      // Set 30-day cooldown
-      const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const formattedCd = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
-      const cooldownKey = getUsernameCooldownKey(user);
-      localStorage.setItem(cooldownKey, String(Date.now()));
-
-      if (user) {
-        const updated = { ...user, username: trimmedUser, usernameCooldownUntil: formattedCd };
-        setUser(updated);
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
-        localStorage.setItem("horizon_current_user", JSON.stringify(updated));
-      }
-      setCooldownRemaining(checkUsernameCooldown({ ...user, usernameCooldownUntil: formattedCd }));
-      logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành công: @${trimmedUser}`);
-
-      // Single-use grant: revoke active status on UI
-      setCredentialGrant({ isActive: false, remainingSeconds: 0 });
-      setTimeout(() => {
-        setIsInlineUsernameOpen(false);
-      }, 1500);
-    } catch (err: any) {
-      let message = err?.data?.status?.message || err?.message || "Cập nhật tên đăng nhập thất bại.";
-      if (message.includes("tồn tại") || message.includes("already exists")) {
-        message = "Tên đăng nhập mới đã tồn tại trên hệ thống.";
-      }
-      showToast(message, "error");
-      logAuditAction("CHANGE_USERNAME", "FAILED", `Thất bại: ${message}`);
-    } finally {
-      setIsUsernameSaving(false);
-    }
-  };
-
-  // Handler 2: Update Password Only (API Call 2: PUT /api/auth/update-credentials { newPassword, confirmPassword })
-  const handleUpdatePassword = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!isCredentialPassEntered) return;
-
-    if (!credentialGrant.isActive) {
-      showToast("Phiên đổi thông tin chưa được kích hoạt hoặc đã hết hạn. Vui lòng gửi email xác thực.", "warning");
-      return;
-    }
-    if (inlinePassword.length < 6) {
-      showToast("Mật khẩu mới phải từ 6 ký tự trở lên.", "error");
-      return;
-    }
-    if (inlinePassword !== inlineConfirmPassword) {
-      showToast("Mật khẩu xác nhận không khớp.", "error");
-      return;
-    }
-
-    setIsPasswordSaving(true);
-    try {
-      const res = await updateCredentials({
-        newPassword: inlinePassword,
-        confirmPassword: inlineConfirmPassword
-      });
-      const successMessage = res?.status?.message || "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.";
-      showToast(successMessage, "success");
-
-      setInlinePassword("");
-      setInlineConfirmPassword("");
-      setShowInlinePassword(false);
-      setShowInlineConfirmPassword(false);
-
-      // Single-use grant: revoke active status on UI
-      setCredentialGrant({ isActive: false, remainingSeconds: 0 });
-      logAuditAction("RESET_PASSWORD", "SUCCESS", "Đổi mật khẩu thành công");
-      setTimeout(() => {
-        setIsInlineUsernameOpen(false);
-      }, 1500);
-    } catch (err: any) {
-      const message = err?.data?.status?.message || err?.message || "Cập nhật mật khẩu thất bại.";
-      showToast(message, "error");
-      logAuditAction("RESET_PASSWORD", "FAILED", `Thất bại: ${message}`);
-    } finally {
-      setIsPasswordSaving(false);
-    }
-  };
-
-  // Handler for Unified Credential Update (PUT /api/auth/update-credentials)
-  const handleUpdateCredentials = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-
-    const trimmedUser = inlineUsername.trim();
-    const isUserChanged = isInlineUserEdited && trimmedUser !== (user?.username || "");
-    const isPassEntered = Boolean(inlinePassword.trim() || inlineConfirmPassword.trim());
-
-    if (!isUserChanged && !isPassEntered) {
-      return;
-    }
-
-    if (!credentialGrant.isActive) {
-      const msg = "Phiên đổi thông tin chưa được kích hoạt hoặc đã hết hạn. Vui lòng gửi email xác thực.";
-      setInlineUsernameError(msg);
-      showToast(msg, "warning");
-      return;
-    }
-
-    if (isUserChanged) {
-      if (cooldownRemaining?.isActive) {
-        const cdMsg = `Tài khoản đang trong thời hạn giãn cách 30 ngày. Bạn có thể đổi lại sau: ${cooldownRemaining.formatted}.`;
-        setInlineUsernameError(cdMsg);
-        showToast(cdMsg, "error");
-        return;
-      }
-      const val = validateUsernameFormat(trimmedUser, user?.username);
-      if (!val.valid) {
-        setInlineUsernameError(val.message);
-        showToast(val.message, "error");
-        return;
-      }
-    }
-
-    if (isPassEntered) {
-      if (inlinePassword.length < 6) {
-        const passMsg = "Mật khẩu mới phải từ 6 ký tự trở lên.";
-        setInlineUsernameError(passMsg);
-        showToast(passMsg, "error");
-        return;
-      }
-      if (inlinePassword !== inlineConfirmPassword) {
-        const matchMsg = "Mật khẩu xác nhận không khớp.";
-        setInlineUsernameError(matchMsg);
-        showToast(matchMsg, "error");
-        return;
-      }
-    }
-
-    setIsInlineUsernameSaving(true);
-    setInlineUsernameError("");
-    setInlineUsernameSuccess("");
-
-    try {
-      const payload: UpdateCredentialsRequest = {};
-      if (isUserChanged) {
-        payload.newUsername = trimmedUser;
-      }
-      if (isPassEntered) {
-        payload.newPassword = inlinePassword;
-        payload.confirmPassword = inlineConfirmPassword;
-      }
-
-      const res = await updateCredentials(payload);
-      const successMessage = res?.status?.message || "Cập nhật thông tin đăng nhập thành công. Vui lòng đăng nhập lại.";
-
-      setInlineUsernameSuccess(successMessage);
-      showToast(successMessage, "success");
-
-      // Clear password inputs
-      setInlinePassword("");
-      setInlineConfirmPassword("");
-      setShowInlinePassword(false);
-      setShowInlineConfirmPassword(false);
-
-      // Single-use grant: revoke active status on UI
-      setCredentialGrant({ isActive: false, remainingSeconds: 0 });
-
-      // If username changed, update local user state & set 30-day cooldown
-      if (isUserChanged) {
-        const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        const pad = (n: number) => String(n).padStart(2, "0");
-        const formattedCd = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
-        const cooldownKey = getUsernameCooldownKey(user);
-        localStorage.setItem(cooldownKey, String(Date.now()));
-
-        if (user) {
-          const updated = { ...user, username: trimmedUser, usernameCooldownUntil: formattedCd };
-          setUser(updated);
-          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
-          localStorage.setItem("horizon_current_user", JSON.stringify(updated));
-
-          const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
-          if (storedProfile) {
-            try {
-              const prof = JSON.parse(storedProfile);
-              prof.username = trimmedUser;
-              prof.usernameCooldownUntil = formattedCd;
-              localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(prof));
-              localStorage.setItem("horizon_redis_profile", JSON.stringify(prof));
-            } catch {}
-          }
-        }
-        setCooldownRemaining(checkUsernameCooldown({ ...user, usernameCooldownUntil: formattedCd }));
-        logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành công: @${trimmedUser}`);
-      }
-
-      if (isPassEntered) {
-        logAuditAction("RESET_PASSWORD", "SUCCESS", "Đổi mật khẩu thành công qua API update-credentials");
-      }
-
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("storage"));
-      }
-
-      // Close drawer after 2.5s
-      setTimeout(() => {
-        setIsInlineUsernameOpen(false);
-        setInlineUsernameSuccess("");
-      }, 2500);
-    } catch (err: any) {
-      console.warn("[Auth] Update credentials error:", err);
-      let message = err?.data?.status?.message || err?.message || "Cập nhật thông tin xác thực thất bại.";
-      
-      if (message.includes("tồn tại") || message.includes("already exists") || message.includes("ALREADY_EXISTS")) {
-        message = "Tên đăng nhập mới đã tồn tại trên hệ thống.";
-      } else if (message.includes("tháng") || message.includes("cooldown") || message.includes("30 ngày")) {
-        message = "Bạn chỉ được đổi tên đăng nhập tối đa 1 lần mỗi tháng. Vui lòng quay lại sau.";
-        const cooldownKey = getUsernameCooldownKey(user);
-        if (!localStorage.getItem(cooldownKey)) {
-          localStorage.setItem(cooldownKey, String(Date.now()));
-        }
-        setCooldownRemaining(checkUsernameCooldown(user));
-      } else if (message.includes("chưa được kích hoạt") || message.includes("hết hạn") || message.includes("INVALID_CREDENTIALS")) {
-        message = "Bạn chưa xác thực qua email hoặc phiên đổi thông tin đã hết hạn.";
-        setCredentialGrant({ isActive: false, remainingSeconds: 0 });
-      }
-
-      setInlineUsernameError(message);
-      setInlineCheckStatus("error");
-      showToast(message, "error");
-      logAuditAction("CHANGE_CREDENTIALS", "FAILED", `Thất bại: ${message}`);
-    } finally {
-       setIsInlineUsernameSaving(false);
-     }
-   };
-
-  const handleSaveInlineCredentials = handleUpdateCredentials;
-
-  // Derived state for Credential Change form validation (ADR-002 & UI validation)
-  const isCredentialUserChanged = isInlineUserEdited && inlineUsername.trim() !== (user?.username || "");
-  const isCredentialPassEntered = Boolean(inlinePassword.trim() || inlineConfirmPassword.trim());
-
-  const isCredentialUsernameFormatValid = inlineUsername.trim().length >= 3 &&
-    inlineUsername.trim().length <= 50 &&
-    !inlineUsername.trim().includes("@") &&
-    /^[a-zA-Z0-9_]+$/.test(inlineUsername.trim());
-
-  const isCredentialUsernameValid = !isCredentialUserChanged || (
-    !cooldownRemaining?.isActive &&
-    isCredentialUsernameFormatValid &&
-    inlineCheckStatus !== "error"
-  );
-
-  const isCredentialPasswordValid = !isCredentialPassEntered || (
-    inlinePassword.length >= 6 &&
-    inlinePassword === inlineConfirmPassword
-  );
-
-  const hasCredentialAtLeastOneChange = (isCredentialUserChanged && isCredentialUsernameValid) || (isCredentialPassEntered && isCredentialPasswordValid);
-
-  const isCredentialFormValid = credentialGrant.isActive &&
-    !isInlineUsernameSaving &&
-    isCredentialUsernameValid &&
-    isCredentialPasswordValid &&
-    hasCredentialAtLeastOneChange;
-
-  const credentialButtonTooltip = !credentialGrant.isActive
-    ? "Chưa kích hoạt quyền thay đổi (vui lòng gửi email xác thực)"
-    : cooldownRemaining?.isActive && isCredentialUserChanged
-      ? "Tài khoản đang trong thời hạn giãn cách đổi tên 30 ngày"
-      : isCredentialPassEntered && inlinePassword.length < 6
-        ? "Mật khẩu mới phải từ 6 ký tự trở lên"
-        : isCredentialPassEntered && inlinePassword !== inlineConfirmPassword
-          ? "Mật khẩu xác nhận không trùng khớp"
-          : !hasCredentialAtLeastOneChange
-            ? "Vui lòng nhập tên đăng nhập mới hoặc mật khẩu mới"
-            : "Xác nhận cập nhật thông tin đăng nhập";
-
-  const usernameButtonTooltip = !credentialGrant.isActive
-    ? "Chưa kích hoạt quyền thay đổi (vui lòng gửi email xác thực)"
-    : cooldownRemaining?.isActive && isCredentialUserChanged
-      ? `Tài khoản đang trong thời hạn giãn cách 30 ngày (còn lại: ${cooldownRemaining.formatted})`
-      : !isCredentialUserChanged
-        ? "Tên đăng nhập chưa thay đổi"
-        : !isCredentialUsernameFormatValid
-          ? "Tên đăng nhập không đúng định dạng (3-50 ký tự, không chứa @)"
-          : "Xác nhận đổi tên đăng nhập (API 1)";
-
-  const passwordButtonTooltip = !credentialGrant.isActive
-    ? "Chưa kích hoạt quyền thay đổi (vui lòng gửi email xác thực)"
-    : !isCredentialPassEntered
-      ? "Vui lòng nhập mật khẩu mới và xác nhận mật khẩu"
-      : inlinePassword.length < 6
-        ? "Mật khẩu mới phải từ 6 ký tự trở lên"
-        : inlinePassword !== inlineConfirmPassword
-          ? "Mật khẩu xác nhận không trùng khớp"
-          : "Xác nhận đổi mật khẩu (API 2)";
-
-  // Accordion Expansions in Security tab
-  const [isUsernameChangeExpanded, setIsUsernameChangeExpanded] = useState<boolean>(true);
-  const [isPasswordResetExpanded, setIsPasswordResetExpanded] = useState<boolean>(false);
-  // Input states
-  const [newUsername, setNewUsername] = useState<string>("");
-  const [newPassword, setNewPassword] = useState<string>("");
-  const [confirmPassword, setConfirmPassword] = useState<string>("");
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-
   // Saved Addresses State
   const [addresses, setAddresses] = useState<AddressDto[]>([]);
   const [isAddingAddress, setIsAddingAddress] = useState<boolean>(false);
@@ -1531,8 +810,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   });
   const [resolvedPreview, setResolvedPreview] = useState<ResolvedAddressDto | null>(null);
   const [isResolvingAddress, setIsResolvingAddress] = useState<boolean>(false);
+  const resolveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [mapLayer, setMapLayer] = useState<"mapnik" | "hot" | "transport">("mapnik");
-  const [isMapActive, setIsMapActive] = useState<boolean>(false);
+  const [isMapActive, setIsMapActive] = useState<boolean>(true);
   const [copiedCoord, setCopiedCoord] = useState<boolean>(false);
   const [mapKey, setMapKey] = useState<number>(0);
 
@@ -2201,7 +1481,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         console.warn("Could not load addresses:", addrErr);
       }
 
-      // Initialize saved payment methods
     } catch (e) {
       console.error("Error loading profile:", e);
       setErrorMsg("Lỗi hệ thống khi tải thông tin tài khoản.");
@@ -2213,18 +1492,18 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   useEffect(() => {
     if (user) {
       setEditFullName(user.fullName || "");
-      setEditPhone(user.phoneNumber || "0901234567");
-      setEditGender(user.gender ? user.gender.toLowerCase() : "male");
+      setEditPhone(user.phoneNumber || "");
+      setEditGender(user.gender ? user.gender.toLowerCase() : "");
       if (user.dateOfBirth) {
         const rawDob = String(user.dateOfBirth);
         const ymd = rawDob.split("T")[0];
         setEditDateOfBirth(ymd);
       } else {
-        setEditDateOfBirth("1998-09-26");
+        setEditDateOfBirth("");
       }
       setEditAvatarUrl(user.avatarUrl || "");
       if (addresses.length > 0 && !newAddressForm.recipientName) {
-        setNewAddressForm(prev => ({ ...prev, recipientName: user.fullName || "", phone: user.phoneNumber || "0901234567" }));
+        setNewAddressForm(prev => ({ ...prev, recipientName: user.fullName || "", phone: user.phoneNumber || "" }));
       }
     }
   }, [user]);
@@ -2235,33 +1514,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     if (!editFullName.trim()) {
       setErrorMsg("Họ và tên không được để trống.");
       return;
-    }
-
-    const trimmedUser = inlineUsername.trim();
-    const isUserChanged = isInlineUserEdited && trimmedUser !== (user?.username || "");
-    const isPassEntered = Boolean(inlinePassword.trim() || inlineConfirmPassword.trim());
-
-    if (isUserChanged) {
-      if (cooldownRemaining?.isActive) {
-        setErrorMsg(`Tài khoản đang trong thời hạn giãn cách 30 ngày. Bạn có thể đổi lại tên đăng nhập sau: ${cooldownRemaining.formatted}.`);
-        return;
-      }
-      const val = validateUsernameFormat(trimmedUser, user?.username);
-      if (!val.valid) {
-        setErrorMsg(val.message);
-        return;
-      }
-    }
-
-    if (isPassEntered) {
-      if (inlinePassword.length < 6) {
-        setErrorMsg("Mật khẩu mới phải từ 6 ký tự trở lên.");
-        return;
-      }
-      if (inlinePassword !== inlineConfirmPassword) {
-        setErrorMsg("Mật khẩu xác nhận không khớp.");
-        return;
-      }
     }
 
     if (editDateOfBirth.trim()) {
@@ -2295,76 +1547,15 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         gender: editGender.toUpperCase()
       };
 
-      let responseData: any = null;
+      let responseData: Record<string, unknown> | null = null;
       try {
         const res = await updateMyProfile(payload);
-        if (res?.data) {
-          responseData = res.data;
+        if (res?.data && typeof res.data === "object") {
+          responseData = res.data as Record<string, unknown>;
         }
-      } catch (apiErr: any) {
-        console.warn("[Profile Update] API Gateway note:", apiErr.message);
-      }
-
-      // Handle username update if requested
-      let updatedUsername = user?.username;
-      let updatedCooldownUntil = user?.usernameCooldownUntil;
-      if (isUserChanged) {
-        try {
-          await changeUsername({ newUsername: trimmedUser });
-          updatedUsername = trimmedUser;
-          const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-          const pad = (n: number) => String(n).padStart(2, "0");
-          updatedCooldownUntil = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
-          const cooldownKey = getUsernameCooldownKey(user);
-          localStorage.setItem(cooldownKey, String(Date.now()));
-          logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành công: @${trimmedUser}`);
-        } catch (uErr: any) {
-          console.warn("Change username warning:", uErr);
-        }
-      }
-
-      // Handle password update if requested
-      if (isPassEntered) {
-        try {
-          await unifiedFetch("/graphql", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              query: `
-                mutation ChangePassword($newPassword: String!, $confirmPassword: String!, $token: String) {
-                  changePassword(newPassword: $newPassword, confirmPassword: $confirmPassword, token: $token) {
-                    status {
-                      code
-                      message
-                    }
-                    message
-                  }
-                }
-              `,
-              variables: {
-                newPassword: inlinePassword,
-                confirmPassword: inlineConfirmPassword,
-                token: token
-              }
-            })
-          });
-          logAuditAction("RESET_PASSWORD", "SUCCESS", "Đổi mật khẩu thành công qua GraphQL Gateway");
-        } catch (pErr) {
-          try {
-            await apiRequest(`/api/auth/change-password`, {
-              method: "PUT",
-              body: JSON.stringify({
-                token: token,
-                newPassword: inlinePassword,
-                confirmPassword: inlineConfirmPassword,
-              }),
-            });
-            logAuditAction("RESET_PASSWORD", "SUCCESS", "Đổi mật khẩu thành công qua REST fallback");
-          } catch (_) {}
-        }
+      } catch (apiErr: unknown) {
+        const msg = apiErr instanceof Error ? apiErr.message : "Gateway error";
+        console.warn("[Profile Update] API Gateway note:", msg);
       }
 
       const updatedUser = {
@@ -2374,8 +1565,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         gender: editGender,
         dateOfBirth: cleanDob || user?.dateOfBirth,
         avatarUrl: editAvatarUrl.trim() || user?.avatarUrl,
-        username: updatedUsername,
-        usernameCooldownUntil: updatedCooldownUntil,
         ...(responseData || {})
       };
       setUser(updatedUser);
@@ -2384,7 +1573,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
       const storedProfile = localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || localStorage.getItem("horizon_redis_profile");
       if (storedProfile) {
-        const prof = JSON.parse(storedProfile);
+        const prof = JSON.parse(storedProfile) as Record<string, unknown>;
         const updatedProf = {
           ...prof,
           fullName: editFullName.trim(),
@@ -2392,21 +1581,11 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           gender: editGender,
           dateOfBirth: cleanDob || prof.dateOfBirth,
           avatarUrl: editAvatarUrl.trim() || prof.avatarUrl,
-          username: updatedUsername,
-          usernameCooldownUntil: updatedCooldownUntil,
           ...(responseData || {})
         };
         localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(updatedProf));
         localStorage.setItem("horizon_redis_profile", JSON.stringify(updatedProf));
       }
-
-      if (isUserChanged) {
-        setCooldownRemaining(checkUsernameCooldown({ ...user, usernameCooldownUntil: updatedCooldownUntil }));
-      }
-
-      setInlinePassword("");
-      setInlineConfirmPassword("");
-      setIsInlineUsernameOpen(false);
 
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("storage"));
@@ -2416,8 +1595,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setLastSyncTime(syncTimeStr);
       setSuccessMsg("Cập nhật thông tin hồ sơ thành công!");
       logAuditAction("UPDATE_PROFILE", "SUCCESS", `Cập nhật hồ sơ: ${editFullName.trim()}`);
-    } catch (err: any) {
-      setErrorMsg("Không thể cập nhật thông tin: " + (err.message || "Lỗi không xác định"));
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : "Lỗi không xác định";
+      setErrorMsg("Không thể cập nhật thông tin: " + errMsg);
     } finally {
       setActionLoading(false);
     }
@@ -2429,10 +1609,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       const cleanDob = dateIso.trim() ? dateIso.trim().split("T")[0] : undefined;
       const payload: UpdateProfileRequest = {
         fullName: editFullName.trim() || user?.fullName || "Hội viên",
-        phoneNumber: editPhone.trim() || user?.phoneNumber || "0901234567",
+        phoneNumber: editPhone.trim() || user?.phoneNumber || "",
         dateOfBirth: cleanDob,
         avatarUrl: editAvatarUrl.trim() || user?.avatarUrl || undefined,
-        gender: (editGender || user?.gender || "male").toUpperCase()
+        gender: (editGender || user?.gender || "").toUpperCase()
       };
 
       let responseData: any = null;
@@ -2451,7 +1631,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         ...(responseData || {})
       };
       setUser(updatedUser);
-      setEditDateOfBirth(cleanDob || "1998-09-26");
+      setEditDateOfBirth(cleanDob || "");
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
       localStorage.setItem("horizon_current_user", JSON.stringify(updatedUser));
 
@@ -2547,9 +1727,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const handleResetProfileForm = () => {
     if (user) {
       setEditFullName(user.fullName || "");
-      setEditPhone(user.phoneNumber || "0901234567");
-      setEditGender(user.gender ? user.gender.toLowerCase() : "male");
-      setEditDateOfBirth(user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "1998-09-26");
+      setEditPhone(user.phoneNumber || "");
+      setEditGender(user.gender ? user.gender.toLowerCase() : "");
+      setEditDateOfBirth(user.dateOfBirth ? String(user.dateOfBirth).split("T")[0] : "");
       setEditAvatarUrl(user.avatarUrl || "");
       setSuccessMsg("Đã khôi phục thông tin ban đầu.");
     }
@@ -2562,17 +1742,38 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setErrorMsg("Vui lòng điền đầy đủ họ tên, số điện thoại và địa chỉ giao hàng.");
       return;
     }
-
-    if (!resolvedPreview || !resolvedPreview.success || !resolvedPreview.latitude || !resolvedPreview.longitude) {
-      setErrorMsg("Địa chỉ chưa được xác thực tọa độ hợp lệ từ hệ thống Geocoding. Vui lòng nhập địa chỉ đầy đủ 3 cấp hành chính.");
-      return;
-    }
-
     setActionLoading(true);
     setErrorMsg("");
     setSuccessMsg("");
 
     try {
+      // Tự động chuẩn đoán / Geocoding & Chuẩn hóa định dạng khi bấm Lưu / Cập nhật
+      let currentResolved = resolvedPreview;
+      const trimmedAddress = newAddressForm.address.trim();
+
+      if (!currentResolved || currentResolved.rawAddress !== trimmedAddress) {
+        setIsResolvingAddress(true);
+        try {
+          const res = await resolveAddress(trimmedAddress);
+          if (res) {
+            currentResolved = res;
+            setResolvedPreview(res);
+          }
+        } catch (resolveErr) {
+          console.warn("Auto-resolve during save address error:", resolveErr);
+        } finally {
+          setIsResolvingAddress(false);
+        }
+      }
+
+      // Tự động chuẩn hóa địa chỉ nếu có kết quả định vị chuẩn từ bản đồ
+      const finalAddress = (currentResolved?.success && currentResolved.formattedAddress?.trim())
+        ? currentResolved.formattedAddress.trim()
+        : trimmedAddress;
+
+      if (finalAddress !== newAddressForm.address) {
+        setNewAddressForm(prev => ({ ...prev, address: finalAddress }));
+      }
       if (editingAddressSku) {
         // UPDATE (PUT /api/addresses/{sku})
         const updated = await updateAddress(editingAddressSku, {
@@ -2652,6 +1853,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     }
     setEditingAddressSku(addr.sku);
     setIsAddingAddress(true);
+    setIsMapActive(true);
     setErrorMsg("");
     setSuccessMsg("");
   };
@@ -2711,31 +1913,35 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       return;
     }
 
+    clearTimeout(resolveTimerRef.current as NodeJS.Timeout);
     setIsResolvingAddress(true);
-    const timer = setTimeout(async () => {
+    resolveTimerRef.current = setTimeout(async () => {
       try {
         const res = await resolveAddress(trimmed);
         setResolvedPreview(res);
-      } catch (_) {
+        setIsMapActive(true);
+      } catch {
         setResolvedPreview(null);
       } finally {
         setIsResolvingAddress(false);
       }
     }, 1250); // Exact 1.25s debounce
 
-    return () => clearTimeout(timer);
+    return () => clearTimeout(resolveTimerRef.current as NodeJS.Timeout);
   }, [newAddressForm.address, isAddingAddress]);
 
   // Handler for active/manual Geocoding refresh on the address input
   const handleManualResolveAddress = async () => {
     const trimmed = newAddressForm.address.trim();
     if (trimmed.length < 3) return;
+    clearTimeout(resolveTimerRef.current as NodeJS.Timeout);
     setIsResolvingAddress(true);
     try {
       const res = await resolveAddress(trimmed);
       setResolvedPreview(res);
       setMapKey(prev => prev + 1);
-    } catch (_) {
+      setIsMapActive(true);
+    } catch {
       setResolvedPreview(null);
     } finally {
       setIsResolvingAddress(false);
@@ -2747,7 +1953,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     setNewAddressForm(prev => ({
       ...prev,
       recipientName: user?.fullName || editFullName || "Người nhận",
-      phone: user?.phoneNumber || editPhone || "0901234567"
+      phone: user?.phoneNumber || editPhone || ""
     }));
     setSuccessMsg("Đã tự động điền thông tin từ hồ sơ cá nhân!");
     if (errorMsg) setErrorMsg("");
@@ -2810,179 +2016,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     );
   };
 
-
-  // Handler for username modification
-  const handleChangeUsername = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (cooldownRemaining?.isActive) {
-      setErrorMsg(`Tài khoản đang trong thời hạn giãn cách 30 ngày. Bạn có thể đổi lại sau: ${cooldownRemaining.formatted}.`);
-      return;
-    }
-
-    const trimmed = newUsername.trim();
-    const val = validateUsernameFormat(trimmed, user?.username);
-    if (!val.valid) {
-      setErrorMsg(val.message);
-      return;
-    }
-
-    setActionLoading(true);
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    try {
-      const response = await changeUsername({ newUsername: trimmed });
-      const successDetail = response?.data || response?.status?.message || "Đổi tên đăng nhập thành công. Vui lòng đăng nhập lại.";
-      setSuccessMsg(successDetail);
-
-      const cd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const formattedCd = `${cd.getFullYear()}-${pad(cd.getMonth() + 1)}-${pad(cd.getDate())} ${pad(cd.getHours())}:${pad(cd.getMinutes())}:${pad(cd.getSeconds())}`;
-      const cooldownKey = getUsernameCooldownKey(user);
-      localStorage.setItem(cooldownKey, String(Date.now()));
-
-      if (user) {
-        const updated = { ...user, username: trimmed, usernameCooldownUntil: formattedCd };
-        setUser(updated);
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
-        localStorage.setItem("horizon_current_user", JSON.stringify(updated));
-      }
-
-      setCooldownRemaining(checkUsernameCooldown({ ...user, usernameCooldownUntil: formattedCd }));
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("storage"));
-      }
-
-      setNewUsername("");
-      setIsUsernameChangeExpanded(false);
-      logAuditAction("CHANGE_USERNAME", "SUCCESS", `Đổi tên đăng nhập thành công: @${trimmed}`);
-    } catch (err: any) {
-      console.warn("changeUsername API call failed:", err);
-      let message = err instanceof Error ? err.message : "Đổi tên đăng nhập thất bại. Vui lòng thử lại.";
-      if (message.includes("tồn tại") || message.includes("already exists") || message.includes("INVALID_CREDENTIALS")) {
-        message = "Tên đăng nhập mới đã tồn tại trên hệ thống.";
-      } else if (message.includes("tháng") || message.includes("cooldown") || message.includes("30 ngày")) {
-        message = "Bạn chỉ được đổi tên đăng nhập tối đa 1 lần mỗi tháng. Vui lòng quay lại sau.";
-        const cooldownKey = getUsernameCooldownKey(user);
-        if (!localStorage.getItem(cooldownKey)) {
-          localStorage.setItem(cooldownKey, String(Date.now()));
-        }
-        setCooldownRemaining(checkUsernameCooldown(user));
-      }
-      setErrorMsg(message);
-      logAuditAction("CHANGE_USERNAME", "FAILED", `Thất bại: ${message}`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Handler for password reset
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPassword) {
-      setErrorMsg("Mật khẩu mới không được để trống.");
-      return;
-    }
-    if (newPassword.length < 6) {
-      setErrorMsg("Mật khẩu mới phải từ 6 ký tự trở lên.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setErrorMsg("Mật khẩu xác nhận không khớp.");
-      return;
-    }
-
-    setActionLoading(true);
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    try {
-      // Gọi GraphQL Mutation changePassword qua BFF Gateway
-      const gqlResponse = await unifiedFetch("/graphql", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          query: `
-            mutation ChangePassword($newPassword: String!, $confirmPassword: String!, $token: String) {
-              changePassword(newPassword: $newPassword, confirmPassword: $confirmPassword, token: $token) {
-                status {
-                  code
-                  message
-                }
-                message
-              }
-            }
-          `,
-          variables: {
-            newPassword: newPassword,
-            confirmPassword: confirmPassword,
-            token: token
-          }
-        })
-      });
-
-      const resJson = await gqlResponse.json();
-      const mutationResult = resJson?.data?.changePassword;
-
-      if (resJson.errors && resJson.errors.length > 0) {
-        throw new Error(resJson.errors[0].message || "GraphQL mutation error");
-      }
-
-      if (mutationResult?.status?.code !== 200) {
-        throw new Error(mutationResult?.message || "Đổi mật khẩu thất bại từ Gateway.");
-      }
-
-      const successDetail = mutationResult?.message || "Mật khẩu của bạn đã được thay đổi thành công!";
-      setSuccessMsg(successDetail);
-      
-      setNewPassword("");
-      setConfirmPassword("");
-      setIsPasswordResetExpanded(false);
-
-      // Add audit log
-      logAuditAction("RESET_PASSWORD", "SUCCESS", "Thay đổi mật khẩu thành công qua GraphQL Gateway");
-    } catch (err: any) {
-      console.warn("GraphQL changePassword failed, trying legacy REST API fallback...", err);
-      try {
-        let response;
-        try {
-          response = await apiRequest(`/api/auth/change-password`, {
-            method: "PUT",
-            body: JSON.stringify({
-              token: token,
-              newPassword: newPassword,
-              confirmPassword: confirmPassword,
-            }),
-          });
-        } catch (putErr) {
-          response = await apiRequest(`/api/auth/reset-password`, {
-            method: "POST",
-            body: JSON.stringify({
-              token: token,
-              newPassword: newPassword,
-              confirmPassword: confirmPassword,
-            }),
-          });
-        }
-        const successDetail = response?.data || "Mật khẩu của bạn đã được thay đổi thành công!";
-        setSuccessMsg(successDetail);
-        setNewPassword("");
-        setConfirmPassword("");
-        setIsPasswordResetExpanded(false);
-        logAuditAction("RESET_PASSWORD", "SUCCESS", "Thay đổi mật khẩu thành công qua REST fallback");
-      } catch (fallbackErr: any) {
-        console.error("REST fallback also failed:", fallbackErr);
-        setErrorMsg(fallbackErr.message || "Thay đổi mật khẩu thất bại. Vui lòng thử lại.");
-        logAuditAction("RESET_PASSWORD", "FAILED", `Thay đổi mật khẩu thất bại: ${fallbackErr.message}`);
-      }
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   // Add item into local Auth Audit Logs
   const logAuditAction = (action: string, status: "SUCCESS" | "FAILED", message: string) => {
@@ -3885,6 +2918,20 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                           <span>{step.time}</span>
                                         </div>
                                       )}
+                                      {(() => {
+                                        const s = step as typeof step & { riskLevel?: string; riskReason?: string };
+                                        if (s.riskLevel && (s.riskLevel === 'HIGH' || s.riskLevel === 'CRITICAL')) {
+                                          return (
+                                            <div 
+                                              title={s.riskReason || 'Cảnh báo rủi ro'}
+                                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-rose-50 border border-rose-200 shadow-sm shrink-0 self-start sm:self-center"
+                                            >
+                                              <AlertTriangle className="w-3 h-3 text-amber-500" />
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
                                     </div>
                                     <p className={`text-[11px] leading-relaxed ${
                                       isStepInProgress 
@@ -4026,7 +3073,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     </div>
 
                     {/* Scrollable list of existing items (Space-optimized & Refined with Bevel) */}
-                    <div className="flex-1 overflow-y-auto hide-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pr-1 space-y-2.5 min-h-0">
+                    <div className="flex-1 overflow-y-auto hide-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden -m-1.5 p-1.5 space-y-2.5 min-h-0">
                       {activeModalTab === "addresses" && addresses.map(addr => {
                         const isOffice = addr.type === "office";
                         const isCurrentlyEditing = editingAddressSku === addr.sku;
@@ -4070,7 +3117,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           </div>
                         );
                       })}
-
                     </div>
 
                     {/* Bottom action when form is open */}
@@ -4118,13 +3164,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
                             },
                             { 
-                              id: "security", 
-                              label: "Mật khẩu & Bảo mật", 
-                              icon: ShieldCheck, 
-                              desc: "Đổi mật khẩu, username",
-                              iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
-                            },
-                            { 
                               id: "addresses", 
                               label: "Sổ địa chỉ nhận hàng", 
                               icon: MapPin, 
@@ -4148,7 +3187,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               iconBoxClass: "bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 border-indigo-200/60"
                             }
                           ] as Array<{
-                            id: "profile" | "security" | "addresses" | "sessions" | "bookmarks";
+                            id: "profile" | "addresses" | "sessions" | "bookmarks";
                             label: string;
                             icon: typeof User;
                             desc: string;
@@ -4213,7 +3252,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <button
                         type="button"
                         onClick={() => setIsAccountsCenterOpen(false)}
-                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100/80 transition-all flex items-center justify-center gap-2 cursor-pointer border border-transparent hover:border-slate-200"
+                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 transition-all duration-300 ease-out flex items-center justify-center gap-2 cursor-pointer bg-gradient-to-b from-white/95 via-white/80 to-slate-50/80 backdrop-blur-sm border-t border-t-white border-b border-b-slate-300/70 border-x border-x-slate-200/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] hover:-translate-y-px active:translate-y-0 active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]"
                       >
                         <X className="w-4 h-4" />
                         <span>Đóng trung tâm tài khoản</span>
@@ -4230,11 +3269,9 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 <div className="flex items-start justify-between gap-3 pb-2.5 mb-3 border-b border-slate-200/80 shrink-0">
                   <div>
                     <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                      {isAddingAddress && (editingAddressSku ? "Chỉnh sửa địa chỉ nhận hàng" : "Thêm địa chỉ giao nhận mới")}
-                      {!isAddingAddress && (
+                      {isAddingAddress ? (editingAddressSku ? "Chỉnh sửa địa chỉ nhận hàng" : "Thêm địa chỉ giao nhận mới") : (
                         <>
                           {activeModalTab === "profile" && "Thông tin hồ sơ cá nhân"}
-                          {activeModalTab === "security" && "Mật khẩu & Thiết lập bảo mật"}
                           {activeModalTab === "addresses" && "Quản lý sổ địa chỉ giao hàng"}
                           {activeModalTab === "sessions" && "Thiết bị & Phiên hoạt động"}
                           {activeModalTab === "bookmarks" && "Sản phẩm & Phụ kiện đã lưu (Bookmarks)"}
@@ -4251,10 +3288,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         form="address-form"
                         disabled={
                           actionLoading ||
-                          isResolvingAddress ||
-                          !resolvedPreview?.success ||
-                          !resolvedPreview?.latitude ||
-                          !resolvedPreview?.longitude ||
                           !newAddressForm.recipientName.trim() ||
                           !newAddressForm.phone.trim() ||
                           !newAddressForm.address.trim()
@@ -4351,60 +3384,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-snug">
-                                {editFullName || user?.fullName || "Hội viên Horizon"}
+                                {editFullName || user?.fullName || "Người dùng"}
                               </h2>
-                              {(() => {
-                                const rankInfo = getMembershipRankInfo(user);
-                                return (
-                                  <span className={`text-[8.5px] px-2 py-0.5 font-mono font-bold uppercase rounded-md border-t border-t-white border-b border-x inline-flex items-center gap-1 ${rankInfo.badgeClass}`}>
-                                    <Crown className={`w-2.5 h-2.5 shrink-0 ${rankInfo.iconColor}`} />
-                                    <span>{rankInfo.label}</span>
-                                  </span>
-                                );
-                              })()}
                             </div>
 
                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono flex-wrap">
-                              <span className="inline-flex items-center gap-1.5">
-                                <span>@{user?.username || "horizon_member"}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIsInlineUsernameOpen(prev => !prev);
-                                    if (!isInlineUsernameOpen) {
-                                      setInlineUsername(user?.username || "");
-                                      setIsInlineUserEdited(false);
-                                      setInlineCheckStatus("idle");
-                                      setInlinePassword("");
-                                      setInlineConfirmPassword("");
-                                      setShowInlinePassword(false);
-                                      setShowInlineConfirmPassword(false);
-                                      setInlineUsernameError("");
-                                      setInlineUsernameSuccess("");
-                                      lastCheckedUsernameRef.current = "";
-                                    }
-                                  }}
-                                  title={isInlineUsernameOpen ? "Đóng chỉnh sửa username" : (cooldownRemaining?.isActive ? `Đổi lại sau: ${cooldownRemaining.formatted}` : "Đổi tên đăng nhập (Username)")}
-                                  className={`p-1 transition-all cursor-pointer inline-flex items-center justify-center rounded-lg active:scale-95 ${
-                                    isInlineUsernameOpen
-                                      ? "bg-[#FF4D24] text-white shadow-xs"
-                                      : cooldownRemaining?.isActive
-                                        ? "text-amber-500 hover:text-amber-600 hover:bg-amber-50"
-                                        : "text-slate-400 hover:text-[#FF4D24] hover:bg-orange-50"
-                                  }`}
-                                >
-                                  <Pencil className="w-3 h-3" />
-                                </button>
-                              </span>
-                              {cooldownRemaining?.isActive && (
-                                <span
-                                  className="text-[9.5px] font-bold font-mono px-2 py-0.5 bg-gradient-to-b from-amber-50 to-amber-100/70 text-amber-800 border border-amber-200/80 rounded-md inline-flex items-center gap-1 shadow-2xs"
-                                  title={`Tài khoản đang trong thời gian giãn cách 30 ngày. Đổi lại sau: ${cooldownRemaining.formatted}`}
-                                >
-                                  <Clock className="w-2.5 h-2.5 text-amber-600 animate-pulse" />
-                                  <span>Đổi lại sau: <span className="font-extrabold">{cooldownRemaining.formatted}</span></span>
-                                </span>
-                              )}
+                              <span>@{user?.username || "username"}</span>
                               <span className="text-slate-300">•</span>
                               <span className="text-slate-600 truncate max-w-[180px] sm:max-w-[240px]">{user?.email || "user@horizon.net"}</span>
                             </div>
@@ -4426,290 +3411,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     {/* 2. FORM PROFILE FIELDS (With In-Place Animated Username Drawer) */}
                     <form onSubmit={handleSaveProfile} className="bg-gradient-to-b from-white via-white/95 to-slate-50/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-3xl p-4 sm:p-5 shadow-[0_3px_10px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] space-y-4">
                       
-                      {/* INLINE USERNAME EDITING DRAWER (GPU-Accelerated 120 FPS High Performance Transition) */}
-                      <div
-                        className={`grid transition-[grid-template-rows,opacity,margin] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[grid-template-rows,opacity] ${
-                          isInlineUsernameOpen
-                            ? "grid-rows-[1fr] opacity-100 mb-2 pointer-events-auto"
-                            : "grid-rows-[0fr] opacity-0 mb-0 pointer-events-none"
-                        }`}
-                      >
-                        <div className="overflow-hidden min-h-0">
-                          <div className="space-y-3 pb-3 px-1.5 pt-1 border-b border-slate-200/60">
-                            {/* Header of Drawer */}
-                            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
-                              <div className="flex items-center gap-2">
-                                <Shield className="w-3.5 h-3.5 text-[#FF4D24]" />
-                                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider font-mono">
-                                  Cập nhật thông tin đăng nhập
-                                </h3>
-                                {credentialGrant.isActive && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center gap-1">
-                                    <Clock className="w-3 h-3 text-amber-500 animate-pulse" />
-                                    Còn lại: {Math.floor(credentialGrant.remainingSeconds / 60)}:
-                                    {String(credentialGrant.remainingSeconds % 60).padStart(2, "0")}
-                                  </span>
-                                )}
-                                {!credentialGrant.isActive && hasPendingCredentialRequest && (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20 flex items-center gap-1">
-                                      <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                                      Đang chờ email...
-                                    </span>
-                                    <a
-                                      href="/credential-change/activate?preview=success"
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-[10px] font-mono text-indigo-600 hover:text-indigo-800 underline flex items-center gap-0.5"
-                                      title="Xem trang xác thực thành công & hướng fix"
-                                    >
-                                      <span>(Xem trang xác thực)</span>
-                                    </a>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* 1. Phần Đổi Tên Đăng Nhập (API Call 1: PUT /api/auth/update-credentials) */}
-                            <div className="space-y-2 bg-slate-50/70 rounded-2xl p-3 border border-slate-200/70">
-                              <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-black text-slate-700 flex items-center gap-1.5 font-mono tracking-wider">
-                                  <span className="w-4 h-4 rounded-md bg-[#FF4D24]/10 text-[#FF4D24] flex items-center justify-center text-[10px] font-bold">1</span>
-                                  <span>ĐỔI TÊN ĐĂNG NHẬP</span>
-                                </label>
-
-                                <button
-                                  type="button"
-                                  onClick={handleUpdateUsername}
-                                  disabled={!credentialGrant.isActive || !isCredentialUserChanged || !isCredentialUsernameValid || isUsernameSaving}
-                                  title={usernameButtonTooltip}
-                                  className={`h-7 px-3.5 rounded-xl select-none text-[11px] font-bold font-mono transition-all flex items-center gap-1.5 ${
-                                    credentialGrant.isActive && isCredentialUserChanged && isCredentialUsernameValid
-                                      ? "bg-gradient-to-b from-[#FF5A30] to-[#E53B12] hover:from-[#FF653C] hover:to-[#D4340C] active:scale-95 text-white border border-[#D4340C] border-t-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_2px_rgba(0,0,0,0.12)] cursor-pointer"
-                                      : "bg-slate-100 text-slate-400 border border-slate-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] opacity-60 cursor-not-allowed"
-                                  }`}
-                                >
-                                  {isUsernameSaving ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin stroke-[2.8]" />
-                                  ) : (
-                                    <Check className="w-3.5 h-3.5 stroke-[2.8]" />
-                                  )}
-                                  <span>Lưu tên</span>
-                                </button>
-                              </div>
-
-                              <div className="relative">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xs select-none">
-                                  @
-                                </span>
-                                <input
-                                  autoFocus={isInlineUsernameOpen}
-                                  maxLength={50}
-                                  value={inlineUsername}
-                                  placeholder="username_moi"
-                                  onChange={(e) => {
-                                    const cleaned = e.target.value.replace(/[^a-zA-Z0-9_]/g, "");
-                                    setInlineUsername(cleaned);
-                                    setIsInlineUserEdited(true);
-                                  }}
-                                  disabled={Boolean(cooldownRemaining?.isActive || isUsernameSaving)}
-                                  className={`w-full bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-xl outline-none transition-all text-[#111111] font-mono font-bold pl-8 pr-10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] ${
-                                    inlineCheckStatus === "error"
-                                      ? "border-red-400! ring-2 ring-red-400/20"
-                                      : inlineCheckStatus === "success"
-                                        ? "border-emerald-400! ring-2 ring-emerald-400/20"
-                                        : inlineCheckStatus === "warning"
-                                          ? "border-amber-400! ring-2 ring-amber-400/20"
-                                          : ""
-                                  }`}
-                                />
-
-                                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
-                                  {inlineCheckStatus === "checking" && (
-                                    <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
-                                  )}
-                                  {inlineCheckStatus === "success" && (
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                  )}
-                                  {inlineCheckStatus === "warning" && (
-                                    <AlertCircle className="w-4 h-4 text-amber-500" />
-                                  )}
-                                  {inlineCheckStatus === "error" && (
-                                    <AlertCircle className="w-4 h-4 text-red-500" />
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 2. Phần Đổi Mật Khẩu (API Call 2: PUT /api/auth/update-credentials) */}
-                            <div className="space-y-2.5 bg-slate-50/70 rounded-2xl p-3 border border-slate-200/70">
-                              <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-black text-slate-700 flex items-center gap-1.5 font-mono tracking-wider">
-                                  <span className="w-4 h-4 rounded-md bg-[#FF4D24]/10 text-[#FF4D24] flex items-center justify-center text-[10px] font-bold">2</span>
-                                  <span>ĐỔI MẬT KHẨU</span>
-                                </label>
-
-                                <button
-                                  type="button"
-                                  onClick={handleUpdatePassword}
-                                  disabled={!credentialGrant.isActive || !isCredentialPassEntered || !isCredentialPasswordValid || isPasswordSaving}
-                                  title={passwordButtonTooltip}
-                                  className={`h-7 px-3.5 rounded-xl select-none text-[11px] font-bold font-mono transition-all flex items-center gap-1.5 ${
-                                    credentialGrant.isActive && isCredentialPassEntered && isCredentialPasswordValid
-                                      ? "bg-gradient-to-b from-[#FF5A30] to-[#E53B12] hover:from-[#FF653C] hover:to-[#D4340C] active:scale-95 text-white border border-[#D4340C] border-t-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_2px_rgba(0,0,0,0.12)] cursor-pointer"
-                                      : "bg-slate-100 text-slate-400 border border-slate-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] opacity-60 cursor-not-allowed"
-                                  }`}
-                                >
-                                  {isPasswordSaving ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin stroke-[2.8]" />
-                                  ) : (
-                                    <Check className="w-3.5 h-3.5 stroke-[2.8]" />
-                                  )}
-                                  <span>Lưu mật khẩu</span>
-                                </button>
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {/* Password Field */}
-                                <div className="space-y-1">
-                                  <span className="text-[10px] font-bold text-slate-600 block">
-                                    Mật khẩu mới
-                                  </span>
-                                  <div className="relative">
-                                    <input
-                                      type={showInlinePassword ? "text" : "password"}
-                                      placeholder="Tối thiểu 6 ký tự..."
-                                      value={inlinePassword}
-                                      onChange={(e) => setInlinePassword(e.target.value)}
-                                      disabled={isPasswordSaving}
-                                      className="w-full bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-xl outline-none transition-all text-[#111111] font-semibold pl-9 pr-9.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)]"
-                                    />
-                                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowInlinePassword(!showInlinePassword)}
-                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 transition-colors"
-                                      title={showInlinePassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                                    >
-                                      {showInlinePassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Confirm Password Field */}
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-slate-600">
-                                      Xác nhận mật khẩu
-                                    </span>
-                                    {inlineConfirmPassword && inlinePassword && (
-                                      <span className={inlinePassword === inlineConfirmPassword ? "text-emerald-600 font-bold font-mono text-[9.5px]" : "text-red-500 font-bold font-mono text-[9.5px]"}>
-                                        {inlinePassword === inlineConfirmPassword ? "✓ Khớp" : "✕ Chưa khớp"}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="relative">
-                                    <input
-                                      type={showInlineConfirmPassword ? "text" : "password"}
-                                      placeholder="Nhập lại mật khẩu..."
-                                      value={inlineConfirmPassword}
-                                      onChange={(e) => setInlineConfirmPassword(e.target.value)}
-                                      disabled={isPasswordSaving}
-                                      className={`w-full bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-xl outline-none transition-all text-[#111111] font-semibold pl-9 pr-9.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] ${
-                                        inlineConfirmPassword && inlinePassword && inlinePassword !== inlineConfirmPassword
-                                          ? "border-red-400! ring-2 ring-red-400/20"
-                                          : inlineConfirmPassword && inlinePassword && inlinePassword === inlineConfirmPassword
-                                            ? "border-emerald-400! ring-2 ring-emerald-400/20"
-                                            : ""
-                                      }`}
-                                    />
-                                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowInlineConfirmPassword(!showInlineConfirmPassword)}
-                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 transition-colors"
-                                      title={showInlineConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                                    >
-                                      {showInlineConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                        <div className="flex items-center gap-2">
-                          <User className="w-3.5 h-3.5 text-[#FF4D24]" />
-                          <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wider font-mono">
-                            Thông tin định danh người dùng
-                          </h3>
-                        </div>
-
-                        {!isInlineUsernameOpen && (
-                          <button
-                            onClick={handleRequestCredentialChange}
-                            disabled={isRequestingCredentialChange}
-                            onMouseEnter={() => setIsHeaderShieldHovered(true)}
-                            onMouseLeave={() => setIsHeaderShieldHovered(false)}
-                            title="Đổi tên đăng nhập & Mật khẩu (Gửi email xác thực)"
-                            className={`relative w-[184px] h-[27px] bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 text-xs font-bold rounded-xl shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all flex items-center select-none overflow-hidden ${
-                              isRequestingCredentialChange ? "opacity-75 cursor-wait" : "cursor-pointer active:scale-95 shrink-0"
-                            }`}
-                          >
-                            {/* Dynamic Wave / Shimmer active ON CLICK or REQUESTING */}
-                            {(isOpeningDrawer || isRequestingCredentialChange) && (
-                              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl z-0">
-                                <motion.div
-                                  className="w-3/5 h-full bg-gradient-to-r from-transparent via-indigo-400/40 via-[#FF4D24]/50 via-white to-transparent -skew-x-20"
-                                  style={{ filter: "drop-shadow(0 0 8px rgba(255,77,36,0.6))" }}
-                                  initial={{ x: "-130%" }}
-                                  animate={{ x: "280%" }}
-                                  transition={{ duration: 0.5, ease: "easeInOut", repeat: isRequestingCredentialChange ? Infinity : 0 }}
-                                />
-                              </div>
-                            )}
-
-                            {/* Icon pinned fixed to the left corner */}
-                            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 z-10 pointer-events-none flex items-center justify-center">
-                              {isRequestingCredentialChange ? (
-                                <Loader2 className="w-3.5 h-3.5 text-indigo-700 animate-spin" />
-                              ) : (
-                                <HoverMorphIcon
-                                  defaultIcon={LucideShield}
-                                  hoverIcon={LucidePencil}
-                                  isHovered={isHeaderShieldHovered}
-                                  size={13.5}
-                                  className="text-indigo-700"
-                                />
-                              )}
-                            </div>
-
-                            {/* Smooth CSS Text Crossfade Transition */}
-                            <div className="relative w-full h-full flex items-center justify-center pl-6 pr-1.5 pointer-events-none overflow-hidden">
-                              <span
-                                className={`text-[10px] font-mono font-bold text-center block whitespace-nowrap transition-all duration-250 ease-out ${
-                                  isHeaderShieldHovered || isRequestingCredentialChange
-                                    ? "opacity-0 -translate-y-2 pointer-events-none absolute"
-                                    : "opacity-100 translate-y-0"
-                                }`}
-                              >
-                                Bảo mật & Tên đăng nhập
-                              </span>
-                              <span
-                                className={`text-[10px] font-mono font-bold text-center block whitespace-nowrap transition-all duration-250 ease-out ${
-                                  isHeaderShieldHovered || isRequestingCredentialChange
-                                    ? "opacity-100 translate-y-0"
-                                    : "opacity-0 translate-y-2 pointer-events-none absolute"
-                                }`}
-                              >
-                                {isRequestingCredentialChange ? "Đang gửi yêu cầu..." : "Gửi yêu cầu thay đổi"}
-                              </span>
-                            </div>
-                          </button>
-                        )}
-                      </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Field: Họ và tên */}
@@ -4740,7 +3441,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               type="tel"
                               value={editPhone}
                               onChange={(e) => setEditPhone(e.target.value)}
-                              placeholder="0901234567"
+                              placeholder="Nhập số điện thoại..."
                               className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 font-mono"
                             />
                             <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -4790,6 +3491,27 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             })}
                           </div>
                         </div>
+                        {/* Field: Địa chỉ mặc định */}
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-[11px] font-bold text-slate-600 block">
+                            Địa chỉ giao hàng mặc định
+                          </label>
+                          <div
+                            onClick={() => {
+                              setActiveModalTab("addresses");
+                              if (addresses.length === 0) setIsAddingAddress(true);
+                            }}
+                            className="relative flex items-center justify-between p-3 rounded-2xl bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border-t border-t-white border-b border-b-slate-300/80 border-x border-x-slate-200/90 cursor-pointer transition-all hover:from-white hover:to-slate-50 hover:border-b-slate-400/70 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-px active:translate-y-0 active:shadow-[0_1px_2px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.8)] group"
+                          >
+                            <div className="flex items-center space-x-3 truncate">
+                              <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                              <span className="text-xs font-medium text-slate-700 truncate">
+                                {addresses.find(a => a.isDefault)?.address || "Chưa thiết lập địa chỉ"}
+                              </span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                          </div>
+                        </div>
                       </div>
 
                       {/* ACTION BUTTONS (Clean bottom alignment inside the card) */}
@@ -4823,246 +3545,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   </div>
                 )}
 
-                {/* TAB 2: Security & Passwords */}
-                {activeModalTab === "security" && (
-                  <div className="space-y-5 flex-1">
-                    
-                    {/* Username Update Section */}
-                    <div className="bg-gradient-to-b from-white via-white/95 to-slate-50/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl overflow-hidden shadow-[0_3px_10px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
-                      <button
-                        type="button"
-                        onClick={() => setIsUsernameChangeExpanded(!isUsernameChangeExpanded)}
-                        className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-indigo-50/30 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center gap-3.5">
-                          <User className="w-5 h-5 text-indigo-600" />
-                          <div>
-                            <span className="text-xs font-black text-slate-800 block">Đổi tên đăng nhập (Username)</span>
-                            <span className="text-[11px] text-slate-400">Tên hiện tại: @{user?.username || "username"}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {cooldownRemaining?.isActive && (
-                            <span className="text-[9.5px] font-bold font-mono px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/90 rounded-md inline-flex items-center gap-1 shadow-2xs">
-                              <Clock className="w-2.5 h-2.5 text-amber-600 animate-pulse" />
-                              <span>Đổi lại sau: {cooldownRemaining.shortFormatted}</span>
-                            </span>
-                          )}
-                          {isUsernameChangeExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                        </div>
-                      </button>
-
-                      <AnimatePresence initial={false}>
-                        {isUsernameChangeExpanded && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden border-t border-slate-100"
-                          >
-                            <form onSubmit={handleChangeUsername} className="p-5 flex flex-col gap-3.5">
-                              {/* Cooldown / Info Callout Banner */}
-                              {cooldownRemaining?.isActive ? (
-                                <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
-                                  <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
-                                  <div className="space-y-0.5">
-                                    <p className="font-bold text-[11.5px]">Tài khoản đang trong thời hạn giãn cách 30 ngày (IAM Cooldown)</p>
-                                    <p className="text-[11px] text-amber-800/90">
-                                      Bạn có thể đổi lại sau: <strong className="font-mono font-bold text-amber-950">{cooldownRemaining.untilDateStr}</strong> ({cooldownRemaining.formatted}).
-                                    </p>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-start gap-2.5 text-xs text-slate-700">
-                                  <ShieldAlert className="w-4 h-4 text-[#FF4D24] shrink-0 mt-0.5" />
-                                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                                    Tên đăng nhập từ 3 đến 50 ký tự, không chứa ký tự '@' và chưa ai sử dụng. Sau khi đổi thành công sẽ kích hoạt hạn khóa 30 ngày.
-                                  </p>
-                                </div>
-                              )}
-
-                              {(() => {
-                                const secValidation = validateUsernameFormat(newUsername, user?.username);
-                                return (
-                                  <>
-                                    <div className="flex flex-col gap-1.5">
-                                      <div className="flex items-center justify-between">
-                                        <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono text-left">
-                                          Tên đăng nhập mới
-                                        </label>
-                                        <span className={`font-mono text-[10px] font-bold ${
-                                          newUsername.length > 50
-                                            ? "text-red-500 font-bold"
-                                            : newUsername.length >= 3
-                                              ? "text-emerald-600"
-                                              : "text-slate-400"
-                                        }`}>
-                                          {newUsername.length}/50 ký tự
-                                        </span>
-                                      </div>
-                                      <div className="relative">
-                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xs select-none">
-                                          @
-                                        </span>
-                                        <input
-                                          type="text"
-                                          maxLength={50}
-                                          disabled={Boolean(cooldownRemaining?.isActive || actionLoading)}
-                                          placeholder="Nhập tên đăng nhập mới..."
-                                          value={newUsername}
-                                          onChange={(e) => {
-                                            const cleaned = e.target.value.replace(/[^a-zA-Z0-9_]/g, "");
-                                            setNewUsername(cleaned);
-                                          }}
-                                          className={`w-full bg-slate-50/80 focus:bg-white border text-xs pl-8 pr-4 py-3 rounded-2xl outline-none transition-all font-mono font-bold text-slate-900 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] ${
-                                            newUsername.length > 0 && !secValidation.valid
-                                              ? "border-red-400 focus:ring-2 focus:ring-red-400/20"
-                                              : newUsername.length > 0 && secValidation.valid
-                                                ? "border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
-                                                : "border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15"
-                                          }`}
-                                        />
-                                      </div>
-
-                                      {/* Live Validation message */}
-                                      {newUsername.length > 0 && secValidation.message && (
-                                        <div className="text-[10.5px] font-medium font-mono flex items-center gap-1.5 mt-0.5">
-                                          {secValidation.valid ? (
-                                            <span className="text-emerald-600 inline-flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80 font-bold">
-                                              <CheckCircle2 className="w-3 h-3" /> Tên đăng nhập hợp lệ và sẵn sàng cập nhật
-                                            </span>
-                                          ) : (
-                                            <span className="text-amber-600 inline-flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/80 font-bold">
-                                              <AlertCircle className="w-3 h-3 shrink-0" /> {secValidation.message}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <button
-                                      type="submit"
-                                      disabled={Boolean(cooldownRemaining?.isActive || !secValidation.valid || actionLoading)}
-                                      className="w-full bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                      {actionLoading ? (
-                                        <>
-                                          <RefreshCw className="w-4 h-4 animate-spin" />
-                                          <span>Đang kiểm tra & cập nhật...</span>
-                                        </>
-                                      ) : cooldownRemaining?.isActive ? (
-                                        <>
-                                          <Clock className="w-4 h-4" />
-                                          <span>Đổi lại sau ({cooldownRemaining.shortFormatted})</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Check className="w-4 h-4" />
-                                          <span>Cập nhật tên đăng nhập</span>
-                                        </>
-                                      )}
-                                    </button>
-                                  </>
-                                );
-                              })()}
-                            </form>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    {/* Password Reset Section */}
-                    <div className="bg-gradient-to-b from-white via-white/95 to-slate-50/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl overflow-hidden shadow-[0_3px_10px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)]">
-                      <button
-                        type="button"
-                        onClick={() => setIsPasswordResetExpanded(!isPasswordResetExpanded)}
-                        className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-indigo-50/30 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center gap-3.5">
-                          <Lock className="w-5 h-5 text-indigo-600" />
-                          <div>
-                            <span className="text-xs font-black text-slate-800 block">Đổi mật khẩu tài khoản</span>
-                            <span className="text-[11px] text-slate-400">Khuyến nghị kết hợp chữ hoa, chữ số & ký tự đặc biệt</span>
-                          </div>
-                        </div>
-                        {isPasswordResetExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                      </button>
-
-                      <AnimatePresence initial={false}>
-                        {isPasswordResetExpanded && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden border-t border-slate-100"
-                          >
-                            <form onSubmit={handleResetPassword} className="p-5 flex flex-col gap-3.5">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                <div className="flex flex-col gap-1.5 text-left">
-                                  <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Mật khẩu mới</label>
-                                  <div className="relative">
-                                    <input
-                                      type={showPassword ? "text" : "password"}
-                                      required
-                                      placeholder="Nhập tối thiểu 6 ký tự..."
-                                      value={newPassword}
-                                      onChange={(e) => setNewPassword(e.target.value)}
-                                      className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs pl-4 pr-10 py-3 rounded-2xl outline-none transition-all text-[#111111] font-medium shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowPassword(!showPassword)}
-                                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                                    >
-                                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-col gap-1.5 text-left">
-                                  <label className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider font-mono">Xác nhận mật khẩu</label>
-                                  <input
-                                    type={showPassword ? "text" : "password"}
-                                    required
-                                    placeholder="Nhập lại mật khẩu..."
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="w-full bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-xs px-4 py-3 rounded-2xl outline-none transition-all text-[#111111] font-medium shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)]"
-                                  />
-                                </div>
-                              </div>
-
-                              <button
-                                type="submit"
-                                disabled={actionLoading}
-                                className="w-full bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold py-3 rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] mt-1 active:scale-95 disabled:opacity-50"
-                              >
-                                {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin mx-auto text-white" /> : "Xác nhận đổi mật khẩu"}
-                              </button>
-                            </form>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    {/* Security 2FA Information */}
-                    <div className="p-4 sm:p-5 bg-gradient-to-b from-white/90 via-emerald-50/20 to-emerald-50/40 border-t border-t-white border-b border-b-emerald-200/70 border-x border-x-emerald-100/60 rounded-2xl flex items-center justify-between text-left shadow-[0_2px_8px_-2px_rgba(16,185,129,0.08),inset_0_1px_0_rgba(255,255,255,1)]">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-b from-emerald-100 to-emerald-200/70 border-t border-t-white text-emerald-700 flex items-center justify-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                          <Shield className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">Bảo mật Token Bearer JWT</p>
-                          <p className="text-[11px] text-slate-500">Mã hóa đối xứng qua Gateway BFF an toàn 100%.</p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-extrabold text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100/80 px-3 py-1 rounded-full border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(16,185,129,0.06)]">
-                        HOẠT ĐỘNG
-                      </span>
-                    </div>
-
-                  </div>
-                )}
 
                 {/* TAB 3: Address Book */}
                 {activeModalTab === "addresses" && (
@@ -5137,29 +3619,43 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             {/* Address Type: Modern Segmented Control */}
                             <div className="md:col-span-3">
                               <label className="text-[11px] font-bold text-slate-700 block mb-1">Loại địa chỉ</label>
-                              <div className="h-9 p-0.5 bg-gradient-to-b from-slate-100 to-slate-200/70 border border-slate-200/90 rounded-xl flex items-center gap-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
+                              <div className="relative grid grid-cols-2 p-1 rounded-xl bg-slate-100/80 border-t border-t-slate-300/50 border-b border-b-white/80 border-x border-x-slate-200/60 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.04),0_1px_0_rgba(255,255,255,0.8)] h-9">
                                 <button
                                   type="button"
                                   onClick={() => setNewAddressForm({ ...newAddressForm, type: "office" })}
-                                  className={`flex-1 h-full rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                                  className={`relative z-10 flex-1 h-full rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer select-none ${
                                     newAddressForm.type === "office"
-                                      ? "bg-gradient-to-b from-white to-slate-50 text-indigo-700 border-t border-t-white border-b border-b-slate-200 border-x border-x-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] font-extrabold"
+                                      ? "text-indigo-900"
                                       : "text-slate-500 hover:text-slate-800"
                                   }`}
                                 >
-                                  <Building2 className="w-3 h-3" />
+                                  {newAddressForm.type === "office" && (
+                                    <motion.div
+                                      layoutId="active-address-type"
+                                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                      className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-white/80 rounded-[8px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] -z-10"
+                                    />
+                                  )}
+                                  <Building2 className={`w-3.5 h-3.5 ${newAddressForm.type === "office" ? "text-indigo-600" : ""}`} />
                                   <span>Văn phòng</span>
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setNewAddressForm({ ...newAddressForm, type: "home" })}
-                                  className={`flex-1 h-full rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                                  className={`relative z-10 flex-1 h-full rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer select-none ${
                                     newAddressForm.type === "home"
-                                      ? "bg-gradient-to-b from-white to-slate-50 text-violet-700 border-t border-t-white border-b border-b-slate-200 border-x border-x-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] font-extrabold"
+                                      ? "text-violet-900"
                                       : "text-slate-500 hover:text-slate-800"
                                   }`}
                                 >
-                                  <Home className="w-3 h-3" />
+                                  {newAddressForm.type === "home" && (
+                                    <motion.div
+                                      layoutId="active-address-type"
+                                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                      className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-white/80 rounded-[8px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] -z-10"
+                                    />
+                                  )}
+                                  <Home className={`w-3.5 h-3.5 ${newAddressForm.type === "home" ? "text-violet-600" : ""}`} />
                                   <span>Nhà riêng</span>
                                 </button>
                               </div>
@@ -5200,8 +3696,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             </label>
 
                             <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
-                              {/* 65% Fixed Width Input */}
-                              <div className="relative w-full sm:w-[65%] sm:basis-[65%] shrink-0">
+                              {/* Flexible Width Search Input */}
+                              <div className="relative flex-1 min-w-0 w-full">
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                                   <Search className="w-3.5 h-3.5" />
                                 </div>
@@ -5221,67 +3717,86 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     type="button"
                                     onClick={handleManualResolveAddress}
                                     disabled={isResolvingAddress}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed active:scale-95"
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed active:scale-95"
                                     title="Chủ động tải lại vị trí / Geocoding tọa độ"
                                   >
-                                    <RefreshCw className={`w-3.5 h-3.5 ${isResolvingAddress ? "animate-spin text-indigo-600" : "text-slate-400 hover:text-indigo-600"}`} />
+                                    {isResolvingAddress ? (
+                                      <BeatLoader color="#4f46e5" size={3} margin={1.5} speedMultiplier={0.8} />
+                                    ) : (
+                                      <RefreshCw className="w-3.5 h-3.5 text-slate-400 hover:text-indigo-600" />
+                                    )}
                                   </button>
                                 )}
                               </div>
 
-                              {/* 35% Fixed Width Geocoding Status Chip (Click to Copy & Stretched Layout) */}
-                              <div className="w-full sm:w-[35%] sm:basis-[35%] shrink-0">
+                              {/* Fixed Width Tactile Geocoding Capsule */}
+                              <div className="w-full sm:w-[220px] shrink-0">
                                 {isResolvingAddress ? (
-                                  <div className="w-full h-9.5 px-3 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 rounded-xl flex items-center justify-center gap-1.5 text-xs text-indigo-700 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
-                                    <span className="truncate">Đang tìm tọa độ...</span>
+                                  <div className="w-full h-9.5 rounded-xl bg-slate-100/90 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200/70 p-1 flex items-center justify-center gap-2 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.03)]">
+                                    <div className="relative flex items-center justify-center size-3.5 shrink-0">
+                                      <div className="absolute inset-0 rounded-full border-2 border-indigo-200 border-t-indigo-600 animate-spin" />
+                                    </div>
+                                    <span className="text-[11px] font-bold text-indigo-900 tracking-tight">Đang quét định vị...</span>
                                   </div>
                                 ) : resolvedPreview && resolvedPreview.success ? (
-                                  <div
-                                    onClick={() => {
-                                      if (resolvedPreview?.latitude && resolvedPreview?.longitude) {
-                                        const mapShareText = `https://maps.google.com/?q=${resolvedPreview.latitude.toFixed(6)},${resolvedPreview.longitude.toFixed(6)}`;
-                                        navigator.clipboard.writeText(mapShareText);
-                                        setSuccessMsg("Đã sao chép liên kết vị trí bản đồ!");
-                                        setTimeout(() => {
-                                          setSuccessMsg((prev) => (prev === "Đã sao chép liên kết vị trí bản đồ!" ? "" : prev));
-                                        }, 1000);
-                                      }
-                                    }}
-                                    className="w-full h-9.5 px-3 bg-gradient-to-b from-emerald-50 via-emerald-50/80 to-emerald-100/60 hover:from-emerald-100 border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 rounded-xl flex items-center justify-between gap-1.5 text-xs transition-all cursor-pointer shadow-[0_1px_3px_rgba(16,185,129,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] group select-none active:scale-[0.99]"
-                                    title="Bấm vào để sao chép liên kết vị trí bản đồ"
-                                  >
-                                    <div className="flex items-center min-w-0 flex-1">
-                                      <span className="font-mono font-bold text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200/70 px-1.5 py-0.5 rounded text-[11px] truncate flex-1 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
-                                        {resolvedPreview.latitude.toFixed(4)}, {resolvedPreview.longitude.toFixed(4)}
-                                      </span>
-                                    </div>
+                                  <div className="w-full h-9.5 rounded-xl bg-gradient-to-b from-slate-100/90 via-slate-50/80 to-slate-100/90 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200/70 p-1 flex items-center shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.8)]">
+                                    {/* Tactile Monospace Coordinate Chip (Full Width, No Ping, No Chuẩn hóa/Chuẩn xác badge) */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (resolvedPreview?.latitude && resolvedPreview?.longitude) {
+                                          const mapShareText = `https://maps.google.com/?q=${resolvedPreview.latitude.toFixed(6)},${resolvedPreview.longitude.toFixed(6)}`;
+                                          navigator.clipboard.writeText(mapShareText);
+                                          setSuccessMsg("Đã sao chép liên kết vị trí bản đồ!");
+                                          setCopiedCoord(true);
+                                          setTimeout(() => {
+                                            setSuccessMsg((prev) => (prev === "Đã sao chép liên kết vị trí bản đồ!" ? "" : prev));
+                                            setCopiedCoord(false);
+                                          }, 1200);
+                                        }
+                                      }}
+                                      title="Bấm vào để sao chép liên kết vị trí bản đồ"
+                                      className="w-full h-full px-2.5 rounded-lg bg-gradient-to-b from-white via-white/95 to-slate-50 hover:to-white border-t border-t-white border-b border-b-slate-200/90 border-x border-x-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-between gap-1.5 min-w-0 cursor-pointer group/geo select-none transition-all active:scale-[0.98]"
+                                    >
+                                      {/* Solid Beacon Dot (animate-ping removed) */}
+                                      <span className="size-1.5 rounded-full bg-emerald-500 shadow-xs shrink-0" />
 
-                                    {newAddressForm.address.trim() !== resolvedPreview.formattedAddress.trim() && (
-                                      <div className="flex items-center shrink-0">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setNewAddressForm(prev => ({ ...prev, address: resolvedPreview.formattedAddress }));
-                                          }}
-                                          className="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-1.5 py-0.5 rounded-lg transition-colors cursor-pointer flex items-center gap-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
-                                          title="Áp dụng định dạng địa chỉ chuẩn hóa"
-                                        >
-                                          <Sparkles className="w-2.5 h-2.5" />
-                                          <span>Chuẩn hóa</span>
-                                        </button>
+                                      {/* Coordinate Value */}
+                                      <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-center">
+                                        <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400 group-hover/geo:text-indigo-600 transition-colors shrink-0">
+                                          GPS
+                                        </span>
+                                        <span className="font-mono text-[11px] font-bold text-slate-700 tracking-tight truncate group-hover/geo:text-indigo-600 transition-colors">
+                                          {copiedCoord ? "Đã sao chép!" : `${resolvedPreview.latitude.toFixed(4)}, ${resolvedPreview.longitude.toFixed(4)}`}
+                                        </span>
                                       </div>
-                                    )}
+
+                                      {/* Micro Copy Feedback */}
+                                      {copiedCoord ? (
+                                        <Check className="size-3 text-emerald-600 shrink-0 animate-in zoom-in" />
+                                      ) : (
+                                        <Copy className="size-2.5 text-slate-400 group-hover/geo:text-indigo-600 shrink-0 transition-colors" />
+                                      )}
+                                    </button>
                                   </div>
                                 ) : resolvedPreview && !resolvedPreview.success ? (
-                                  <div className="w-full h-9.5 px-3 bg-gradient-to-b from-amber-50 to-amber-100/70 border-t border-t-white border-b border-b-amber-200 border-x border-x-amber-100 rounded-xl flex items-center justify-center gap-1.5 text-xs text-amber-800 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                    <span className="truncate">Chưa tìm thấy tọa độ</span>
+                                  <div className="w-full h-9.5 rounded-xl bg-gradient-to-b from-amber-50 to-amber-100/60 border-t border-t-white border-b border-b-amber-300/70 border-x border-x-amber-200/80 px-2.5 flex items-center justify-between gap-1.5 shadow-[inset_0_1px_2px_rgba(245,158,11,0.05)]">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <AlertCircle className="size-3.5 text-amber-600 shrink-0" />
+                                      <span className="text-[11px] font-bold text-amber-800 truncate">Không tìm thấy tọa độ</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={handleManualResolveAddress}
+                                      className="text-[10px] font-bold text-amber-700 hover:text-amber-900 underline underline-offset-2 shrink-0 cursor-pointer"
+                                    >
+                                      Thử lại
+                                    </button>
                                   </div>
                                 ) : (
-                                  <div className="w-full h-9.5 px-3 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border border-dashed border-slate-300/80 rounded-xl flex items-center justify-center text-[11px] text-slate-400 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                                    <span>Chờ nhập địa chỉ...</span>
+                                  <div className="w-full h-9.5 rounded-xl bg-slate-100/60 border border-slate-200/70 border-dashed px-3 flex items-center gap-2 text-slate-400 select-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]">
+                                    <MapPin className="size-3.5 text-slate-400/80 shrink-0" />
+                                    <span className="text-[11px] font-medium text-slate-500 truncate">Tọa độ GPS tự động cập nhật</span>
                                   </div>
                                 )}
                               </div>
@@ -5293,25 +3808,23 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         <div className="flex-1 min-h-[360px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200 bg-slate-100 overflow-hidden relative shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex">
                           
                           {/* Map Viewport Area */}
-                          <div className="w-full h-full relative bg-slate-100 flex items-center justify-center overflow-hidden flex-1">
+                          <div className="w-full h-full relative bg-slate-100 flex items-center justify-center overflow-hidden flex-1 [transform:translateZ(0)] isolate">
                             {resolvedPreview?.success && resolvedPreview.latitude && resolvedPreview.longitude ? (
                               <>
-                                {/* Iframe with dynamic blur effect according to performance state */}
+                                {/* Direct crisp live map iframe without blur filter, scaling, or transition lag */}
                                 <iframe
                                   key={mapKey}
-                                  title="OpenStreetMap Live Preview"
-                                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${resolvedPreview.longitude - 0.007}%2C${resolvedPreview.latitude - 0.004}%2C${resolvedPreview.longitude + 0.007}%2C${resolvedPreview.latitude + 0.004}&layer=${mapLayer}&marker=${resolvedPreview.latitude}%2C${resolvedPreview.longitude}`}
-                                  className={`w-full h-full border-0 absolute inset-0 transition-all duration-300 ${
+                                  title="Live Map Preview"
+                                  src={`https://maps.google.com/maps?q=${resolvedPreview.latitude},${resolvedPreview.longitude}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                                  className={`w-full h-full border-0 absolute inset-0 ${
                                     isMapActive 
-                                      ? "filter-none opacity-100 scale-100 pointer-events-auto" 
-                                      : "filter blur-[4px] opacity-40 scale-105 pointer-events-none"
+                                      ? "opacity-100 pointer-events-auto" 
+                                      : "opacity-40 pointer-events-none"
                                   }`}
-                                  loading="lazy"
                                 />
-
                                 {/* Performance Saver Overlay: Single Minimal Eye Button with 3D Bevel */}
                                 {!isMapActive && (
-                                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-900/10 backdrop-blur-[2px] p-4">
+                                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-900/20 p-4">
                                     <button
                                       type="button"
                                       onClick={() => setIsMapActive(true)}
@@ -5325,16 +3838,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                                 {/* Floating Location Action Bar when Map is Active (No Name, Recenter Icon + Google Maps Button) */}
                                 {isMapActive && (
-                                  <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 bg-gradient-to-b from-white/95 via-white/90 to-white/80 backdrop-blur-md p-1 pl-2.5 rounded-xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_4px_14px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] animate-in fade-in duration-200">
-                                    <div className="flex items-center gap-1.5 pr-1">
-                                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                                      <span className="text-[11px] font-mono font-bold text-slate-700">
-                                        {resolvedPreview.latitude.toFixed(4)}, {resolvedPreview.longitude.toFixed(4)}
-                                      </span>
-                                    </div>
-
-                                    <div className="h-4 w-px bg-slate-200 shrink-0" />
-
+                                  <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 bg-gradient-to-b from-white/95 via-white/90 to-white/80 backdrop-blur-md p-1 rounded-xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_4px_14px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] animate-in fade-in duration-200">
                                     {/* Button 1: Recenter map to target address (Icon Only) */}
                                     <button
                                       type="button"
@@ -5395,6 +3899,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             onClick={() => {
                               setIsAddingAddress(true);
                               setEditingAddressSku(null);
+                              setIsMapActive(true);
                               setNewAddressForm({
                                 recipientName: user?.fullName || "",
                                 phone: user?.phoneNumber || "",
@@ -5535,6 +4040,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 )}
 
 
+
                 {/* TAB 5: System Settings, API Gateway & Active Sessions */}
                 {activeModalTab === "sessions" && (
                   <div className="space-y-4 flex-1 flex flex-col min-h-0">
@@ -5625,6 +4131,22 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             <Activity className={`w-3.5 h-3.5 text-indigo-500 ${isPinging ? "animate-spin" : ""}`} />
                             <span>{isPinging ? "Đang ping..." : "Kiểm tra Ping"}</span>
                           </button>
+
+                          {/* URL Configuration Drawer Trigger Button (ADR-002 & USER_UPDATE_FEATURES_SPEC.md 4.2) */}
+                          <button
+                            type="button"
+                            onClick={() => setIsEndpointDrawerOpen(prev => !prev)}
+                            className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer border active:scale-95 ${
+                              isEndpointDrawerOpen
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-200 shadow-inner"
+                                : "bg-gradient-to-b from-white via-slate-50 to-slate-100 border-t border-t-white border-b border-b-slate-300 border-x border-x-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-200 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)]"
+                            }`}
+                            title="Mở rộng khung tùy chỉnh URL Endpoint máy chủ"
+                          >
+                            <Settings2 className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>{isEndpointDrawerOpen ? "Đóng cấu hình" : "Cấu hình URL"}</span>
+                            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isEndpointDrawerOpen ? "rotate-180" : ""}`} />
+                          </button>
                         </div>
                       </div>
 
@@ -5643,98 +4165,108 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         </span>
                       </div>
 
-                      {/* Endpoint Customization Controls & Presets */}
-                      <div className="space-y-2.5 relative z-10">
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                          <div className="relative flex-1">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                              <Wifi className="w-4 h-4" />
+                      {/* Endpoint Customization Controls & Presets Drawer (Collapsible) */}
+                      <AnimatePresence initial={false}>
+                        {isEndpointDrawerOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className="space-y-2.5 relative z-10 overflow-hidden pt-1"
+                          >
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <div className="relative flex-1">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                  <Wifi className="w-4 h-4" />
+                                </div>
+                                <input
+                                  type="text"
+                                  value={customInputUrl}
+                                  onChange={(e) => {
+                                    setCustomInputUrl(e.target.value);
+                                    if (endpointValidationError) setEndpointValidationError("");
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      handleApplyEndpoint();
+                                    }
+                                  }}
+                                  placeholder="http://localhost:8080 hoặc https://api.yourdomain.com"
+                                  className={`w-full pl-9 pr-3 py-2 text-xs font-mono bg-white border rounded-xl shadow-inner focus:outline-none focus:ring-2 transition-all ${
+                                    endpointValidationError
+                                      ? "border-rose-400 focus:ring-rose-500/20 text-rose-700"
+                                      : "border-slate-200/90 focus:border-indigo-500 focus:ring-indigo-500/20 text-slate-800"
+                                  }`}
+                                />
+                              </div>
+
+                              {/* Apply & Reset Buttons */}
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={handleApplyEndpoint}
+                                  disabled={isPinging}
+                                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 border-t border-t-white/30 border-b border-b-indigo-900/40 border-x border-x-indigo-600/50 shadow-[0_2px_8px_rgba(99,102,241,0.35),inset_0_1px_0_rgba(255,255,255,0.3)] hover:brightness-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                                >
+                                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                                  <span>Áp dụng Endpoint</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={handleResetEndpoint}
+                                  className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 active:scale-95 transition-all cursor-pointer"
+                                  title="Khôi phục URL về mặc định hệ thống"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                                  <span className="hidden sm:inline">Khôi phục mặc định</span>
+                                </button>
+                              </div>
                             </div>
-                            <input
-                              type="text"
-                              value={customInputUrl}
-                              onChange={(e) => {
-                                setCustomInputUrl(e.target.value);
-                                if (endpointValidationError) setEndpointValidationError("");
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  handleApplyEndpoint();
-                                }
-                              }}
-                              placeholder="http://localhost:8080 hoặc https://api.yourdomain.com"
-                              className={`w-full pl-9 pr-3 py-2 text-xs font-mono bg-white border rounded-xl shadow-inner focus:outline-none focus:ring-2 transition-all ${
-                                endpointValidationError
-                                  ? "border-rose-400 focus:ring-rose-500/20 text-rose-700"
-                                  : "border-slate-200/90 focus:border-indigo-500 focus:ring-indigo-500/20 text-slate-800"
-                              }`}
-                            />
-                          </div>
 
-                          {/* Apply & Reset Buttons */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              type="button"
-                              onClick={handleApplyEndpoint}
-                              disabled={isPinging}
-                              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 border-t border-t-white/30 border-b border-b-indigo-900/40 border-x border-x-indigo-600/50 shadow-[0_2px_8px_rgba(99,102,241,0.35),inset_0_1px_0_rgba(255,255,255,0.3)] hover:brightness-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-                            >
-                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                              <span>Áp dụng Endpoint</span>
-                            </button>
+                            {endpointValidationError && (
+                              <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                <span>{endpointValidationError}</span>
+                              </div>
+                            )}
 
-                            <button
-                              type="button"
-                              onClick={handleResetEndpoint}
-                              className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 active:scale-95 transition-all cursor-pointer"
-                              title="Khôi phục URL về mặc định hệ thống"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                              <span className="hidden sm:inline">Khôi phục mặc định</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {endpointValidationError && (
-                          <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                            <span>{endpointValidationError}</span>
-                          </div>
+                            {/* 1-Click Presets */}
+                            <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                              <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-amber-500" />
+                                Cài đặt nhanh (1-Click):
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handlePresetSelect("http://localhost:8080")}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer active:scale-95 border ${
+                                  customInputUrl.trim() === "http://localhost:8080"
+                                    ? "bg-indigo-50 text-indigo-700 border-indigo-300 font-bold shadow-sm"
+                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                }`}
+                              >
+                                <Server className="w-3 h-3 text-indigo-500" />
+                                Spring Boot Local (:8080)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handlePresetSelect("http://localhost:3000")}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer active:scale-95 border ${
+                                  customInputUrl.trim() === "http://localhost:3000"
+                                    ? "bg-indigo-50 text-indigo-700 border-indigo-300 font-bold shadow-sm"
+                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                }`}
+                              >
+                                <Code2 className="w-3 h-3 text-sky-500" />
+                                Express BFF (:3000)
+                              </button>
+                            </div>
+                          </motion.div>
                         )}
-
-                        {/* 1-Click Presets */}
-                        <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                          <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 text-amber-500" />
-                            Cài đặt nhanh (1-Click):
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handlePresetSelect("http://localhost:8080")}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer active:scale-95 border ${
-                              customInputUrl.trim() === "http://localhost:8080"
-                                ? "bg-indigo-50 text-indigo-700 border-indigo-300 font-bold shadow-sm"
-                                : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                            }`}
-                          >
-                            <Server className="w-3 h-3 text-indigo-500" />
-                            Spring Boot Local (:8080)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handlePresetSelect("http://localhost:3000")}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer active:scale-95 border ${
-                              customInputUrl.trim() === "http://localhost:3000"
-                                ? "bg-indigo-50 text-indigo-700 border-indigo-300 font-bold shadow-sm"
-                                : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                            }`}
-                          >
-                            <Code2 className="w-3 h-3 text-sky-500" />
-                            Express BFF (:3000)
-                          </button>
-                        </div>
-                      </div>
+                      </AnimatePresence>
                     </div>
 
 

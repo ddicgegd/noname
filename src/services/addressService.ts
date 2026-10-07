@@ -251,6 +251,7 @@ export async function getMyAddresses(): Promise<AddressDto[]> {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch (_) {}
   }
+
   return [];
 }
 

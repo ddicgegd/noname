@@ -159,11 +159,18 @@ async function executeCartGraphql<T>(
     return executeCartGraphql<T>(query, variables, true);
   }
 
-  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Cart GraphQL request failed (${response.status})`);
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: T;
+    errors?: Array<{ message?: string; extensions?: GraphQLErrorExtensions }>;
+  };
 
   if (payload.errors && payload.errors.length > 0) {
     const firstErr = payload.errors[0];
-    const extensions: GraphQLErrorExtensions | undefined = firstErr.extensions;
+    const extensions = firstErr.extensions;
 
     // Handle UNAUTHORIZED in extensions
     if (extensions?.errorCode === "UNAUTHORIZED" && !isRetry) {
@@ -173,14 +180,12 @@ async function executeCartGraphql<T>(
     }
 
     const err = new Error(firstErr.message || "GraphQL Cart Error");
-    (err as any).extensions = extensions;
-    (err as any).errorCode = extensions?.errorCode;
+    Object.assign(err, { extensions, errorCode: extensions?.errorCode });
     throw err;
   }
 
   return payload.data as T;
 }
-
 // -------------------------------------------------------------
 // GraphQL Query / Mutation Definitions
 // -------------------------------------------------------------
@@ -403,33 +408,29 @@ const MERGE_CART_MUTATION = `
  * 1. Fast Path: Lấy số lượng Badge Header (getCartCount)
  */
 export async function getCartBadge(guestId?: string): Promise<CartSummaryBadge> {
-  try {
-    const data = await executeCartGraphql<{ getCartCount: CartCountResponse }>(
-      GET_CART_COUNT_QUERY,
-      { guestId: guestId || getOrCreateGuestId() }
-    );
-    const count = data?.getCartCount?.data ?? 0;
-    return { totalItems: count };
-  } catch (error) {
-    console.warn("[cartService] getCartBadge failed:", error);
-    return { totalItems: 0 };
+  const data = await executeCartGraphql<{ getCartCount: CartCountResponse }>(
+    GET_CART_COUNT_QUERY,
+    { guestId: guestId || getOrCreateGuestId() }
+  );
+  if (data?.getCartCount?.status?.code && data.getCartCount.status.code !== 200) {
+    throw new Error(data.getCartCount.status.message || `Cart count error (${data.getCartCount.status.code})`);
   }
+  const count = data?.getCartCount?.data ?? 0;
+  return { totalItems: count };
 }
 
 /**
  * Fast Path: Lấy số lượng nguyên thủy
  */
 export async function getCartCount(guestId?: string): Promise<number> {
-  try {
-    const data = await executeCartGraphql<{ getCartCount: CartCountResponse }>(
-      GET_CART_COUNT_QUERY,
-      { guestId: guestId || getOrCreateGuestId() }
-    );
-    return data?.getCartCount?.data ?? 0;
-  } catch (error) {
-    console.warn("[cartService] getCartCount failed:", error);
-    return 0;
+  const data = await executeCartGraphql<{ getCartCount: CartCountResponse }>(
+    GET_CART_COUNT_QUERY,
+    { guestId: guestId || getOrCreateGuestId() }
+  );
+  if (data?.getCartCount?.status?.code && data.getCartCount.status.code !== 200) {
+    throw new Error(data.getCartCount.status.message || `Cart count error (${data.getCartCount.status.code})`);
   }
+  return data?.getCartCount?.data ?? 0;
 }
 
 /**
@@ -449,8 +450,16 @@ export async function getCart(params?: {
       guestId,
     }
   );
+  const cartResp = data?.getCart;
+  if (cartResp?.status?.code && cartResp.status.code !== 200) {
+    throw new Error(cartResp.status.message || `Cart service error (${cartResp.status.code})`);
+  }
 
-  const cartData = data?.getCart?.data || { ...EMPTY_CART };
+  if (!cartResp?.data) {
+    throw new Error(cartResp?.status?.message || "Không nhận được dữ liệu giỏ hàng từ máy chủ");
+  }
+
+  const cartData = cartResp.data;
   setCachedCart(cartData);
   return cartData;
 }
@@ -484,7 +493,16 @@ export async function addToCart(
     { items, guestId: guestId || getOrCreateGuestId() }
   );
 
-  const cartData = data?.addToCart?.data || { ...EMPTY_CART };
+  const resp = data?.addToCart;
+  if (resp?.status?.code && resp.status.code !== 200) {
+    throw new Error(resp.status.message || `Thêm vào giỏ hàng thất bại (${resp.status.code})`);
+  }
+
+  if (!resp?.data) {
+    throw new Error(resp?.status?.message || "Không thể thêm sản phẩm vào giỏ hàng");
+  }
+
+  const cartData = resp.data;
   notifyCartUpdated(cartData);
   return cartData;
 }
@@ -506,7 +524,16 @@ export async function updateCartItemQuantity(
     guestId: guestId || getOrCreateGuestId(),
   });
 
-  const cartData = data?.updateCartItemQuantity?.data || { ...EMPTY_CART };
+  const resp = data?.updateCartItemQuantity;
+  if (resp?.status?.code && resp.status.code !== 200) {
+    throw new Error(resp.status.message || `Cập nhật số lượng thất bại (${resp.status.code})`);
+  }
+
+  if (!resp?.data) {
+    throw new Error(resp?.status?.message || "Không thể cập nhật số lượng");
+  }
+
+  const cartData = resp.data;
   notifyCartUpdated(cartData);
   return cartData;
 }
@@ -525,7 +552,16 @@ export async function removeCartItem(
     guestId: guestId || getOrCreateGuestId(),
   });
 
-  const cartData = data?.removeCartItem?.data || { ...EMPTY_CART };
+  const resp = data?.removeCartItem;
+  if (resp?.status?.code && resp.status.code !== 200) {
+    throw new Error(resp.status.message || `Xóa sản phẩm thất bại (${resp.status.code})`);
+  }
+
+  if (!resp?.data) {
+    throw new Error(resp?.status?.message || "Không thể xóa sản phẩm");
+  }
+
+  const cartData = resp.data;
   notifyCartUpdated(cartData);
   return cartData;
 }
@@ -547,7 +583,16 @@ export async function deleteCart(
     }
   );
 
-  const cartData = data?.deleteCart?.data || { ...EMPTY_CART };
+  const resp = data?.deleteCart;
+  if (resp?.status?.code && resp.status.code !== 200) {
+    throw new Error(resp.status.message || `Xóa giỏ hàng thất bại (${resp.status.code})`);
+  }
+
+  if (!resp?.data) {
+    throw new Error(resp?.status?.message || "Không thể xóa giỏ hàng");
+  }
+
+  const cartData = resp.data;
   notifyCartUpdated(cartData);
   return cartData;
 }
@@ -582,19 +627,18 @@ export async function mergeGuestCart(
     localStorage.getItem("guest_id");
   if (!guestId) return null;
 
-  try {
-    const data = await executeCartGraphql<{ mergeCart: ShoppingCartResponse }>(
-      MERGE_CART_MUTATION,
-      { guestId }
-    );
-    clearGuestId();
-    const cartData = data?.mergeCart?.data || null;
-    if (cartData) {
-      notifyCartUpdated(cartData);
-    }
-    return cartData;
-  } catch (error: any) {
-    console.error("[cartService] Failed to merge cart on login:", error);
-    return null;
+  const data = await executeCartGraphql<{ mergeCart: ShoppingCartResponse }>(
+    MERGE_CART_MUTATION,
+    { guestId }
+  );
+  const resp = data?.mergeCart;
+  if (resp?.status?.code && resp.status.code !== 200) {
+    throw new Error(resp.status.message || `Hợp nhất giỏ hàng thất bại (${resp.status.code})`);
   }
+  clearGuestId();
+  const cartData = resp?.data || null;
+  if (cartData) {
+    notifyCartUpdated(cartData);
+  }
+  return cartData;
 }

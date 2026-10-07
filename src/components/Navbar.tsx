@@ -2384,7 +2384,6 @@ const resolveProductMetadata = (skuOrName: string) => {
                     <span>Thiết lập tài khoản</span>
                   </button>
 
-
                   <div className="my-1 border-t border-neutral-100" />
 
                   <button 

@@ -301,29 +301,42 @@ export async function searchCategoriesForCatalog(filter: CategorySearchFilter = 
     }
   `;
 
-  try {
-    const data = await localGraphqlRequest<any>(query, {
-      filter: {
-        page: filter.page || 1,
-        size: filter.size || 20,
-        ...filter,
-      }
-    });
-    const contents = data?.searchCategories?.contents;
-    const categories: CategoryItem[] = Array.isArray(contents)
-      ? contents.map((c: any) => ({
-          name: c.name || "Danh mục",
-          sku: c.skuInfo?.sku || c.sku || "",
-          productCount: typeof c.productCount === "number" ? c.productCount : undefined
-        }))
-      : [];
-    return {
-      categories,
-      totalElements: data?.searchCategories?.paging?.totalElements || categories.length
+  const data = await localGraphqlRequest<{
+    searchCategories?: {
+      contents?: Array<{
+        name?: string | null;
+        skuInfo?: { sku?: string | null } | null;
+        sku?: string | null;
+        productCount?: number | null;
+      }>;
+      paging?: {
+        pageNumber?: number;
+        pageSize?: number;
+        totalElements?: number;
+        totalPages?: number;
+      };
     };
-  } catch (error) {
-    console.warn("Không thể tải danh mục từ GraphQL Gateway:", error);
-    return { categories: [], totalElements: 0 };
-  }
+  }>(query, {
+    filter: {
+      page: filter.page || 1,
+      size: filter.size || 20,
+      ...filter,
+    }
+  });
+  const contents = data?.searchCategories?.contents;
+  const categories: CategoryItem[] = Array.isArray(contents)
+    ? contents.map((c) => ({
+        name: c.name || "Danh mục",
+        sku: c.skuInfo?.sku || c.sku || "",
+        productCount: typeof c.productCount === "number" ? c.productCount : undefined
+      }))
+    : [];
+  return {
+    categories,
+    totalElements: data?.searchCategories?.paging?.totalElements || categories.length
+  };
 }
+
+export const searchProduct = searchProductsForCatalog;
+export const getCategories = searchCategoriesForCatalog;
 

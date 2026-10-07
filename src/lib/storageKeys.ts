@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
   BUY_NOW_PRODUCT: "buy_now_product",
   USER_ORDERS: "user_orders",
   USER_ADDRESSES: "user_addresses",
+  USER_PAYMENT_METHODS: "user_payment_methods",
 
   AUTH_AUDIT_LOGS: "auth_audit_logs",
   ADDRESS_API_LOGS: "address_api_logs",
