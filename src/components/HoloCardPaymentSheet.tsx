@@ -223,31 +223,29 @@ export default function HoloCardPaymentSheet({
             initial={
               shouldReduceMotion
                 ? { opacity: 0 }
-                : { y: "100%", opacity: 0, scale: 0.96 }
+                : { y: "100%" }
             }
             animate={
               shouldReduceMotion
                 ? { opacity: 1 }
-                : { y: 0, opacity: 1, scale: 1 }
+                : { y: 0 }
             }
             exit={
               shouldReduceMotion
                 ? { opacity: 0 }
-                : { y: "100%", opacity: 0, scale: 0.96 }
+                : { y: "100%" }
             }
             transition={
               shouldReduceMotion
                 ? { duration: 0.15 }
                 : {
-                    type: "spring",
-                    damping: 30,
-                    stiffness: 350,
-                    mass: 0.85,
+                    duration: 0.36,
+                    ease: [0.32, 0.72, 0, 1],
                   }
             }
             className={cn(
               "pointer-events-auto relative z-10 w-full max-w-3xl",
-              "bg-white/90 dark:bg-neutral-900/90 backdrop-blur-2xl",
+              "bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl",
               "rounded-t-3xl sm:rounded-3xl",
               "border border-white/70 dark:border-white/15",
               "shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)]",
@@ -255,6 +253,7 @@ export default function HoloCardPaymentSheet({
               "flex flex-col"
             )}
             style={{
+              willChange: "transform",
               boxShadow: `0 20px 50px -10px ${activePlan.glowColor}, 0 0 0 1px rgba(255,255,255,0.6)`,
             }}
           >

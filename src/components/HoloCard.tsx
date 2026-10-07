@@ -95,12 +95,9 @@ export function HoloCard({
       rim.style.opacity = (0.2 + a * 0.55).toFixed(3);
 
       // --- Shadows & Borders ---
-      if (a > 0.01) {
+      if (a > 0.02) {
         card.style.boxShadow = `${plan.glowColor} 0px ${lerp(20, 36, a).toFixed(0)}px ${lerp(30, 48, a).toFixed(0)}px -8px, rgba(0,0,0,0.06) 0px 4px 16px`;
         card.style.borderColor = plan.hoverBorderColor;
-      } else {
-        card.style.boxShadow = `${plan.glowColor} 0px 20px 30px -8px, rgba(0,0,0,0.05) 0px 4px 16px`;
-        card.style.borderColor = "rgba(255,255,255,0.6)";
       }
 
       raf.current = requestAnimationFrame(tick);
