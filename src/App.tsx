@@ -19,6 +19,7 @@ import TermsPage from "./components/TermsPage";
 import OrderPage from "./components/OrderPage";
 import EmailActionResponsePage from "./components/EmailActionResponsePage";
 import AntiAverage404Page from "./components/AntiAverage404Page";
+import AmbientUploadCard from "./components/AmbientUploadCard";
 import { GenieCartFlyProvider } from "./components/ui/genie-cart-fly";
 import { ToastProvider } from "./components/ui/Toast";
 import { AnimatePresence, motion } from "motion/react";
@@ -65,7 +66,7 @@ interface RisingStar {
   duration: number;
 }
 
-export type AppPage = "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response" | "404";
+export type AppPage = "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response" | "bevel" | "404";
 
 export default function App() {
   const getPageFromPath = (path: string): AppPage => {
@@ -79,6 +80,7 @@ export default function App() {
     if (["/p", "/product", "/products"].includes(cleanPath)) return "product";
     if (["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath)) return "order";
     if (["/auth-report", "/diagnostic", "/diagnostics"].includes(cleanPath)) return "auth-report";
+    if (["/bevel", "/iconly", "/button-demo"].includes(cleanPath)) return "bevel";
     // Strict RFC 4122 UUID v4 Token validator: matches UUID.randomUUID().toString() from backend
     const hasValidToken = (): boolean => {
       if (typeof window === "undefined") return false;
@@ -616,6 +618,17 @@ export default function App() {
           >
             <TermsPage onNavigate={navigate} />
           </motion.div>
+        ) : currentPage === "bevel" ? (
+          <motion.div
+            key="bevel"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+            className="min-h-screen bg-[#EEF2F6] flex flex-col items-center justify-center p-4 sm:p-8"
+          >
+            <AmbientUploadCard />
+          </motion.div>
         ) : (
           <motion.div
             key="404"
@@ -623,6 +636,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
+            className="w-full"
           >
             <AntiAverage404Page onNavigate={navigate} />
           </motion.div>
