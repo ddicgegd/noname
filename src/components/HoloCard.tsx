@@ -84,18 +84,20 @@ export function HoloCard({
       // --- Foil shimmer ---
       foil.style.setProperty("--px", effectPx.toFixed(2));
       foil.style.setProperty("--py", effectPy.toFixed(2));
-      foil.style.opacity = lerp(0.48, 0.88, a).toFixed(3);
+      foil.style.opacity = lerp(0.24, 0.85, a).toFixed(3);
       foil.style.filter = `saturate(1.2) hue-rotate(calc((${effectPx.toFixed(2)} - 50) * 1.4deg))`;
-      // --- Specular glint ---
       glint.style.backgroundPosition = `${effectPx.toFixed(1)}% ${effectPy.toFixed(1)}%`;
       glint.style.opacity = lerp(0.06, 0.187, a).toFixed(3);
 
       // --- Rim light ---
       rim.style.opacity = (0.2 + a * 0.55).toFixed(3);
 
-      // --- Shadows & Borders ---
+      // --- External Drop Shadow & Borders (around and beneath the frame) ---
+      const spread = lerp(compact ? 14 : 20, compact ? 24 : 36, a).toFixed(0);
+      const blur = lerp(compact ? 28 : 36, compact ? 44 : 54, a).toFixed(0);
+      card.style.boxShadow = `${plan.glowColor} 0px ${spread}px ${blur}px -8px, rgba(0,0,0,0.06) 0px 4px 16px`;
+
       if (a > 0.02) {
-        card.style.boxShadow = `${plan.glowColor} 0px ${lerp(20, 36, a).toFixed(0)}px ${lerp(30, 48, a).toFixed(0)}px -8px, rgba(0,0,0,0.06) 0px 4px 16px`;
         card.style.borderColor = plan.hoverBorderColor;
       } else {
         card.style.borderColor = defaultBorderColor;
@@ -136,6 +138,8 @@ export function HoloCard({
   const currentPeriod = overridePeriod ?? plan.period;
   const defaultBorderColor =
     plan.id === "free" ? "rgba(56, 189, 248, 0.35)" : "rgba(192, 132, 252, 0.4)";
+  const defaultBoxShadow = `${plan.glowColor} 0px ${compact ? 14 : 20}px ${compact ? 28 : 36}px -8px, rgba(0,0,0,0.06) 0px 4px 16px`;
+
   return (
     <div
       ref={wrapRef}
@@ -153,35 +157,16 @@ export function HoloCard({
           compact ? "p-5 sm:p-6 min-h-[380px]" : "p-8 sm:p-10 min-h-[550px]"
         } bg-white/50 dark:bg-neutral-900/40 backdrop-blur-xl rounded-2xl flex flex-col relative overflow-hidden h-full ${
           onSelect ? "cursor-pointer" : ""
-        } border shadow-[0_8px_32px_rgba(0,0,0,0.04)]`}
+        } border`}
         style={{
           transformStyle: "preserve-3d",
           borderColor: defaultBorderColor,
+          boxShadow: defaultBoxShadow,
           willChange: "transform, box-shadow, border-color",
         }}
       >
-        {/* Ambient Tinted Background (Always visible by default at idle) */}
-        <div
-          className="absolute inset-0 pointer-events-none rounded-2xl"
-          style={{
-            background:
-              plan.id === "free"
-                ? "radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.22) 0%, rgba(56, 189, 248, 0.08) 50%, transparent 80%)"
-                : "radial-gradient(circle at 80% 20%, rgba(192, 132, 252, 0.28) 0%, rgba(255, 154, 158, 0.15) 50%, transparent 80%)",
-          }}
-          aria-hidden="true"
-        />
-
-        {/* Ambient Corner Orb Glow */}
-        <div
-          className="absolute -top-12 -right-12 w-48 h-48 rounded-full blur-2xl pointer-events-none"
-          style={{
-            backgroundColor: plan.foilTint,
-            opacity: compact ? 0.32 : 0.22,
-          }}
-          aria-hidden="true"
-        />
-        {/* Foil shimmer — repeating-linear-gradient + CSS var position */}
+        {/* Base gradient */}
+        <div className={`absolute inset-0 ${plan.bgGradient} pointer-events-none rounded-2xl`} />
         <div
           ref={foilRef}
           className="absolute inset-0 pointer-events-none rounded-2xl opacity-0"
