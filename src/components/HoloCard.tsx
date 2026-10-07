@@ -84,9 +84,8 @@ export function HoloCard({
       // --- Foil shimmer ---
       foil.style.setProperty("--px", effectPx.toFixed(2));
       foil.style.setProperty("--py", effectPy.toFixed(2));
-      foil.style.opacity = lerp(0.24, 0.85, a).toFixed(3);
+      foil.style.opacity = lerp(0.48, 0.88, a).toFixed(3);
       foil.style.filter = `saturate(1.2) hue-rotate(calc((${effectPx.toFixed(2)} - 50) * 1.4deg))`;
-
       // --- Specular glint ---
       glint.style.backgroundPosition = `${effectPx.toFixed(1)}% ${effectPy.toFixed(1)}%`;
       glint.style.opacity = lerp(0.06, 0.187, a).toFixed(3);
@@ -161,9 +160,27 @@ export function HoloCard({
           willChange: "transform, box-shadow, border-color",
         }}
       >
-        {/* Base gradient */}
-        <div className={`absolute inset-0 ${plan.bgGradient} -z-10`} />
+        {/* Ambient Tinted Background (Always visible by default at idle) */}
+        <div
+          className="absolute inset-0 pointer-events-none rounded-2xl"
+          style={{
+            background:
+              plan.id === "free"
+                ? "radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.22) 0%, rgba(56, 189, 248, 0.08) 50%, transparent 80%)"
+                : "radial-gradient(circle at 80% 20%, rgba(192, 132, 252, 0.28) 0%, rgba(255, 154, 158, 0.15) 50%, transparent 80%)",
+          }}
+          aria-hidden="true"
+        />
 
+        {/* Ambient Corner Orb Glow */}
+        <div
+          className="absolute -top-12 -right-12 w-48 h-48 rounded-full blur-2xl pointer-events-none"
+          style={{
+            backgroundColor: plan.foilTint,
+            opacity: compact ? 0.32 : 0.22,
+          }}
+          aria-hidden="true"
+        />
         {/* Foil shimmer — repeating-linear-gradient + CSS var position */}
         <div
           ref={foilRef}
