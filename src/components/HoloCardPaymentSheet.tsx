@@ -305,11 +305,11 @@ export default function HoloCardPaymentSheet({
                     Kỳ thanh toán
                   </div>
 
-                  {/* Beveled iOS Segmented Control with Smooth Clean Borders */}
+                  {/* Recessed Beveled iOS Segmented Control with Rounded-2xl Frame */}
                   <div
                     role="radiogroup"
                     aria-labelledby="billing-cycle-label"
-                    className="relative grid grid-cols-2 p-1 rounded-xl bg-neutral-200/50 dark:bg-neutral-800/60 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
+                    className="relative grid grid-cols-2 p-1.5 rounded-2xl bg-neutral-200/80 dark:bg-black/35 border border-black/[0.08] dark:border-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),inset_0_1px_2px_rgba(0,0,0,0.06),inset_0_-1px_0_rgba(255,255,255,0.85)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.4),inset_0_-1px_0_rgba(255,255,255,0.1)]"
                   >
                     <button
                       type="button"
@@ -317,7 +317,7 @@ export default function HoloCardPaymentSheet({
                       aria-checked={billingCycle === "monthly"}
                       onClick={() => setBillingCycle("monthly")}
                       className={cn(
-                        "relative py-2.5 rounded-lg text-xs transition-colors cursor-pointer select-none font-medium text-center z-10",
+                        "relative py-2.5 rounded-xl text-xs transition-colors cursor-pointer select-none font-medium text-center z-10",
                         billingCycle === "monthly"
                           ? "text-neutral-900 dark:text-white font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
@@ -327,7 +327,7 @@ export default function HoloCardPaymentSheet({
                         <motion.div
                           layoutId="billing-pill-active"
                           transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/5 dark:border-white/10 -z-10"
+                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] border border-black/[0.04] dark:border-white/10 -z-10"
                         />
                       )}
                       Hàng tháng
@@ -338,7 +338,7 @@ export default function HoloCardPaymentSheet({
                       aria-checked={billingCycle === "yearly"}
                       onClick={() => setBillingCycle("yearly")}
                       className={cn(
-                        "relative py-2.5 rounded-lg text-xs transition-colors cursor-pointer select-none font-medium flex items-center justify-center gap-1.5 z-10",
+                        "relative py-2.5 rounded-xl text-xs transition-colors cursor-pointer select-none font-medium flex items-center justify-center gap-1.5 z-10",
                         billingCycle === "yearly"
                           ? "text-neutral-900 dark:text-white font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
@@ -348,7 +348,7 @@ export default function HoloCardPaymentSheet({
                         <motion.div
                           layoutId="billing-pill-active"
                           transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/5 dark:border-white/10 -z-10"
+                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] border border-black/[0.04] dark:border-white/10 -z-10"
                         />
                       )}
                       <span>Hàng năm</span>
