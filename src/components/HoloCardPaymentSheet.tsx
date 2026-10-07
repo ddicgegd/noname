@@ -11,11 +11,8 @@ import {
   QrCode,
   Check,
   X,
-  ShieldCheck,
-  Lock,
-  CheckCircle2,
-  Loader2,
 } from "lucide-react";
+import HoloCard from "./HoloCard";
 import { cn } from "@/lib/utils";
 
 export interface PricingPlan {
@@ -274,119 +271,45 @@ export default function HoloCardPaymentSheet({
               <div className="w-10 h-1 rounded-full bg-neutral-300 dark:bg-neutral-700" />
             </div>
 
-            {/* Header Bar */}
-            <div className="px-5 pt-3 sm:px-7 sm:pt-5 pb-3 border-b border-black/5 dark:border-white/10 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <h2
-                  id="holo-payment-title"
-                  className="text-base sm:text-lg font-bold font-display text-neutral-900 dark:text-white tracking-tight"
-                >
-                  Thanh toán &amp; Kích hoạt
-                </h2>
-                <span
-                  className="text-xs font-semibold px-2.5 py-0.5 rounded-full border"
-                  style={{
-                    backgroundColor: `${activePlan.foilTint}20`,
-                    color: activePlan.foilTint,
-                    borderColor: `${activePlan.foilTint}40`,
-                  }}
-                >
-                  {activePlan.name}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Đóng thanh toán"
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-neutral-200/60 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-black dark:hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            {/* Floating Close Button */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Đóng"
+              className="absolute top-4 right-4 z-30 w-8 h-8 rounded-full bg-neutral-200/70 dark:bg-neutral-800/80 flex items-center justify-center text-neutral-600 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-black dark:hover:text-white transition-colors cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            >
+              <X className="w-4 h-4" />
+            </button>
 
             {/* Deck Body: 2 Columns */}
             <div className="p-5 sm:p-7 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-              {/* Left Column: Mini Hologram Card & Features */}
-              <div
-                className="md:col-span-5 flex flex-col justify-between p-5 rounded-2xl bg-gradient-to-b from-white/90 to-white/50 dark:from-white/10 dark:to-white/5 border border-white/80 dark:border-white/10 shadow-xs relative overflow-hidden"
-                style={{
-                  boxShadow: `0 10px 30px -10px ${activePlan.glowColor}`,
-                }}
-              >
-                {/* Foil Gradient Light Effect */}
-                <div
-                  className="absolute -top-12 -right-12 w-36 h-36 rounded-full blur-2xl opacity-25 pointer-events-none"
-                  style={{ backgroundColor: activePlan.foilTint }}
-                  aria-hidden="true"
+              {/* Left Column: Interactive Hologram Card */}
+              <div className="md:col-span-5 h-full flex flex-col justify-center">
+                <HoloCard
+                  plan={activePlan}
+                  compact
+                  hideButton
+                  overridePrice={displayPrice}
+                  overridePeriod={displayPeriod}
                 />
-                <div
-                  className="absolute inset-x-0 top-0 h-0.5 opacity-60"
-                  style={{
-                    background: `linear-gradient(90deg, transparent, ${activePlan.rimColor}, transparent)`,
-                  }}
-                  aria-hidden="true"
-                />
-
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                      Chi tiết gói
-                    </span>
-                    <span
-                      className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
-                      style={{
-                        backgroundColor: `${activePlan.foilTint}25`,
-                        color: activePlan.foilTint,
-                      }}
-                    >
-                      {activePlan.name}
-                    </span>
-                  </div>
-
-                  <div className="my-2">
-                    <div className="text-3xl font-extrabold font-display text-neutral-900 dark:text-white flex items-baseline tracking-tight">
-                      {displayPrice}
-                      <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400 ml-1">
-                        {displayPeriod}
-                      </span>
-                    </div>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                      Kích hoạt ngay vào tài khoản của bạn
-                    </p>
-                  </div>
-
-                  {/* Features list */}
-                  <div className="space-y-2 mt-4 pt-4 border-t border-black/5 dark:border-white/10">
-                    {activePlan.features.map((feat, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300"
-                      >
-                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 font-bold" />
-                        <span>{feat}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
 
               {/* Right Column: iOS Segmented Billing & Payment Methods & Action CTA */}
               <div className="md:col-span-7 flex flex-col gap-4">
-                {/* Billing Cycle Section */}
+                {/* Billing Cycle Section - Bevel Effect & Smooth Motion */}
                 <div className="space-y-1.5">
                   <div
                     id="billing-cycle-label"
-                    className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
+                    className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 px-0.5"
                   >
                     Kỳ thanh toán
                   </div>
 
-                  {/* iOS Segmented Control */}
+                  {/* Beveled iOS Segmented Control */}
                   <div
                     role="radiogroup"
                     aria-labelledby="billing-cycle-label"
-                    className="grid grid-cols-2 p-1 rounded-xl bg-neutral-200/70 dark:bg-neutral-900/80 text-xs font-medium border border-black/5 dark:border-white/10"
+                    className="relative grid grid-cols-2 p-1 rounded-2xl bg-gradient-to-b from-neutral-200/90 to-neutral-200/60 dark:from-neutral-800/90 dark:to-neutral-900/90 shadow-[inset_0_2px_4px_rgba(0,0,0,0.06),inset_0_-1px_0_rgba(255,255,255,0.7)] border border-neutral-300/50 dark:border-white/10"
                   >
                     <button
                       type="button"
@@ -394,12 +317,19 @@ export default function HoloCardPaymentSheet({
                       aria-checked={billingCycle === "monthly"}
                       onClick={() => setBillingCycle("monthly")}
                       className={cn(
-                        "py-2 rounded-lg transition-all cursor-pointer text-center select-none",
+                        "relative py-2.5 rounded-xl text-xs transition-colors cursor-pointer select-none font-medium text-center z-10",
                         billingCycle === "monthly"
-                          ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-xs font-semibold"
+                          ? "text-neutral-900 dark:text-white font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
                       )}
                     >
+                      {billingCycle === "monthly" && (
+                        <motion.div
+                          layoutId="billing-pill-active"
+                          transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                          className="absolute inset-0 bg-gradient-to-b from-white via-white to-[#F4F4F6] dark:from-neutral-700 dark:to-neutral-800 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] border-t border-t-white border-b border-b-neutral-300/70 border-x border-x-white/70 -z-10"
+                        />
+                      )}
                       Hàng tháng
                     </button>
                     <button
@@ -408,14 +338,21 @@ export default function HoloCardPaymentSheet({
                       aria-checked={billingCycle === "yearly"}
                       onClick={() => setBillingCycle("yearly")}
                       className={cn(
-                        "py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 select-none",
+                        "relative py-2.5 rounded-xl text-xs transition-colors cursor-pointer select-none font-medium flex items-center justify-center gap-1.5 z-10",
                         billingCycle === "yearly"
-                          ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-xs font-semibold"
+                          ? "text-neutral-900 dark:text-white font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
                       )}
                     >
+                      {billingCycle === "yearly" && (
+                        <motion.div
+                          layoutId="billing-pill-active"
+                          transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                          className="absolute inset-0 bg-gradient-to-b from-white via-white to-[#F4F4F6] dark:from-neutral-700 dark:to-neutral-800 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] border-t border-t-white border-b border-b-neutral-300/70 border-x border-x-white/70 -z-10"
+                        />
+                      )}
                       <span>Hàng năm</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
                         -20%
                       </span>
                     </button>
@@ -495,51 +432,33 @@ export default function HoloCardPaymentSheet({
                 </div>
 
                 {/* Action CTA Button */}
-                <div className="pt-1 flex flex-col gap-2">
+                <div className="pt-2">
                   <button
                     type="button"
                     disabled={isProcessing || isSuccess}
                     onClick={handlePay}
                     className={cn(
-                      "w-full py-3.5 px-4 rounded-xl font-semibold text-sm transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 select-none",
+                      "w-full py-3.5 px-4 rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer flex items-center justify-center select-none text-white",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2",
                       isSuccess
-                        ? "bg-emerald-600 text-white shadow-emerald-600/30"
-                        : "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-90 active:scale-[0.99]",
+                        ? "bg-emerald-600 shadow-emerald-600/30"
+                        : activePlan.id === "free"
+                        ? "bg-gradient-to-b from-[#38BDF8] via-[#0EA5E9] to-[#0284C7] border-t border-t-white/40 border-b border-b-[#0369A1] hover:brightness-105 active:scale-[0.99]"
+                        : "bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/40 border-b border-b-[#A8280A] hover:brightness-105 active:scale-[0.99]",
                       isProcessing && "opacity-85 cursor-wait"
                     )}
-                    style={
-                      !isSuccess && !isProcessing
-                        ? {
-                            boxShadow: `0 8px 24px -4px ${activePlan.glowColor}`,
-                          }
-                        : undefined
-                    }
+                    style={{
+                      boxShadow: !isSuccess ? `0 8px 24px -4px ${activePlan.glowColor}` : undefined,
+                    }}
                   >
                     {isProcessing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden="true" />
-                        <span>Đang kết nối cổng thanh toán...</span>
-                      </>
+                      <span>Đang kết nối...</span>
                     ) : isSuccess ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
-                        <span>Thanh toán thành công!</span>
-                      </>
+                      <span>Thành công!</span>
                     ) : (
-                      <>
-                        <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
-                        <span>
-                          Xác nhận &amp; Mở khóa ngay ({displayPrice})
-                        </span>
-                      </>
+                      <span>Thanh toán</span>
                     )}
                   </button>
-
-                  <div className="flex items-center justify-center gap-1.5 text-[11px] text-neutral-400 dark:text-neutral-500">
-                    <Lock className="w-3 h-3 shrink-0" aria-hidden="true" />
-                    <span>Bảo mật SSL 256-bit • Có thể hủy bất cứ lúc nào</span>
-                  </div>
                 </div>
               </div>
             </div>
