@@ -145,16 +145,6 @@ export default function HoloCardPaymentSheet({
     }
   }, [isOpen]);
 
-  // Lock body scroll when open
-  useEffect(() => {
-    if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
-    }
-  }, [isOpen]);
 
   // Keyboard Escape listener
   useEffect(() => {
@@ -207,9 +197,8 @@ export default function HoloCardPaymentSheet({
           {/* Backdrop with iOS blur */}
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
+            animate={{ opacity: 1, transition: { duration: 0.28, ease: "easeOut" } }}
+            exit={{ opacity: 0, transition: { duration: 0.2, ease: "easeIn" } }}
             onClick={onClose}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm cursor-pointer pointer-events-auto"
             aria-hidden="true"
@@ -223,24 +212,28 @@ export default function HoloCardPaymentSheet({
             initial={
               shouldReduceMotion
                 ? { opacity: 0 }
-                : { y: "100%" }
+                : { y: "calc(100% + 56px)" }
             }
             animate={
               shouldReduceMotion
                 ? { opacity: 1 }
-                : { y: 0 }
+                : {
+                    y: 0,
+                    transition: {
+                      duration: 0.3,
+                      ease: [0.16, 1, 0.3, 1],
+                    },
+                  }
             }
             exit={
               shouldReduceMotion
                 ? { opacity: 0 }
-                : { y: "100%" }
-            }
-            transition={
-              shouldReduceMotion
-                ? { duration: 0.15 }
                 : {
-                    duration: 0.36,
-                    ease: [0.32, 0.72, 0, 1],
+                    y: "calc(100% + 56px)",
+                    transition: {
+                      duration: 0.22,
+                      ease: [0.4, 0, 0.2, 1],
+                    },
                   }
             }
             className={cn(
