@@ -282,9 +282,9 @@ export default function HoloCardPaymentSheet({
             </button>
 
             {/* Deck Body: 2 Columns */}
-            <div className="p-5 sm:p-7 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+            <div className="p-5 sm:p-7 grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
               {/* Left Column: Interactive Hologram Card */}
-              <div className="md:col-span-5 h-full flex flex-col justify-center">
+              <div className="md:col-span-5 h-full flex flex-col">
                 <HoloCard
                   plan={activePlan}
                   compact
@@ -294,8 +294,8 @@ export default function HoloCardPaymentSheet({
                 />
               </div>
 
-              {/* Right Column: iOS Segmented Billing & Payment Methods & Action CTA */}
-              <div className="md:col-span-7 flex flex-col gap-4">
+              {/* Right Column: Top-anchored & Bottom-anchored */}
+              <div className="md:col-span-7 flex flex-col justify-between h-full pt-0.5">
                 {/* Billing Cycle Section - Bevel Effect & Smooth Motion */}
                 <div className="space-y-1.5">
                   <div
@@ -305,11 +305,11 @@ export default function HoloCardPaymentSheet({
                     Kỳ thanh toán
                   </div>
 
-                  {/* Beveled iOS Segmented Control */}
+                  {/* Beveled iOS Segmented Control with Smooth Clean Borders */}
                   <div
                     role="radiogroup"
                     aria-labelledby="billing-cycle-label"
-                    className="relative grid grid-cols-2 p-1 rounded-2xl bg-gradient-to-b from-neutral-200/90 to-neutral-200/60 dark:from-neutral-800/90 dark:to-neutral-900/90 shadow-[inset_0_2px_4px_rgba(0,0,0,0.06),inset_0_-1px_0_rgba(255,255,255,0.7)] border border-neutral-300/50 dark:border-white/10"
+                    className="relative grid grid-cols-2 p-1 rounded-xl bg-neutral-200/50 dark:bg-neutral-800/60 border border-black/5 dark:border-white/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]"
                   >
                     <button
                       type="button"
@@ -317,7 +317,7 @@ export default function HoloCardPaymentSheet({
                       aria-checked={billingCycle === "monthly"}
                       onClick={() => setBillingCycle("monthly")}
                       className={cn(
-                        "relative py-2.5 rounded-xl text-xs transition-colors cursor-pointer select-none font-medium text-center z-10",
+                        "relative py-2.5 rounded-lg text-xs transition-colors cursor-pointer select-none font-medium text-center z-10",
                         billingCycle === "monthly"
                           ? "text-neutral-900 dark:text-white font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
@@ -327,7 +327,7 @@ export default function HoloCardPaymentSheet({
                         <motion.div
                           layoutId="billing-pill-active"
                           transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-gradient-to-b from-white via-white to-[#F4F4F6] dark:from-neutral-700 dark:to-neutral-800 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] border-t border-t-white border-b border-b-neutral-300/70 border-x border-x-white/70 -z-10"
+                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/5 dark:border-white/10 -z-10"
                         />
                       )}
                       Hàng tháng
@@ -338,7 +338,7 @@ export default function HoloCardPaymentSheet({
                       aria-checked={billingCycle === "yearly"}
                       onClick={() => setBillingCycle("yearly")}
                       className={cn(
-                        "relative py-2.5 rounded-xl text-xs transition-colors cursor-pointer select-none font-medium flex items-center justify-center gap-1.5 z-10",
+                        "relative py-2.5 rounded-lg text-xs transition-colors cursor-pointer select-none font-medium flex items-center justify-center gap-1.5 z-10",
                         billingCycle === "yearly"
                           ? "text-neutral-900 dark:text-white font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
@@ -348,7 +348,7 @@ export default function HoloCardPaymentSheet({
                         <motion.div
                           layoutId="billing-pill-active"
                           transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-gradient-to-b from-white via-white to-[#F4F4F6] dark:from-neutral-700 dark:to-neutral-800 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] border-t border-t-white border-b border-b-neutral-300/70 border-x border-x-white/70 -z-10"
+                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/5 dark:border-white/10 -z-10"
                         />
                       )}
                       <span>Hàng năm</span>
@@ -431,24 +431,29 @@ export default function HoloCardPaymentSheet({
                   </div>
                 </div>
 
-                {/* Action CTA Button */}
-                <div className="pt-2">
+                {/* Action CTA Button - Bottom Anchored & Bevel Effect */}
+                <div className="mt-auto pt-3">
                   <button
                     type="button"
                     disabled={isProcessing || isSuccess}
                     onClick={handlePay}
                     className={cn(
-                      "w-full py-3.5 px-4 rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer flex items-center justify-center select-none text-white",
+                      "w-full py-3.5 px-5 rounded-2xl font-bold text-sm tracking-wide select-none text-white",
+                      "flex items-center justify-center cursor-pointer",
+                      "border-t border-t-white/60",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2",
+                      "transition-all duration-200 active:scale-[0.985] active:brightness-95",
                       isSuccess
-                        ? "bg-emerald-600 shadow-emerald-600/30"
+                        ? "bg-emerald-600 shadow-emerald-600/30 border-b-2 border-b-emerald-800"
                         : activePlan.id === "free"
-                        ? "bg-gradient-to-b from-[#38BDF8] via-[#0EA5E9] to-[#0284C7] border-t border-t-white/40 border-b border-b-[#0369A1] hover:brightness-105 active:scale-[0.99]"
-                        : "bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/40 border-b border-b-[#A8280A] hover:brightness-105 active:scale-[0.99]",
+                        ? "bg-gradient-to-b from-[#38BDF8] via-[#0EA5E9] to-[#0284C7] border-b-2 border-b-[#0369A1] hover:brightness-105"
+                        : "bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-b-2 border-b-[#991B1B] hover:brightness-105",
                       isProcessing && "opacity-85 cursor-wait"
                     )}
                     style={{
-                      boxShadow: !isSuccess ? `0 8px 24px -4px ${activePlan.glowColor}` : undefined,
+                      boxShadow: !isSuccess
+                        ? `inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 0 rgba(0,0,0,0.12), 0 8px 24px -4px ${activePlan.glowColor}`
+                        : undefined,
                     }}
                   >
                     {isProcessing ? (
