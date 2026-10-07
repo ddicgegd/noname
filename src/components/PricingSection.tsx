@@ -3,20 +3,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useRef, useState, type MouseEvent, type CSSProperties } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import ClawMachine from "./ClawMachine";
 import HoloCardPaymentSheet, { type PricingPlan } from "./HoloCardPaymentSheet";
 import { HoloCard } from "./HoloCard";
+import { getSubscriptionPlans } from "../services/subscriptionService";
 
-const PRICING_PLANS: PricingPlan[] = [
+const INITIAL_PLANS: PricingPlan[] = [
   {
     id: "free",
-    name: "Horizon Free",
-    price: "$0",
-    period: "/mo",
-    features: ["3 Active Projects", "Community Support", "Basic UI Components"],
-    buttonText: "Get Started",
+    planCode: "ANH_KIM",
+    name: "Gói Ánh Kim",
+    price: "30.000₫",
+    period: "/tháng",
+    priceAmount: 30000,
+    freeTrialDays: 7,
+    targetRank: "SILVER",
+    features: [
+      "7 ngày dùng thử miễn phí",
+      "Giỏ hàng 100 sản phẩm",
+      "Hạng hội viên Bạc (Silver)",
+      "Hỗ trợ cộng đồng 24/7",
+    ],
+    buttonText: "Dùng thử 7 ngày",
     bgGradient: "bg-gradient-to-b from-[#38BDF8]/10 to-transparent",
     hoverBorderColor: "rgba(56,189,248,0.55)",
     checkIconColor: "text-primary",
@@ -28,16 +38,20 @@ const PRICING_PLANS: PricingPlan[] = [
   },
   {
     id: "pro",
-    name: "Horizon Pro",
-    price: "$20",
-    period: "/mo",
+    planCode: "MA_THUAT",
+    name: "Gói Ma Thuật",
+    price: "120.000₫",
+    period: "/tháng",
+    priceAmount: 120000,
+    freeTrialDays: 0,
+    targetRank: "DIAMOND",
     features: [
-      "Unlimited Projects",
-      "Priority 24/7 Support",
-      "Custom Domain Binding",
-      "Advanced APIs & Integrations",
+      "Chiết khấu 3% toàn bộ đơn hàng",
+      "Giỏ hàng không giới hạn",
+      "Miễn phí vận chuyển toàn quốc",
+      "Hạng hội viên Kim Cương (Diamond)",
     ],
-    buttonText: "Upgrade to Pro",
+    buttonText: "Nâng cấp Kim Cương",
     isPopular: true,
     bgGradient: "bg-gradient-to-b from-[#C084FC]/20 to-[#FF9A9E]/20",
     hoverBorderColor: "rgba(192,132,252,0.55)",
@@ -54,7 +68,41 @@ const PRICING_PLANS: PricingPlan[] = [
 export default function PricingSection() {
   const [isVerified, setIsVerified] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
+  const [plans, setPlans] = useState<PricingPlan[]>(INITIAL_PLANS);
 
+  useEffect(() => {
+    let isCurrent = true;
+    getSubscriptionPlans()
+      .then((apiPlans) => {
+        if (!isCurrent || !apiPlans || apiPlans.length === 0) return;
+        setPlans((prev) =>
+          prev.map((p) => {
+            const matched = apiPlans.find(
+              (ap) =>
+                ap.planCode === p.planCode ||
+                (p.id === "free" && ap.planCode === "ANH_KIM") ||
+                (p.id === "pro" && ap.planCode === "MA_THUAT")
+            );
+            if (!matched) return p;
+            return {
+              ...p,
+              name: matched.name,
+              price: `${matched.priceAmount.toLocaleString("vi-VN")}₫`,
+              priceAmount: matched.priceAmount,
+              freeTrialDays: matched.freeTrialDays,
+              targetRank: matched.targetRank,
+            };
+          })
+        );
+      })
+      .catch((err) => {
+        console.warn("Could not fetch subscription plans:", err);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
   return (
     <section id="pricing" className="py-24 px-6 sm:px-16 relative">
       <div className="max-w-7xl mx-auto relative z-10">
@@ -81,7 +129,7 @@ export default function PricingSection() {
             <ClawMachine onVerify={setIsVerified} />
           </motion.div>
 
-          {PRICING_PLANS.map((plan) => (
+          {plans.map((plan) => (
             <div key={plan.id} className="contents">
               <HoloCard plan={plan} isVerified={isVerified} onSelect={setSelectedPlan} />
             </div>

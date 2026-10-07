@@ -22,7 +22,7 @@ export function HoloCard({
   isVerified = false,
   onSelect,
   compact = false,
-  hideButton = false,
+  hideButton: _hideButton = false,
   overridePrice,
   overridePeriod,
   className,
@@ -237,7 +237,7 @@ export function HoloCard({
             </span>
           </div>
 
-          <ul className={`space-y-3 mb-2 flex-1 font-sans text-xs sm:text-sm text-[#555555] dark:text-neutral-300`}>
+          <ul className={`flex flex-col gap-2.5 mb-2 flex-1 font-sans text-xs sm:text-sm text-[#555555] dark:text-neutral-300`}>
             {plan.features.map((feature, idx) => (
               <li key={idx} className="flex items-center gap-2.5">
                 <span className={`material-symbols-outlined ${plan.checkIconColor} text-base sm:text-lg font-bold shrink-0`}>
@@ -248,20 +248,6 @@ export function HoloCard({
             ))}
           </ul>
 
-          {!hideButton && (
-            <div className="mt-6 pt-4 border-t border-black/5 dark:border-white/10">
-              <button
-                type="button"
-                className={plan.buttonClass}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelect?.(plan);
-                }}
-              >
-                {plan.buttonText}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -10,13 +10,22 @@ import {
   CreditCard,
   QrCode,
   Check,
-  X,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import HoloCard from "./HoloCard";
 import { cn } from "@/lib/utils";
-
+import type { UserSubscription, PaymentMethod } from "../types/subscription";
+import {
+  registerGooglePaySubscription,
+  purchaseOneTimeSubscription,
+} from "../services/subscriptionService";
 export interface PricingPlan {
   id: string;
+  planCode?: string;
+  priceAmount?: number;
+  freeTrialDays?: number;
+  targetRank?: string;
   name: string;
   price: string;
   period: string;
@@ -47,27 +56,28 @@ interface PaymentOption {
   account?: string;
 }
 
-function AppleLogo({ className = "w-4 h-4 fill-current inline-block" }: { className?: string }) {
+function GooglePayLogo({ className = "h-4 inline-block" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 170 170" className={className} aria-hidden="true">
-      <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.69-3.04-7.67-7.81-11.96-14.34-6.3-9.61-11.22-20.44-14.75-32.48-3.53-12.04-5.29-23.48-5.29-34.33 0-14.35 3.69-26.31 11.08-35.88 7.39-9.57 16.63-14.42 27.72-14.54 4.8 0 10.11 1.25 15.93 3.76 5.82 2.51 9.77 3.82 11.87 3.93 1.68-.11 5.92-1.53 12.74-4.25 6.82-2.72 12.51-3.93 17.07-3.63 13.51.78 24.16 5.85 31.95 15.22-11.98 7.29-17.84 17.3-17.58 30.05.24 10.13 4.14 18.52 11.71 25.18 7.57 6.66 16.48 10.45 26.73 11.37-2.61 7.74-5.77 15.14-9.48 22.2zM119.22 31.84c0-7.29 2.58-14.07 7.74-20.35 5.16-6.28 11.66-10.45 19.5-12.51.68 1.47 1.05 3.05 1.12 4.75.14 7.62-2.58 14.76-8.15 21.43-5.58 6.67-12.18 10.66-19.8 11.98-.12-1.74-.41-3.51-.41-5.3z" />
-    </svg>
+    <span className="font-bold text-xs tracking-tight flex items-center gap-1">
+      <svg viewBox="0 0 48 48" className="w-4 h-4 shrink-0" aria-hidden="true">
+        <path fill="#4285F4" d="M46.145 24.5c0-1.57-.14-3.09-.4-4.5H24v8.52h12.43c-.54 2.87-2.19 5.31-4.66 6.94v5.77h7.55c4.42-4.07 6.825-10.06 6.825-16.73z"/>
+        <path fill="#34A853" d="M24 47c6.21 0 11.42-2.06 15.23-5.59l-7.55-5.77c-2.06 1.38-4.7 2.2-7.68 2.2-5.91 0-10.92-3.99-12.71-9.36H3.34v5.96C7.15 42.06 14.95 47 24 47z"/>
+        <path fill="#FBBC05" d="M11.29 28.48c-.45-1.35-.71-2.79-.71-4.28 0-1.49.26-2.93.71-4.28V13.96H3.34C1.86 16.91 1 20.24 1 24s.86 7.09 2.34 10.04l7.95-5.56z"/>
+        <path fill="#EA4335" d="M24 10.16c3.38 0 6.41 1.16 8.79 3.44l6.59-6.59C35.41 3.25 30.2 1 24 1 14.95 1 7.15 5.94 3.34 13.96l7.95 5.96c1.79-5.37 6.8-9.36 12.71-9.36z"/>
+      </svg>
+      <span>Pay</span>
+    </span>
   );
 }
 
 const PAYMENT_METHODS: PaymentOption[] = [
   {
-    id: "apple_pay",
-    name: "Apple Pay",
-    badge: "Nhanh nhất",
-    icon: (
-      <span className="font-bold text-base tracking-tighter flex items-center gap-0.5">
-        <AppleLogo className="w-3.5 h-3.5 fill-current mb-0.5" />
-        <span>Pay</span>
-      </span>
-    ),
-    detail: "Xác thực tức thì bằng Face ID / Touch ID",
-    account: "Thiết bị Apple mặc định",
+    id: "gpay",
+    name: "Google Pay",
+    badge: "Ưu tiên",
+    icon: <GooglePayLogo />,
+    detail: "Google Wallet & Thẻ liên kết",
+    account: "Visa / Mastercard quốc tế",
   },
   {
     id: "momo",
@@ -78,11 +88,11 @@ const PAYMENT_METHODS: PaymentOption[] = [
         M
       </div>
     ),
-    detail: "Liên kết ví MoMo hoặc quét mã QR tự động",
+    detail: "Liên kết ví MoMo hoặc quét QR tự động",
     account: "0988 ••• •89",
   },
   {
-    id: "visa",
+    id: "card",
     name: "Thẻ Quốc Tế",
     icon: <CreditCard className="w-4 h-4 text-sky-500" />,
     detail: "Hỗ trợ Visa, Mastercard, JCB toàn cầu",
@@ -93,7 +103,7 @@ const PAYMENT_METHODS: PaymentOption[] = [
     name: "VNPay QR",
     badge: "Không phí",
     icon: <QrCode className="w-4 h-4 text-emerald-500" />,
-    detail: "Quét mã qua 40+ ứng dụng ngân hàng Việt Nam",
+    detail: "Quét mã qua 40+ ứng dụng ngân hàng",
     account: "VietQR liên ngân hàng",
   },
 ];
@@ -103,10 +113,12 @@ export default function HoloCardPaymentSheet({
   isOpen,
   onClose,
 }: HoloCardPaymentSheetProps) {
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
-  const [selectedMethod, setSelectedMethod] = useState<string>("apple_pay");
+  const [billingCycle, setBillingCycle] = useState<"quarterly" | "yearly">("quarterly");
+  const [selectedMethod, setSelectedMethod] = useState<string>("gpay");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successInfo, setSuccessInfo] = useState<{ planName: string; expiryTime?: string } | null>(null);
   const [mounted, setMounted] = useState<boolean>(false);
 
   const shouldReduceMotion = useReducedMotion();
@@ -141,6 +153,8 @@ export default function HoloCardPaymentSheet({
     if (!isOpen) {
       setIsProcessing(false);
       setIsSuccess(false);
+      setErrorMessage(null);
+      setSuccessInfo(null);
       clearAllTimers();
     }
   }, [isOpen]);
@@ -160,34 +174,68 @@ export default function HoloCardPaymentSheet({
 
   if (!mounted || !activePlan) return null;
 
-  // Price calculation
-  const numericPrice = Number(activePlan.price.replace(/[^0-9.]/g, "")) || 0;
-  const isFree = numericPrice === 0;
-  const yearlyPriceNum = Math.round(numericPrice * 12 * 0.8);
-  const displayPrice = isFree
-    ? "$0"
-    : billingCycle === "monthly"
-    ? activePlan.price
-    : `$${yearlyPriceNum}`;
-  const displayPeriod = isFree
-    ? "/vĩnh viễn"
-    : billingCycle === "monthly"
-    ? "/tháng"
-    : "/năm (tiết kiệm 20%)";
+  // Price calculation based on DB billing periods: 3 months and 1 year
+  const baseMonthlyAmount = activePlan.priceAmount ?? (activePlan.id === "pro" ? 120000 : 30000);
+  const quarterlyAmount = baseMonthlyAmount * 3;
+  const yearlyAmount = Math.round(baseMonthlyAmount * 12 * 0.8);
 
-  const handlePay = () => {
+  const displayPrice =
+    billingCycle === "quarterly"
+      ? `${quarterlyAmount.toLocaleString("vi-VN")}₫`
+      : `${yearlyAmount.toLocaleString("vi-VN")}₫`;
+
+  const displayPeriod =
+    billingCycle === "quarterly" ? "/3 tháng" : "/năm (tiết kiệm 20%)";
+
+  const handlePay = async () => {
     if (isProcessing || isSuccess) return;
     setIsProcessing(true);
-    const t1 = window.setTimeout(() => {
-      setIsProcessing(false);
+    setErrorMessage(null);
+
+    const planCode = activePlan.planCode || (activePlan.id === "pro" ? "MA_THUAT" : "ANH_KIM");
+    const cycleLabel = billingCycle === "yearly" ? "1 năm (-20%)" : "3 tháng";
+
+    try {
+      if (selectedMethod === "gpay") {
+        const res = await registerGooglePaySubscription({
+          planCode,
+          paymentToken: "tok_gpay_wallet_" + Date.now(),
+          cardNetwork: "VISA",
+          lastFour: "4242",
+        });
+        setSuccessInfo({
+          planName: res.planName || activePlan.name,
+          expiryTime: res.expiryTime,
+        });
+      } else {
+        let method: PaymentMethod = "VNPAY";
+        if (selectedMethod === "momo") method = "MOMO";
+        else if (selectedMethod === "card") method = "CREDIT_CARD";
+        else if (selectedMethod === "vnpay") method = "VNPAY";
+
+        const res = await purchaseOneTimeSubscription({
+          planCode,
+          paymentMethod: method,
+          transactionReference: `${method}_TXN_${Date.now()}`,
+          note: `Thanh toán gói ${activePlan.name} chu kỳ ${cycleLabel}`,
+        });
+        setSuccessInfo({
+          planName: res.planName || activePlan.name,
+          expiryTime: res.expiryTime,
+        });
+      }
+
       setIsSuccess(true);
-      const t2 = window.setTimeout(() => {
-        setIsSuccess(false);
+      const t = window.setTimeout(() => {
         onClose();
-      }, 1800);
-      timersRef.current.push(t2);
-    }, 1200);
-    timersRef.current.push(t1);
+      }, 3500);
+      timersRef.current.push(t);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return createPortal(
@@ -263,16 +311,6 @@ export default function HoloCardPaymentSheet({
               <div className="w-10 h-1 rounded-full bg-neutral-300 dark:bg-neutral-700" />
             </div>
 
-            {/* Floating Close Button */}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Đóng"
-              className="absolute top-4 right-4 z-30 w-8 h-8 rounded-full bg-neutral-200/70 dark:bg-neutral-800/80 flex items-center justify-center text-neutral-600 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-black dark:hover:text-white transition-colors cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
             {/* Deck Body: 2 Columns */}
             <div className="p-5 sm:p-7 grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
               {/* Left Column: Interactive Hologram Card */}
@@ -306,23 +344,23 @@ export default function HoloCardPaymentSheet({
                     <button
                       type="button"
                       role="radio"
-                      aria-checked={billingCycle === "monthly"}
-                      onClick={() => setBillingCycle("monthly")}
+                      aria-checked={billingCycle === "quarterly"}
+                      onClick={() => setBillingCycle("quarterly")}
                       className={cn(
                         "relative py-2.5 rounded-xl text-xs transition-colors cursor-pointer select-none font-medium text-center z-10",
-                        billingCycle === "monthly"
+                        billingCycle === "quarterly"
                           ? "text-neutral-900 dark:text-white font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
                       )}
                     >
-                      {billingCycle === "monthly" && (
+                      {billingCycle === "quarterly" && (
                         <motion.div
                           layoutId="billing-pill-active"
                           transition={{ type: "spring", stiffness: 420, damping: 32 }}
                           className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] border border-black/[0.04] dark:border-white/10 -z-10"
                         />
                       )}
-                      Hàng tháng
+                      3 tháng
                     </button>
                     <button
                       type="button"
@@ -343,9 +381,9 @@ export default function HoloCardPaymentSheet({
                           className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] border border-black/[0.04] dark:border-white/10 -z-10"
                         />
                       )}
-                      <span>Hàng năm</span>
+                      <span>1 năm</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
-                        -20%
+                        {"-20%"}
                       </span>
                     </button>
                   </div>
@@ -422,6 +460,32 @@ export default function HoloCardPaymentSheet({
                     })}
                   </div>
                 </div>
+
+                {/* Error Banner */}
+                {errorMessage && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+                    <div className="flex-1">
+                      <div className="font-semibold">Thanh toán chưa thành công</div>
+                      <div className="text-[11px] opacity-90">{errorMessage}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Success Banner */}
+                {isSuccess && successInfo && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-2.5 text-xs text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                    <div className="flex-1">
+                      <div className="font-semibold">Kích hoạt thành công {successInfo.planName}!</div>
+                      {successInfo.expiryTime && (
+                        <div className="text-[11px] opacity-90">
+                          Hạn dùng đến: {new Date(successInfo.expiryTime).toLocaleDateString("vi-VN")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Action CTA Button - Bottom Anchored & Bevel Effect */}
                 <div className="mt-auto pt-3">
