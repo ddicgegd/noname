@@ -312,7 +312,7 @@ export default function HoloCardPaymentSheet({
             </div>
 
             {/* Deck Body: 2 Columns */}
-            <div className="p-5 sm:p-7 grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+            <div className="p-4 sm:p-5.5 grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-5 items-stretch">
               {/* Left Column: Interactive Hologram Card */}
               <div className="md:col-span-5 h-full flex flex-col">
                 <HoloCard
@@ -326,20 +326,12 @@ export default function HoloCardPaymentSheet({
 
               {/* Right Column: Top-anchored & Bottom-anchored */}
               <div className="md:col-span-7 flex flex-col justify-between h-full pt-0.5">
-                {/* Billing Cycle Section - Bevel Effect & Smooth Motion */}
-                <div className="space-y-1.5">
-                  <div
-                    id="billing-cycle-label"
-                    className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 px-0.5"
-                  >
-                    Kỳ thanh toán
-                  </div>
-
-                  {/* Recessed Beveled iOS Segmented Control with Rounded-2xl Frame */}
+                <div className="space-y-3">
+                  {/* Billing Cycle Section - Compact Segmented Control with Optical Bevel */}
                   <div
                     role="radiogroup"
-                    aria-labelledby="billing-cycle-label"
-                    className="relative grid grid-cols-2 p-1.5 rounded-2xl bg-neutral-200/80 dark:bg-black/35 border border-black/[0.08] dark:border-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),inset_0_1px_2px_rgba(0,0,0,0.06),inset_0_-1px_0_rgba(255,255,255,0.85)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.4),inset_0_-1px_0_rgba(255,255,255,0.1)]"
+                    aria-label="Kỳ thanh toán"
+                    className="relative grid grid-cols-2 p-1 rounded-full bg-neutral-200/80 dark:bg-black/35 border border-black/[0.08] dark:border-white/10 shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.12),inset_0_0.5px_1px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.85)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6),0_1px_0_rgba(255,255,255,0.08)]"
                   >
                     <button
                       type="button"
@@ -347,9 +339,9 @@ export default function HoloCardPaymentSheet({
                       aria-checked={billingCycle === "quarterly"}
                       onClick={() => setBillingCycle("quarterly")}
                       className={cn(
-                        "relative py-2.5 rounded-xl text-xs transition-colors cursor-pointer select-none font-medium text-center z-10",
+                        "relative py-1.5 px-3 rounded-full text-xs font-semibold transition-colors cursor-pointer select-none text-center z-10 flex items-center justify-center",
                         billingCycle === "quarterly"
-                          ? "text-neutral-900 dark:text-white font-semibold"
+                          ? "text-neutral-900 dark:text-white"
                           : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
                       )}
                     >
@@ -357,10 +349,10 @@ export default function HoloCardPaymentSheet({
                         <motion.div
                           layoutId="billing-pill-active"
                           transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] border border-black/[0.04] dark:border-white/10 -z-10"
+                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] border-t border-t-white dark:border-t-white/30 border border-black/[0.04] dark:border-white/10 -z-10"
                         />
                       )}
-                      3 tháng
+                      <span>3 tháng</span>
                     </button>
                     <button
                       type="button"
@@ -368,9 +360,9 @@ export default function HoloCardPaymentSheet({
                       aria-checked={billingCycle === "yearly"}
                       onClick={() => setBillingCycle("yearly")}
                       className={cn(
-                        "relative py-2.5 rounded-xl text-xs transition-colors cursor-pointer select-none font-medium flex items-center justify-center gap-1.5 z-10",
+                        "relative py-1.5 px-3 rounded-full text-xs font-semibold transition-colors cursor-pointer select-none text-center z-10 flex items-center justify-center gap-1.5",
                         billingCycle === "yearly"
-                          ? "text-neutral-900 dark:text-white font-semibold"
+                          ? "text-neutral-900 dark:text-white"
                           : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
                       )}
                     >
@@ -378,29 +370,20 @@ export default function HoloCardPaymentSheet({
                         <motion.div
                           layoutId="billing-pill-active"
                           transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] border border-black/[0.04] dark:border-white/10 -z-10"
+                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] border-t border-t-white dark:border-t-white/30 border border-black/[0.04] dark:border-white/10 -z-10"
                         />
                       )}
                       <span>1 năm</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
-                        {"-20%"}
+                      <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                        -20%
                       </span>
                     </button>
                   </div>
-                </div>
 
-                {/* Payment Methods */}
-                <div className="space-y-1.5">
-                  <div
-                    id="payment-methods-label"
-                    className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400"
-                  >
-                    Phương thức thanh toán
-                  </div>
-
+                  {/* Payment Methods */}
                   <div
                     role="radiogroup"
-                    aria-labelledby="payment-methods-label"
+                    aria-label="Phương thức thanh toán"
                     className="grid grid-cols-1 sm:grid-cols-2 gap-2"
                   >
                     {PAYMENT_METHODS.map((m) => {
@@ -419,38 +402,38 @@ export default function HoloCardPaymentSheet({
                             }
                           }}
                           className={cn(
-                            "p-3 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer transition-all duration-150 select-none",
+                            "p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer transition-all duration-150 select-none",
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
                             isSelected
-                              ? "bg-sky-50/80 dark:bg-sky-950/30 border-sky-400 dark:border-sky-600 shadow-xs ring-1 ring-sky-400/20"
+                              ? "bg-sky-50/70 dark:bg-sky-950/40 border-sky-400/80 dark:border-sky-500/70 ring-1 ring-sky-400/30 shadow-xs"
                               : "bg-white/60 dark:bg-white/5 border-black/5 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
                           )}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-lg bg-white dark:bg-neutral-800 border border-black/5 dark:border-white/10 flex items-center justify-center shrink-0">
+                            <div className="w-8 h-8 rounded-lg bg-neutral-100/80 dark:bg-neutral-800/80 flex items-center justify-center shrink-0">
                               {m.icon}
                             </div>
                             <div className="min-w-0">
                               <div className="text-xs font-semibold truncate text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
                                 <span>{m.name}</span>
                                 {m.badge && (
-                                  <span className="text-[9px] font-medium px-1 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400">
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-neutral-200/70 dark:bg-neutral-700/70 text-neutral-600 dark:text-neutral-300">
                                     {m.badge}
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">
-                                {m.account}
+                              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
+                                {m.account ?? m.detail}
                               </div>
                             </div>
                           </div>
 
                           <div
                             className={cn(
-                              "w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors",
+                              "w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors",
                               isSelected
-                                ? "border-sky-500 bg-sky-500 text-white"
-                                : "border-neutral-300 dark:border-neutral-600"
+                                ? "bg-sky-500 text-white shadow-xs"
+                                : "border border-neutral-300 dark:border-neutral-600"
                             )}
                           >
                             {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
@@ -460,7 +443,6 @@ export default function HoloCardPaymentSheet({
                     })}
                   </div>
                 </div>
-
                 {/* Error Banner */}
                 {errorMessage && (
                   <div className="mt-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300">
@@ -494,32 +476,27 @@ export default function HoloCardPaymentSheet({
                     disabled={isProcessing || isSuccess}
                     onClick={handlePay}
                     className={cn(
-                      "w-full py-3.5 px-5 rounded-2xl font-bold text-sm tracking-wide select-none text-white",
+                      "w-full py-3 px-5 rounded-xl font-bold text-sm tracking-wide select-none text-white",
                       "flex items-center justify-center cursor-pointer",
                       "border-t border-t-white/60",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2",
                       "transition-all duration-200 active:scale-[0.985] active:brightness-95",
                       isSuccess
-                        ? "bg-emerald-600 shadow-emerald-600/30 border-b-2 border-b-emerald-800"
+                        ? "bg-emerald-600 border-b border-b-emerald-800 shadow-[0_4px_14px_rgba(16,185,129,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)]"
                         : activePlan.id === "free"
-                        ? "bg-gradient-to-b from-[#38BDF8] via-[#0EA5E9] to-[#0284C7] border-b-2 border-b-[#0369A1] hover:brightness-105"
-                        : "bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-b-2 border-b-[#991B1B] hover:brightness-105",
+                        ? "bg-gradient-to-b from-[#38BDF8] to-[#0284C7] border-b border-b-sky-700/60 shadow-[0_4px_14px_rgba(14,165,233,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] hover:brightness-105"
+                        : "bg-gradient-to-b from-[#FF5E3A] to-[#E03A12] border-b border-b-[#c23b10]/80 shadow-[0_4px_14px_rgba(255,94,58,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] hover:brightness-105",
                       isProcessing && "opacity-85 cursor-wait"
                     )}
-                    style={{
-                      boxShadow: !isSuccess
-                        ? `inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 0 rgba(0,0,0,0.12), 0 8px 24px -4px ${activePlan.glowColor}`
-                        : undefined,
-                    }}
                   >
                     {isProcessing ? (
-                      <span>Đang kết nối...</span>
-                    ) : isSuccess ? (
-                      <span>Thành công!</span>
-                    ) : (
-                      <span>Thanh toán</span>
-                    )}
-                  </button>
+                       <span>Đang kết nối...</span>
+                     ) : isSuccess ? (
+                       <span>Thành công!</span>
+                     ) : (
+                       <span>Thanh toán</span>
+                     )}
+                   </button>
                 </div>
               </div>
             </div>

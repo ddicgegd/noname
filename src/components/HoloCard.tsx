@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useRef, type MouseEvent, type CSSProperties } from "react";
+import { Check } from "lucide-react";
 import { type PricingPlan } from "./HoloCardPaymentSheet";
 
 export interface HoloCardProps {
@@ -154,7 +155,7 @@ export function HoloCard({
         ref={cardRef}
         onClick={() => onSelect?.(plan)}
         className={`${
-          compact ? "p-5 sm:p-6 min-h-[380px]" : "p-8 sm:p-10 min-h-[550px]"
+          compact ? "p-4 sm:p-5 min-h-[320px] sm:min-h-[330px]" : "p-8 sm:p-10 min-h-[550px]"
         } bg-white/50 dark:bg-neutral-900/40 backdrop-blur-xl rounded-2xl flex flex-col relative overflow-hidden h-full ${
           onSelect ? "cursor-pointer" : ""
         } border`}
@@ -227,27 +228,53 @@ export function HoloCard({
               Popular
             </div>
           )}
-          <h3 className={`font-display ${compact ? "text-xl mb-1" : "text-2xl mb-2"} text-black dark:text-white font-bold`}>
+          <h3
+            className={`font-display ${
+              compact ? "text-lg mb-1" : "text-2xl mb-2"
+            } text-black dark:text-white font-bold`}
+          >
             {plan.name}
           </h3>
-          <div className={`font-display ${compact ? "text-3xl mb-4" : "text-5xl mb-6"} text-black dark:text-white font-extrabold flex items-baseline tracking-tight`}>
+          <div
+            className={`font-display ${
+              compact ? "text-2xl sm:text-3xl mb-3.5" : "text-5xl mb-6"
+            } text-black dark:text-white font-extrabold flex items-baseline tracking-tight`}
+          >
             {currentPrice}
-            <span className="font-sans text-xs sm:text-sm font-medium text-[#555555] dark:text-neutral-400 ml-1">
+            <span
+              className={
+                compact
+                  ? "font-sans text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400 ml-1.5"
+                  : "font-sans text-xs sm:text-sm font-medium text-[#555555] dark:text-neutral-400 ml-1"
+              }
+            >
               {currentPeriod}
             </span>
           </div>
 
-          <ul className={`flex flex-col gap-2.5 mb-2 flex-1 font-sans text-xs sm:text-sm text-[#555555] dark:text-neutral-300`}>
+          <ul
+            className={`flex flex-col ${
+              compact ? "gap-2 text-xs" : "gap-2.5 text-xs sm:text-sm"
+            } mb-2 flex-1 font-sans text-[#555555] dark:text-neutral-300`}
+          >
             {plan.features.map((feature, idx) => (
-              <li key={idx} className="flex items-center gap-2.5">
-                <span className={`material-symbols-outlined ${plan.checkIconColor} text-base sm:text-lg font-bold shrink-0`}>
-                  check
-                </span>
+              <li
+                key={idx}
+                className={`flex items-center ${compact ? "gap-2" : "gap-2.5"}`}
+              >
+                {compact ? (
+                  <span className="w-4 h-4 rounded-full bg-sky-500/10 dark:bg-sky-400/15 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                  </span>
+                ) : (
+                  <span className="w-5 h-5 rounded-full bg-sky-500/10 dark:bg-sky-400/15 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </span>
+                )}
                 <span>{feature}</span>
               </li>
             ))}
           </ul>
-
         </div>
       </div>
     </div>
