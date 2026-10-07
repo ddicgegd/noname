@@ -98,8 +98,9 @@ export function HoloCard({
       if (a > 0.02) {
         card.style.boxShadow = `${plan.glowColor} 0px ${lerp(20, 36, a).toFixed(0)}px ${lerp(30, 48, a).toFixed(0)}px -8px, rgba(0,0,0,0.06) 0px 4px 16px`;
         card.style.borderColor = plan.hoverBorderColor;
+      } else {
+        card.style.borderColor = defaultBorderColor;
       }
-
       raf.current = requestAnimationFrame(tick);
     };
 
@@ -132,10 +133,10 @@ export function HoloCard({
     tgt.current.ry = 0;
     tgt.current.active = 0;
   };
-
   const currentPrice = overridePrice ?? plan.price;
   const currentPeriod = overridePeriod ?? plan.period;
-
+  const defaultBorderColor =
+    plan.id === "free" ? "rgba(56, 189, 248, 0.35)" : "rgba(192, 132, 252, 0.4)";
   return (
     <div
       ref={wrapRef}
@@ -153,8 +154,12 @@ export function HoloCard({
           compact ? "p-5 sm:p-6 min-h-[380px]" : "p-8 sm:p-10 min-h-[550px]"
         } bg-white/50 dark:bg-neutral-900/40 backdrop-blur-xl rounded-2xl flex flex-col relative overflow-hidden h-full ${
           onSelect ? "cursor-pointer" : ""
-        } border border-white/60 dark:border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.04)]`}
-        style={{ transformStyle: "preserve-3d", willChange: "transform, box-shadow, border-color" }}
+        } border shadow-[0_8px_32px_rgba(0,0,0,0.04)]`}
+        style={{
+          transformStyle: "preserve-3d",
+          borderColor: defaultBorderColor,
+          willChange: "transform, box-shadow, border-color",
+        }}
       >
         {/* Base gradient */}
         <div className={`absolute inset-0 ${plan.bgGradient} -z-10`} />
