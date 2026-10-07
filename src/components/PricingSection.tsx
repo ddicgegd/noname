@@ -6,28 +6,7 @@
 import React, { useEffect, useRef, useState, type MouseEvent, type CSSProperties } from "react";
 import { motion } from "motion/react";
 import ClawMachine from "./ClawMachine";
-
-
-
-interface PricingPlan {
-  id: string;
-  name: string;
-  price: string;
-  period: string;
-  features: string[];
-  buttonText: string;
-  isPopular?: boolean;
-  bgGradient: string;
-  hoverBorderColor: string;
-  checkIconColor: string;
-  buttonClass: string;
-  /** Primary foil color (rgba) */
-  foilTint: string;
-  /** Glow shadow color (rgba) */
-  glowColor: string;
-  /** Top rim light color */
-  rimColor: string;
-}
+import HoloCardPaymentSheet, { type PricingPlan } from "./HoloCardPaymentSheet";
 
 const PRICING_PLANS: PricingPlan[] = [
   {
@@ -70,7 +49,15 @@ const PRICING_PLANS: PricingPlan[] = [
   },
 ];
 
-function HoloCard({ plan, isVerified }: { plan: PricingPlan; isVerified: boolean }) {
+function HoloCard({
+  plan,
+  isVerified,
+  onSelect,
+}: {
+  plan: PricingPlan;
+  isVerified: boolean;
+  onSelect: (plan: PricingPlan) => void;
+}) {
   const wrapRef = useRef<HTMLDivElement>(null);   // perspective wrapper
   const cardRef = useRef<HTMLDivElement>(null);   // tilting card
   const foilRef = useRef<HTMLDivElement>(null);   // foil overlay
@@ -204,6 +191,7 @@ function HoloCard({ plan, isVerified }: { plan: PricingPlan; isVerified: boolean
       {/* The card — tilt applied via direct DOM style */}
       <div
         ref={cardRef}
+        onClick={() => onSelect(plan)}
         className="p-8 sm:p-10 bg-white/50 backdrop-blur-xl rounded-2xl flex flex-col relative overflow-hidden h-full min-h-[550px] cursor-pointer border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)]"
         style={{ transformStyle: "preserve-3d", willChange: "transform, box-shadow, border-color" }}
       >
@@ -280,6 +268,18 @@ function HoloCard({ plan, isVerified }: { plan: PricingPlan; isVerified: boolean
               </li>
             ))}
           </ul>
+          <div className="mt-6 pt-4 border-t border-black/5">
+            <button
+              type="button"
+              className={plan.buttonClass}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(plan);
+              }}
+            >
+              {plan.buttonText}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -288,6 +288,7 @@ function HoloCard({ plan, isVerified }: { plan: PricingPlan; isVerified: boolean
 
 export default function PricingSection() {
   const [isVerified, setIsVerified] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
 
   return (
     <section id="pricing" className="py-24 px-6 sm:px-16 relative">
@@ -317,7 +318,7 @@ export default function PricingSection() {
 
           {PRICING_PLANS.map((plan) => (
             <div key={plan.id} className="contents">
-              <HoloCard plan={plan} isVerified={isVerified} />
+              <HoloCard plan={plan} isVerified={isVerified} onSelect={setSelectedPlan} />
             </div>
           ))}
         </div>
@@ -342,6 +343,13 @@ export default function PricingSection() {
             Contact Sales
           </button>
         </motion.div>
+
+        {/* Hologram Card Payment Sheet (Style B - Floating Glass Deck) */}
+        <HoloCardPaymentSheet
+          plan={selectedPlan}
+          isOpen={!!selectedPlan}
+          onClose={() => setSelectedPlan(null)}
+        />
       </div>
     </section>
   );
