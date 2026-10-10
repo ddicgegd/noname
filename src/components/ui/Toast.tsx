@@ -140,7 +140,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
                 {/* Left Content: Badge Icon and Message */}
                 <div className="relative z-10 flex items-center gap-3 min-w-0 pr-1 flex-1">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                     {toast.type === "error" ? (
                       <AlertCircle className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />
                     ) : toast.type === "warning" ? (

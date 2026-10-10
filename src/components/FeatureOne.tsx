@@ -180,7 +180,7 @@ export default function FeatureOne() {
 
   return (
     <section id="features" className="py-16 px-4 sm:px-8 md:px-16 relative">
-      <div className="w-[85%] 2xl:max-w-[1800px] mx-auto bg-gradient-to-b from-white/70 via-white/50 to-white/30 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-[26px] shadow-[0_16px_44px_-10px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,1)] overflow-hidden">
+      <div className="w-[85%] 2xl:max-w-[1800px] mx-auto bg-gradient-to-b from-white/70 via-white/50 to-white/30 backdrop-blur-2xl rounded-[26px] shadow-[0_16px_44px_-10px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,1)] overflow-hidden outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
         
         {/* FIRST FEATURE: Trao đổi & xử lý vấn đề khách hàng */}
         <div className="flex flex-col md:flex-row min-h-[596px]">
@@ -199,7 +199,7 @@ export default function FeatureOne() {
               <a
                 href="#pricing"
                 onClick={handleScrollToPricing}
-                className="inline-flex items-center justify-center gap-2.5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/80 border-x border-x-white/80 shadow-[0_2px_10px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] backdrop-blur-md text-slate-900 hover:text-white hover:bg-gradient-to-b hover:from-[#FF5E3A] hover:via-[#FF4D24] hover:to-[#E03A12] hover:border-[#FF4D24] hover:shadow-[0_4px_16px_rgba(255,77,36,0.35)] font-semibold text-[15px] px-8 py-4 rounded-[14px] w-fit transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer select-none"
+                className="inline-flex items-center justify-center gap-2.5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 shadow-[0_2px_10px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] backdrop-blur-md text-slate-900 hover:text-white hover:bg-gradient-to-b hover:from-[#FF5E3A] hover:via-[#FF4D24] hover:to-[#E03A12] hover:shadow-[0_4px_16px_rgba(255,77,36,0.35)] font-semibold text-[15px] px-8 py-4 rounded-[14px] w-fit transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
               >
                 <span>Bắt đầu trải nghiệm</span>
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
@@ -233,7 +233,7 @@ export default function FeatureOne() {
             </div>
 
             {/* Glowing Glass Chat Card */}
-            <div className="relative z-10 w-[92%] max-w-xl min-h-[470px] bg-gradient-to-b from-white/95 via-white/80 to-white/65 backdrop-blur-[32px] rounded-2xl border-t border-t-white border-x border-x-white/70 border-b border-b-slate-300/60 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col overflow-hidden">
+            <div className="relative z-10 w-[92%] max-w-xl min-h-[470px] bg-gradient-to-b from-white/95 via-white/80 to-white/65 backdrop-blur-[32px] rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col overflow-hidden outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
 
               {/* Chat Frame Body */}
               <div className="flex-1 p-3.5 sm:p-4 flex flex-col justify-between overflow-hidden relative">
@@ -267,7 +267,7 @@ export default function FeatureOne() {
                                 initial={{ opacity: 0, y: 6 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                className="flex items-center gap-1.5 bg-gradient-to-b from-white/95 via-white/85 to-white/75 backdrop-blur-md rounded-full px-2.5 py-1 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 ring-1 ring-black/[0.06] shadow-[0_2px_6px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] text-xs"
+                                className="flex items-center gap-1.5 bg-gradient-to-b from-white/95 via-white/85 to-white/75 backdrop-blur-md rounded-full px-2.5 py-1 ring-1 ring-black/[0.06] shadow-[0_2px_6px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] text-xs outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                               >
                                 <span className="material-symbols-outlined text-primary text-[14px]">
                                   description
@@ -369,8 +369,8 @@ export default function FeatureOne() {
                                     }}
                                     className={`relative ${cardWidth} h-[36px] shrink-0 backdrop-blur-md rounded-full px-2 py-1 transition-[background-color,border-color,box-shadow] duration-150 flex items-center gap-1.5 cursor-pointer ${
                                       isHovered
-                                        ? "bg-white border-t border-t-white border-b border-b-slate-300/80 border-x border-x-white/80 ring-1 ring-black/[0.08] shadow-[0_4px_14px_-2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,1)]"
-                                        : "bg-gradient-to-b from-white/95 via-white/85 to-white/75 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 ring-1 ring-black/[0.06] shadow-[0_2px_8px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)]"
+                                        ? "bg-white ring-1 ring-black/[0.08] shadow-[0_4px_14px_-2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                        : "bg-gradient-to-b from-white/95 via-white/85 to-white/75 ring-1 ring-black/[0.06] shadow-[0_2px_8px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                     }`}
                                   >
                                   {/* Thumbnail Image: click to enlarge */}
@@ -432,7 +432,7 @@ export default function FeatureOne() {
                   <div
                     ref={containerRef}
                     onClick={() => inputRef.current?.focus()}
-                    className="h-[46px] bg-gradient-to-b from-white/95 via-white/85 to-white/70 backdrop-blur-xl rounded-full border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_4px_20px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center px-1.5 gap-1 relative z-20 pointer-events-auto cursor-text focus-within:ring-1 focus-within:ring-primary/25 transition-shadow"
+                    className="h-[46px] bg-gradient-to-b from-white/95 via-white/85 to-white/70 backdrop-blur-xl rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center px-1.5 gap-1 relative z-20 pointer-events-auto cursor-text focus-within:ring-1 focus-within:ring-primary/25 transition-shadow outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                   >
                     {/* Action tool: Attach button on left */}
                     <label
@@ -486,7 +486,7 @@ export default function FeatureOne() {
                       onClick={handleSendMessage}
                       disabled={!inputValue.trim() && attachedFiles.length === 0}
                       title="Gửi vấn đề để kích hoạt luồng xử lý"
-                      className="w-[36px] h-[36px] rounded-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/50 border-b border-b-[#A8280A] shadow-[0_2px_8px_rgba(255,77,36,0.35),inset_0_1px_0_rgba(255,255,255,0.4)] flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed pointer-events-auto shrink-0 transition-transform"
+                      className="w-[36px] h-[36px] rounded-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] shadow-[0_2px_8px_rgba(255,77,36,0.35),inset_0_1px_0_rgba(255,255,255,0.4)] flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed pointer-events-auto shrink-0 transition-transform outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                     >
                       <span className="material-symbols-outlined text-white text-[17px]">
                         arrow_upward
@@ -527,7 +527,7 @@ export default function FeatureOne() {
 
             {/* Glowing Glass Card with Bevel Frame */}
             <motion.div
-              className="relative z-10 w-[80%] max-w-2xl min-h-[385px] bg-gradient-to-b from-white/85 via-white/70 to-white/50 backdrop-blur-[40px] rounded-3xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)] p-6 sm:p-8 overflow-hidden flex flex-col"
+              className="relative z-10 w-[80%] max-w-2xl min-h-[385px] bg-gradient-to-b from-white/85 via-white/70 to-white/50 backdrop-blur-[40px] rounded-3xl shadow-[0_30px_70px_-20px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,1)] p-6 sm:p-8 overflow-hidden flex flex-col outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
@@ -536,7 +536,7 @@ export default function FeatureOne() {
               {/* Header section */}
               <div className="flex items-center justify-between mb-6 border-b border-black/5 pb-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-white/90 to-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_2px_6px_rgba(255,77,36,0.1),inset_0_1px_0_rgba(255,255,255,0.9)]">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-white/90 to-primary/10 flex items-center justify-center border-primary/20 shadow-[0_2px_6px_rgba(255,77,36,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                     <span className="material-symbols-outlined text-primary text-xl">
                       cloud_upload
                     </span>
@@ -614,7 +614,7 @@ export default function FeatureOne() {
                 </div>
 
                 {/* Bottom Live Banner with Bevel Pill */}
-                <div className="mt-4 p-3 bg-gradient-to-b from-white/95 via-white/85 to-white/70 rounded-xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-between">
+                <div className="mt-4 p-3 bg-gradient-to-b from-white/95 via-white/85 to-white/70 rounded-xl shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-between outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-[#27C93F] text-[18px] font-bold">
                       check_circle

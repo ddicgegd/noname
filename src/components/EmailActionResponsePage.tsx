@@ -618,7 +618,7 @@ export default function EmailActionResponsePage({
               type="button"
               onClick={handleExecuteNavigation}
               disabled={executionStatus === "calling"}
-              className="w-full h-11 rounded-xl text-white font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none bg-gradient-to-b from-[#FF552D] via-[#FF4D24] to-[#E33B12] border border-[#FF6B45]/40 border-t-white/35 border-b-black/30 shadow-[0_4px_14px_rgba(255,77,36,0.28),inset_0_1px_0_rgba(255,255,255,0.25)] hover:brightness-105 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+              className="w-full h-11 rounded-xl text-white font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none bg-gradient-to-b from-[#FF552D] via-[#FF4D24] to-[#E33B12] border-[#FF6B45]/40 shadow-[0_4px_14px_rgba(255,77,36,0.28),inset_0_1px_0_rgba(255,255,255,0.25)] hover:brightness-105 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
             >
               <span>{navigationTarget.buttonLabel}</span>
               <ArrowRight size={14} />

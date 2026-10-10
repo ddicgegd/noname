@@ -331,7 +331,7 @@ export default function HoloCardPaymentSheet({
                   <div
                     role="radiogroup"
                     aria-label="Kỳ thanh toán"
-                    className="relative grid grid-cols-2 p-1 rounded-full bg-neutral-200/80 dark:bg-black/35 border border-black/[0.08] dark:border-white/10 shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.12),inset_0_0.5px_1px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.85)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6),0_1px_0_rgba(255,255,255,0.08)]"
+                    className="relative grid grid-cols-2 p-1 rounded-full bg-neutral-200/80 dark:bg-black/35 border-black/[0.08] dark:border-white/10 shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.12),inset_0_0.5px_1px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.85)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6),0_1px_0_rgba(255,255,255,0.08)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                   >
                     <button
                       type="button"
@@ -349,7 +349,7 @@ export default function HoloCardPaymentSheet({
                         <motion.div
                           layoutId="billing-pill-active"
                           transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] border-t border-t-white dark:border-t-white/30 border border-black/[0.04] dark:border-white/10 -z-10"
+                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] dark:border-t-white/30 border-black/[0.04] dark:border-white/10 -z-10 outline-none focus:outline-none focus-visible:outline-none"
                         />
                       )}
                       <span>3 tháng</span>
@@ -370,7 +370,7 @@ export default function HoloCardPaymentSheet({
                         <motion.div
                           layoutId="billing-pill-active"
                           transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] border-t border-t-white dark:border-t-white/30 border border-black/[0.04] dark:border-white/10 -z-10"
+                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] dark:border-t-white/30 border-black/[0.04] dark:border-white/10 -z-10 outline-none focus:outline-none focus-visible:outline-none"
                         />
                       )}
                       <span>1 năm</span>
@@ -478,14 +478,14 @@ export default function HoloCardPaymentSheet({
                     className={cn(
                       "w-full py-3 px-5 rounded-xl font-bold text-sm tracking-wide select-none text-white",
                       "flex items-center justify-center cursor-pointer",
-                      "border-t border-t-white/60",
+                      "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus-visible:outline-none",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2",
                       "transition-all duration-200 active:scale-[0.985] active:brightness-95",
                       isSuccess
-                        ? "bg-emerald-600 border-b border-b-emerald-800 shadow-[0_4px_14px_rgba(16,185,129,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)]"
+                        ? "bg-emerald-600 shadow-[0_4px_14px_rgba(16,185,129,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                         : activePlan.id === "free"
-                        ? "bg-gradient-to-b from-[#38BDF8] to-[#0284C7] border-b border-b-sky-700/60 shadow-[0_4px_14px_rgba(14,165,233,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] hover:brightness-105"
-                        : "bg-gradient-to-b from-[#FF5E3A] to-[#E03A12] border-b border-b-[#c23b10]/80 shadow-[0_4px_14px_rgba(255,94,58,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] hover:brightness-105",
+                        ? "bg-gradient-to-b from-[#38BDF8] to-[#0284C7] shadow-[0_4px_14px_rgba(14,165,233,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] hover:brightness-105 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                        : "bg-gradient-to-b from-[#FF5E3A] to-[#E03A12] shadow-[0_4px_14px_rgba(255,94,58,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] hover:brightness-105 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
                       isProcessing && "opacity-85 cursor-wait"
                     )}
                   >

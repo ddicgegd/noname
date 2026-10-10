@@ -166,7 +166,7 @@ export function TraditionalCustomerChat({
             KH
           </div>
           <div className="flex flex-col items-end max-w-[85%]">
-            <div className="bg-gradient-to-br from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] text-white rounded-2xl rounded-tr-xs px-4 py-3 shadow-[0_4px_16px_rgba(255,77,36,0.22),inset_0_1px_0_rgba(255,255,255,0.3)] border border-white/20">
+            <div className="bg-gradient-to-br from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] text-white rounded-2xl rounded-tr-xs px-4 py-3 shadow-[0_4px_16px_rgba(255,77,36,0.22),inset_0_1px_0_rgba(255,255,255,0.3)] border-white/20 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
               {uploadedFileName && (
                 <div className="flex items-center gap-1.5 mb-1.5 bg-black/20 backdrop-blur-xs px-2.5 py-1 rounded-lg text-white text-[11px] font-mono border border-white/10">
                   <span className="material-symbols-outlined text-[13px]">description</span>
@@ -202,7 +202,7 @@ export function TraditionalCustomerChat({
               <span className="material-symbols-outlined text-[14px]">smart_toy</span>
             </div>
 
-            <div className="max-w-[88%] bg-white/95 backdrop-blur-xl rounded-2xl rounded-tl-xs px-4 py-3.5 border border-slate-200/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2.5 font-mono text-[12.5px]">
+            <div className="max-w-[88%] bg-white/95 backdrop-blur-xl rounded-2xl rounded-tl-xs px-4 py-3.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2.5 font-mono text-[12.5px] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
               <ShimmerLoader
                 key={`loader-1-${replayKey}`}
                 labels={['Đang quét…', 'Phân tích…', 'Chẩn đoán…', 'Kiểm tra…']}
@@ -255,7 +255,7 @@ export function TraditionalCustomerChat({
               <span className="material-symbols-outlined text-[14px]">smart_toy</span>
             </div>
 
-            <div className="max-w-[88%] bg-white/95 backdrop-blur-xl rounded-2xl rounded-tl-xs px-4 py-3.5 border border-slate-200/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2 font-mono text-[12.5px]">
+            <div className="max-w-[88%] bg-white/95 backdrop-blur-xl rounded-2xl rounded-tl-xs px-4 py-3.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2 font-mono text-[12.5px] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
               <ShimmerLoader
                 key={`loader-2-${replayKey}`}
                 labels={['Khởi động…', 'Đang nạp…', 'Chuẩn bị…', 'Khởi tạo…']}
@@ -282,7 +282,7 @@ export function TraditionalCustomerChat({
               <span className="material-symbols-outlined text-[14px]">smart_toy</span>
             </div>
 
-            <div className="max-w-[88%] bg-white/95 backdrop-blur-xl rounded-2xl rounded-tl-xs px-4 py-3.5 border border-slate-200/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2 font-mono text-[12.5px]">
+            <div className="max-w-[88%] bg-white/95 backdrop-blur-xl rounded-2xl rounded-tl-xs px-4 py-3.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col gap-2 font-mono text-[12.5px] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
               <ShimmerLoader
                 key={`loader-3-${replayKey}`}
                 labels={['Đồng bộ…', 'Cấu hình…', 'Thiết lập…', 'Hoàn tất…']}

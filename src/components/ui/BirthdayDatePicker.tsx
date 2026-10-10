@@ -213,8 +213,8 @@ export function BirthdayDatePicker({
           disabled={disabled}
           maxLength={10}
           className={cn(
-            "w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 pr-20 font-mono disabled:opacity-50",
-            effectiveError && "border-red-400! ring-2 ring-red-400/20 focus:border-red-500"
+            "w-full bg-slate-50/80 focus:bg-white text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 pr-20 font-mono disabled:opacity-50 focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
+            effectiveError && "border-red-400! focus:outline-none focus:ring-0 focus:border-red-500"
           )}
         />
 
@@ -229,7 +229,7 @@ export function BirthdayDatePicker({
               onClick={handleConfirmClick}
               disabled={disabled || isSubmitting}
               title="Xác nhận áp dụng ngày sinh mới"
-              className="px-2.5 py-1 bg-gradient-to-b from-emerald-50/95 via-emerald-50/80 to-emerald-100/60 hover:from-emerald-100 hover:to-emerald-150 border-t border-t-white border-b border-b-emerald-300/80 border-x border-x-emerald-200/80 text-emerald-800 text-[10px] font-mono font-bold rounded-xl shadow-[0_1.5px_4px_rgba(16,185,129,0.14),inset_0_1px_0_rgba(255,255,255,0.95)] flex items-center gap-1 cursor-pointer active:scale-95 transition-all select-none"
+              className="px-2.5 py-1 bg-gradient-to-b from-emerald-50/95 via-emerald-50/80 to-emerald-100/60 hover:from-emerald-100 hover:to-emerald-150 text-emerald-800 text-[10px] font-mono font-bold rounded-xl shadow-[0_1.5px_4px_rgba(16,185,129,0.14),inset_0_1px_0_rgba(255,255,255,0.95)] flex items-center gap-1 cursor-pointer active:scale-95 transition-all select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
             >
               <Check className="w-3 h-3 text-emerald-600 stroke-[2.8]" />
               <span>Áp dụng</span>

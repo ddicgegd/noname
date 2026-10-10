@@ -1120,7 +1120,7 @@ const resolveProductMetadata = (skuOrName: string) => {
           part.toLowerCase() === cleanQuery.toLowerCase() ? (
             <span
               key={i}
-              className="text-[#FF4D24] font-extrabold bg-[#FF4D24]/[0.12] px-1 py-0.5 rounded-[4px] shadow-[inset_0_0_0_1px_rgba(255,77,36,0.25)]"
+              className="text-[#FF4D24] font-extrabold bg-[#FF4D24]/[0.12] px-1 py-0.5 rounded-[4px] shadow-[inset_0_0_0_1px_rgba(255,77,36,0.25)] outline-none focus:outline-none focus-visible:outline-none"
             >
               {part}
             </span>
@@ -1198,7 +1198,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             setIsNavFocused(false);
           }
         }}
-        className="fixed top-6 left-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full border border-white/45 bg-gradient-to-b from-white/30 via-white/20 to-white/10 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.4)] z-[120] flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-1.5"
+        className="fixed top-6 left-1/2 w-[92%] lg:w-[85%] xl:w-[75%] max-w-[1240px] rounded-full bg-gradient-to-b from-white/30 via-white/20 to-white/10 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.4)] z-[120] flex justify-between items-center py-1.5 pl-5 sm:pl-6 pr-1.5 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
       >
         <motion.div
           animate={
@@ -1411,7 +1411,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             className={`flex items-center overflow-hidden rounded-full ${
-              isSearchExpanded ? "shadow-[0_1px_4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)]" : ""
+              isSearchExpanded ? "shadow-[0_1px_4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none" : ""
             }`}
             style={{ height: '44px', willChange: 'width, background-color' }}
           >
@@ -1420,7 +1420,7 @@ const resolveProductMetadata = (skuOrName: string) => {
               className={`w-[44px] h-[44px] shrink-0 flex items-center justify-center cursor-pointer transition-colors rounded-full ${
                 isSearchExpanded 
                   ? "text-[#FF4D24]" 
-                  : "text-[#555555] hover:text-[#FF4D24] hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)]"
+                  : "text-[#555555] hover:text-[#FF4D24] hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] outline-none focus:outline-none focus-visible:outline-none"
               }`}
               onClick={() => {
                 if (!isSearchExpanded) {
@@ -1497,7 +1497,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(160% at 24px -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at 24px -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute left-0 top-[calc(100%+14px)] w-[330px] sm:w-[360px] rounded-2xl border border-slate-200/90 ring-1 ring-slate-900/[0.04] bg-white/[0.93] backdrop-blur-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_0_0_rgba(255,255,255,1)] p-3 sm:p-3.5 z-50 origin-top-left overflow-hidden text-slate-900"
+                className="absolute left-0 top-[calc(100%+14px)] w-[330px] sm:w-[360px] rounded-2xl ring-1 ring-slate-900/[0.04] bg-white/[0.93] backdrop-blur-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_0_0_rgba(255,255,255,1)] p-3 sm:p-3.5 z-50 origin-top-left overflow-hidden text-slate-900 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
               >
                 {/* Refined Ambient Glow - Warm subtle diffusion */}
                 <div className="absolute -top-10 -right-10 w-36 h-36 bg-[#FF4D24]/[0.08] rounded-full blur-[32px] pointer-events-none" />
@@ -1523,7 +1523,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                           setSearchQuery(item.name);
                           onNavigate("product");
                         }}
-                        className="group flex items-center justify-between px-3 py-2.5 -mx-1 rounded-xl border border-transparent hover:border-[#FF4D24]/20 hover:bg-white/90 hover:backdrop-blur-md hover:shadow-[0_4px_14px_-2px_rgba(255,77,36,0.1),inset_0_1px_0_0_rgba(255,255,255,1)] transition-all duration-150 ease-out cursor-pointer select-none"
+                        className="group flex items-center justify-between px-3 py-2.5 -mx-1 rounded-xl border-transparent hover:bg-white/90 hover:backdrop-blur-md hover:shadow-[0_4px_14px_-2px_rgba(255,77,36,0.1),inset_0_1px_0_0_rgba(255,255,255,1)] transition-all duration-150 ease-out cursor-pointer select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       >
                         {/* 1. Animated Flame Icon + Product Name with Optical Glass Depth & Search Highlight */}
                         <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
@@ -1603,13 +1603,13 @@ const resolveProductMetadata = (skuOrName: string) => {
                   <div className="pt-2 mt-1 border-t border-slate-100/90 flex items-center justify-between text-[11px] text-slate-500 font-medium px-1 select-none">
                     <div className="flex items-center gap-1.5 text-slate-600">
                       <span className="[text-shadow:0_1px_0_rgba(255,255,255,0.9)]">Nhấn</span>
-                      <kbd className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1 rounded bg-white/95 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] font-mono text-[10px] text-[#FF4D24] font-bold">
+                      <kbd className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1 rounded bg-white/95 shadow-[0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] font-mono text-[10px] text-[#FF4D24] font-bold outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                         <CornerDownLeft size={10.5} className="stroke-[2.5]" />
                       </kbd>
                       <span className="[text-shadow:0_1px_0_rgba(255,255,255,0.9)]">để tìm kiếm</span>
                     </div>
                     <div className="flex items-center gap-1 text-slate-500">
-                      <kbd className="inline-flex items-center justify-center px-1.5 h-[18px] rounded bg-white/95 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] font-mono text-[9.5px] text-slate-600 font-bold uppercase">
+                      <kbd className="inline-flex items-center justify-center px-1.5 h-[18px] rounded bg-white/95 shadow-[0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] font-mono text-[9.5px] text-slate-600 font-bold uppercase outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                         ESC
                       </kbd>
                       <span className="[text-shadow:0_1px_0_rgba(255,255,255,0.9)]">để đóng</span>
@@ -1646,7 +1646,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 ? "text-[#FF4D24] bg-transparent border-none outline-none ring-0 shadow-none"
                 : isBouncing 
                   ? "bg-red-50 text-[#FF4D24] border-none outline-none ring-0" 
-                  : "text-[#555555] hover:text-[#FF4D24] hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] bg-transparent"
+                  : "text-[#555555] hover:text-[#FF4D24] hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] bg-transparent outline-none focus:outline-none focus-visible:outline-none"
             }`}
           >
             <ShoppingCart size={22} className="stroke-[2.2]" />
@@ -2233,7 +2233,7 @@ const resolveProductMetadata = (skuOrName: string) => {
             className={`h-[44px] pl-2 pr-4.5 rounded-full flex items-center gap-2.5 transition-all duration-200 cursor-pointer select-none whitespace-nowrap ${
               showAccountMenu
                 ? "text-[#FF4D24]"
-                : "text-[#111111] hover:text-[#FF4D24] hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] bg-transparent"
+                : "text-[#111111] hover:text-[#FF4D24] hover:bg-white/40 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)] bg-transparent outline-none focus:outline-none focus-visible:outline-none"
             }`}
           >
             {/* Elegant Circle Avatar */}
@@ -2263,7 +2263,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 animate={{ opacity: 1, clipPath: "circle(150% at calc(100% - 24px) -20px)", filter: "blur(0px)" }}
                 exit={{ opacity: 0, clipPath: "circle(0% at calc(100% - 24px) -20px)", filter: "blur(10px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
-                className="absolute right-0 top-[calc(100%+14px)] w-[295px] rounded-[24px] border border-slate-200/90 bg-white/[0.93] backdrop-blur-2xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden"
+                className="absolute right-0 top-[calc(100%+14px)] w-[295px] rounded-[24px] bg-white/[0.93] backdrop-blur-2xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)_inset] p-3 z-50 flex flex-col gap-1 origin-top-right overflow-hidden outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
               >
                 {/* Decorative background glows */}
                 <div className="absolute top-0 right-0 w-48 h-48 bg-[#FF4D24]/15 rounded-full blur-[50px] pointer-events-none -z-10" />

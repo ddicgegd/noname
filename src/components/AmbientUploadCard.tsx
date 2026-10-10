@@ -86,7 +86,7 @@ export function AmbientUploadCard({ onUpload, onCancel, className }: AmbientUplo
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {/* Icon Video camera */}
-              <div className="size-10 rounded-xl bg-gradient-to-b from-[#E8F1FD] to-[#D5E6FC] border border-blue-200/50 flex items-center justify-center text-[#1A73E8] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+              <div className="size-10 rounded-xl bg-gradient-to-b from-[#E8F1FD] to-[#D5E6FC] flex items-center justify-center text-[#1A73E8] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                 <Video className="size-5" />
               </div>
               <div className="flex flex-col text-left">

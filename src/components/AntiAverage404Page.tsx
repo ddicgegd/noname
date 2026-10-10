@@ -84,7 +84,7 @@ export default function AntiAverage404Page({ onNavigate }: AntiAverage404PagePro
 
             {/* Frosted Glass Collar / Cone Disc (The "0") */}
             <div
-              className="absolute inset-0 m-auto w-[34%] aspect-square rounded-full border border-white/20 bg-white/[0.08] backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.7)] flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-white/30 group-hover:bg-white/[0.12]"
+              className="absolute inset-0 m-auto w-[34%] aspect-square rounded-full border-white/20 bg-white/[0.08] backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.7)] flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:bg-white/[0.12] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
               style={{ top: "-12%" }}
             />
 

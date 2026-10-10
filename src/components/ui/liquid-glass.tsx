@@ -101,7 +101,7 @@ export const LiquidGlassCard = React.forwardRef<HTMLDivElement, LiquidGlassCardP
         onMouseLeave={handleMouseLeave}
         className={cn(
           "group relative border border-white/70 bg-gradient-to-b from-white/65 via-white/45 to-white/35 text-card-foreground",
-          "shadow-[inset_0_1.5px_0_0_rgba(255,255,255,0.95),inset_0_-1px_0_0_rgba(255,255,255,0.4),inset_0_0_20px_rgba(255,255,255,0.2)]",
+          "shadow-[inset_0_1.5px_0_0_rgba(255,255,255,0.95),inset_0_-1px_0_0_rgba(255,255,255,0.4),inset_0_0_20px_rgba(255,255,255,0.2)] outline-none focus:outline-none focus-visible:outline-none",
           blurMap[blurIntensity] || blurMap.lg,
           glowMap[glowIntensity] || glowMap.md,
           shadowMap[shadowIntensity] || shadowMap.md,

@@ -1570,7 +1570,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
               >
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                       <Mail className="w-4.5 h-4.5 text-[#FF4D24]" />
                     </div>
                     <div>
@@ -1622,9 +1622,9 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                         onBlur={() => setFocusedField(null)}
                         className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
                           fieldErrors["resendEmail"]
-                            ? "border-red-500 focus:ring-red-500/15"
-                            : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
-                        } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500"
+                            : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"
+                        } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                       />
                     </div>
                   </div>
@@ -1640,7 +1640,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       }}
                       title="Quay lại trang Đăng nhập"
                       aria-label="Quay lại trang Đăng nhập"
-                      className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0"
+                      className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                     >
                       <ArrowLeft className="w-4 h-4 text-[#FF4D24] transition-transform duration-200 group-hover:-translate-x-0.5" />
                     </button>
@@ -1650,8 +1650,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       disabled={loading || cooldownTime > 0}
                       className={`relative flex-1 ${
                         loading || cooldownTime > 0
-                          ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
-                          : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                          ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                          : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
                     >
                       {loading && <DynamicButtonShimmer />}
@@ -1714,7 +1714,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
               >
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                       <Key className="w-4.5 h-4.5 text-[#FF4D24]" />
                     </div>
                     <div>
@@ -1765,9 +1765,9 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                         onBlur={() => setFocusedField(null)}
                         className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
                           fieldErrors["recoveryEmail"]
-                            ? "border-red-500 focus:ring-red-500/15"
-                            : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
-                        } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500"
+                            : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"
+                        } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                       />
                     </div>
                   </div>
@@ -1783,7 +1783,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       }}
                       title="Quay lại trang Đăng nhập"
                       aria-label="Quay lại trang Đăng nhập"
-                      className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0"
+                      className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                     >
                       <ArrowLeft className="w-4 h-4 text-[#FF4D24] transition-transform duration-200 group-hover:-translate-x-0.5" />
                     </button>
@@ -1793,8 +1793,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       disabled={loading || cooldownTime > 0}
                       className={`relative flex-1 ${
                         loading || cooldownTime > 0
-                          ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
-                          : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                          ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                          : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
                     >
                       {loading && <DynamicButtonShimmer />}
@@ -1856,7 +1856,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
               >
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                       <Key className="w-4.5 h-4.5 text-[#FF4D24]" />
                     </div>
                     <div>
@@ -1911,15 +1911,15 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                         onBlur={() => setFocusedField(null)}
                         className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
                           fieldErrors["manualToken"]
-                            ? "border-red-500 focus:ring-red-500/15"
-                            : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
-                        } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                            ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500"
+                            : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"
+                        } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                       />
                     </div>
                   </div>
 
                   {cooldownTime > 0 && (
-                    <div className="text-center text-[10px] font-mono font-bold text-slate-500 bg-slate-50/80 py-1.5 rounded-xl border border-slate-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                    <div className="text-center text-[10px] font-mono font-bold text-slate-500 bg-slate-50/80 py-1.5 rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                       THỜI GIAN GỬI LẠI EMAIL: <span className="text-[#FF4D24] font-black">{cooldownTime}s</span>
                     </div>
                   )}
@@ -1935,7 +1935,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       }}
                       title="Quay lại gửi liên kết khôi phục"
                       aria-label="Quay lại gửi liên kết khôi phục"
-                      className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0"
+                      className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                     >
                       <ArrowLeft className="w-4 h-4 text-[#FF4D24] transition-transform duration-200 group-hover:-translate-x-0.5" />
                     </button>
@@ -1945,8 +1945,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       disabled={isVerifyingManualToken || loading}
                       className={`relative flex-1 ${
                         isVerifyingManualToken || loading
-                          ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
-                          : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                          ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                          : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
                     >
                       {(isVerifyingManualToken || loading) && <DynamicButtonShimmer />}
@@ -2001,7 +2001,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
               >
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                       <Lock className="w-4.5 h-4.5 text-[#FF4D24]" />
                     </div>
                     <div>
@@ -2043,7 +2043,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="inline-flex items-center gap-2 bg-gradient-to-b from-slate-50 to-slate-100 border border-t-white border-b-slate-300/80 border-x-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.05)] hover:scale-[1.01] active:scale-[0.99] transition-all"
+                        className="inline-flex items-center gap-2 bg-gradient-to-b from-slate-50 to-slate-100 text-slate-700 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.05)] hover:scale-[1.01] active:scale-[0.99] transition-all outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       >
                         <Key className="w-3.5 h-3.5 text-[#FF4D24]" />
                         Nhập lại mã Token
@@ -2057,7 +2057,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="inline-flex items-center gap-2 bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer border-t border-t-white/35 border-b border-b-black/80 border-x border-x-white/10 shadow-[0_3px_10px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all"
+                        className="inline-flex items-center gap-2 bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer shadow-[0_3px_10px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.25)] hover:scale-[1.01] active:scale-[0.99] transition-all outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                         Yêu cầu lại liên kết mới
@@ -2103,9 +2103,9 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                           onBlur={() => setFocusedField(null)}
                           className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
                             fieldErrors["newPassword"]
-                              ? "border-red-500 focus:ring-red-500/15"
-                              : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
-                          } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                              ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500"
+                              : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"
+                          } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                         />
                         <button
                           type="button"
@@ -2163,9 +2163,9 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                           onBlur={() => setFocusedField(null)}
                           className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${
                             fieldErrors["confirmPassword"]
-                              ? "border-red-500 focus:ring-red-500/15"
-                              : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"
-                          } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                              ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500"
+                              : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"
+                          } shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                         />
                         <button
                           type="button"
@@ -2202,7 +2202,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                         }}
                         title="Quay lại trang Đăng nhập"
                         aria-label="Quay lại trang Đăng nhập"
-                        className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0"
+                        className="w-[15%] min-w-[48px] bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] py-3.5 px-2 rounded-xl font-sans transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden group shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       >
                         <ArrowLeft className="w-4 h-4 text-[#FF4D24] transition-transform duration-200 group-hover:-translate-x-0.5" />
                       </button>
@@ -2212,8 +2212,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                         disabled={loading}
                         className={`relative flex-1 ${
                           loading
-                            ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
-                            : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                            ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                            : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                         } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
                       >
                         {loading && <DynamicButtonShimmer />}
@@ -2344,7 +2344,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       placeholder="Dán mã kích hoạt của bạn vào đây"
                       value={verificationTokenInput}
                       onChange={(e) => setVerificationTokenInput(e.target.value)}
-                      className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-[#FF4D24] text-xs font-sans pl-11 pr-4 py-4 rounded-2xl outline-none transition-all focus:ring-4 focus:ring-[#FF4D24]/10 text-[#111111] font-mono tracking-tight shadow-inner"
+                      className="w-full bg-white border border-slate-200 focus:outline-none focus:ring-0 focus:border-transparent text-xs font-sans pl-11 pr-4 py-4 rounded-2xl outline-none transition-all focus:ring-0 focus:outline-none text-[#111111] font-mono tracking-tight shadow-inner"
                     />
                   </div>
                 </div>
@@ -2448,7 +2448,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 className="space-y-4"
               >
                 {/* Tab Switcher: Sign In vs Sign Up */}
-                <div className="grid grid-cols-2 p-1 bg-gradient-to-b from-slate-200/60 via-slate-200/40 to-slate-100/25 dark:from-zinc-900/60 dark:via-zinc-850/45 dark:to-zinc-800/35 rounded-xl mb-4 relative border border-t-slate-300/60 border-b-white/80 border-x-slate-200/50 dark:border-t-black/40 dark:border-b-white/10 dark:border-x-white/5 shadow-[inset_0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_3px_rgba(0,0,0,0.025),inset_0_-1px_1.5px_rgba(255,255,255,0.6),0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.3),inset_0_1px_3px_rgba(0,0,0,0.2),inset_0_-1px_0_rgba(255,255,255,0.05)]">
+                <div className="grid grid-cols-2 p-1 bg-gradient-to-b from-slate-200/60 via-slate-200/40 to-slate-100/25 dark:from-zinc-900/60 dark:via-zinc-850/45 dark:to-zinc-800/35 rounded-xl mb-4 relative dark:border-t-black/40 dark:border-b-white/10 dark:border-x-white/5 shadow-[inset_0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_3px_rgba(0,0,0,0.025),inset_0_-1px_1.5px_rgba(255,255,255,0.6),0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.3),inset_0_1px_3px_rgba(0,0,0,0.2),inset_0_-1px_0_rgba(255,255,255,0.05)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                   <button
                     onClick={() => {
                       window.location.hash = "login";
@@ -2464,7 +2464,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     {!isSignUp && (
                       <motion.div
                         layoutId="auth-active-tab-pill"
-                        className="absolute inset-0 rounded-lg bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/[0.04] dark:border-white/10"
+                        className="absolute inset-0 rounded-lg bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border-black/[0.04] dark:border-white/10 outline-none focus:outline-none focus-visible:outline-none"
                         transition={{ type: "spring", stiffness: 500, damping: 35 }}
                       />
                     )}
@@ -2485,7 +2485,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     {isSignUp && (
                       <motion.div
                         layoutId="auth-active-tab-pill"
-                        className="absolute inset-0 rounded-lg bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border border-black/[0.04] dark:border-white/10"
+                        className="absolute inset-0 rounded-lg bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_1px_rgba(0,0,0,0.04)] border-black/[0.04] dark:border-white/10 outline-none focus:outline-none focus-visible:outline-none"
                         transition={{ type: "spring", stiffness: 500, damping: 35 }}
                       />
                     )}
@@ -2569,7 +2569,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                                   setFieldErrors(prev => ({ ...prev, username: "", name: "" }));
                                 }
                               }}
-                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["username"] || fieldErrors["name"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["username"] || fieldErrors["name"] ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500" : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                             />
                           </div>
                           {(fieldErrors["username"] || fieldErrors["name"]) && (
@@ -2609,7 +2609,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                                 setFullName(e.target.value);
                                 if (fieldErrors["fullName"]) setFieldErrors(prev => ({ ...prev, fullName: "" }));
                               }}
-                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["fullName"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["fullName"] ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500" : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                             />
                           </div>
                           {fieldErrors["fullName"] && (
@@ -2649,7 +2649,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                                 setEmail(e.target.value);
                                 if (fieldErrors["email"]) setFieldErrors(prev => ({ ...prev, email: "" }));
                               }}
-                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500" : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                             />
                           </div>
                           {fieldErrors["email"] && (
@@ -2689,7 +2689,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                                 setPassword(e.target.value);
                                 if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
                               }}
-                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500" : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                             />
                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
                               <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
@@ -2732,7 +2732,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                                 setConfirmPassword(e.target.value);
                                 if (fieldErrors["confirmPassword"]) setFieldErrors(prev => ({ ...prev, confirmPassword: "" }));
                               }}
-                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["confirmPassword"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["confirmPassword"] ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500" : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                             />
                             <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
                               <MorphIcon icon={showConfirmPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
@@ -2798,7 +2798,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                                   setFieldErrors(prev => ({ ...prev, email: "", usernameOrEmail: "" }));
                                 }
                               }}
-                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] || fieldErrors["usernameOrEmail"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["email"] || fieldErrors["usernameOrEmail"] ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500" : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                             />
                           </div>
                           {(fieldErrors["email"] || fieldErrors["usernameOrEmail"]) && (
@@ -2843,7 +2843,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                                 setPassword(e.target.value);
                                 if (fieldErrors["password"]) setFieldErrors(prev => ({ ...prev, password: "" }));
                               }}
-                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:ring-red-500/10" : "border-t-slate-300/80 border-b-slate-200/80 border-x-slate-200 hover:border-slate-300 focus:border-[#FF4D24] focus:ring-[#FF4D24]/10"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-4 text-[#111111]`}
+                              className={`w-full bg-gradient-to-b from-slate-50/60 via-white to-white border ${fieldErrors["password"] ? "border-red-500 focus:outline-none focus:ring-0 focus:border-red-500" : "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus:ring-0 focus:border-transparent"} shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-sans pl-10 pr-10 py-3 rounded-xl outline-none transition-all focus:ring-0 text-[#111111]`}
                             />
                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer flex items-center justify-center">
                               <MorphIcon icon={showPassword ? MorphEyeOff : MorphEye} spring="bouncy" size={16} />
@@ -2865,8 +2865,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     disabled={loading}
                     className={`relative w-full ${
                       loading
-                        ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-[#FF4D24]/40 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)]"
-                        : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] border-t border-t-white/35 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99]"
+                        ? "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_12px_rgba(255,77,36,0.15)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                        : "bg-gradient-to-b from-[#2a2d34] via-[#1e2126] to-[#121417] text-white shadow-[0_6px_20px_rgba(0,0,0,0.22),0_1.5px_4px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.4)] hover:brightness-110 active:scale-[0.99] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                     } py-3.5 px-4 rounded-xl font-sans text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:cursor-not-allowed overflow-hidden`}
                   >
                     {loading && <DynamicButtonShimmer />}
@@ -2908,7 +2908,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => handleSocialLogin("Google")}
-                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border-t border-t-white border-b border-b-slate-300/40 border-x border-x-white/70 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer"
+                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
@@ -2920,7 +2920,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   </button>
                   <button
                     onClick={() => handleSocialLogin("GitHub")}
-                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border-t border-t-white border-b border-b-slate-300/40 border-x border-x-white/70 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer"
+                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />

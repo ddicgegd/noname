@@ -408,7 +408,7 @@ export function CartDropdownMenu({
   const isBottomPosition = position === "bottom";
 
   const containerClasses = isBottomPosition
-    ? "absolute right-0 bottom-[calc(100%+18px)] before:absolute before:-bottom-[18px] before:left-0 before:right-0 before:h-[18px] before:content-[''] w-[420px] sm:w-[480px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 dark:border-white/15 bg-white/[0.93] dark:bg-zinc-900/[0.93] backdrop-blur-2xl shadow-[0_16px_40px_-10px_rgba(0,0,0,0.18),0_4px_16px_-2px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-bottom-right overflow-hidden text-slate-900 dark:text-white select-none"
+    ? "absolute right-0 bottom-[calc(100%+18px)] before:absolute before:-bottom-[18px] before:left-0 before:right-0 before:h-[18px] before:content-[''] w-[420px] sm:w-[480px] rounded-2xl dark:border-white/15 bg-white/[0.93] dark:bg-zinc-900/[0.93] backdrop-blur-2xl shadow-[0_16px_40px_-10px_rgba(0,0,0,0.18),0_4px_16px_-2px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-bottom-right overflow-hidden text-slate-900 dark:text-white select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
     : "absolute right-0 top-[calc(100%+14px)] w-[450px] sm:w-[500px] rounded-2xl border border-slate-200/90 bg-white/[0.93] backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] pt-4 sm:pt-5 px-4 sm:px-5 pb-3 sm:pb-3.5 z-50 origin-top-right overflow-hidden text-slate-900 select-none";
 
   const animInitial = isBottomPosition
@@ -931,7 +931,7 @@ export function CartDropdownMenu({
                     }}
                     className={`px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer ${
                       getSelectedItemsCount() > 0
-                        ? "bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] text-white hover:brightness-105 shadow-[0_4px_12px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.4)]"
+                        ? "bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] text-white hover:brightness-105 shadow-[0_4px_12px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.4)] outline-none focus:outline-none focus-visible:outline-none"
                         : "bg-slate-100 dark:bg-zinc-800 text-slate-400 cursor-not-allowed shadow-none"
                     }`}
                   >

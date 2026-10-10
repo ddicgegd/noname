@@ -1462,7 +1462,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
         <div className="grid gap-3.5 lg:grid-cols-[290px_minmax(0,1fr)]">
           {/* 2. Left Sidebar Filter Dock (GraphQL Gateway Endpoint Compliant with Bevel Lighting) */}
           <aside className="flex flex-col gap-3.5 lg:sticky lg:top-[max(1.25rem,calc(50vh-365px))] lg:self-start">
-            <div className="relative overflow-hidden flex flex-col max-h-[calc(100vh-2.5rem)] bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 backdrop-blur-2xl shadow-[0_8px_30px_-6px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] rounded-2xl transition-all">
+            <div className="relative overflow-hidden flex flex-col max-h-[calc(100vh-2.5rem)] bg-gradient-to-b from-white/95 via-white/85 to-white/70 backdrop-blur-2xl shadow-[0_8px_30px_-6px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] rounded-2xl transition-all outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
               {/* Ambient light layer */}
               <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
                 <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
@@ -1472,7 +1472,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
               {/* Header */}
               <div className="py-3 px-3.5 border-b border-slate-200/60 bg-gradient-to-b from-white/80 via-white/50 to-transparent flex items-center justify-between shrink-0 relative z-10">
                 <div className="flex items-center gap-2.5">
-                  <div className="size-7.5 rounded-xl bg-gradient-to-b from-slate-800 via-slate-900 to-black border-t border-t-white/30 border-b border-b-black border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] flex items-center justify-center">
+                  <div className="size-7.5 rounded-xl bg-gradient-to-b from-slate-800 via-slate-900 to-black text-white shadow-[0_2px_6px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] flex items-center justify-center outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                     <SlidersHorizontalIcon className="size-3.5" />
                   </div>
                   <div>
@@ -1488,7 +1488,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                   <button
                     type="button"
                     onClick={handleReset}
-                    className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-gradient-to-b from-rose-50 to-rose-100/70 border-t border-t-white border-b border-b-rose-300 border-x border-x-rose-200 text-rose-600 shadow-[0_1px_3px_rgba(225,29,72,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+                    className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-gradient-to-b from-rose-50 to-rose-100/70 text-rose-600 shadow-[0_1px_3px_rgba(225,29,72,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] hover:brightness-105 active:scale-95 transition-all cursor-pointer outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                   >
                     Đặt lại ({activeFilterCount})
                   </button>
@@ -1538,8 +1538,8 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                             onClick={() => setActiveCategory(category.id)}
                             className={`group flex items-center justify-between h-[38px] text-[13px] px-3 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] shrink-0 ${
                               isActive
-                                ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
-                                : "bg-gradient-to-b from-white/90 via-white/70 to-white/45 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_1.5px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] text-slate-700 hover:from-white hover:to-white/75 hover:border-slate-300 hover:shadow-xs"
+                                ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] text-white shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                : "bg-gradient-to-b from-white/90 via-white/70 to-white/45 shadow-[0_1.5px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] text-slate-700 hover:from-white hover:to-white/75 hover:shadow-xs outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                             }`}
                           >
                             <span className="inline-flex items-center gap-2.5 truncate">
@@ -1549,8 +1549,8 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                             <span
                               className={`text-[11px] h-5 min-w-[22px] px-2 rounded-full inline-flex items-center justify-center font-bold shrink-0 transition-colors ${
                                 isActive
-                                  ? "bg-white/20 text-white border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]"
-                                  : "bg-gradient-to-b from-white to-slate-100/90 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200/60 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)]"
+                                  ? "bg-white/20 text-white border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                  : "bg-gradient-to-b from-white to-slate-100/90 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                               }`}
                             >
                               {count}
@@ -1602,7 +1602,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                             key="custom-apply"
                             type="button"
                             onClick={handleApplyCustomPrice}
-                            className="h-7.5 text-[11px] px-2 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 truncate flex items-center justify-center gap-1.5 bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
+                            className="h-7.5 text-[11px] px-2 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 truncate flex items-center justify-center gap-1.5 bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                           >
                             <SearchIcon className="size-3 shrink-0 text-white" />
                             <span>Tìm kiếm</span>
@@ -1617,8 +1617,8 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                           onClick={() => handleSelectPriceRange(item.id)}
                           className={`h-7.5 text-[11px] px-2 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 truncate flex items-center justify-center ${
                             isActive
-                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
-                              : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
+                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                              : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                           }`}
                         >
                           {item.label}
@@ -1637,7 +1637,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                         className="overflow-hidden"
                       >
                         <div className="pt-1.5">
-                          <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-gradient-to-b from-slate-100/80 to-slate-50/60 border-t border-t-slate-300/60 border-b border-b-white border-x border-x-slate-200/60 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.05)]">
+                          <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-gradient-to-b from-slate-100/80 to-slate-50/60 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.05)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                             <div className="relative flex-1">
                               <input
                                 type="text"
@@ -1713,8 +1713,8 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                           onClick={() => setSelectedRating(rating.value as any)}
                           className={`h-7.5 text-[11px] px-2 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-95 flex items-center justify-center gap-1 ${
                             isActive
-                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
-                              : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
+                              ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                              : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                           }`}
                         >
                           <span>{rating.label}</span>
@@ -1741,8 +1741,8 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                       onClick={() => setSelectedMinSold(selectedMinSold === null ? 50 : null)}
                       className={`flex items-center justify-between h-8 text-xs px-2.5 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
                         selectedMinSold !== null
-                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
-                          : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
+                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                          : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}
                     >
                       <span className="inline-flex items-center gap-2">
@@ -1757,8 +1757,8 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                       onClick={() => setSelectedMinView(selectedMinView === null ? 100 : null)}
                       className={`flex items-center justify-between h-8 text-xs px-2.5 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
                         selectedMinView !== null
-                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
-                          : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
+                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                          : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}
                     >
                       <span className="inline-flex items-center gap-2">
@@ -1773,8 +1773,8 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                       onClick={() => setOnlyDiscounted(!onlyDiscounted)}
                       className={`flex items-center justify-between h-8 text-xs px-2.5 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none active:scale-[0.98] ${
                         onlyDiscounted
-                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/90 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold"
-                          : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
+                          ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] text-white shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] font-semibold outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                          : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 text-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}
                     >
                       <span className="inline-flex items-center gap-2">
@@ -1792,12 +1792,12 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="inline-flex items-center gap-1.5 h-7.5 text-xs px-3 rounded-xl bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_2px_5px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] text-slate-800 font-semibold hover:from-white active:scale-95 cursor-pointer transition-all"
+                  className="inline-flex items-center gap-1.5 h-7.5 text-xs px-3 rounded-xl bg-gradient-to-b from-white/95 via-white/85 to-white/70 shadow-[0_2px_5px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] text-slate-800 font-semibold hover:from-white active:scale-95 cursor-pointer transition-all outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                 >
                   <RefreshCcwIcon className="size-3 text-slate-500" />
                   Xóa tất cả lọc
                 </button>
-                <span className="text-[11px] font-bold text-slate-800 bg-gradient-to-b from-white/95 to-slate-100/80 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 px-2.5 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.04)]">
+                <span className="text-[11px] font-bold text-slate-800 bg-gradient-to-b from-white/95 to-slate-100/80 px-2.5 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.04)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                   {filteredProducts.length} kết quả
                 </span>
               </div>
@@ -1805,7 +1805,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
           </aside>
 
           <section className="flex min-w-0 flex-col gap-3.5">
-            <div className="grid w-full grid-cols-2 overflow-hidden sm:grid-cols-5 gap-1 bg-gradient-to-b from-neutral-200/50 via-neutral-100/60 to-neutral-200/40 p-1 rounded-xl border-t border-t-neutral-300/40 border-b border-b-white border-x border-x-neutral-200/50 shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-medium shrink-0 relative">
+            <div className="grid w-full grid-cols-2 overflow-hidden sm:grid-cols-5 gap-1 bg-gradient-to-b from-neutral-200/50 via-neutral-100/60 to-neutral-200/40 p-1 rounded-xl shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.9)] text-xs font-medium shrink-0 relative outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
               {sortItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = sortBy === item.id;
@@ -1823,7 +1823,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                     {isActive && (
                       <motion.div
                         layoutId="activeSortTabIndicator"
-                        className="absolute inset-0 bg-gradient-to-b from-white via-white to-neutral-50 border-t border-t-white border-b border-b-neutral-300/60 shadow-[0_1.5px_4px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] rounded-lg"
+                        className="absolute inset-0 bg-gradient-to-b from-white via-white to-neutral-50 shadow-[0_1.5px_4px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] rounded-lg outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                         transition={{ type: "spring", stiffness: 500, damping: 35 }}
                       />
                     )}
@@ -1934,7 +1934,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                   >
                     <Card
                       size="sm"
-                      className="group relative h-full cursor-pointer gap-1 overflow-visible py-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-xl shadow-[0_4px_16px_-2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_32px_-4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-1 rounded-2xl transition-all duration-200"
+                      className="group relative h-full cursor-pointer gap-1 overflow-visible py-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 backdrop-blur-xl shadow-[0_4px_16px_-2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_32px_-4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-1 rounded-2xl transition-all duration-200 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       onClick={() => {
                         const productSku = getProductHashSku(product);
                         setProductHashSku(productSku);
@@ -1996,7 +1996,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                           {specs.slice(0, 2).map((spec, specIdx) => (
                             <span
                               key={`${spec.label}-${specIdx}`}
-                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-medium bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)] text-slate-700 select-none"
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-medium bg-gradient-to-b from-white/95 via-white/85 to-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)] text-slate-700 select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                             >
                               {spec.value.length > 22 ? `${spec.value.slice(0, 22)}...` : spec.value}
                             </span>
@@ -2057,8 +2057,8 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                             }}
                             className={`inline-flex items-center justify-center gap-1.5 h-6.5 px-2.5 text-[11px] font-semibold rounded-lg transition-all duration-200 cursor-pointer select-none active:scale-95 ${
                               compared
-                                ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] border-t border-t-white/20 border-b border-b-black/80 border-x border-x-white/10 text-white shadow-[0_2px_6px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)]"
-                                : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] text-slate-800 hover:from-white hover:to-white/80"
+                                ? "bg-gradient-to-b from-[#2e3239] via-[#22252a] to-[#181a1e] text-white shadow-[0_2px_6px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] text-slate-800 hover:from-white hover:to-white/80 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                             }`}
                           >
                             <CheckIcon className="size-3" />
@@ -2185,7 +2185,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
             }}
             className="fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] sm:w-auto max-w-[620px]"
           >
-            <div className="relative flex items-center justify-between gap-3 sm:gap-4 rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/95 dark:bg-zinc-900/95 p-2 sm:p-2.5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-colors duration-200 select-none">
+            <div className="relative flex items-center justify-between gap-3 sm:gap-4 rounded-2xl dark:border-white/20 bg-white/95 dark:bg-zinc-900/95 p-2 sm:p-2.5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-colors duration-200 select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
               {/* Ambient backdrop clipping safely */}
               <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl overflow-hidden -z-10">
                 <div className="absolute inset-0 bg-gradient-to-r from-[#FF4D24]/[0.05] via-transparent to-transparent" />
@@ -2204,7 +2204,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                       className="relative size-11 sm:size-12 shrink-0 group select-none"
                       title={product.name}
                     >
-                      <div className="size-full rounded-xl overflow-hidden border border-slate-200/90 dark:border-white/15 bg-white dark:bg-zinc-800 shadow-[0_2px_6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)]">
+                      <div className="size-full rounded-xl overflow-hidden dark:border-white/15 bg-white dark:bg-zinc-800 shadow-[0_2px_6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                         <img src={getProductImage(product)} alt={product.name} className="size-full object-cover transition-transform duration-200 group-hover:scale-105" referrerPolicy="no-referrer" />
                       </div>
                       <motion.button
@@ -2258,7 +2258,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.96 }}
                   title={comparedProductIds.length < 2 ? "Chọn thêm ít nhất 1 sản phẩm nữa để so sánh" : "Mở bảng so sánh thông số"}
-                  className="h-10 px-4 sm:px-5 rounded-xl font-sans font-black text-xs uppercase tracking-wider text-white bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/50 border-b border-b-[#A8280A] border-x border-x-[#FF4D24]/80 shadow-[0_4px_14px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-all"
+                  className="h-10 px-4 sm:px-5 rounded-xl font-sans font-black text-xs uppercase tracking-wider text-white bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] shadow-[0_4px_14px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-all outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                   onClick={() => {
                     if (comparedProductIds.length < 2) {
                       showToast("Vui lòng chọn ít nhất 2 sản phẩm để so sánh.", "warning");
@@ -2284,7 +2284,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                   onClick={handleToggleCompareBookmark}
                   title={isCompareBookmarked ? "Đã lưu trong Bookmark 7 ngày" : "Lưu danh sách so sánh vào Bookmark 7 ngày"}
                   aria-label={isCompareBookmarked ? "Đã lưu trong Bookmark 7 ngày" : "Lưu danh sách so sánh vào Bookmark 7 ngày"}
-                  className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative transition-all duration-200"
+                  className="size-10 rounded-xl border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative transition-all duration-200 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                 >
                   {/* Ripple ring burst effect on click */}
                   {isCompareBookmarkAnimating && (
@@ -2345,7 +2345,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
                   onClick={() => setComparedProductIds([])}
                   title="Xóa tất cả danh sách so sánh"
                   aria-label="Xóa tất cả"
-                  className="btn-clear-dock size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative transition-all duration-200"
+                  className="btn-clear-dock size-10 rounded-xl border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative transition-all duration-200 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                 >
                   <span className="icon-spin-target pointer-events-none">
                     <XIcon className="size-4 stroke-[2.4]" />
@@ -3834,7 +3834,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 8 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 flex h-[85vh] w-[94vw] sm:w-[90vw] md:w-[85vw] max-w-[1600px] flex-col overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-b from-white/95 via-white/90 to-white/80 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/80 backdrop-blur-2xl text-foreground shadow-[0_20px_50px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4),inset_0_1px_0_rgba(255,255,255,1)]"
+        className="relative z-10 flex h-[85vh] w-[94vw] sm:w-[90vw] md:w-[85vw] max-w-[1600px] flex-col overflow-hidden rounded-2xl border-white/60 bg-gradient-to-b from-white/95 via-white/90 to-white/80 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/80 backdrop-blur-2xl text-foreground shadow-[0_20px_50px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
       >
 
         {/* Modal Main Scrollable Content Wrapper */}
@@ -4007,7 +4007,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
 
                   {/* Indicator Dots - subtle translucent glass overlay on the bottom */}
                   {images.length > 0 && (
-                  <div className="absolute bottom-3 z-10 flex select-none items-center gap-1.5 h-6 rounded-full px-2.5 bg-black/35 backdrop-blur-md border border-white/15 shadow-[0_2px_8px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]">
+                  <div className="absolute bottom-3 z-10 flex select-none items-center gap-1.5 h-6 rounded-full px-2.5 bg-black/35 backdrop-blur-md border-white/15 shadow-[0_2px_8px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                     {images.map((_, idx) => (
                       <span
                         key={idx}
@@ -4261,7 +4261,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
             <div className="lg:col-span-4 flex flex-col gap-2 sm:gap-2.5">
 
               {/* Premium Tactile Bevel Pricing & Smember Privilege Card - Optimized inner spacing with 3D ribbons */}
-              <div className="relative overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-2.5 sm:p-3 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 flex flex-col gap-2.5 select-none">
+              <div className="relative overflow-visible rounded-2xl bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-2.5 sm:p-3 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 flex flex-col gap-2.5 select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                 {/* Multi-corner ambient luxury glow aura wrapping around opposite corners - reduced by 20% */}
                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
                   <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
@@ -4311,7 +4311,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                 </div>
 
                 {/* Row 2: Smember Luxury Member Privilege Strip with Multi-Corner Animated Ambient Glow & Shimmer */}
-                <div className="group relative z-10 overflow-hidden flex select-none items-center justify-between gap-2 rounded-xl border border-white/80 bg-gradient-to-r from-orange-500/[0.08] via-amber-500/[0.05] to-secondary/80 p-2 sm:px-2.5 text-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_3px_rgba(0,0,0,0.03)] dark:border-white/10 dark:from-orange-500/10 dark:to-zinc-800/80">
+                <div className="group relative z-10 overflow-hidden flex select-none items-center justify-between gap-2 rounded-xl border-white/80 bg-gradient-to-r from-orange-500/[0.08] via-amber-500/[0.05] to-secondary/80 p-2 sm:px-2.5 text-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_3px_rgba(0,0,0,0.03)] dark:border-white/10 dark:from-orange-500/10 dark:to-zinc-800/80 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                   {/* Multi-corner animated ambient glow aura */}
                   <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
                     {/* Top-Right drifting ambient warm spot */}
@@ -4507,7 +4507,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
               </div>
 
               {/* Promotion & Coupon Card with Tactile Bevel Glass & Ambient Luxury Glow Aura */}
-              <div className="relative overflow-hidden rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-3 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 flex flex-col gap-2.5">
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-3 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 flex flex-col gap-2.5 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                 {/* Multi-corner ambient luxury glow aura wrapping around opposite corners - reduced by 20% */}
                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
                   <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
@@ -4552,7 +4552,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                 </div>
               </div>
 
-              <div className="relative flex select-none flex-col gap-2.5 rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-3 sm:p-3.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 sticky top-6 z-20">
+              <div className="relative flex select-none flex-col gap-2.5 rounded-2xl bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-3 sm:p-3.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 sticky top-6 z-20 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                 {/* Multi-corner ambient luxury glow aura - reduced by 20% */}
                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
                   <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-2xl" />
@@ -4624,7 +4624,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                           <div
                             key={item.id}
                             data-acc-item={item.id}
-                            className="relative flex h-[96px] items-center gap-2.5 overflow-visible rounded-xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-2 text-card-foreground shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 transition-all hover:border-primary/40 hover:shadow-md sm:h-[104px] sm:gap-3 sm:p-2.5"
+                            className="relative flex h-[96px] items-center gap-2.5 overflow-visible rounded-xl bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-2 text-card-foreground shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 transition-all hover:shadow-md sm:h-[104px] sm:gap-3 sm:p-2.5 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                           >
                             {/* Top 3D Ribbon: Giảm X% (Left) wrapped around the edge */}
                             <div className="absolute -top-1.5 left-[-4px] h-[22px] bg-gradient-to-r from-[#FF4D24] to-[#FF6B35] text-white text-[9.5px] font-black px-2 rounded-br-md rounded-tr-sm shadow-[1px_1px_3px_rgba(0,0,0,0.15)] flex items-center justify-center z-20 select-none">
@@ -4788,7 +4788,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                                 className={`h-7 px-3 text-[10.5px] font-bold rounded-lg shrink-0 select-none cursor-pointer transition-all ${
                                   isAdded
                                     ? "bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-none cursor-default"
-                                    : "shadow-[0_2px_8px_rgba(255,77,36,0.35),inset_0_1px_0_rgba(255,255,255,0.4)]"
+                                    : "shadow-[0_2px_8px_rgba(255,77,36,0.35),inset_0_1px_0_rgba(255,255,255,0.4)] outline-none focus:outline-none focus-visible:outline-none"
                                 }`}
                               >
                                 {isAdded ? (
@@ -4818,7 +4818,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
             </div>
 
           {/* 2. ĐÁNH GIÁ & NHẬN XÉT SECTION with Tactile Bevel Glass & Ambient Luxury Glow Aura */}
-          <div className="relative mt-4 sm:mt-5 mx-2.5 sm:mx-3.5 overflow-hidden rounded-2xl border-t border-t-white/95 border-b border-b-slate-300/60 border-x border-x-white/70 bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-4 sm:p-5 pb-20 sm:pb-24 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10">
+          <div className="relative mt-4 sm:mt-5 mx-2.5 sm:mx-3.5 overflow-hidden rounded-2xl bg-gradient-to-b from-white/95 via-white/85 to-white/70 p-4 sm:p-5 pb-20 sm:pb-24 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] dark:from-zinc-900/90 dark:to-zinc-950/80 dark:border-white/10 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
             {/* Multi-corner ambient luxury glow aura - reduced by 20% */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
               <div className="absolute -top-12 -right-12 h-44 w-44 rounded-full bg-gradient-to-br from-primary/[0.088] via-orange-500/[0.064] to-transparent blur-3xl" />
@@ -4980,7 +4980,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
         </div>
 
         {/* Floating bottom actions bar with 3D discount ribbon & enhanced frosted glass */}
-        <div className="absolute bottom-5 left-1/2 z-30 flex h-[72px] w-[calc(100%-3.5rem)] sm:w-[79%] max-w-[790px] -translate-x-1/2 items-center justify-between overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 select-none">
+        <div className="absolute bottom-5 left-1/2 z-30 flex h-[72px] w-[calc(100%-3.5rem)] sm:w-[79%] max-w-[790px] -translate-x-1/2 items-center justify-between overflow-visible rounded-2xl dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 transition-all duration-300 select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/[0.04] via-transparent to-transparent" />
           {formattedDiscount && (
             <>
@@ -5050,7 +5050,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
             <button
               type="button"
               onClick={handleInstallment}
-              className="hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] text-[11.5px] sm:text-[12px] font-black shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18),inset_0_1px_0_rgba(255,255,255,1)] active:scale-95 transition-all duration-200 cursor-pointer whitespace-nowrap"
+              className="hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] text-[11.5px] sm:text-[12px] font-black shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18),inset_0_1px_0_rgba(255,255,255,1)] active:scale-95 transition-all duration-200 cursor-pointer whitespace-nowrap outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
             >
               Trả góp 0%
             </button>
@@ -5059,7 +5059,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
               variant="primary"
               size="none"
               onClick={handleBuyNow}
-              className="flex h-10 rounded-xl px-5 sm:px-6 text-[11.5px] sm:text-[12px] font-black uppercase tracking-wider text-white shadow-[0_4px_16px_rgba(255,77,36,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 transition-all"
+              className="flex h-10 rounded-xl px-5 sm:px-6 text-[11.5px] sm:text-[12px] font-black uppercase tracking-wider text-white shadow-[0_4px_16px_rgba(255,77,36,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 transition-all outline-none focus:outline-none focus-visible:outline-none"
             >
               MUA NGAY
             </BevelButton>
@@ -5121,7 +5121,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                     onAddToCart(variantLabel, formattedCurrentPrice, e, String(attrSku));
                   }
                 }}
-                className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative"
+                className="size-10 rounded-xl border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                 title={isAlreadyInCart || cartHatMode === 'bold' ? "Đã có trong giỏ hàng" : "Thêm vào giỏ hàng"}
               >
                 {/* Ripple ring burst effect on click */}
@@ -5276,7 +5276,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                     ? "Sản phẩm / phụ kiện đã lưu"
                     : "Lưu vào danh sách yêu thích"
                 }
-                className="size-10 rounded-xl border border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:border-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative z-20"
+                className="size-10 rounded-xl border-primary/60 bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-800 dark:to-zinc-900 text-primary hover:text-primary hover:from-orange-500/[0.08] hover:to-orange-500/[0.03] shadow-[0_2px_6px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_rgba(255,77,36,0.18)] cursor-pointer flex items-center justify-center shrink-0 relative z-20 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
               >
                 {/* Ripple ring burst effect on click */}
                 {hasBookmarkItems && isPlusAnimating && (
@@ -5373,7 +5373,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                         setShowBookmarkPopup(false);
                       }, 300);
                     }}
-                    className="absolute right-0 bottom-[calc(100%+18px)] before:absolute before:-bottom-[18px] before:left-0 before:right-0 before:h-[18px] before:content-[''] w-[360px] sm:w-[400px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 dark:border-white/15 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_16px_40px_-10px_rgba(0,0,0,0.12),0_4px_16px_-2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,1)] p-3.5 sm:p-4 z-50 origin-bottom-right overflow-hidden text-slate-900 dark:text-white"
+                    className="absolute right-0 bottom-[calc(100%+18px)] before:absolute before:-bottom-[18px] before:left-0 before:right-0 before:h-[18px] before:content-[''] w-[360px] sm:w-[400px] rounded-2xl dark:border-white/15 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_16px_40px_-10px_rgba(0,0,0,0.12),0_4px_16px_-2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,1)] p-3.5 sm:p-4 z-50 origin-bottom-right overflow-hidden text-slate-900 dark:text-white outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                   >
                     {/* Ambient Glow & Subtle Warm Tint */}
                     <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-2xl overflow-hidden -z-10">
@@ -5478,7 +5478,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                               } catch (_) {}
                             }}
                             className="flex flex-col max-h-[300px] overflow-y-auto pr-1 pb-1 overscroll-contain [overscroll-behavior:contain] [touch-action:pan-y] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent_100%)]"
-                            itemClassName="mb-1.5 last:mb-0 p-2 rounded-xl border-t border-t-white/90 border-b border-b-slate-300/60 border-x border-x-white/60 dark:border-white/10 bg-gradient-to-b from-white/95 via-white/85 to-white/75 dark:from-zinc-800/90 dark:to-zinc-800/60 shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between gap-2.5 group transition-colors duration-150 hover:border-slate-300 dark:hover:border-white/20 cursor-grab active:cursor-grabbing"
+                            itemClassName="mb-1.5 last:mb-0 p-2 rounded-xl dark:border-white/10 bg-gradient-to-b from-white/95 via-white/85 to-white/75 dark:from-zinc-800/90 dark:to-zinc-800/60 shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)] flex items-center justify-between gap-2.5 group transition-colors duration-150  cursor-grab active:cursor-grabbing outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                           >
                             {(item, _index, { dismiss }) => (
                               <>
@@ -5576,7 +5576,7 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
                                 onNavigate("order");
                               }
                             }}
-                            className="px-3 py-1 rounded-lg font-bold text-[11px] text-white bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] border-t border-t-white/50 border-b border-b-[#A8280A] border-x border-x-[#FF4D24]/80 shadow-[0_4px_12px_rgba(255,77,36,0.3),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
+                            className="px-3 py-1 rounded-lg font-bold text-[11px] text-white bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] shadow-[0_4px_12px_rgba(255,77,36,0.3),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] hover:brightness-105 active:scale-95 cursor-pointer flex items-center gap-1 shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                           >
                             <span>Thanh toán</span>
                             <ChevronRightIcon className="size-3" />

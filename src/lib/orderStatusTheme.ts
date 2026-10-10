@@ -29,7 +29,7 @@ export interface StatusThemeConfig {
 export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
   WAITING_PAYMENT: {
     label: "Chờ thanh toán",
-    badgeClass: "text-amber-800 bg-gradient-to-b from-amber-50 to-amber-100/80 border-t-white border-b-amber-300/80 border-x-amber-200/80 shadow-[0_1px_2px_rgba(245,158,11,0.14),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-amber-800 bg-gradient-to-b from-amber-50 to-amber-100/80 shadow-[0_1px_2px_rgba(245,158,11,0.14),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-amber-500",
     glowClass: "shadow-[0_0_8px_rgba(245,158,11,0.5)]",
     iconColor: "text-amber-600",
@@ -39,7 +39,7 @@ export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
   },
   PENDING: {
     label: "Chờ xử lý",
-    badgeClass: "text-amber-800 bg-gradient-to-b from-amber-50 to-amber-100/80 border-t-white border-b-amber-300/80 border-x-amber-200/80 shadow-[0_1px_2px_rgba(245,158,11,0.14),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-amber-800 bg-gradient-to-b from-amber-50 to-amber-100/80 shadow-[0_1px_2px_rgba(245,158,11,0.14),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-amber-500",
     glowClass: "shadow-[0_0_8px_rgba(245,158,11,0.5)]",
     iconColor: "text-amber-600",
@@ -49,7 +49,7 @@ export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
   },
   CONFIRMED: {
     label: "Đã xác nhận",
-    badgeClass: "text-indigo-700 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t-white border-b-indigo-200/80 border-x-indigo-100/80 shadow-[0_1px_2px_rgba(99,102,241,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-indigo-700 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 shadow-[0_1px_2px_rgba(99,102,241,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-indigo-600",
     glowClass: "shadow-[0_0_8px_rgba(99,102,241,0.5)]",
     iconColor: "text-indigo-600",
@@ -59,7 +59,7 @@ export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
   },
   PROCESSING: {
     label: "Đang xử lý",
-    badgeClass: "text-indigo-700 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t-white border-b-indigo-200/80 border-x-indigo-100/80 shadow-[0_1px_2px_rgba(99,102,241,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-indigo-700 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 shadow-[0_1px_2px_rgba(99,102,241,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-indigo-600",
     glowClass: "shadow-[0_0_8px_rgba(99,102,241,0.5)]",
     iconColor: "text-indigo-600",
@@ -69,7 +69,7 @@ export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
   },
   SHIPPED: {
     label: "Đang vận chuyển",
-    badgeClass: "text-sky-800 bg-gradient-to-b from-sky-50 to-sky-100/80 border-t-white border-b-sky-300/80 border-x-sky-200/70 shadow-[0_1px_2px_rgba(14,165,233,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-sky-800 bg-gradient-to-b from-sky-50 to-sky-100/80 shadow-[0_1px_2px_rgba(14,165,233,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-sky-500",
     glowClass: "shadow-[0_0_8px_rgba(14,165,233,0.5)]",
     iconColor: "text-sky-600",
@@ -79,7 +79,7 @@ export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
   },
   DELIVERED: {
     label: "Giao thành công",
-    badgeClass: "text-emerald-800 bg-gradient-to-b from-emerald-50 to-emerald-100/80 border-t-white border-b-emerald-300/80 border-x-emerald-200/80 shadow-[0_1px_2px_rgba(16,185,129,0.14),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-emerald-800 bg-gradient-to-b from-emerald-50 to-emerald-100/80 shadow-[0_1px_2px_rgba(16,185,129,0.14),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-emerald-500",
     glowClass: "shadow-[0_0_8px_rgba(16,185,129,0.5)]",
     iconColor: "text-emerald-600",
@@ -89,7 +89,7 @@ export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
   },
   COMPLETED: {
     label: "Hoàn tất",
-    badgeClass: "text-emerald-800 bg-gradient-to-b from-emerald-50 to-emerald-100/80 border-t-white border-b-emerald-300/80 border-x-emerald-200/80 shadow-[0_1px_2px_rgba(16,185,129,0.14),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-emerald-800 bg-gradient-to-b from-emerald-50 to-emerald-100/80 shadow-[0_1px_2px_rgba(16,185,129,0.14),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-emerald-500",
     glowClass: "shadow-[0_0_8px_rgba(16,185,129,0.5)]",
     iconColor: "text-emerald-600",
@@ -99,7 +99,7 @@ export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
   },
   CANCELLED: {
     label: "Đã hủy",
-    badgeClass: "text-rose-700 bg-gradient-to-b from-rose-50 to-red-100/60 border-t-white border-b-red-200 border-x-red-100 shadow-[0_1px_2px_rgba(244,63,94,0.10),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-rose-700 bg-gradient-to-b from-rose-50 to-red-100/60 shadow-[0_1px_2px_rgba(244,63,94,0.10),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-rose-500",
     glowClass: "shadow-[0_0_8px_rgba(244,63,94,0.4)]",
     iconColor: "text-rose-600",
@@ -109,7 +109,7 @@ export const ORDER_STATUS_THEMES: Record<string, StatusThemeConfig> = {
   },
   REFUNDED: {
     label: "Đã hoàn tiền",
-    badgeClass: "text-rose-700 bg-gradient-to-b from-rose-50 to-red-100/60 border-t-white border-b-red-200 border-x-red-100 shadow-[0_1px_2px_rgba(244,63,94,0.10),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-rose-700 bg-gradient-to-b from-rose-50 to-red-100/60 shadow-[0_1px_2px_rgba(244,63,94,0.10),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-rose-500",
     glowClass: "shadow-[0_0_8px_rgba(244,63,94,0.4)]",
     iconColor: "text-rose-600",
@@ -144,7 +144,7 @@ export function getOrderStatusTheme(rawStatus?: string): StatusThemeConfig {
 
   return {
     label: rawStatus || "Không xác định",
-    badgeClass: "text-indigo-700 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t-white border-b-indigo-200/80 border-x-indigo-100/80 shadow-[0_1px_2px_rgba(99,102,241,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]",
+    badgeClass: "text-indigo-700 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 shadow-[0_1px_2px_rgba(99,102,241,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     dotClass: "bg-indigo-600",
     glowClass: "shadow-[0_0_8px_rgba(99,102,241,0.5)]",
     iconColor: "text-indigo-600",

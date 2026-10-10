@@ -184,32 +184,32 @@ function getMembershipRankInfo(user: any) {
     case "DIAMOND":
       return {
         label: "Hạng Bạch Kim",
-        badgeClass: "text-sky-700 bg-gradient-to-b from-sky-50 to-sky-100/80 border-t-white border-b-sky-300/80 border-x-sky-200/70 shadow-[0_1px_2px_rgba(14,165,233,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        badgeClass: "text-sky-700 bg-gradient-to-b from-sky-50 to-sky-100/80 shadow-[0_1px_2px_rgba(14,165,233,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
         iconColor: "text-sky-500",
       };
     case "GOLD":
       return {
         label: "Hạng Vàng",
-        badgeClass: "text-amber-800 bg-gradient-to-b from-amber-50 to-amber-100/80 border-t-white border-b-amber-300/80 border-x-amber-200/80 shadow-[0_1px_2px_rgba(245,158,11,0.14),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        badgeClass: "text-amber-800 bg-gradient-to-b from-amber-50 to-amber-100/80 shadow-[0_1px_2px_rgba(245,158,11,0.14),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
         iconColor: "text-amber-500",
       };
     case "SILVER":
       return {
         label: "Hạng Bạc",
-        badgeClass: "text-slate-700 bg-gradient-to-b from-slate-50 to-slate-100/80 border-t-white border-b-slate-300 border-x-slate-200 shadow-[0_1px_2px_rgba(100,116,139,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        badgeClass: "text-slate-700 bg-gradient-to-b from-slate-50 to-slate-100/80 shadow-[0_1px_2px_rgba(100,116,139,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
         iconColor: "text-slate-400",
       };
     case "BRONZE":
       return {
         label: "Hạng Đồng",
-        badgeClass: "text-orange-900 bg-gradient-to-b from-orange-50 to-amber-100/70 border-t-white border-b-orange-200 border-x-orange-100 shadow-[0_1px_2px_rgba(194,65,12,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        badgeClass: "text-orange-900 bg-gradient-to-b from-orange-50 to-amber-100/70 shadow-[0_1px_2px_rgba(194,65,12,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
         iconColor: "text-orange-500",
       };
     case "MEMBER":
     default:
       return {
         label: "Hội viên Horizon",
-        badgeClass: "text-[#FF4D24] bg-gradient-to-b from-rose-50 to-red-100/60 border-t-white border-b-red-200 border-x-red-100 shadow-[0_1px_2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        badgeClass: "text-[#FF4D24] bg-gradient-to-b from-rose-50 to-red-100/60 shadow-[0_1px_2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
         iconColor: "text-[#FF4D24]",
       };
   }
@@ -2075,7 +2075,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 20, scale: 0.96 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="pointer-events-auto relative w-full flex items-center justify-between gap-3 overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 select-none text-left"
+              className="pointer-events-auto relative w-full flex items-center justify-between gap-3 overflow-visible rounded-2xl dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 select-none text-left outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
             >
               {/* Ambient tint overlay identical to /p bottom bar */}
               <div
@@ -2085,7 +2085,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
               {/* Left Content: Badge Icon and Message */}
               <div className="relative z-10 flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center border-t border-t-white border-b border-b-orange-200/70 border-x border-x-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                   {(() => {
                     const msg = (errorMsg || successMsg || "").toLowerCase();
                     if (errorMsg) {
@@ -2142,7 +2142,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 damping: 24,
                 mass: 0.8,
               }}
-              className="pointer-events-auto relative w-full overflow-hidden rounded-3xl border-t border-t-white/95 border-b border-b-slate-400/50 border-x border-x-white/80 dark:border-white/20 bg-white/90 dark:bg-zinc-900/90 p-5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.25),0_10px_25px_-5px_rgba(255,77,36,0.18),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 text-left select-none"
+              className="pointer-events-auto relative w-full overflow-hidden rounded-3xl dark:border-white/20 bg-white/90 dark:bg-zinc-900/90 p-5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.25),0_10px_25px_-5px_rgba(255,77,36,0.18),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 text-left select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
             >
               {/* Ambient gradient aura */}
               <div
@@ -2168,7 +2168,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                 {/* 30s Countdown Auto-Dismiss Indicator */}
                 <div
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-b from-orange-50/90 to-orange-100/60 dark:bg-zinc-800/80 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100 dark:border-white/10 text-[#FF4D24] shadow-[0_1px_2px_rgba(255,77,36,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] shrink-0 select-none cursor-default"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-b from-orange-50/90 to-orange-100/60 dark:bg-zinc-800/80 dark:border-white/10 text-[#FF4D24] shadow-[0_1px_2px_rgba(255,77,36,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] shrink-0 select-none cursor-default outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                   title={`Tự động ẩn sau ${tutorialCountdown} giây`}
                 >
                   <Clock className="w-3.5 h-3.5 stroke-[2.2] animate-pulse" />
@@ -2197,14 +2197,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
                         activePressedKeys["A"]
                           ? "bg-[#FF4D24] text-white border border-[#FF4D24] shadow-sm scale-95"
-                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24]"
+                          : "bg-white shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}>
                         A
                       </kbd>
                       <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
                         activePressedKeys["D"]
                           ? "bg-[#FF4D24] text-white border border-[#FF4D24] shadow-sm scale-95"
-                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24]"
+                          : "bg-white shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}>
                         D
                       </kbd>
@@ -2212,14 +2212,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
                         activePressedKeys["Left"]
                           ? "bg-[#FF4D24] text-white border border-[#FF4D24] shadow-sm scale-95"
-                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24]"
+                          : "bg-white shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}>
                         ←
                       </kbd>
                       <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
                         activePressedKeys["Right"]
                           ? "bg-[#FF4D24] text-white border border-[#FF4D24] shadow-sm scale-95"
-                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24]"
+                          : "bg-white shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-[#FF4D24] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}>
                         →
                       </kbd>
@@ -2249,14 +2249,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
                         activePressedKeys["W"]
                           ? "bg-indigo-600 text-white border border-indigo-600 shadow-sm scale-95"
-                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600"
+                          : "bg-white shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}>
                         W
                       </kbd>
                       <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
                         activePressedKeys["S"]
                           ? "bg-indigo-600 text-white border border-indigo-600 shadow-sm scale-95"
-                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600"
+                          : "bg-white shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}>
                         S
                       </kbd>
@@ -2264,14 +2264,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
                         activePressedKeys["Up"]
                           ? "bg-indigo-600 text-white border border-indigo-600 shadow-sm scale-95"
-                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600"
+                          : "bg-white shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}>
                         ↑
                       </kbd>
                       <kbd className={`inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg font-mono text-[10.5px] font-black transition-all duration-100 ${
                         activePressedKeys["Down"]
                           ? "bg-indigo-600 text-white border border-indigo-600 shadow-sm scale-95"
-                          : "bg-white border border-slate-200/90 shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600"
+                          : "bg-white shadow-[0_1.5px_2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] text-indigo-600 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       }`}>
                         ↓
                       </kbd>
@@ -2291,7 +2291,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 <button
                   type="button"
                   onClick={handleDismissTutorial}
-                  className="px-4 py-2 bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] hover:brightness-105 active:scale-95 text-white text-xs font-extrabold rounded-xl transition-all cursor-pointer border-t border-t-white/60 border-b border-b-[#9E2407] border-x border-x-[#FF4D24]/80 shadow-[0_3px_10px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.4)]"
+                  className="px-4 py-2 bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] hover:brightness-105 active:scale-95 text-white text-xs font-extrabold rounded-xl transition-all cursor-pointer shadow-[0_3px_10px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.4)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                 >
                   Đã hiểu & Bắt đầu
                 </button>
@@ -2319,7 +2319,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     className="w-14 h-14 rounded-full object-cover shadow-[0_4px_12px_rgba(0,0,0,0.15)] border-2 border-white ring-4 ring-indigo-50/80 shrink-0 select-none"
                   />
                 ) : (
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] shrink-0 select-none border-t border-t-white/80 border-b border-b-slate-400/60 border-x border-x-white/50 ring-4 ring-indigo-50/80">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] shrink-0 select-none ring-4 ring-indigo-50/80 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                     {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : "H")}
                   </div>
                 )}
@@ -2329,7 +2329,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     {(() => {
                       const rankInfo = getMembershipRankInfo(user);
                       return (
-                        <span className={`text-xs font-bold font-mono px-2.5 py-0.5 rounded-md uppercase border-t border-t-white border-b border-x inline-flex items-center gap-1.5 ${rankInfo.badgeClass}`}>
+                        <span className={`text-xs font-bold font-mono px-2.5 py-0.5 rounded-md uppercase border border-black/[0.04] dark:border-white/[0.05] inline-flex items-center gap-1.5 ${rankInfo.badgeClass}`}>
                           <Crown className={`w-3.5 h-3.5 shrink-0 ${rankInfo.iconColor}`} />
                           <span>{rankInfo.label}</span>
                         </span>
@@ -2357,14 +2357,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   }}
                   onMouseEnter={() => setIsSecurityBtnHovered(true)}
                   onMouseLeave={() => setIsSecurityBtnHovered(false)}
-                  className="px-4 py-2.5 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95"
+                  className="px-4 py-2.5 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                 >
                   <SequentialTagMorphIcon isHovered={isSecurityBtnHovered} />
                   <span>Quản lý bảo mật</span>
                 </button>
                 <button 
                   onClick={handleLogout}
-                  className="px-4 py-2.5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-rose-50 hover:to-rose-100/60 hover:text-red-600 border-t border-t-white border-b border-b-slate-300/70 hover:border-b-rose-300 border-x border-x-white/70 text-slate-600 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] active:scale-95"
+                  className="px-4 py-2.5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-rose-50 hover:to-rose-100/60 hover:text-red-600 text-slate-600 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] active:scale-95 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                 >
                   <span>Đăng xuất</span>
                 </button>
@@ -2375,7 +2375,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
         {/* Loading screen */}
         {isLoading ? (
-          <div className="bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-3xl p-16 text-center flex flex-col items-center justify-center gap-4 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)]">
+          <div className="bg-gradient-to-b from-white/95 via-white/85 to-white/70 backdrop-blur-2xl rounded-3xl p-16 text-center flex flex-col items-center justify-center gap-4 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
             <RefreshCw className="w-7 h-7 text-[#FF4D24] animate-spin" />
             <p className="text-xs text-slate-400 font-bold font-mono tracking-wider uppercase animate-pulse">
               Đang đồng bộ dữ liệu dịch vụ...
@@ -2383,8 +2383,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           </div>
         ) : !token || !user ? (
           /* Empty / Not logged-in dashboard */
-          <div className="max-w-md mx-auto bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-3xl p-8 text-center space-y-6 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)]">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-b from-rose-50 to-rose-100 border-t border-t-white border-b border-b-rose-200 border-x border-x-rose-100 flex items-center justify-center mx-auto text-red-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_2px_6px_rgba(225,29,72,0.1)]">
+          <div className="max-w-md mx-auto bg-gradient-to-b from-white/95 via-white/85 to-white/70 backdrop-blur-2xl rounded-3xl p-8 text-center space-y-6 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-b from-rose-50 to-rose-100 flex items-center justify-center mx-auto text-red-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_2px_6px_rgba(225,29,72,0.1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
               <AlertCircle className="w-5 h-5 animate-pulse" />
             </div>
             <div className="space-y-1.5">
@@ -2395,7 +2395,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             </div>
             <button
               onClick={() => { window.location.hash = "login"; onNavigate("auth"); }}
-              className="w-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] hover:brightness-105 active:scale-95 text-white text-xs font-bold py-3.5 rounded-2xl transition-all cursor-pointer border-t border-t-white/50 border-b border-b-[#A8280A] border-x border-x-[#FF4D24]/80 shadow-[0_4px_16px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)]"
+              className="w-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] hover:brightness-105 active:scale-95 text-white text-xs font-bold py-3.5 rounded-2xl transition-all cursor-pointer shadow-[0_4px_16px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
             >
               Đăng ký / Đăng nhập ngay ↗
             </button>
@@ -2437,7 +2437,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 {/* Status Filter Pills Bar with Concave Sunken Bevel Track & A/D keyboard navigation */}
                 <div className="shrink-0 relative">
                   {/* Sunken Concave Bevel Track (Rãnh lõm quang học nguyên khối) */}
-                  <div className="bg-slate-200/55 dark:bg-zinc-800/60 p-[2px] rounded-full shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.09),0_1px_0_rgba(255,255,255,0.85)] border-t border-t-black/[0.06] border-b border-b-white/80 border-x border-x-transparent relative">
+                  <div className="bg-slate-200/55 dark:bg-zinc-800/60 p-[2px] rounded-full shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.09),0_1px_0_rgba(255,255,255,0.85)] relative outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                     <div
                       ref={filterPillsRef}
                       onScroll={handleFilterScroll}
@@ -2476,7 +2476,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             {isFilterActive && (
                               <motion.div
                                 layoutId="statusFilterPillActive"
-                                className="absolute inset-0 rounded-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E63E14] border-t border-t-white/80 border-b border-b-[#9E2407]/50 border-x border-x-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.15),0_1.5px_4px_rgba(255,77,36,0.35)] z-0"
+                                className="absolute inset-0 rounded-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E63E14] shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.15),0_1.5px_4px_rgba(255,77,36,0.35)] z-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 transition={{ type: "spring", stiffness: 280, damping: 26, mass: 0.8 }}
                               />
                             )}
@@ -2487,7 +2487,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             </span>
                             <span className={`relative z-10 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold leading-none transition-all duration-150 antialiased ${
                               isFilterActive
-                                ? "bg-white/25 text-white border border-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+                                ? "bg-white/25 text-white border-white/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 : "bg-black/5 text-slate-500"
                             }`}>
                               {count}
@@ -2530,7 +2530,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         {filteredOrders.length === 0 ? (
                           <div className="h-64 sm:h-80 flex flex-col items-center justify-center p-8 select-none pointer-events-none">
                             <div className="relative flex flex-col items-center justify-center">
-                              <div className="w-16 h-16 rounded-2xl bg-gradient-to-b from-white/95 via-white/80 to-slate-100/60 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-white/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center">
+                              <div className="w-16 h-16 rounded-2xl bg-gradient-to-b from-white/95 via-white/80 to-slate-100/60 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                 <PackageOpen className="w-8 h-8 text-slate-300 stroke-[1.4]" />
                               </div>
                             </div>
@@ -2546,8 +2546,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 onClick={() => handleSelectOrder(item.id)}
                                 className={`p-3.5 rounded-2xl text-left cursor-pointer transition-all duration-150 relative ${
                                   isSelected 
-                                    ? "bg-gradient-to-b from-orange-50/40 via-white to-white border border-[#FF4D24]/40 border-l-4 border-l-[#FF4D24] shadow-[0_4px_16px_-2px_rgba(255,77,36,0.12),0_1px_3px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)]" 
-                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border border-slate-200/70 border-t-white border-b-slate-300/60 hover:border-slate-300/80 hover:from-white hover:to-white/85 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)]"
+                                    ? "bg-gradient-to-b from-orange-50/40 via-white to-white border-[#FF4D24]/40 shadow-[0_4px_16px_-2px_rgba(255,77,36,0.12),0_1px_3px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]" 
+                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 }`}
                               >
                                 <div className="flex items-center justify-between gap-1.5 mb-1 pb-1 border-b border-slate-100">
@@ -2629,7 +2629,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       exit={{ opacity: 0, y: -8 }}
                       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
                       onAnimationComplete={scrollToEndpoint}
-                      className="relative overflow-hidden flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-2xl p-3 sm:p-3.5 flex flex-col gap-2.5 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)]"
+                      className="relative overflow-hidden flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 backdrop-blur-2xl rounded-2xl p-3 sm:p-3.5 flex flex-col gap-2.5 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.07),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                     >
                       {/* Multi-corner Ambient Luxury Glow Aura (hiệu ứng ám màu tương đồng OrderPage/ProductPage) */}
                       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl z-0 select-none">
@@ -2671,14 +2671,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       {/* Header info of selected Order: Hợp nhất hoàn toàn với nền khung lớn, icon và badge có hiệu ứng bevel làm mịn */}
                       <div className="relative z-10 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1 pt-0.5 pb-1">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-white via-slate-50 to-slate-100/80 border-t border-t-white border-b border-b-slate-200/60 border-x border-x-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-center shrink-0">
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-white via-slate-50 to-slate-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-center shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                             <Building2 className="w-3.5 h-3.5 text-slate-700" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="text-[8.5px] font-bold text-slate-400 font-mono uppercase tracking-wider block leading-none">VẬN CHUYỂN BỞI</span>
                               {activeOrder.rawOrder?.paymentMethod && (
-                                <span className="font-mono text-[8px] font-extrabold px-1.5 py-0.2 rounded-md bg-gradient-to-b from-slate-50 to-slate-100/80 border border-slate-200/80 text-slate-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] uppercase">
+                                <span className="font-mono text-[8px] font-extrabold px-1.5 py-0.2 rounded-md bg-gradient-to-b from-slate-50 to-slate-100/80 text-slate-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] uppercase outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                   {activeOrder.rawOrder.paymentMethod}
                                 </span>
                               )}
@@ -2836,19 +2836,19 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   <div className={`rounded-xl p-2.5 sm:p-3 transition-all duration-200 border ${
                                     isStepInProgress
                                       ? currentTheme === "amber"
-                                        ? "bg-gradient-to-b from-amber-50/95 via-white/95 to-orange-50/45 border-t-white border-b-amber-300/80 border-x-amber-200/60 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(245,158,11,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(245,158,11,0.04)]"
+                                        ? "bg-gradient-to-b from-amber-50/95 via-white/95 to-orange-50/45 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(245,158,11,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(245,158,11,0.04)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                         : currentTheme === "sky"
-                                        ? "bg-gradient-to-b from-sky-50/95 via-white/95 to-blue-50/45 border-t-white border-b-sky-300/80 border-x-sky-200/60 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(14,165,233,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(14,165,233,0.04)]"
+                                        ? "bg-gradient-to-b from-sky-50/95 via-white/95 to-blue-50/45 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(14,165,233,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(14,165,233,0.04)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                         : currentTheme === "indigo"
-                                        ? "bg-gradient-to-b from-indigo-50/95 via-white/95 to-violet-50/40 border-t-white border-b-indigo-200/80 border-x-indigo-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(99,102,241,0.04)]"
+                                        ? "bg-gradient-to-b from-indigo-50/95 via-white/95 to-violet-50/40 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(99,102,241,0.04)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                         : currentTheme === "rose"
-                                        ? "bg-gradient-to-b from-rose-50/90 via-white/90 to-red-50/50 border-t-white border-b-rose-200/80 border-x-rose-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(244,63,94,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(244,63,94,0.04)]"
-                                        : "bg-gradient-to-b from-emerald-50/90 via-white/90 to-teal-50/50 border-t-white border-b-emerald-200/80 border-x-emerald-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(16,185,129,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(16,185,129,0.04)]"
+                                        ? "bg-gradient-to-b from-rose-50/90 via-white/90 to-red-50/50 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(244,63,94,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(244,63,94,0.04)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                        : "bg-gradient-to-b from-emerald-50/90 via-white/90 to-teal-50/50 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(16,185,129,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(16,185,129,0.04)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                       : isOrderDelivered && isLast
-                                        ? "bg-gradient-to-b from-emerald-50/90 via-white/90 to-emerald-50/50 border-t-white border-b-emerald-200/80 border-x-emerald-100/70 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(16,185,129,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(16,185,129,0.04)]"
+                                        ? "bg-gradient-to-b from-emerald-50/90 via-white/90 to-emerald-50/50 backdrop-blur-md shadow-[0_4px_16px_-2px_rgba(16,185,129,0.12),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(16,185,129,0.04)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                         : step.completed
-                                          ? "bg-gradient-to-b from-white/80 via-white/60 to-white/40 hover:from-white/95 hover:via-white/75 hover:to-white/55 border-t-white border-b-slate-200/60 border-x-white/70 backdrop-blur-md shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)]"
-                                          : "bg-gradient-to-b from-white/45 via-white/30 to-white/20 border-t-white/70 border-b-slate-200/40 border-x-white/50 backdrop-blur-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_1px_rgba(0,0,0,0.015)] opacity-60 text-slate-400"
+                                          ? "bg-gradient-to-b from-white/80 via-white/60 to-white/40 hover:from-white/95 hover:via-white/75 hover:to-white/55 backdrop-blur-md shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                          : "bg-gradient-to-b from-white/45 via-white/30 to-white/20 backdrop-blur-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-1px_1px_rgba(0,0,0,0.015)] opacity-60 text-slate-400 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                   }`}>
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1">
                                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -2884,18 +2884,18 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                         <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold transition-all shrink-0 self-start sm:self-center border ${
                                           isStepInProgress
                                             ? currentTheme === "amber"
-                                              ? "bg-gradient-to-b from-amber-50 to-orange-50/80 border-t-white border-b-amber-300/70 border-x-amber-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-amber-900"
+                                              ? "bg-gradient-to-b from-amber-50 to-orange-50/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-amber-900 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                               : currentTheme === "sky"
-                                              ? "bg-gradient-to-b from-sky-50 to-blue-50/80 border-t-white border-b-sky-300/70 border-x-sky-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-sky-900"
+                                              ? "bg-gradient-to-b from-sky-50 to-blue-50/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-sky-900 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                               : currentTheme === "indigo"
-                                              ? "bg-gradient-to-b from-indigo-50 to-violet-50/80 border-t-white border-b-indigo-200/70 border-x-indigo-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-indigo-900"
+                                              ? "bg-gradient-to-b from-indigo-50 to-violet-50/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-indigo-900 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                               : currentTheme === "rose"
-                                              ? "bg-gradient-to-b from-rose-50 to-red-50/80 border-t-white border-b-rose-200/70 border-x-rose-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-rose-900"
-                                              : "bg-gradient-to-b from-emerald-50 to-teal-50/80 border-t-white border-b-emerald-200/70 border-x-emerald-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-emerald-900"
+                                              ? "bg-gradient-to-b from-rose-50 to-red-50/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-rose-900 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                              : "bg-gradient-to-b from-emerald-50 to-teal-50/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-emerald-900 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                             : isOrderDelivered && isLast
-                                              ? "bg-gradient-to-b from-emerald-50 to-emerald-100/70 border-t-white border-b-emerald-200/70 border-x-emerald-100/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-emerald-700"
+                                              ? "bg-gradient-to-b from-emerald-50 to-emerald-100/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] text-emerald-700 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                               : step.completed
-                                                ? "bg-gradient-to-b from-white/90 to-slate-100/70 border-t-white border-b-slate-200/60 border-x-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)] text-slate-600"
+                                                ? "bg-gradient-to-b from-white/90 to-slate-100/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)] text-slate-600 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                                 : "bg-slate-100/40 border-slate-200/30 text-slate-400"
                                         }`}>
                                           <Clock className={`w-3 h-3 ${
@@ -2958,19 +2958,19 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             setActiveModalTab("addresses");
                             setIsAccountsCenterOpen(true);
                           }}
-                          className="bg-gradient-to-b from-white/85 via-white/70 to-slate-50/50 hover:from-white hover:to-slate-50/70 border-t border-t-white border-b border-b-slate-200/70 hover:border-slate-300/80 border-x border-x-white/70 backdrop-blur-md shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-3 transition-all cursor-pointer group"
+                          className="bg-gradient-to-b from-white/85 via-white/70 to-slate-50/50 hover:from-white hover:to-slate-50/70 backdrop-blur-md shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-3 transition-all cursor-pointer group outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className={`w-[34px] h-[34px] rounded-[10px] bg-gradient-to-b border-t border-t-white flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
                               orderTheme === "emerald"
-                                ? "from-emerald-50 via-emerald-50/80 to-emerald-100/60 border-b-emerald-200/80 border-x-emerald-100/80 text-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(16,185,129,0.08)]"
+                                ? "from-emerald-50 via-emerald-50/80 to-emerald-100/60 text-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(16,185,129,0.08)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 : orderTheme === "sky"
-                                ? "from-sky-50 via-sky-50/80 to-blue-100/60 border-b-sky-200/80 border-x-sky-100/80 text-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(14,165,233,0.08)]"
+                                ? "from-sky-50 via-sky-50/80 to-blue-100/60 text-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(14,165,233,0.08)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 : orderTheme === "indigo"
-                                ? "from-indigo-50 via-indigo-50/80 to-violet-100/60 border-b-indigo-200/80 border-x-indigo-100/80 text-indigo-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.08)]"
+                                ? "from-indigo-50 via-indigo-50/80 to-violet-100/60 text-indigo-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.08)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 : orderTheme === "amber"
-                                ? "from-amber-50 via-amber-50/80 to-orange-100/60 border-b-amber-200/80 border-x-amber-100/80 text-amber-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(245,158,11,0.08)]"
-                                : "from-rose-50/90 via-rose-50/70 to-red-100/50 border-b-rose-200/80 border-x-rose-100/80 text-rose-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(244,63,94,0.08)]"
+                                ? "from-amber-50 via-amber-50/80 to-orange-100/60 text-amber-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(245,158,11,0.08)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                : "from-rose-50/90 via-rose-50/70 to-red-100/50 text-rose-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(244,63,94,0.08)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                             }`}>
                               <HoverMorphIcon 
                                 defaultIcon={LucideMapPin} 
@@ -3005,10 +3005,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 backdrop-blur-2xl rounded-2xl p-12 flex flex-col items-center justify-center shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] select-none pointer-events-none"
+                      className="flex-1 min-h-0 bg-gradient-to-b from-white/95 via-white/85 to-white/70 backdrop-blur-2xl rounded-2xl p-12 flex flex-col items-center justify-center shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] select-none pointer-events-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                     >
                       <div className="relative flex flex-col items-center justify-center">
-                        <div className="w-18 h-18 rounded-2xl bg-gradient-to-b from-white/95 via-white/80 to-slate-100/60 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-white/80 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center">
+                        <div className="w-18 h-18 rounded-2xl bg-gradient-to-b from-white/95 via-white/80 to-slate-100/60 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                           <Truck className="w-8 h-8 text-slate-300 stroke-[1.4]" />
                         </div>
                       </div>
@@ -3043,7 +3043,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 15 }}
               transition={{ type: "spring", duration: 0.35 }}
-              className="relative w-full max-w-6xl bg-gradient-to-b from-white/98 via-white/95 to-slate-50/90 backdrop-blur-2xl border-t border-t-white border-b border-b-slate-300/80 border-x border-x-white/80 rounded-[28px] shadow-[0_32px_100px_-20px_rgba(15,23,42,0.3),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col md:flex-row overflow-hidden max-h-[92vh] md:h-[750px] lg:h-[780px] z-10"
+              className="relative w-full max-w-6xl bg-gradient-to-b from-white/98 via-white/95 to-slate-50/90 backdrop-blur-2xl rounded-[28px] shadow-[0_32px_100px_-20px_rgba(15,23,42,0.3),inset_0_1px_0_rgba(255,255,255,1)] flex flex-col md:flex-row overflow-hidden max-h-[92vh] md:h-[750px] lg:h-[780px] z-10 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
             >
               
               {/* LEFT COLUMN: Sidebar Navigation / Context Data View */}
@@ -3067,7 +3067,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
                         <span>Danh sách địa chỉ</span>
                       </button>
-                      <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/60 shadow-[0_1px_2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.95)] text-slate-700 rounded-full">
+                      <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-gradient-to-b from-white/95 via-white/85 to-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.95)] text-slate-700 rounded-full outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                         {addresses.length} đã lưu
                       </span>
                     </div>
@@ -3083,10 +3083,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             onClick={() => handleOpenEditAddress(addr)}
                             className={`p-3 rounded-2xl text-left transition-all cursor-pointer relative group ${
                               isCurrentlyEditing
-                                ? "bg-gradient-to-b from-white via-indigo-50/40 to-indigo-50/60 border-t border-t-white border-b border-b-indigo-400/70 border-x border-x-indigo-300/60 ring-2 ring-indigo-500/20 shadow-[0_4px_14px_-2px_rgba(79,70,229,0.12),inset_0_1px_0_rgba(255,255,255,1)]"
+                                ? "bg-gradient-to-b from-white via-indigo-50/40 to-indigo-50/60 ring-2 ring-indigo-500/20 shadow-[0_4px_14px_-2px_rgba(79,70,229,0.12),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 : addr.isDefault 
-                                  ? "bg-gradient-to-b from-white via-white/95 to-indigo-50/30 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:border-indigo-300" 
-                                  : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 hover:from-white shadow-[0_2px_6px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)]"
+                                  ? "bg-gradient-to-b from-white via-white/95 to-indigo-50/30 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]" 
+                                  : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white shadow-[0_2px_6px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -3099,7 +3099,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 <span className="text-xs font-bold text-slate-900 truncate">{addr.recipientName}</span>
                               </div>
                               {addr.isDefault && (
-                                <span className="inline-flex items-center gap-1 text-[9px] px-2 py-0.5 font-bold uppercase bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 rounded-full shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.08)]">
+                                <span className="inline-flex items-center gap-1 text-[9px] px-2 py-0.5 font-bold uppercase bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 rounded-full shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.08)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                   <Check className="w-2.5 h-2.5 stroke-[2.5]" /> Mặc định
                                 </span>
                               )}
@@ -3128,7 +3128,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="w-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 text-slate-700 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 text-xs font-bold py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-[0_2px_5px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] active:scale-95"
+                        className="w-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 text-slate-700 text-xs font-bold py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-[0_2px_5px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] active:scale-95 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       >
                         <X className="w-3.5 h-3.5 text-slate-400" />
                         <span>Hủy bỏ biểu mẫu</span>
@@ -3142,7 +3142,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       
                       {/* Top Branding (Horizon Signature Theme) */}
                       <div className="flex items-center gap-3 pb-4 border-b border-slate-200/70">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] border-t border-t-white/80 border-b border-b-slate-400/60 border-x border-x-white/50 ring-2 ring-indigo-50/80 shrink-0">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] ring-2 ring-indigo-50/80 shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                           <Sliders className="w-5 h-5 text-white stroke-[2.2]" />
                         </div>
                         <div>
@@ -3209,14 +3209,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               }}
                               className={`w-full px-3.5 py-2.5 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border group ${
                                 isActive
-                                  ? "bg-gradient-to-b from-indigo-100/95 via-indigo-100/80 to-indigo-200/70 hover:from-indigo-150 hover:to-indigo-200/90 border-t border-t-white border-b border-b-indigo-300 border-x border-x-indigo-200 text-indigo-950 shadow-[0_3px_10px_-1px_rgba(99,102,241,0.18),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-indigo-500/30"
-                                  : "border-transparent text-slate-700 hover:bg-gradient-to-b hover:from-white/95 hover:via-white/85 hover:to-white/70 hover:border-t-white hover:border-b-slate-200/80 hover:border-x-slate-100/80 hover:shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.95)]"
+                                  ? "bg-gradient-to-b from-indigo-100/95 via-indigo-100/80 to-indigo-200/70 hover:from-indigo-150 hover:to-indigo-200/90 text-indigo-950 shadow-[0_3px_10px_-1px_rgba(99,102,241,0.18),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-indigo-500/30 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                  : "border-transparent text-slate-700 hover:bg-gradient-to-b hover:from-white/95 hover:via-white/85 hover:to-white/70 hover:shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.95)] outline-none focus:outline-none focus-visible:outline-none"
                               }`}
                             >
                               <div className="flex items-center gap-3 min-w-0">
                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
                                   isActive
-                                    ? "bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 shadow-[0_2px_6px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-indigo-500/20"
+                                    ? "bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-[0_2px_6px_rgba(79,70,229,0.3),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-indigo-500/20 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                     : `${tab.iconBoxClass} border shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.03)]`
                                 }`}>
                                   <Icon className="w-4 h-4 stroke-[2]" />
@@ -3235,8 +3235,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               {tab.count !== undefined && (
                                 <span className={`text-[10.5px] px-2.5 py-0.5 rounded-full font-mono font-bold shrink-0 ml-2 ${
                                   isActive 
-                                    ? "bg-gradient-to-b from-indigo-500 to-indigo-600 text-white border-t border-t-indigo-300/60 border-b border-b-indigo-900/60 border-x border-x-indigo-600 shadow-[0_1px_3px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.3)]" 
-                                    : "bg-gradient-to-b from-white/95 to-slate-100 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)] text-slate-700"
+                                    ? "bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-[0_1px_3px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.3)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]" 
+                                    : "bg-gradient-to-b from-white/95 to-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.03)] text-slate-700 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 }`}>
                                   {tab.count}
                                 </span>
@@ -3252,7 +3252,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <button
                         type="button"
                         onClick={() => setIsAccountsCenterOpen(false)}
-                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 transition-all duration-300 ease-out flex items-center justify-center gap-2 cursor-pointer bg-gradient-to-b from-white/95 via-white/80 to-slate-50/80 backdrop-blur-sm border-t border-t-white border-b border-b-slate-300/70 border-x border-x-slate-200/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] hover:-translate-y-px active:translate-y-0 active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]"
+                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 transition-all duration-300 ease-out flex items-center justify-center gap-2 cursor-pointer bg-gradient-to-b from-white/95 via-white/80 to-slate-50/80 backdrop-blur-sm shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] hover:-translate-y-px active:translate-y-0 active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       >
                         <X className="w-4 h-4" />
                         <span>Đóng trung tâm tài khoản</span>
@@ -3292,7 +3292,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           !newAddressForm.phone.trim() ||
                           !newAddressForm.address.trim()
                         }
-                        className="h-9 px-4.5 bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                        className="h-9 px-4.5 bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                       >
                         {actionLoading ? (
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -3317,7 +3317,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       )}
                       <button 
                         onClick={() => setIsAccountsCenterOpen(false)}
-                        className="w-9 h-9 rounded-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center text-slate-500 hover:text-black transition-all cursor-pointer shrink-0 active:scale-95"
+                        className="w-9 h-9 rounded-full bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white hover:to-white/85 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-center text-slate-500 hover:text-black transition-all cursor-pointer shrink-0 active:scale-95 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                         title="Đóng"
                       >
                         <X className="w-4.5 h-4.5" />
@@ -3332,14 +3332,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                 {activeModalTab === "profile" && (
                   <div className="space-y-4 flex-1 flex flex-col min-h-0 text-left">
                     {/* 1. HERO IDENTITY & AVATAR CARD */}
-                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-slate-50/70 to-slate-100/60 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-100 p-4.5 sm:p-5 shadow-[0_4px_16px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] shrink-0">
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-slate-50/70 to-slate-100/60 p-4.5 sm:p-5 shadow-[0_4px_16px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1)] shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                       {/* Decorative ambient corner glow */}
                       <div className="absolute top-0 right-0 w-56 h-56 bg-gradient-to-br from-[#FF4D24]/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
 
                       <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
                         <div className="flex items-center gap-3.5">
                           {/* Avatar with live upload & hover action */}
-                          <div className="relative group shrink-0 w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shadow-[0_8px_20px_-4px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.3)] border-t border-t-white/80 border-b border-b-slate-400/40 border-x border-x-white/50 ring-2 ring-slate-900/5">
+                          <div className="relative group shrink-0 w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shadow-[0_8px_20px_-4px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.3)] ring-2 ring-slate-900/5 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                             {(editAvatarUrl || user?.avatarUrl) ? (
                               <img 
                                 src={editAvatarUrl || user?.avatarUrl} 
@@ -3409,7 +3409,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
 
                     {/* 2. FORM PROFILE FIELDS (With In-Place Animated Username Drawer) */}
-                    <form onSubmit={handleSaveProfile} className="bg-gradient-to-b from-white via-white/95 to-slate-50/60 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-3xl p-4 sm:p-5 shadow-[0_3px_10px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] space-y-4">
+                    <form onSubmit={handleSaveProfile} className="bg-gradient-to-b from-white via-white/95 to-slate-50/60 rounded-3xl p-4 sm:p-5 shadow-[0_3px_10px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] space-y-4 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                       
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3425,7 +3425,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               value={editFullName}
                               onChange={(e) => setEditFullName(e.target.value)}
                               placeholder="Nhập họ và tên đầy đủ..."
-                              className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5"
+                              className="w-full bg-slate-50/80 focus:bg-white text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                             />
                             <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
@@ -3442,7 +3442,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               value={editPhone}
                               onChange={(e) => setEditPhone(e.target.value)}
                               placeholder="Nhập số điện thoại..."
-                              className="w-full bg-slate-50/80 focus:bg-white border-t border-t-slate-200/90 border-b border-b-slate-300/60 border-x border-x-slate-200/80 focus:border-[#FF4D24] focus:ring-2 focus:ring-[#FF4D24]/15 text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 font-mono"
+                              className="w-full bg-slate-50/80 focus:bg-white text-xs px-3.5 py-2.5 rounded-2xl outline-none transition-all text-[#111111] font-semibold shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.9)] pl-9.5 font-mono focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                             />
                             <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
@@ -3460,7 +3460,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <label className="text-[11px] font-bold text-slate-600 block">
                             Giới tính
                           </label>
-                          <div className="relative grid grid-cols-3 p-1 rounded-2xl bg-slate-100/85 border-t border-t-slate-300/60 border-b border-b-white/80 border-x border-x-slate-200/70 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),inset_0_-1px_0_rgba(255,255,255,0.7),0_1px_0_rgba(255,255,255,0.8)]">
+                          <div className="relative grid grid-cols-3 p-1 rounded-2xl bg-slate-100/85 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),inset_0_-1px_0_rgba(255,255,255,0.7),0_1px_0_rgba(255,255,255,0.8)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                             {[
                               { id: "male", label: "Nam" },
                               { id: "female", label: "Nữ" },
@@ -3480,7 +3480,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     <motion.div
                                       layoutId="active-gender-pill"
                                       transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                                      className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/80 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)]"
+                                      className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                     />
                                   )}
                                   <span className="relative z-10 flex items-center justify-center">
@@ -3501,7 +3501,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               setActiveModalTab("addresses");
                               if (addresses.length === 0) setIsAddingAddress(true);
                             }}
-                            className="relative flex items-center justify-between p-3 rounded-2xl bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border-t border-t-white border-b border-b-slate-300/80 border-x border-x-slate-200/90 cursor-pointer transition-all hover:from-white hover:to-slate-50 hover:border-b-slate-400/70 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-px active:translate-y-0 active:shadow-[0_1px_2px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.8)] group"
+                            className="relative flex items-center justify-between p-3 rounded-2xl bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 cursor-pointer transition-all hover:from-white hover:to-slate-50 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] hover:-translate-y-px active:translate-y-0 active:shadow-[0_1px_2px_-1px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.8)] group outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                           >
                             <div className="flex items-center space-x-3 truncate">
                               <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
@@ -3529,7 +3529,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         <button
                           type="submit"
                           disabled={actionLoading}
-                          className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-b from-[#FF552B] via-[#FF4D24] to-[#E83F16] hover:from-[#ff643c] hover:to-[#f0471f] border-t border-t-white/35 border-b border-b-black/25 border-x border-x-transparent text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-[0_2px_10px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.25),inset_0_-1px_0_rgba(0,0,0,0.12)] hover:shadow-[0_4px_16px_rgba(255,77,36,0.38),inset_0_1px_0_rgba(255,255,255,0.3)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                          className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-b from-[#FF552B] via-[#FF4D24] to-[#E83F16] hover:from-[#ff643c] hover:to-[#f0471f] text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-[0_2px_10px_rgba(255,77,36,0.3),inset_0_1px_0_rgba(255,255,255,0.25),inset_0_-1px_0_rgba(0,0,0,0.12)] hover:shadow-[0_4px_16px_rgba(255,77,36,0.38),inset_0_1px_0_rgba(255,255,255,0.3)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                         >
                           {actionLoading ? (
                             <>
@@ -3563,7 +3563,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           <motion.div
                             initial={{ opacity: 0, y: -4 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="p-2.5 bg-gradient-to-b from-rose-50 to-rose-100/70 border-t border-t-white border-b border-b-rose-300 border-x border-x-rose-200 text-rose-700 rounded-xl flex items-start gap-2.5 text-left text-xs shrink-0 shadow-[0_2px_6px_rgba(225,29,72,0.08),inset_0_1px_0_rgba(255,255,255,0.8)]"
+                            className="p-2.5 bg-gradient-to-b from-rose-50 to-rose-100/70 text-rose-700 rounded-xl flex items-start gap-2.5 text-left text-xs shrink-0 shadow-[0_2px_6px_rgba(225,29,72,0.08),inset_0_1px_0_rgba(255,255,255,0.8)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                           >
                             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                             <div className="space-y-0.5 min-w-0 flex-1">
@@ -3574,7 +3574,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         )}
 
                         {/* TOP SECTION: Expanded Input Dashboard with 3D Bevel */}
-                        <div className="bg-gradient-to-b from-white/98 via-white/90 to-white/80 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 rounded-2xl p-3 sm:p-3.5 space-y-2.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] shrink-0 w-full">
+                        <div className="bg-gradient-to-b from-white/98 via-white/90 to-white/80 rounded-2xl p-3 sm:p-3.5 space-y-2.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] shrink-0 w-full outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                           {/* Row 1: Recipient, Phone, Address Type, Default Switch */}
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center w-full">
                             
@@ -3593,7 +3593,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   setNewAddressForm({ ...newAddressForm, recipientName: e.target.value });
                                   if (errorMsg) setErrorMsg("");
                                 }}
-                                className="w-full h-9 px-3 bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-slate-400"
+                                className="w-full h-9 px-3 bg-slate-50/80 focus:bg-white rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-slate-400 focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                               />
                             </div>
 
@@ -3612,14 +3612,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   setNewAddressForm({ ...newAddressForm, phone: e.target.value });
                                   if (errorMsg) setErrorMsg("");
                                 }}
-                                className="w-full h-9 px-3 bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-mono font-medium text-slate-900 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-slate-400"
+                                className="w-full h-9 px-3 bg-slate-50/80 focus:bg-white rounded-xl text-xs font-mono font-medium text-slate-900 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-slate-400 focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                               />
                             </div>
 
                             {/* Address Type: Modern Segmented Control */}
                             <div className="md:col-span-3">
                               <label className="text-[11px] font-bold text-slate-700 block mb-1">Loại địa chỉ</label>
-                              <div className="relative grid grid-cols-2 p-1 rounded-xl bg-slate-100/80 border-t border-t-slate-300/50 border-b border-b-white/80 border-x border-x-slate-200/60 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.04),0_1px_0_rgba(255,255,255,0.8)] h-9">
+                              <div className="relative grid grid-cols-2 p-1 rounded-xl bg-slate-100/80 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.04),0_1px_0_rgba(255,255,255,0.8)] h-9 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                 <button
                                   type="button"
                                   onClick={() => setNewAddressForm({ ...newAddressForm, type: "office" })}
@@ -3633,7 +3633,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     <motion.div
                                       layoutId="active-address-type"
                                       transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                                      className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-white/80 rounded-[8px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] -z-10"
+                                      className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 rounded-[8px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] -z-10 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                     />
                                   )}
                                   <Building2 className={`w-3.5 h-3.5 ${newAddressForm.type === "office" ? "text-indigo-600" : ""}`} />
@@ -3652,7 +3652,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     <motion.div
                                       layoutId="active-address-type"
                                       transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                                      className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 border-t border-t-white border-b border-b-slate-200/80 border-x border-x-white/80 rounded-[8px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] -z-10"
+                                      className="absolute inset-0 bg-gradient-to-b from-white via-white/95 to-slate-50 rounded-[8px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] -z-10 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                     />
                                   )}
                                   <Home className={`w-3.5 h-3.5 ${newAddressForm.type === "home" ? "text-violet-600" : ""}`} />
@@ -3671,8 +3671,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 onClick={() => setNewAddressForm({ ...newAddressForm, isDefault: !newAddressForm.isDefault })}
                                 className={`h-9 px-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer select-none ${
                                   newAddressForm.isDefault 
-                                    ? "bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 text-indigo-900 shadow-[0_1px_3px_rgba(99,102,241,0.1),inset_0_1px_0_rgba(255,255,255,0.9)]" 
-                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 text-slate-600 shadow-[0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white"
+                                    ? "bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 text-indigo-900 shadow-[0_1px_3px_rgba(99,102,241,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]" 
+                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 text-slate-600 shadow-[0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] hover:from-white outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 }`}
                                 title="Bật/Tắt làm địa chỉ giao hàng mặc định"
                               >
@@ -3710,7 +3710,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     setNewAddressForm({ ...newAddressForm, address: e.target.value });
                                     if (errorMsg) setErrorMsg("");
                                   }}
-                                  className="w-full h-9.5 pl-9 pr-9 bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-slate-400"
+                                  className="w-full h-9.5 pl-9 pr-9 bg-slate-50/80 focus:bg-white rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] placeholder:text-slate-400 focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 />
                                 {newAddressForm.address.trim() && (
                                   <button
@@ -3732,14 +3732,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               {/* Fixed Width Tactile Geocoding Capsule */}
                               <div className="w-full sm:w-[220px] shrink-0">
                                 {isResolvingAddress ? (
-                                  <div className="w-full h-9.5 rounded-xl bg-slate-100/90 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200/70 p-1 flex items-center justify-center gap-2 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.03)]">
+                                  <div className="w-full h-9.5 rounded-xl bg-slate-100/90 p-1 flex items-center justify-center gap-2 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.03)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                     <div className="relative flex items-center justify-center size-3.5 shrink-0">
                                       <div className="absolute inset-0 rounded-full border-2 border-indigo-200 border-t-indigo-600 animate-spin" />
                                     </div>
                                     <span className="text-[11px] font-bold text-indigo-900 tracking-tight">Đang quét định vị...</span>
                                   </div>
                                 ) : resolvedPreview && resolvedPreview.success ? (
-                                  <div className="w-full h-9.5 rounded-xl bg-gradient-to-b from-slate-100/90 via-slate-50/80 to-slate-100/90 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200/70 p-1 flex items-center shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.8)]">
+                                  <div className="w-full h-9.5 rounded-xl bg-gradient-to-b from-slate-100/90 via-slate-50/80 to-slate-100/90 p-1 flex items-center shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.03),0_1px_0_rgba(255,255,255,0.8)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                     {/* Tactile Monospace Coordinate Chip (Full Width, No Ping, No Chuẩn hóa/Chuẩn xác badge) */}
                                     <button
                                       type="button"
@@ -3756,7 +3756,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                         }
                                       }}
                                       title="Bấm vào để sao chép liên kết vị trí bản đồ"
-                                      className="w-full h-full px-2.5 rounded-lg bg-gradient-to-b from-white via-white/95 to-slate-50 hover:to-white border-t border-t-white border-b border-b-slate-200/90 border-x border-x-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-between gap-1.5 min-w-0 cursor-pointer group/geo select-none transition-all active:scale-[0.98]"
+                                      className="w-full h-full px-2.5 rounded-lg bg-gradient-to-b from-white via-white/95 to-slate-50 hover:to-white shadow-[0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,1)] flex items-center justify-between gap-1.5 min-w-0 cursor-pointer group/geo select-none transition-all active:scale-[0.98] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                     >
                                       {/* Coordinate Value */}
                                       <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-center">
@@ -3777,7 +3777,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     </button>
                                   </div>
                                 ) : resolvedPreview && !resolvedPreview.success ? (
-                                  <div className="w-full h-9.5 rounded-xl bg-gradient-to-b from-amber-50 to-amber-100/60 border-t border-t-white border-b border-b-amber-300/70 border-x border-x-amber-200/80 px-2.5 flex items-center justify-between gap-1.5 shadow-[inset_0_1px_2px_rgba(245,158,11,0.05)]">
+                                  <div className="w-full h-9.5 rounded-xl bg-gradient-to-b from-amber-50 to-amber-100/60 px-2.5 flex items-center justify-between gap-1.5 shadow-[inset_0_1px_2px_rgba(245,158,11,0.05)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                     <div className="flex items-center gap-1.5 min-w-0">
                                       <AlertCircle className="size-3.5 text-amber-600 shrink-0" />
                                       <span className="text-[11px] font-bold text-amber-800 truncate">Không tìm thấy tọa độ</span>
@@ -3791,7 +3791,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     </button>
                                   </div>
                                 ) : (
-                                  <div className="w-full h-9.5 rounded-xl bg-slate-100/60 border border-slate-200/70 border-dashed px-3 flex items-center gap-2 text-slate-400 select-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]">
+                                  <div className="w-full h-9.5 rounded-xl bg-slate-100/60 border-dashed px-3 flex items-center gap-2 text-slate-400 select-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                     <MapPin className="size-3.5 text-slate-400/80 shrink-0" />
                                     <span className="text-[11px] font-medium text-slate-500 truncate">Tọa độ GPS tự động cập nhật</span>
                                   </div>
@@ -3802,7 +3802,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         </div>
 
                         {/* BOTTOM SECTION: Full-Height Clean Interactive Map Viewport (MINIMAL EYE BLUR SAVER with Bevel) */}
-                        <div className="flex-1 min-h-[360px] rounded-2xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-slate-200 bg-slate-100 overflow-hidden relative shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex">
+                        <div className="flex-1 min-h-[360px] rounded-2xl bg-slate-100 overflow-hidden relative shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] flex outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                           
                           {/* Map Viewport Area */}
                           <div className="w-full h-full relative bg-slate-100 flex items-center justify-center overflow-hidden flex-1">
@@ -3818,12 +3818,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 />
 
                                 {/* Floating Location Action Bar (Recenter Icon + OpenStreetMap External Link) */}
-                                <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 bg-gradient-to-b from-white/95 via-white/90 to-white/80 backdrop-blur-md p-1 rounded-xl border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[0_4px_14px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] animate-in fade-in duration-200">
+                                <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 bg-gradient-to-b from-white/95 via-white/90 to-white/80 backdrop-blur-md p-1 rounded-xl shadow-[0_4px_14px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] animate-in fade-in duration-200 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                   {/* Button 1: Recenter map to target address (Icon Only) */}
                                   <button
                                     type="button"
                                     onClick={() => setMapKey(prev => prev + 1)}
-                                    className="w-6.5 h-6.5 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 hover:from-indigo-100 text-indigo-700 rounded-lg border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 transition-all flex items-center justify-center cursor-pointer shrink-0 active:scale-95 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.06)]"
+                                    className="w-6.5 h-6.5 bg-gradient-to-b from-indigo-50 via-indigo-50/80 to-indigo-100/60 hover:from-indigo-100 text-indigo-700 rounded-lg transition-all flex items-center justify-center cursor-pointer shrink-0 active:scale-95 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.06)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                     title="Trỏ lại tâm vị trí"
                                   >
                                     <LocateFixed className="w-3.5 h-3.5 text-indigo-600" />
@@ -3834,7 +3834,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     href={`https://www.openstreetmap.org/?mlat=${resolvedPreview.latitude}&mlon=${resolvedPreview.longitude}#map=16/${resolvedPreview.latitude}/${resolvedPreview.longitude}`}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="px-2 py-1 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white text-slate-700 text-[10.5px] font-bold rounded-lg border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] transition-all flex items-center gap-1 cursor-pointer shrink-0 active:scale-95"
+                                    className="px-2 py-1 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white text-slate-700 text-[10.5px] font-bold rounded-lg shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] transition-all flex items-center gap-1 cursor-pointer shrink-0 active:scale-95 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                     title="Mở vị trí này trên OpenStreetMap"
                                   >
                                     <span>OpenStreetMap</span>
@@ -3855,7 +3855,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               </div>
                             ) : (
                               <div className="flex flex-col items-center justify-center gap-3 p-6 text-center z-10 max-w-sm">
-                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 text-indigo-600 flex items-center justify-center shadow-[0_2px_6px_rgba(99,102,241,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]">
+                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-600 flex items-center justify-center shadow-[0_2px_6px_rgba(99,102,241,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                   <LucideMap className="w-7 h-7" />
                                 </div>
                                 <div className="space-y-1">
@@ -3889,7 +3889,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               setErrorMsg("");
                               setSuccessMsg("");
                             }}
-                            className="px-4 py-2 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95"
+                            className="px-4 py-2 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 text-indigo-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-[0_2px_6px_-1px_rgba(99,102,241,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                           >
                             <Plus className="w-4 h-4" />
                             <span>Thêm địa chỉ mới</span>
@@ -3904,8 +3904,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 key={addr.sku}
                                 className={`relative p-5 rounded-2xl text-left transition-all duration-200 flex flex-col justify-between overflow-hidden group ${
                                   addr.isDefault 
-                                    ? "bg-gradient-to-b from-white via-indigo-50/25 to-indigo-50/45 border-t border-t-white border-b border-b-indigo-300/80 border-x border-x-indigo-200/70 shadow-[0_4px_16px_-2px_rgba(79,70,229,0.08),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-indigo-500/15" 
-                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 border-t border-t-white border-b border-b-slate-300/60 border-x border-x-white/70 hover:from-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)]"
+                                    ? "bg-gradient-to-b from-white via-indigo-50/25 to-indigo-50/45 shadow-[0_4px_16px_-2px_rgba(79,70,229,0.08),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-indigo-500/15 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]" 
+                                    : "bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.02)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 }`}
                               >
                                 {addr.isDefault && (
@@ -3941,7 +3941,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     </div>
 
                                     {addr.isDefault && (
-                                      <span className="inline-flex items-center gap-1 text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.08)] shrink-0 tracking-wider">
+                                      <span className="inline-flex items-center gap-1 text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(99,102,241,0.08)] shrink-0 tracking-wider outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                         <Check className="w-3 h-3 stroke-[2.5]" /> Mặc định
                                       </span>
                                     )}
@@ -3949,13 +3949,13 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
                                   {/* Contact & GPS Metadata */}
                                   <div className="flex items-center flex-wrap gap-2 text-xs">
-                                    <div className="inline-flex items-center gap-1.5 font-mono text-slate-700 bg-gradient-to-b from-slate-50 to-slate-100/80 px-2.5 py-1 rounded-lg border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-100 text-[11px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)]">
+                                    <div className="inline-flex items-center gap-1.5 font-mono text-slate-700 bg-gradient-to-b from-slate-50 to-slate-100/80 px-2.5 py-1 rounded-lg text-[11px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                       <Phone className="w-3 h-3 text-indigo-600 shrink-0" />
                                       <span>{addr.phoneNumber}</span>
                                     </div>
 
                                     {addr.latitude && addr.longitude && (
-                                      <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100/70 px-2.5 py-1 rounded-lg border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(16,185,129,0.06)]">
+                                      <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100/70 px-2.5 py-1 rounded-lg font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(16,185,129,0.06)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                         <Compass className="w-3 h-3 text-emerald-600 shrink-0" />
                                         <span>{addr.latitude.toFixed(4)}, {addr.longitude.toFixed(4)}</span>
                                       </div>
@@ -3963,7 +3963,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   </div>
 
                                   {/* Detailed Address Box */}
-                                  <div className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed bg-gradient-to-b from-white/95 via-slate-50/80 to-slate-100/60 p-2.5 rounded-xl border-t border-t-white border-b border-b-slate-200/80 border-x border-x-slate-200/60 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)]">
+                                  <div className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed bg-gradient-to-b from-white/95 via-slate-50/80 to-slate-100/60 p-2.5 rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,1),0_1px_2px_rgba(0,0,0,0.03)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                     <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                                     <span className="text-slate-700 font-medium leading-snug break-words flex-1">
                                       {addr.address}
@@ -4025,14 +4025,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                   <div className="space-y-4 flex-1 flex flex-col min-h-0">
                     
                     {/* 1. API Gateway & Network Ping Probe Control Card (Bevel Glassmorphism) */}
-                    <div className="p-4 sm:p-5 bg-gradient-to-b from-white via-white/95 to-slate-50/80 border-t border-t-white border-b border-b-slate-300/80 border-x border-x-slate-200/80 rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-slate-900/5 text-left space-y-3.5 shrink-0 relative overflow-hidden">
+                    <div className="p-4 sm:p-5 bg-gradient-to-b from-white via-white/95 to-slate-50/80 rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-slate-900/5 text-left space-y-3.5 shrink-0 relative overflow-hidden outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                       {/* Ambient corner glow */}
                       <div className="absolute top-0 right-0 w-64 h-32 bg-gradient-to-br from-indigo-500/5 via-sky-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
 
                       {/* Header with Title, Status Badge & Ping Probe Button */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_3px_10px_rgba(99,102,241,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] border-t border-t-white/30">
+                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_3px_10px_rgba(99,102,241,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                             <Server className="w-5 h-5 stroke-[2.2]" />
                           </div>
                           <div className="min-w-0">
@@ -4040,7 +4040,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                               <h4 className="text-sm font-black text-slate-900 leading-tight">
                                 API Gateway & Kết Nối Hệ Thống
                               </h4>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                 <ShieldCheck className="w-3 h-3 text-indigo-600" />
                                 TLS 1.3 • Bearer
                               </span>
@@ -4104,7 +4104,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             type="button"
                             onClick={() => handlePingTest()}
                             disabled={isPinging}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-gradient-to-b from-white via-slate-50 to-slate-100 border-t border-t-white border-b border-b-slate-300 border-x border-x-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-200 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-700 hover:text-indigo-600 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                             title="Đo độ trễ tới Endpoint qua API /api/health"
                           >
                             <Activity className={`w-3.5 h-3.5 text-indigo-500 ${isPinging ? "animate-spin" : ""}`} />
@@ -4118,7 +4118,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer border active:scale-95 ${
                               isEndpointDrawerOpen
                                 ? "bg-indigo-50 text-indigo-700 border-indigo-200 shadow-inner"
-                                : "bg-gradient-to-b from-white via-slate-50 to-slate-100 border-t border-t-white border-b border-b-slate-300 border-x border-x-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-200 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)]"
+                                : "bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-700 hover:text-indigo-600 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                             }`}
                             title="Mở rộng khung tùy chỉnh URL Endpoint máy chủ"
                           >
@@ -4176,7 +4176,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   className={`w-full pl-9 pr-3 py-2 text-xs font-mono bg-white border rounded-xl shadow-inner focus:outline-none focus:ring-2 transition-all ${
                                     endpointValidationError
                                       ? "border-rose-400 focus:ring-rose-500/20 text-rose-700"
-                                      : "border-slate-200/90 focus:border-indigo-500 focus:ring-indigo-500/20 text-slate-800"
+                                      : "border-slate-200/90 focus:outline-none focus:ring-0 focus:border-transparent text-slate-800"
                                   }`}
                                 />
                               </div>
@@ -4187,7 +4187,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                   type="button"
                                   onClick={handleApplyEndpoint}
                                   disabled={isPinging}
-                                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 border-t border-t-white/30 border-b border-b-indigo-900/40 border-x border-x-indigo-600/50 shadow-[0_2px_8px_rgba(99,102,241,0.35),inset_0_1px_0_rgba(255,255,255,0.3)] hover:brightness-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 shadow-[0_2px_8px_rgba(99,102,241,0.35),inset_0_1px_0_rgba(255,255,255,0.3)] hover:brightness-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                 >
                                   <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                                   <span>Áp dụng Endpoint</span>
@@ -4319,10 +4319,10 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                           const isTablet = currentSession.clientType?.toUpperCase() === "TABLET";
 
                           return (
-                            <div className="p-4 sm:p-4.5 bg-gradient-to-b from-white via-white/98 to-emerald-50/20 border-t border-t-white border-b border-b-emerald-200/80 border-x border-x-emerald-100/70 rounded-2xl shadow-[0_4px_16px_-4px_rgba(16,185,129,0.08),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-emerald-500/15 text-left space-y-2.5 shrink-0 relative overflow-hidden">
+                            <div className="p-4 sm:p-4.5 bg-gradient-to-b from-white via-white/98 to-emerald-50/20 rounded-2xl shadow-[0_4px_16px_-4px_rgba(16,185,129,0.08),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-emerald-500/15 text-left space-y-2.5 shrink-0 relative overflow-hidden outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b border-emerald-100/80">
                                 <div className="flex items-center gap-3 min-w-0">
-                                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-600 text-white flex items-center justify-center shrink-0 shadow-[0_3px_10px_rgba(16,185,129,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] border-t border-t-white/30">
+                                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-600 text-white flex items-center justify-center shrink-0 shadow-[0_3px_10px_rgba(16,185,129,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                     {isTablet ? <Laptop className="w-5 h-5 stroke-[2.2]" /> : (isMobile ? <Smartphone className="w-5 h-5 stroke-[2.2]" /> : <Laptop className="w-5 h-5 stroke-[2.2]" />)}
                                   </div>
                                   <div className="min-w-0">
@@ -4330,7 +4330,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                       <h4 className="text-sm font-black text-slate-900 leading-tight">
                                         {currentSession.deviceName}
                                       </h4>
-                                      <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100 border-t border-t-white border-b border-b-emerald-200 border-x border-x-emerald-100 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                                      <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-gradient-to-b from-emerald-50 to-emerald-100 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                         HOẠT ĐỘNG NGAY BÂY GIỜ
                                       </span>
@@ -4382,16 +4382,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                 return (
                                   <div
                                     key={session.id}
-                                    className="p-3.5 bg-gradient-to-b from-white via-white/95 to-slate-50/70 border-t border-t-white border-b border-b-slate-300/70 border-x border-x-white/70 rounded-2xl shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] hover:border-slate-300 transition-all flex flex-col justify-between gap-2.5 text-left group"
+                                    className="p-3.5 bg-gradient-to-b from-white via-white/95 to-slate-50/70 rounded-2xl shadow-[0_2px_8px_-1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] transition-all flex flex-col justify-between gap-2.5 text-left group outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex items-start gap-3 min-w-0">
                                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border-t border-t-white ${
                                           isTablet
-                                            ? "bg-gradient-to-b from-sky-50 to-sky-100/80 text-sky-700 border-b border-b-sky-200 border-x border-x-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"
+                                            ? "bg-gradient-to-b from-sky-50 to-sky-100/80 text-sky-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                             : (isMobile 
-                                              ? "bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 border-b border-b-indigo-200 border-x border-x-indigo-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"
-                                              : "bg-gradient-to-b from-slate-50 to-slate-100/80 text-slate-700 border-b border-b-slate-200 border-x border-x-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]")
+                                              ? "bg-gradient-to-b from-indigo-50 to-indigo-100/80 text-indigo-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                                              : "bg-gradient-to-b from-slate-50 to-slate-100/80 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]")
                                         }`}>
                                           {isTablet ? <Laptop className="w-4.5 h-4.5" /> : (isMobile ? <Smartphone className="w-4.5 h-4.5" /> : <Laptop className="w-4.5 h-4.5" />)}
                                         </div>
@@ -4445,12 +4445,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     )}
 
                     {/* 4. Bottom Orange Tinted Security Banner with Dynamic Animated Logo */}
-                    <div className="p-3.5 sm:p-4 bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-white/95 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100/80 rounded-2xl flex items-center gap-3.5 text-left shadow-[0_2px_8px_-2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,1)] relative overflow-hidden mt-auto shrink-0">
+                    <div className="p-3.5 sm:p-4 bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-white/95 rounded-2xl flex items-center gap-3.5 text-left shadow-[0_2px_8px_-2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,1)] relative overflow-hidden mt-auto shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                       {/* Ambient orange aura glow */}
                       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#FF4D24]/[0.05] via-amber-500/[0.02] to-transparent" />
 
                       {/* Dynamic Morphing Security Logo */}
-                      <div className="relative z-10 w-10 h-10 rounded-2xl bg-gradient-to-b from-orange-50 to-orange-100/80 border-t border-t-white border-b border-b-orange-200/80 border-x border-x-orange-100 flex items-center justify-center text-[#FF4D24] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_rgba(255,77,36,0.15)] shrink-0">
+                      <div className="relative z-10 w-10 h-10 rounded-2xl bg-gradient-to-b from-orange-50 to-orange-100/80 flex items-center justify-center text-[#FF4D24] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_rgba(255,77,36,0.15)] shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                         <SecurityDynamicMorphIcon />
                       </div>
 
@@ -4493,7 +4493,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                     {/* Empty State */}
                     {!isBookmarksLoading && userBookmarks.length === 0 && (
                       <Bevel variant="card" className="py-12 px-5 text-center flex flex-col items-center justify-center gap-3.5 rounded-2xl">
-                        <div className="size-16 rounded-2xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 border-t border-t-white border-b border-b-indigo-200 border-x border-x-indigo-100 text-indigo-700 flex items-center justify-center shadow-[0_4px_16px_rgba(79,70,229,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]">
+                        <div className="size-16 rounded-2xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 text-indigo-700 flex items-center justify-center shadow-[0_4px_16px_rgba(79,70,229,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
                           <Bookmark className="size-8 stroke-[1.75]" />
                         </div>
                         <div className="max-w-md">
@@ -4508,7 +4508,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                             setIsAccountsCenterOpen(false);
                             onNavigate("product");
                           }}
-                          className="mt-1 px-5 h-10 text-xs font-bold rounded-xl text-white bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+                          className="mt-1 px-5 h-10 text-xs font-bold rounded-xl text-white bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 shadow-[0_3px_12px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                         >
                           <ShoppingBag className="size-4" />
                           <span>Khám phá sản phẩm ngay</span>
@@ -4586,7 +4586,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                       type="button"
                                       onClick={() => handleExtendBookmarkPackage(bookmark.mainSku)}
                                       disabled={isExtending}
-                                      className="h-7 px-3 text-[10.5px] font-bold text-indigo-700 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 border-t border-t-white border-b border-b-indigo-200/80 border-x border-x-indigo-100/80 rounded-lg shadow-[0_1.5px_4px_rgba(99,102,241,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95 transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                                      className="h-7 px-3 text-[10.5px] font-bold text-indigo-700 bg-gradient-to-b from-indigo-50/90 via-indigo-50/70 to-indigo-100/50 hover:from-indigo-100 hover:to-indigo-150 rounded-lg shadow-[0_1.5px_4px_rgba(99,102,241,0.1),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-95 transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                     >
                                       {isExtending ? <RefreshCw className="size-3 animate-spin mr-1" /> : <Sparkles className="size-3 text-indigo-600 mr-1" />}
                                       <span>Gia hạn 7 ngày</span>
@@ -4702,7 +4702,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     type="button"
                                     onClick={() => handleClearBookmarkPackage(bookmark.mainSku)}
                                     disabled={isPackageLoading}
-                                    className="h-9 px-4 text-xs font-semibold text-slate-600 hover:text-indigo-700 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-indigo-50/80 hover:to-indigo-100/60 rounded-xl border-t border-t-white border-b border-b-slate-300/70 hover:border-b-indigo-300 border-x border-x-white/70 hover:border-x-indigo-200 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_2px_8px_-1px_rgba(99,102,241,0.15)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                    className="h-9 px-4 text-xs font-semibold text-slate-600 hover:text-indigo-700 bg-gradient-to-b from-white/95 via-white/85 to-white/70 hover:from-indigo-50/80 hover:to-indigo-100/60 rounded-xl shadow-[0_2px_6px_-1px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] hover:shadow-[0_2px_8px_-1px_rgba(99,102,241,0.15)] active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                   >
                                     {bookmarkActionLoading === bookmark.mainSku ? (
                                       <RefreshCw className="size-3.5 animate-spin text-indigo-500" />
@@ -4716,7 +4716,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                                     type="button"
                                     onClick={() => handleCheckoutBookmarkPackage(bookmark)}
                                     disabled={isPackageLoading}
-                                    className="h-9 px-4.5 text-xs font-bold text-white rounded-xl bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-t border-t-indigo-300/70 border-b border-b-indigo-950 border-x border-x-indigo-500 shadow-[0_4px_16px_rgba(79,70,229,0.35),0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.4)] hover:shadow-[0_6px_22px_rgba(79,70,229,0.45),0_3px_8px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.5)] hover:brightness-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                                    className="h-9 px-4.5 text-xs font-bold text-white rounded-xl bg-gradient-to-b from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 shadow-[0_4px_16px_rgba(79,70,229,0.35),0_2px_6px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.4)] hover:shadow-[0_6px_22px_rgba(79,70,229,0.45),0_3px_8px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.5)] hover:brightness-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                                   >
                                     {bookmarkActionLoading === `checkout::${bookmark.mainSku}` ? (
                                       <RefreshCw className="size-3.5 animate-spin" />

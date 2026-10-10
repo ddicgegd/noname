@@ -104,7 +104,7 @@ export default function CTAButton({ text, variant = "primary", onClick, id }: CT
         className="group relative overflow-hidden flex items-center border-none bg-transparent cursor-pointer rounded-full p-1.5 gap-2 select-none active:scale-95 transition-transform duration-200"
       >
         {/* Dynamic sliding pill background with 3D Bevel */}
-        <span className="absolute top-1.5 bottom-1.5 left-2 w-[calc(100%-8px-8px-38px-8px)] rounded-full bg-gradient-to-b from-white via-[#FCFCFC] to-[#F0F0F0] border-t border-t-white border-b border-b-black/[0.08] shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.05)] z-0 transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:w-[calc(100%-12px)] pointer-events-none" />
+        <span className="absolute top-1.5 bottom-1.5 left-2 w-[calc(100%-8px-8px-38px-8px)] rounded-full bg-gradient-to-b from-white via-[#FCFCFC] to-[#F0F0F0] shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.05)] z-0 transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:w-[calc(100%-12px)] pointer-events-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]" />
 
         {/* Text Container */}
         <span className="relative z-10 text-[#111111] font-medium text-sm px-10 py-2 whitespace-nowrap inline-flex items-center justify-center select-none">
@@ -117,7 +117,7 @@ export default function CTAButton({ text, variant = "primary", onClick, id }: CT
         </span>
 
         {/* Small arrow circle with 3D Bevel */}
-        <span className="relative z-10 flex items-center justify-center w-[38px] h-[38px] rounded-full bg-gradient-to-b from-[#99DEF2] via-[#75C5DE] to-[#54ABC8] border-t border-t-white/90 border-b-2 border-b-[#3B8A9F] shadow-[0_2px_8px_rgba(85,185,215,0.45),inset_0_1.5px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(30,90,110,0.3)] shrink-0 transition-transform duration-300 ease-out group-hover:-translate-x-1">
+        <span className="relative z-10 flex items-center justify-center w-[38px] h-[38px] rounded-full bg-gradient-to-b from-[#99DEF2] via-[#75C5DE] to-[#54ABC8] shadow-[0_2px_8px_rgba(85,185,215,0.45),inset_0_1.5px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(30,90,110,0.3)] shrink-0 transition-transform duration-300 ease-out group-hover:-translate-x-1 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
           <svg
             width="14"
             height="14"
@@ -154,7 +154,7 @@ export default function CTAButton({ text, variant = "primary", onClick, id }: CT
       }}
     >
       {/* Expanding Capsule Background with rich 3D Optical Bevel */}
-      <span className="absolute top-1.5 bottom-1.5 left-2 w-[calc(100%-8px-8px-48px-12px)] md:w-[calc(100%-8px-8px-54px-12px)] rounded-full bg-gradient-to-b from-white via-[#FCFCFC] to-[#F0F0F0] border-t border-t-white border-b border-b-black/[0.08] shadow-[0_4px_16px_rgba(0,0,0,0.1),inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1.5px_1.5px_rgba(0,0,0,0.06)] z-0 transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:w-[calc(100%-16px)] pointer-events-none" />
+      <span className="absolute top-1.5 bottom-1.5 left-2 w-[calc(100%-8px-8px-48px-12px)] md:w-[calc(100%-8px-8px-54px-12px)] rounded-full bg-gradient-to-b from-white via-[#FCFCFC] to-[#F0F0F0] shadow-[0_4px_16px_rgba(0,0,0,0.1),inset_0_1.5px_0_rgba(255,255,255,1),inset_0_-1.5px_1.5px_rgba(0,0,0,0.06)] z-0 transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:w-[calc(100%-16px)] pointer-events-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]" />
 
       {/* Button Text */}
       <span className="relative z-10 text-[#111111] font-medium text-base md:text-lg px-8 md:px-10 py-3 md:py-4 whitespace-nowrap inline-flex items-center justify-center select-none">
@@ -167,7 +167,7 @@ export default function CTAButton({ text, variant = "primary", onClick, id }: CT
       </span>
 
       {/* Arrow Circle with rich 3D Optical Bevel */}
-      <span className="relative z-10 flex items-center justify-center w-12 h-12 md:w-[54px] md:h-[54px] rounded-full bg-gradient-to-b from-[#99DEF2] via-[#75C5DE] to-[#54ABC8] border-t border-t-white/90 border-b-2 border-b-[#3B8A9F] shadow-[0_4px_14px_rgba(85,185,215,0.5),inset_0_1.5px_0_rgba(255,255,255,0.95),inset_0_-1.5px_1px_rgba(30,90,110,0.35)] shrink-0 transition-transform duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:-translate-x-1.5 group-hover:shadow-[0_6px_18px_rgba(85,185,215,0.65),inset_0_1.5px_0_rgba(255,255,255,1)]">
+      <span className="relative z-10 flex items-center justify-center w-12 h-12 md:w-[54px] md:h-[54px] rounded-full bg-gradient-to-b from-[#99DEF2] via-[#75C5DE] to-[#54ABC8] shadow-[0_4px_14px_rgba(85,185,215,0.5),inset_0_1.5px_0_rgba(255,255,255,0.95),inset_0_-1.5px_1px_rgba(30,90,110,0.35)] shrink-0 transition-transform duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:-translate-x-1.5 group-hover:shadow-[0_6px_18px_rgba(85,185,215,0.65),inset_0_1.5px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
         <svg
           width="18"
           height="18"
