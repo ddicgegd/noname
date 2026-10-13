@@ -61,6 +61,8 @@ export const Particles: React.FC<ParticlesProps> = ({
   const mousePosition = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const mouse = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const canvasSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
+  const canvasRectRef = useRef<DOMRect | null>(null);
+  const rafIdRef = useRef<number | null>(null);
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
 
   useEffect(() => {
@@ -75,11 +77,20 @@ export const Particles: React.FC<ParticlesProps> = ({
       onMouseMove();
     };
 
+    const handleScrollOrResize = () => {
+      canvasRectRef.current = null;
+    };
+
     window.addEventListener("resize", initCanvas);
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("scroll", handleScrollOrResize, { passive: true });
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
 
     return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
       window.removeEventListener("resize", initCanvas);
+      window.removeEventListener("scroll", handleScrollOrResize);
       window.removeEventListener("mousemove", handleMouseMove);
     };
   }, [color]);
@@ -95,7 +106,10 @@ export const Particles: React.FC<ParticlesProps> = ({
 
   const onMouseMove = () => {
     if (canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
+      if (!canvasRectRef.current) {
+        canvasRectRef.current = canvasRef.current.getBoundingClientRect();
+      }
+      const rect = canvasRectRef.current;
       const { w, h } = canvasSize.current;
       const x = mousePosition.current.x - rect.left - w / 2;
       const y = mousePosition.current.y - rect.top - h / 2;
@@ -116,6 +130,7 @@ export const Particles: React.FC<ParticlesProps> = ({
       canvasRef.current.height = canvasSize.current.h * dpr;
       canvasRef.current.style.width = `${canvasSize.current.w}px`;
       canvasRef.current.style.height = `${canvasSize.current.h}px`;
+      canvasRectRef.current = canvasRef.current.getBoundingClientRect();
       context.current.scale(dpr, dpr);
     }
   };
@@ -248,7 +263,7 @@ export const Particles: React.FC<ParticlesProps> = ({
         );
       }
     });
-    window.requestAnimationFrame(animate);
+    rafIdRef.current = window.requestAnimationFrame(animate);
   };
 
   return (

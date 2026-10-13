@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 
 import { useToast } from "@/components/ui/Toast";
+import { getAppErrorMessage } from "@/components/ui/AppErrorNotice";
 import {
   BookmarkData,
   BookmarkItem,
@@ -1052,7 +1053,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct,
         showToast(`Đã lưu "${first.name} (${first.color} - ${first.size})" vào Bookmark trong 7 ngày!`, "success");
       }
     } catch (err: any) {
-      showToast(err?.message || "Lỗi lưu bookmark vào hệ thống", "warning");
+      showToast(getAppErrorMessage(err), "warning");
     } finally {
       setIsSavingBookmark(false);
     }
@@ -1334,7 +1335,7 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct,
       }
     } catch (err: any) {
       console.error("[OrderPage] Error applying for loan directly:", err);
-      setLoanApplyError(err?.message || "Không thể nộp đơn xin vay lúc này. Vui lòng thử lại sau.");
+      setLoanApplyError(getAppErrorMessage(err));
     } finally {
       setIsSubmittingLoanApp(false);
     }
@@ -1644,8 +1645,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct,
           onError: (errorMessage) => {
             console.error("[OrderPage] Async order creation error:", errorMessage);
             setWsStatus("error");
-            setWsMessage(errorMessage);
-            setOrderError(errorMessage);
+            const cleanMsg = getAppErrorMessage(errorMessage);
+            setWsMessage(cleanMsg);
+            setOrderError(cleanMsg);
             setIsPlacingOrder(false);
           },
         }
@@ -1655,8 +1657,9 @@ export default function OrderPage({ onNavigate, onRemoveCartItem, buyNowProduct,
     } catch (err: any) {
       console.error("[OrderPage] Order placement fatal error:", err);
       setWsStatus("error");
-      setWsMessage(err?.message || "Không thể khởi tạo luồng đơn hàng");
-      setOrderError(err?.message || "Không thể khởi tạo luồng đơn hàng. Vui lòng kiểm tra lại.");
+      const cleanMsg = getAppErrorMessage(err);
+      setWsMessage(cleanMsg);
+      setOrderError(cleanMsg);
       setIsPlacingOrder(false);
     }
   };

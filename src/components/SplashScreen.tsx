@@ -18,8 +18,6 @@ export default function SplashScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  if (!isVisible) return null;
-
   const boxes = [0, 1, 2, 3, 4];
 
   // Custom cubic-bezier easing to match original design: [0.96, -0.02, 0.38, 1.01]
@@ -31,42 +29,44 @@ export default function SplashScreen() {
 
   return (
     <AnimatePresence>
-      <motion.div
-        id="splash"
-        className="fixed inset-0 w-screen h-screen z-[9999] pointer-events-none overflow-hidden flex flex-col"
-        initial={{ opacity: 1 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3, delay: 1.35 }}
-      >
-        {/* Top Row: sliding upward */}
-        <div className="flex w-full h-1/2 overflow-hidden">
-          {boxes.map((i) => (
-            <motion.div
-              key={`top-${i}`}
-              id={`splash-top-${i}`}
-              className="w-1/5 h-full bg-[#75C5DE]"
-              initial={{ y: "0%" }}
-              animate={{ y: "-100%" }}
-              transition={transitionConfig(i)}
-            />
-          ))}
-        </div>
+      {isVisible && (
+        <motion.div
+          id="splash"
+          className="fixed inset-0 w-screen h-screen z-[9999] pointer-events-none overflow-hidden flex flex-col"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35, ease: "easeInOut" }}
+        >
+          {/* Top Row: sliding upward */}
+          <div className="flex w-full h-1/2 overflow-hidden">
+            {boxes.map((i) => (
+              <motion.div
+                key={`top-${i}`}
+                id={`splash-top-${i}`}
+                className="w-1/5 h-full bg-[#75C5DE]"
+                initial={{ y: "0%" }}
+                animate={{ y: "-100%" }}
+                transition={transitionConfig(i)}
+              />
+            ))}
+          </div>
 
-        {/* Bottom Row: sliding downward */}
-        <div className="flex w-full h-1/2 overflow-hidden">
-          {boxes.map((i) => (
-            <motion.div
-              key={`bottom-${i}`}
-              id={`splash-bottom-${i}`}
-              className="w-1/5 h-full bg-[#75C5DE]"
-              initial={{ y: "0%" }}
-              animate={{ y: "100%" }}
-              transition={transitionConfig(i)}
-            />
-          ))}
-        </div>
-      </motion.div>
+          {/* Bottom Row: sliding downward */}
+          <div className="flex w-full h-1/2 overflow-hidden">
+            {boxes.map((i) => (
+              <motion.div
+                key={`bottom-${i}`}
+                id={`splash-bottom-${i}`}
+                className="w-1/5 h-full bg-[#75C5DE]"
+                initial={{ y: "0%" }}
+                animate={{ y: "100%" }}
+                transition={transitionConfig(i)}
+              />
+            ))}
+          </div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 }

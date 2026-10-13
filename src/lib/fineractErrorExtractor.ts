@@ -188,13 +188,13 @@ export function extractFineractError(error: unknown): FineractParsedError {
 
   // Generate appropriate title based on HTTP status code
   if (httpStatusCode === 403) {
-    title = "Từ Chối Nghiệp Vụ (HTTP 403)";
+    title = "Yêu cầu bị từ chối";
   } else if (httpStatusCode === 400) {
-    title = "Dữ Liệu Không Hợp Lệ (HTTP 400)";
+    title = "Dữ liệu không hợp lệ";
   } else if (httpStatusCode === 404) {
-    title = "Không Tìm Thấy Bản Ghi (HTTP 404)";
+    title = "Không tìm thấy bản ghi";
   } else if (httpStatusCode >= 500) {
-    title = "Lỗi Máy Chủ Core Banking (HTTP 500)";
+    title = "Lỗi hệ thống";
   }
 
   return {

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import SplashScreen from "./components/SplashScreen";
 import Navbar from "./components/Navbar";
 import SpotlightSection from "./components/SpotlightSection";
@@ -11,15 +11,16 @@ import FeatureOne from "./components/FeatureOne";
 import ShowcaseSection from "./components/ShowcaseSection";
 import PricingSection from "./components/PricingSection";
 import { ScrollAnimation } from "./components/ui/scroll-animation";
-import ProductPage from "./components/ProductPage";
-import RegisterPage from "./components/RegisterPage";
-import AuthReportDashboard from "./components/AuthReportDashboard";
-import ProfilePage from "./components/ProfilePage";
-import TermsPage from "./components/TermsPage";
-import OrderPage from "./components/OrderPage";
-import EmailActionResponsePage from "./components/EmailActionResponsePage";
-import AntiAverage404Page from "./components/AntiAverage404Page";
-import AmbientUploadCard from "./components/AmbientUploadCard";
+
+const ProductPage = lazy(() => import("./components/ProductPage"));
+const RegisterPage = lazy(() => import("./components/RegisterPage"));
+const AuthReportDashboard = lazy(() => import("./components/AuthReportDashboard"));
+const ProfilePage = lazy(() => import("./components/ProfilePage"));
+const TermsPage = lazy(() => import("./components/TermsPage"));
+const OrderPage = lazy(() => import("./components/OrderPage"));
+const EmailActionResponsePage = lazy(() => import("./components/EmailActionResponsePage"));
+const AntiAverage404Page = lazy(() => import("./components/AntiAverage404Page"));
+const AmbientUploadCard = lazy(() => import("./components/AmbientUploadCard"));
 import { GenieCartFlyProvider } from "./components/ui/genie-cart-fly";
 import { ToastProvider } from "./components/ui/Toast";
 import { AnimatePresence, motion } from "motion/react";
@@ -537,20 +538,22 @@ export default function App() {
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
-            <ProductPage 
-              cartItems={cartItems}
-              onRemoveCartItem={handleRemoveCartItem}
-              onAddToCart={handleAddToCart} 
-              onNavigate={navigate} 
-              onFlyEffect={handleFlyEffect}
-              onSpawnStars={handleSpawnStars}
-              onFlyToAccount={handleFlyToAccount}
-              onDetailOpenChange={setIsProductDetailOpen}
-              onBuyNow={(product) => {
-                setBuyNowProduct(product);
-                navigate("order");
-              }}
-            />
+            <Suspense fallback={null}>
+              <ProductPage 
+                cartItems={cartItems}
+                onRemoveCartItem={handleRemoveCartItem}
+                onAddToCart={handleAddToCart} 
+                onNavigate={navigate} 
+                onFlyEffect={handleFlyEffect}
+                onSpawnStars={handleSpawnStars}
+                onFlyToAccount={handleFlyToAccount}
+                onDetailOpenChange={setIsProductDetailOpen}
+                onBuyNow={(product) => {
+                  setBuyNowProduct(product);
+                  navigate("order");
+                }}
+              />
+            </Suspense>
           </motion.div>
         ) : currentPage === "order" ? (
           <motion.div
@@ -560,13 +563,15 @@ export default function App() {
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
-            <OrderPage
-              onNavigate={navigate}
-              cartItems={cartItems}
-              onRemoveCartItem={handleRemoveCartItem}
-              onAddToCart={handleAddToCart}
-              buyNowProduct={buyNowProduct}
-            />
+            <Suspense fallback={null}>
+              <OrderPage
+                onNavigate={navigate}
+                cartItems={cartItems}
+                onRemoveCartItem={handleRemoveCartItem}
+                onAddToCart={handleAddToCart}
+                buyNowProduct={buyNowProduct}
+              />
+            </Suspense>
           </motion.div>
         ) : currentPage === "auth-report" ? (
           <motion.div
@@ -576,7 +581,9 @@ export default function App() {
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
-            <AuthReportDashboard onNavigate={navigate} />
+            <Suspense fallback={null}>
+              <AuthReportDashboard onNavigate={navigate} />
+            </Suspense>
           </motion.div>
         ) : currentPage === "email-response" ? (
           <motion.div
@@ -586,7 +593,9 @@ export default function App() {
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
-            <EmailActionResponsePage onNavigate={navigate} />
+            <Suspense fallback={null}>
+              <EmailActionResponsePage onNavigate={navigate} />
+            </Suspense>
           </motion.div>
         ) : currentPage === "profile" ? (
           <motion.div
@@ -596,7 +605,9 @@ export default function App() {
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
-            <ProfilePage onNavigate={navigate} />
+            <Suspense fallback={null}>
+              <ProfilePage onNavigate={navigate} />
+            </Suspense>
           </motion.div>
         ) : currentPage === "auth" ? (
           <motion.div
@@ -606,7 +617,9 @@ export default function App() {
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
-            <RegisterPage onNavigate={navigate} />
+            <Suspense fallback={null}>
+              <RegisterPage onNavigate={navigate} />
+            </Suspense>
           </motion.div>
         ) : currentPage === "terms" ? (
           <motion.div
@@ -616,7 +629,9 @@ export default function App() {
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
           >
-            <TermsPage onNavigate={navigate} />
+            <Suspense fallback={null}>
+              <TermsPage onNavigate={navigate} />
+            </Suspense>
           </motion.div>
         ) : currentPage === "bevel" ? (
           <motion.div
@@ -627,7 +642,9 @@ export default function App() {
             transition={{ duration: 0.35, ease: "easeInOut" }}
             className="min-h-screen bg-[#EEF2F6] flex flex-col items-center justify-center p-4 sm:p-8"
           >
-            <AmbientUploadCard />
+            <Suspense fallback={null}>
+              <AmbientUploadCard />
+            </Suspense>
           </motion.div>
         ) : (
           <motion.div
@@ -638,7 +655,9 @@ export default function App() {
             transition={{ duration: 0.35, ease: "easeInOut" }}
             className="w-full"
           >
-            <AntiAverage404Page onNavigate={navigate} />
+            <Suspense fallback={null}>
+              <AntiAverage404Page onNavigate={navigate} />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>

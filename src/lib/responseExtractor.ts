@@ -58,27 +58,9 @@ export function extractBackendMessage(response: ApiResponse): ExtractedMessageRe
   return { message: "" };
 }
 
-export function sanitizeErrorMessage(msg: string): string {
-  if (!msg) {
-    return "";
-  }
-  let clean = msg;
-  clean = clean.replace(/API Error:\s*\d+\s*(Unauthorized|Bad Request|Internal Server Error|Forbidden)?/i, "").trim();
-  clean = clean.replace(/^(API Error:\s*\d+|Error\s*\d+|Mã lỗi:\s*\d+)\s*-?\\s*/i, "").trim();
-  // Sanitize URLs, hostnames, ports, and internal endpoints to avoid leaking technical details
-  clean = clean.replace(/https?:\/\/[^\s/$.?#].[^\s]*/gi, "").trim();
-  clean = clean.replace(/localhost(:\d+)?/gi, "").trim();
-  clean = clean.replace(/\/api\/[a-zA-Z0-9_\-\/]+/gi, "").trim();
+import { getAppErrorMessage, resolveAppError } from "../components/ui/AppErrorNotice";
+export { getAppErrorMessage, resolveAppError };
 
-  if (
-    clean.includes("Failed to fetch") ||
-    clean.includes("NetworkError") ||
-    clean.includes("Network Error") ||
-    clean.includes("ECONNREFUSED") ||
-    clean.includes("connection refused") ||
-    clean.length === 0
-  ) {
-    return "Mã lỗi: SYS-503 (Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau ít phút).";
-  }
-  return clean;
+export function sanitizeErrorMessage(msg: string): string {
+  return getAppErrorMessage(msg);
 }

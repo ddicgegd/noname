@@ -380,13 +380,13 @@ export default function EmailActionResponsePage({
           errorText.includes("Failed to fetch")
         ) {
           if (statusCode === 404) {
-            errorText = "Mã lỗi: AUTH-404 (Liên kết xác thực không tồn tại hoặc đã bị thu hồi).";
+            errorText = "Liên kết xác thực không tồn tại hoặc đã bị thu hồi.";
           } else if (actionType === "verify-email") {
-            errorText = "Mã lỗi: AUTH-401 (Liên kết xác thực email đã hết hạn hoặc không hợp lệ. Vui lòng yêu cầu liên kết mới).";
+            errorText = "Liên kết xác thực email đã hết hạn hoặc không hợp lệ. Vui lòng yêu cầu liên kết mới.";
           } else if (actionType === "credential-change") {
-            errorText = "Mã lỗi: AUTH-401 (Liên kết xác thực đổi thông tin đã hết hạn hoặc không hợp lệ. Vui lòng yêu cầu liên kết mới).";
+            errorText = "Liên kết xác thực đổi thông tin đã hết hạn hoặc không hợp lệ. Vui lòng yêu cầu liên kết mới.";
           } else {
-            errorText = "Mã lỗi: AUTH-401 (Mã xác thực không hợp lệ hoặc phiên thao tác đã hết hạn).";
+            errorText = "Mã xác thực không hợp lệ hoặc phiên thao tác đã hết hạn.";
           }
         } else {
           errorText = sanitizeErrorMessage(errorText);

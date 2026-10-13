@@ -9,7 +9,6 @@ import { type PricingPlan } from "./HoloCardPaymentSheet";
 
 export interface HoloCardProps {
   plan: PricingPlan;
-  isVerified?: boolean;
   onSelect?: (plan: PricingPlan) => void;
   compact?: boolean;
   hideButton?: boolean;
@@ -20,7 +19,6 @@ export interface HoloCardProps {
 
 export function HoloCard({
   plan,
-  isVerified = false,
   onSelect,
   compact = false,
   hideButton: _hideButton = false,
@@ -50,7 +48,11 @@ export function HoloCard({
     const wrap = wrapRef.current;
     if (!card || !foil || !glint || !rim || !wrap) return;
 
+    let isVisible = true;
+    let observer: IntersectionObserver | null = null;
+
     const tick = () => {
+      if (!isVisible) return;
       const c = cur.current;
       const t = tgt.current;
       const lf = 0.12;
@@ -106,8 +108,27 @@ export function HoloCard({
       raf.current = requestAnimationFrame(tick);
     };
 
-    raf.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf.current);
+    if (typeof IntersectionObserver !== "undefined") {
+      isVisible = false;
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          const wasVisible = isVisible;
+          isVisible = entry.isIntersecting;
+          if (isVisible && !wasVisible) {
+            raf.current = requestAnimationFrame(tick);
+          }
+        },
+        { rootMargin: "250px 0px" }
+      );
+      observer.observe(wrap);
+    } else {
+      raf.current = requestAnimationFrame(tick);
+    }
+
+    return () => {
+      observer?.disconnect();
+      cancelAnimationFrame(raf.current);
+    };
   }, [plan, compact]);
 
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {

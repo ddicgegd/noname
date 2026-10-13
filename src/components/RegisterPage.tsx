@@ -19,8 +19,9 @@ import {
 import { MorphIcon } from "morphicons/react";
 import { HoverMorphIcon } from "./ui/HoverMorphIcon";
 import { useToast } from "./ui/Toast";
+import { getAppErrorMessage } from "./ui/AppErrorNotice";
 import { apiRequest, getApiBaseUrl } from "../lib/api";
-import { extractBackendMessage, sanitizeErrorMessage } from "../lib/responseExtractor";
+import { extractBackendMessage } from "../lib/responseExtractor";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 import { ApiResponse } from "../types/api";
 import {
@@ -88,6 +89,52 @@ function DynamicButtonLoader({ text }: { text: string }) {
     </div>
   );
 }
+
+const authFrameClipVariants = {
+  hidden: {
+    opacity: 0,
+    clipPath: "inset(8% 5% 8% 5%)",
+    scale: 0.98,
+  },
+  visible: {
+    opacity: 1,
+    clipPath: "inset(0% 0% 0% 0%)",
+    scale: 1,
+    transition: {
+      duration: 0.28,
+      ease: [0.16, 1, 0.3, 1],
+      staggerChildren: 0.045,
+      delayChildren: 0.03,
+    },
+  },
+  exit: {
+    opacity: 0,
+    clipPath: "inset(8% 5% 8% 5%)",
+    scale: 0.98,
+    transition: {
+      duration: 0.16,
+      ease: "easeInOut",
+    },
+  },
+};
+
+const authItemCascadeVariants = {
+  hidden: {
+    opacity: 0,
+    y: 8,
+    scale: 0.98,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 420,
+      damping: 28,
+    },
+  },
+};
 
 export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [isSignUp, setIsSignUp] = useState(() => window.location.hash.toLowerCase() === "#register");
@@ -193,20 +240,8 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     return () => clearInterval(interval);
   }, [cooldownTime]);
 
-  // --- SANITIZE ERROR FUNCTION ---
-  const sanitizeErrorMessage = (msg: string): string => {
-    if (!msg) return "";
-    let clean = msg;
-    clean = clean.replace(/API Error:\s*\d+\s*(Unauthorized|Bad Request|Internal Server Error|Forbidden)?/i, "").trim();
-    clean = clean.replace(/^(API Error:\s*\d+|Error\s*\d+|Mã lỗi:\s*\d+)\s*-?\\s*/i, "").trim();
-    if (clean.includes("Failed to fetch") || clean.includes("NetworkError") || clean.includes("Network Error")) {
-      return "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại máy chủ backend (http://localhost:8080).";
-    }
-    if (!clean) {
-      return "Đã có lỗi xảy ra từ máy chủ. Vui lòng thử lại sau.";
-    }
-    return clean;
-  };
+  // Chuẩn hóa lỗi dứt khoát không dùng regex hay fallback lộn xộn
+  const sanitizeErrorMessage = (error: unknown): string => getAppErrorMessage(error);
 
   const [isVerifyingMode, setIsVerifyingMode] = useState(() => {
     const hash = window.location.hash.toLowerCase();
@@ -407,7 +442,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
       if (reqError) {
         console.error("Manual token validation failed:", reqError);
-        const cleanReason = sanitizeErrorMessage(reqError.message) || "Mã token không hợp lệ hoặc đã hết hạn.";
+        const cleanReason = getAppErrorMessage(reqError);
         // Stay on current page and show top-right toast!
         setToastNotification({
           id: Date.now().toString(),
@@ -439,7 +474,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       }
     } catch (err: any) {
       console.error("Unexpected error in token verification:", err);
-      const cleanReason = sanitizeErrorMessage(err.message) || "Mã token không hợp lệ hoặc đã hết hạn.";
+      const cleanReason = getAppErrorMessage(err);
       setToastNotification({
         id: Date.now().toString(),
         type: "error",
@@ -493,7 +528,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       }, 1000);
     } catch (err: unknown) {
       const errorObj = err as Error;
-      const cleanReason = sanitizeErrorMessage(errorObj.message || "") || "Mã xác thực email không hợp lệ hoặc đã hết hạn.";
+      const cleanReason = getAppErrorMessage(errorObj);
       setVerifyOverlayStatus("error");
       setVerifyOverlayMsg(cleanReason);
       setVerifyOverlayTimeLeft(4);
@@ -1104,7 +1139,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     } catch (err: unknown) {
       const errorObj = err as Error;
       console.error("Real API Verification Failed:", errorObj);
-      const cleanReason = sanitizeErrorMessage(errorObj.message || "") || "Mã xác thực email không hợp lệ hoặc đã hết hạn.";
+      const cleanReason = getAppErrorMessage(errorObj);
       setVerificationLogs(prev => [
         ...prev,
         `[ERROR] Xác thực thất bại: ${cleanReason}`,
@@ -1443,10 +1478,9 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
 
         // General business/system error — only show if no field errors
         const cleanReason =
-          extracted?.message ||
-          (typeof err.message === "string" && err.message.length > 0
-            ? sanitizeErrorMessage(err.message)
-            : "Xác thực không thành công. Hãy kiểm tra lại thông tin đăng nhập.");
+          extracted?.message && extracted.message.trim().length > 0
+            ? extracted.message.trim()
+            : getAppErrorMessage(err);
 
         if (Object.keys(rawFieldErrors).length === 0) {
           setErrorMsg(cleanReason);
@@ -1465,7 +1499,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       }
     } catch (err: any) {
       setLoading(false);
-      const msg = err.message || "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.";
+      const msg = getAppErrorMessage(err);
       setErrorMsg(msg);
       setToastNotification({
         id: Date.now().toString(),
@@ -2497,10 +2531,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   {isSignUp ? (
                     <motion.div
                       key="register-heading"
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      initial={{ opacity: 0, clipPath: "inset(0% 40% 0% 40%)", scale: 0.98 }}
+                      animate={{ opacity: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1 }}
+                      exit={{ opacity: 0, clipPath: "inset(0% 40% 0% 40%)", scale: 0.98 }}
+                      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                       className="mb-2"
                     >
                       <h2 className="text-xl font-black text-[#111111] tracking-tight font-sans">
@@ -2510,10 +2544,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   ) : (
                     <motion.div
                       key="login-heading"
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      initial={{ opacity: 0, clipPath: "inset(0% 40% 0% 40%)", scale: 0.98 }}
+                      animate={{ opacity: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1 }}
+                      exit={{ opacity: 0, clipPath: "inset(0% 40% 0% 40%)", scale: 0.98 }}
+                      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                       className="mb-2"
                     >
                       <h2 className="text-xl font-black text-[#111111] tracking-tight font-sans">
@@ -2523,7 +2557,6 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                   )}
                 </AnimatePresence>
 
-
                 {/* Primary Form */}
                 <form onSubmit={handleFormSubmit} noValidate className="flex flex-col gap-3">
 
@@ -2531,14 +2564,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                     {isSignUp ? (
                       <motion.div
                         key="register-fields-container"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        variants={authFrameClipVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
                         className="flex flex-col gap-3"
                       >
                         {/* Tên đăng nhập */}
-                        <div className="flex flex-col gap-1">
+                        <motion.div variants={authItemCascadeVariants} className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-username">
                             Tên đăng nhập
                           </label>
@@ -2577,10 +2610,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["username"] || fieldErrors["name"]}</span>
                             </p>
                           )}
-                        </div>
+                        </motion.div>
 
                         {/* Ho va ten */}
-                        <div className="flex flex-col gap-1">
+                        <motion.div variants={authItemCascadeVariants} className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-fullname">
                             Họ và Tên đầy đủ
                           </label>
@@ -2617,10 +2650,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["fullName"]}</span>
                             </p>
                           )}
-                        </div>
+                        </motion.div>
 
                         {/* Email */}
-                        <div className="flex flex-col gap-1">
+                        <motion.div variants={authItemCascadeVariants} className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-email">
                             Địa chỉ Email
                           </label>
@@ -2657,10 +2690,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["email"]}</span>
                             </p>
                           )}
-                        </div>
+                        </motion.div>
 
                         {/* Mat khau */}
-                        <div className="flex flex-col gap-1">
+                        <motion.div variants={authItemCascadeVariants} className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-password">
                             Mật khẩu
                           </label>
@@ -2700,10 +2733,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["password"]}</span>
                             </p>
                           )}
-                        </div>
+                        </motion.div>
 
                         {/* Xác nhận mật khẩu */}
-                        <div className="flex flex-col gap-1">
+                        <motion.div variants={authItemCascadeVariants} className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="su-confirm">
                             Xác nhận mật khẩu
                           </label>
@@ -2743,10 +2776,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["confirmPassword"]}</span>
                             </p>
                           )}
-                        </div>
+                        </motion.div>
 
                         {/* Terms */}
-                        <div className="flex items-center gap-2.5 mt-0.5 text-left">
+                        <motion.div variants={authItemCascadeVariants} className="flex items-center gap-2.5 mt-0.5 text-left">
                           <input id="su-terms" type="checkbox" checked={agreeToTerms} onChange={(e) => setAgreeToTerms(e.target.checked)} className="w-4 h-4 accent-[#FF4D24] border-slate-300 rounded cursor-pointer shrink-0" />
                           <label htmlFor="su-terms" className="text-[10.5px] text-slate-500 leading-normal font-sans">
                             Tôi đồng ý với{" "}
@@ -2755,19 +2788,19 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                             <a href="#privacy" onClick={(e) => { e.preventDefault(); onNavigate("terms"); }} className="text-[#FF4D24] font-bold hover:underline">Chính sách Bảo mật</a>
                             {" "}của Horizon Mobile.
                           </label>
-                        </div>
+                        </motion.div>
                       </motion.div>
                     ) : (
                       <motion.div
                         key="login-fields-container"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        variants={authFrameClipVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
                         className="flex flex-col gap-3"
                       >
                         {/* Email hoac Username */}
-                        <div className="flex flex-col gap-1">
+                        <motion.div variants={authItemCascadeVariants} className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-left" htmlFor="li-email">
                             Tên đăng nhập hoặc Email
                           </label>
@@ -2806,10 +2839,10 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["email"] || fieldErrors["usernameOrEmail"]}</span>
                             </p>
                           )}
-                        </div>
+                        </motion.div>
 
                         {/* Mat khau */}
-                        <div className="flex flex-col gap-1">
+                        <motion.div variants={authItemCascadeVariants} className="flex flex-col gap-1">
                           <div className="flex justify-between items-center">
                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono" htmlFor="li-password">
                               Mật khẩu
@@ -2854,7 +2887,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                               <AlertCircle className="w-3 h-3 inline shrink-0" /><span>{fieldErrors["password"]}</span>
                             </p>
                           )}
-                        </div>
+                        </motion.div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -2878,8 +2911,19 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                         pointerEvents: loading ? "none" : "auto"
                       }}
                     >
-                      <span>{isSignUp ? "Tạo tài khoản" : "Đăng nhập"}</span>
-                      <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span
+                          key={isSignUp ? "text-signup" : "text-signin"}
+                          initial={{ opacity: 0, scale: 0.96 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.96 }}
+                          transition={{ duration: 0.15, ease: "easeOut" }}
+                          className="flex items-center gap-2"
+                        >
+                          <span>{isSignUp ? "Tạo tài khoản" : "Đăng nhập"}</span>
+                          <ArrowRight className="w-4 h-4 text-[#FF4D24]" />
+                        </motion.span>
+                      </AnimatePresence>
                     </span>
                     <span 
                       className="absolute inset-0 flex items-center justify-center text-white transition-all duration-200" 

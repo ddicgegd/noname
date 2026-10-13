@@ -5,6 +5,7 @@
  */
 
 import { getApiBaseUrl, unifiedFetch } from "../lib/api";
+import { getAppErrorMessage } from "../components/ui/AppErrorNotice";
 import { ApiResponse } from "../types/api";
 import { 
   SessionListData, 
@@ -43,7 +44,7 @@ export async function getActiveSessions(): Promise<ApiResponse<SessionListData>>
   }
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
-    throw new Error(errorData?.message || errorData?.status?.message || `Lỗi truy xuất phiên (${res.status})`);
+    throw new Error(getAppErrorMessage(errorData?.message || errorData?.status?.message || res.status));
   }
   return await res.json();
 }
@@ -79,7 +80,7 @@ export async function terminateSession(sessionId: string): Promise<ApiResponse<T
   }
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
-    throw new Error(errorData?.message || errorData?.status?.message || `Lỗi thu hồi phiên (${res.status})`);
+    throw new Error(getAppErrorMessage(errorData?.message || errorData?.status?.message || res.status));
   }
   return await res.json();
 }
@@ -115,7 +116,7 @@ export async function terminateOtherSessions(): Promise<ApiResponse<TerminateOth
   }
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
-    throw new Error(errorData?.message || errorData?.status?.message || `Lỗi đăng xuất các phiên khác (${res.status})`);
+    throw new Error(getAppErrorMessage(errorData?.message || errorData?.status?.message || res.status));
   }
   return await res.json();
 }

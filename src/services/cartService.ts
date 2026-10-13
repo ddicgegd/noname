@@ -5,6 +5,7 @@
  */
 
 import { getUnifiedAccessToken, unifiedFetch } from "../lib/api";
+import { getAppErrorMessage } from "../components/ui/AppErrorNotice";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 import type {
   Cart,
@@ -160,7 +161,7 @@ async function executeCartGraphql<T>(
   }
 
   if (!response.ok) {
-    throw new Error(`Cart GraphQL request failed (${response.status})`);
+    throw new Error("Lỗi hệ thống. Vui lòng thử lại sau.");
   }
 
   const payload = (await response.json().catch(() => ({}))) as {
@@ -413,7 +414,7 @@ export async function getCartBadge(guestId?: string): Promise<CartSummaryBadge> 
     { guestId: guestId || getOrCreateGuestId() }
   );
   if (data?.getCartCount?.status?.code && data.getCartCount.status.code !== 200) {
-    throw new Error(data.getCartCount.status.message || `Cart count error (${data.getCartCount.status.code})`);
+    throw new Error(getAppErrorMessage(data.getCartCount.status.message || data.getCartCount.status.code));
   }
   const count = data?.getCartCount?.data ?? 0;
   return { totalItems: count };
@@ -428,7 +429,7 @@ export async function getCartCount(guestId?: string): Promise<number> {
     { guestId: guestId || getOrCreateGuestId() }
   );
   if (data?.getCartCount?.status?.code && data.getCartCount.status.code !== 200) {
-    throw new Error(data.getCartCount.status.message || `Cart count error (${data.getCartCount.status.code})`);
+    throw new Error(getAppErrorMessage(data.getCartCount.status.message || data.getCartCount.status.code));
   }
   return data?.getCartCount?.data ?? 0;
 }
@@ -452,11 +453,11 @@ export async function getCart(params?: {
   );
   const cartResp = data?.getCart;
   if (cartResp?.status?.code && cartResp.status.code !== 200) {
-    throw new Error(cartResp.status.message || `Cart service error (${cartResp.status.code})`);
+    throw new Error(getAppErrorMessage(cartResp.status.message || cartResp.status.code));
   }
 
   if (!cartResp?.data) {
-    throw new Error(cartResp?.status?.message || "Không nhận được dữ liệu giỏ hàng từ máy chủ");
+    throw new Error("Không thể tải thông tin giỏ hàng.");
   }
 
   const cartData = cartResp.data;
@@ -495,11 +496,11 @@ export async function addToCart(
 
   const resp = data?.addToCart;
   if (resp?.status?.code && resp.status.code !== 200) {
-    throw new Error(resp.status.message || `Thêm vào giỏ hàng thất bại (${resp.status.code})`);
+    throw new Error(getAppErrorMessage(resp.status.message || resp.status.code));
   }
 
   if (!resp?.data) {
-    throw new Error(resp?.status?.message || "Không thể thêm sản phẩm vào giỏ hàng");
+    throw new Error("Không thể thêm sản phẩm vào giỏ hàng.");
   }
 
   const cartData = resp.data;
@@ -526,11 +527,11 @@ export async function updateCartItemQuantity(
 
   const resp = data?.updateCartItemQuantity;
   if (resp?.status?.code && resp.status.code !== 200) {
-    throw new Error(resp.status.message || `Cập nhật số lượng thất bại (${resp.status.code})`);
+    throw new Error(getAppErrorMessage(resp.status.message || resp.status.code));
   }
 
   if (!resp?.data) {
-    throw new Error(resp?.status?.message || "Không thể cập nhật số lượng");
+    throw new Error("Không thể cập nhật số lượng.");
   }
 
   const cartData = resp.data;
@@ -554,11 +555,11 @@ export async function removeCartItem(
 
   const resp = data?.removeCartItem;
   if (resp?.status?.code && resp.status.code !== 200) {
-    throw new Error(resp.status.message || `Xóa sản phẩm thất bại (${resp.status.code})`);
+    throw new Error(getAppErrorMessage(resp.status.message || resp.status.code));
   }
 
   if (!resp?.data) {
-    throw new Error(resp?.status?.message || "Không thể xóa sản phẩm");
+    throw new Error("Không thể xóa sản phẩm.");
   }
 
   const cartData = resp.data;
@@ -585,11 +586,11 @@ export async function deleteCart(
 
   const resp = data?.deleteCart;
   if (resp?.status?.code && resp.status.code !== 200) {
-    throw new Error(resp.status.message || `Xóa giỏ hàng thất bại (${resp.status.code})`);
+    throw new Error(getAppErrorMessage(resp.status.message || resp.status.code));
   }
 
   if (!resp?.data) {
-    throw new Error(resp?.status?.message || "Không thể xóa giỏ hàng");
+    throw new Error("Không thể xóa giỏ hàng.");
   }
 
   const cartData = resp.data;
@@ -633,7 +634,7 @@ export async function mergeGuestCart(
   );
   const resp = data?.mergeCart;
   if (resp?.status?.code && resp.status.code !== 200) {
-    throw new Error(resp.status.message || `Hợp nhất giỏ hàng thất bại (${resp.status.code})`);
+    throw new Error(getAppErrorMessage(resp.status.message || resp.status.code));
   }
   clearGuestId();
   const cartData = resp?.data || null;

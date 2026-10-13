@@ -5,7 +5,6 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import ClawMachine from "./ClawMachine";
 import HoloCardPaymentSheet, { type PricingPlan } from "./HoloCardPaymentSheet";
 import { HoloCard } from "./HoloCard";
 import { getSubscriptionPlans } from "../services/subscriptionService";
@@ -66,7 +65,6 @@ const INITIAL_PLANS: PricingPlan[] = [
 
 
 export default function PricingSection() {
-  const [isVerified, setIsVerified] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
   const [plans, setPlans] = useState<PricingPlan[]>(INITIAL_PLANS);
 
@@ -106,38 +104,16 @@ export default function PricingSection() {
   return (
     <section id="pricing" className="py-24 px-6 sm:px-16 relative">
       <div className="max-w-7xl mx-auto relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <motion.div
-            className="p-4 sm:p-5 bg-white/50 backdrop-blur-xl rounded-2xl flex flex-col justify-between relative overflow-hidden h-full min-h-[550px] border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.04)]"
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            {/* Subtle light ambient glow */}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#FF4D24]/6 via-transparent to-transparent -z-10 pointer-events-none" />
-            <div className="absolute -top-12 -left-12 w-48 h-48 bg-[#FF4D24]/10 rounded-full blur-3xl -z-10 pointer-events-none" />
-
-            {/* Top pill badge matching HoloCard popular badge */}
-            <div className="absolute top-4 right-4 sm:top-5 sm:right-5 z-20 pointer-events-none">
-              <span className="bg-white/70 backdrop-blur-md border border-white/80 text-primary shadow-xs text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5 select-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                Anti-Bot
-              </span>
-            </div>
-
-            <ClawMachine onVerify={setIsVerified} />
-          </motion.div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl lg:max-w-5xl mx-auto justify-center">
           {plans.map((plan) => (
             <div key={plan.id} className="contents">
-              <HoloCard plan={plan} isVerified={isVerified} onSelect={setSelectedPlan} />
+              <HoloCard plan={plan} onSelect={setSelectedPlan} />
             </div>
           ))}
         </div>
 
         <motion.div
-          className="mt-8 bg-gradient-to-b from-white/80 via-white/65 to-white/45 backdrop-blur-xl rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between shadow-[0_10px_30px_-5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] relative overflow-hidden outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+          className="mt-8 max-w-4xl lg:max-w-5xl mx-auto bg-gradient-to-b from-white/80 via-white/65 to-white/45 backdrop-blur-xl rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between shadow-[0_10px_30px_-5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] relative overflow-hidden outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}

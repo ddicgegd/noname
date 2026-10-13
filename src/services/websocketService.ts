@@ -213,14 +213,14 @@ export async function executeAsyncOrderCreation(
       if (!hasCompleted) {
         hasCompleted = true;
         if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
-        callbacks.onError("Không thể kết nối đến cổng WebSocket Gateway. Vui lòng kiểm tra lại dịch vụ.");
+        callbacks.onError("Lỗi hệ thống. Vui lòng thử lại sau.");
       }
     },
     onClose: (event, reasonText) => {
       if (!hasCompleted && event.code !== 1000) {
         hasCompleted = true;
         if (sessionTimeoutTimer) clearTimeout(sessionTimeoutTimer);
-        callbacks.onError(`Phiên WebSocket bị gián đoạn: ${reasonText}`);
+        callbacks.onError("Kết nối bị gián đoạn. Vui lòng thử lại sau.");
       }
     },
   });

@@ -54,6 +54,15 @@
 - **ZERO-TOLERANCE ON VERIFICATION FRAUD**:
   - A clean build (`npm run build`) or type-check (`tsc --noEmit`) is ONLY proof of syntactic validity, NEVER proof of visual correctness.
   - NEVER declare a UI task complete or output `GOAL_COMPLETE` without direct, visual, in-browser rendering evidence matching reference aesthetics.
+- **ANTI-SUPERFICIAL VERIFICATION (CẤM KIỂM ĐỊNH BỀ MẶT)**:
+  - Nghiêm cấm coi các chỉ số sau là bằng chứng UI hoạt động:
+    1. Exit code `0` từ `tsc` / `npm run build` (chỉ chứng minh đúng cú pháp).
+    2. `root.children.length > 0` hoặc `innerText.length > 0` (DOM có phần tử vẫn có thể là màn hình trắng nếu kích thước = 0 hoặc opacity = 0).
+    3. Trạng thái không có lỗi ở console trong 0.5s đầu tiên (bỏ sót async query crash hoặc hydration failure).
+  - **TIÊU CHUẨN BẰNG CHỨNG THỰC NGHIỆM BẮT BUỘC (MANDATORY EMPIRICAL EVIDENCE)**:
+    1. **Physical Render Metrics**: Phần tử đích phải có kích thước thực tế hiển thị (`rect.width > 0 && rect.height > 0`) và computed style hợp lệ (`opacity !== '0'`, `visibility !== 'hidden'`, `display !== 'none'`).
+    2. **Zero Uncaught Error Boundary**: Không có React Error Boundary fallback được kích hoạt, không có Unhandled Promise Rejection hoặc Uncaught TypeErrors.
+    3. **Visual Frame Evidence**: Bằng chứng thị giác thực tế (ảnh chụp screenshot hoặc DOM layout snapshot) thể hiện đầy đủ nội dung, không bị khoảng trắng vô định (Empty Void).
 
 ### 1.11. SUBAGENT DELEGATION GUARDRAILS & ANTI-POISONING
 - **FAITHFUL PROMPT PROPAGATION**: When delegating tasks to subagents, the primary agent MUST forward the user's exact requirements, bounds, and negative constraints verbatim. NEVER inject speculative architectures, unrequested mask designs, or subjective biases into the subagent prompt.
@@ -72,8 +81,8 @@
 2. **UI Component & Style Boundaries**: NEVER introduce unsolicited UI components, error modals, arbitrary palette changes, or layout wrappers without explicit confirmation.
 3. **Strict Page-Level Scope**: Confine all UI modifications strictly to the designated page/component. Do not modify global themes or adjacent pages.
 4. **Context-Aware Design Standards**: Infer design patterns directly from neighboring components and maintain visual consistency across the entire page.
-5. **Mandatory Design & Component Skills (`design-taste-frontend` & `shadcn`)**:
-   - For all frontend UI, redesigns, landing pages, styling, or component composition, ALWAYS activate and follow `.agents/skills/design-taste-frontend/SKILL.md` and `.agents/skills/shadcn/SKILL.md`.
+5. **Mandatory Design & Component Skills (`ui-engineering-flow`, `design-taste-frontend` & `shadcn`)**:
+   - For all frontend UI, redesigns, landing pages, styling, or component composition, ALWAYS activate and follow `.agents/skills/ui-engineering-flow/SKILL.md`, `.agents/skills/design-taste-frontend/SKILL.md`, and `.agents/skills/shadcn/SKILL.md`.
    - Strictly enforce Shadcn rules: Use semantic color tokens (`bg-primary`, `text-muted-foreground`, `border-border`), layout with `flex gap-*` / `grid gap-*` (NEVER `space-y-*` / `space-x-*`), and always use `cn()` from `@/lib/utils`.
 6. **Defect-Targeted Fix Constraint**: Confine all UI repairs strictly to the minimal defect site. Preserve full hierarchy, padding, margin, and adjacent component layouts intact.
 7. **Master-Detail Synchronous State Alignment (Filter Tabs & Item Selection)**:

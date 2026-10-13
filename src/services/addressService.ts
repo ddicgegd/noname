@@ -5,6 +5,7 @@
  */
 
 import { getApiBaseUrl, getUnifiedAccessToken, unifiedFetch } from "../lib/api";
+import { getAppErrorMessage } from "../components/ui/AppErrorNotice";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 
 export interface AddressDto {
@@ -178,11 +179,11 @@ async function executeRealApiCall<T = any>(
   } catch (networkError: any) {
     const durationMs = Math.round(performance.now() - startTime);
     status = 0;
-    statusText = "Fetch Failed / Backend Offline";
+    statusText = "Fetch Failed";
     responseData = {
       error: "Connection Refused",
-      message: networkError?.message || `Không thể kết nối đến máy chủ ${baseUrl}`,
-      hint: "Hãy kiểm tra xem backend Spring Boot (http://localhost:8080) có đang mở và cho phép CORS không."
+      message: "Lỗi hệ thống. Vui lòng thử lại sau.",
+      hint: ""
     };
 
     recordApiLog({
@@ -212,7 +213,7 @@ async function executeRealApiCall<T = any>(
  */
 function extractErrorMessage(responseData: any, fallback: string): string {
   if (!responseData) return fallback;
-  if (typeof responseData === "string") return responseData;
+  if (typeof responseData === "string") return getAppErrorMessage(responseData);
 
   const detail = responseData.detail || responseData.message || responseData.title;
   if (detail === "Location not found") {
@@ -222,7 +223,7 @@ function extractErrorMessage(responseData: any, fallback: string): string {
     const firstField = Object.values(responseData.fieldErrors)[0];
     if (typeof firstField === "string") return firstField;
   }
-  return detail || fallback;
+  return detail ? getAppErrorMessage(detail) : fallback;
 }
 
 /**
@@ -285,7 +286,7 @@ export async function createAddress(input: CreateAddressInput): Promise<AddressD
     };
   }
 
-  const errMsg = extractErrorMessage(result.data, `Không thể tạo địa chỉ (Mã lỗi HTTP ${result.status}).`);
+  const errMsg = extractErrorMessage(result.data, "Không thể tạo địa chỉ.");
   throw new Error(errMsg);
 }
 
@@ -307,7 +308,7 @@ export async function updateAddress(sku: string, input: CreateAddressInput): Pro
     };
   }
 
-  const errMsg = extractErrorMessage(result.data, `Không thể cập nhật địa chỉ (Mã lỗi HTTP ${result.status}).`);
+  const errMsg = extractErrorMessage(result.data, "Không thể cập nhật địa chỉ.");
   throw new Error(errMsg);
 }
 
@@ -322,7 +323,7 @@ export async function setDefaultAddress(sku: string): Promise<string> {
     return result.data?.data || result.data?.message || "Đã đặt làm địa chỉ mặc định thành công.";
   }
 
-  const errMsg = extractErrorMessage(result.data, `Không thể đặt làm địa chỉ mặc định (Mã lỗi HTTP ${result.status}).`);
+  const errMsg = extractErrorMessage(result.data, "Không thể đặt làm địa chỉ mặc định.");
   throw new Error(errMsg);
 }
 
@@ -337,7 +338,7 @@ export async function deleteAddress(sku: string): Promise<string> {
     return result.data?.data || result.data?.message || "Xóa địa chỉ thành công.";
   }
 
-  const errMsg = extractErrorMessage(result.data, `Không thể xóa địa chỉ (Mã lỗi HTTP ${result.status}).`);
+  const errMsg = extractErrorMessage(result.data, "Không thể xóa địa chỉ.");
   throw new Error(errMsg);
 }
 

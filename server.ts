@@ -1029,7 +1029,7 @@ async function startServer() {
       return {
         status: {
           code: 503,
-          message: "ERP Backend Service Unavailable (http://localhost:8080 offline)"
+          message: "Lỗi hệ thống. Vui lòng thử lại sau."
         },
         data: null
       };
@@ -2649,7 +2649,7 @@ async function startServer() {
       res.status(backendRes.status).json(data);
     } catch (err: any) {
       console.warn(`[BOOKMARK PROXY] Failed to connect to ${targetUrl}: ${err.message}`);
-      res.status(502).json({ success: false, message: "Không thể kết nối đến máy chủ Bookmark" });
+      res.status(502).json({ success: false, message: "Lỗi hệ thống. Vui lòng thử lại sau." });
     }
   });
 
@@ -2671,7 +2671,7 @@ async function startServer() {
       const statusCode = response?.status?.code || (response?.code ?? 200);
       res.status(typeof statusCode === "number" ? statusCode : 200).json(response);
     } catch (err: any) {
-      res.status(500).json({ status: { code: 500, message: err.message }, data: null });
+      res.status(500).json({ status: { code: 500, message: "Lỗi hệ thống. Vui lòng thử lại sau." }, data: null });
     }
   });
 
@@ -2714,7 +2714,7 @@ async function startServer() {
       if (err.message === "Unauthorized") {
         return res.status(401).json({ status: { code: 401, message: "Unauthorized" }, data: null });
       }
-      res.status(500).json({ status: { code: 500, message: err.message }, data: null });
+      res.status(500).json({ status: { code: 500, message: "Lỗi hệ thống. Vui lòng thử lại sau." }, data: null });
     }
   });
 

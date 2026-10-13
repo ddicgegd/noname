@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { BirthdayDatePicker } from "./ui/BirthdayDatePicker";
 import { useToast } from "./ui/Toast";
+import { getAppErrorMessage } from "./ui/AppErrorNotice";
 import { apiRequest, unifiedFetch, getUnifiedAccessToken, getApiBaseUrl, setApiBaseUrl, resetApiBaseUrl, pingEndpoint, PingResult } from "../lib/api";
 import { 
   updateMyProfile, 
@@ -346,8 +347,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setDeviceSessions(prev => prev.filter(s => s.id !== sessionId));
       setSuccessMsg("Đã thu hồi phiên thiết bị thành công!");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Không thể thu hồi phiên thiết bị. Vui lòng thử lại sau.";
-      setErrorMsg(msg);
+      setErrorMsg(getAppErrorMessage(err));
     } finally {
       setSessionActionLoading("");
     }
@@ -360,8 +360,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setDeviceSessions(prev => prev.filter(s => s.isCurrent));
       setSuccessMsg("Đã đăng xuất khỏi tất cả các thiết bị khác thành công!");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Không thể đăng xuất tất cả thiết bị khác. Vui lòng thử lại sau.";
-      setErrorMsg(msg);
+      setErrorMsg(getAppErrorMessage(err));
     } finally {
       setSessionActionLoading("");
     }
@@ -651,7 +650,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       await loadUserBookmarks(false);
       setSuccessMsg(`Đã xóa "${itemName || itemSku}" khỏi danh sách đã lưu`);
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi xóa sản phẩm khỏi danh sách đã lưu");
+      setErrorMsg(getAppErrorMessage(err));
     } finally {
       setBookmarkActionLoading("");
     }
@@ -664,7 +663,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       await loadUserBookmarks(false);
       setSuccessMsg(`Đã xóa gói đã lưu thành công`);
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi xóa gói đã lưu");
+      setErrorMsg(getAppErrorMessage(err));
     } finally {
       setBookmarkActionLoading("");
     }
@@ -677,7 +676,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       await loadUserBookmarks(false);
       setSuccessMsg(`Đã gia hạn lưu 7 ngày thành công`);
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi gia hạn lưu 7 ngày");
+      setErrorMsg(getAppErrorMessage(err));
     } finally {
       setBookmarkActionLoading("");
     }
@@ -708,7 +707,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setIsAccountsCenterOpen(false);
       onNavigate("cart");
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi thêm sản phẩm vào giỏ hàng");
+      setErrorMsg(getAppErrorMessage(err));
     } finally {
       setBookmarkActionLoading("");
     }
@@ -1596,8 +1595,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setSuccessMsg("Cập nhật thông tin hồ sơ thành công!");
       logAuditAction("UPDATE_PROFILE", "SUCCESS", `Cập nhật hồ sơ: ${editFullName.trim()}`);
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : "Lỗi không xác định";
-      setErrorMsg("Không thể cập nhật thông tin: " + errMsg);
+      setErrorMsg(getAppErrorMessage(err));
     } finally {
       setActionLoading(false);
     }
@@ -1657,7 +1655,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setErrorMsg("");
       logAuditAction("UPDATE_BIRTHDAY", "SUCCESS", `Cập nhật ngày sinh: ${cleanDob}`);
     } catch (err: any) {
-      setErrorMsg("Không thể cập nhật ngày sinh: " + (err.message || "Lỗi không xác định"));
+      setErrorMsg(getAppErrorMessage(err));
     }
   };
 
@@ -1715,7 +1713,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setSuccessMsg("Tải ảnh đại diện thành công!");
       logAuditAction("UPLOAD_AVATAR", "SUCCESS", `Cập nhật ảnh đại diện: ${file.name}`);
     } catch (err: any) {
-      setErrorMsg("Lỗi khi tải ảnh: " + (err.message || "Không thể tải file"));
+      setErrorMsg(getAppErrorMessage(err));
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -1825,7 +1823,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
         isDefault: false
       });
     } catch (err: any) {
-      setErrorMsg("Không thể lưu địa chỉ: " + (err.message || "Lỗi máy chủ"));
+      setErrorMsg(getAppErrorMessage(err));
     } finally {
       setActionLoading(false);
     }
@@ -1872,7 +1870,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setErrorMsg("");
       logAuditAction("SET_DEFAULT_ADDRESS", "SUCCESS", `Đặt mặc định địa chỉ SKU: ${sku}`);
     } catch (err: any) {
-      setErrorMsg("Không thể đặt làm mặc định: " + (err.message || "Lỗi mạng"));
+      setErrorMsg(getAppErrorMessage(err));
     }
   };
 
@@ -1894,7 +1892,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       setErrorMsg("");
       logAuditAction("DELETE_ADDRESS", "SUCCESS", `Xóa địa chỉ SKU: ${sku}`);
     } catch (err: any) {
-      setErrorMsg("Không thể xóa địa chỉ: " + (err.message || "Lỗi mạng"));
+      setErrorMsg(getAppErrorMessage(err));
     }
   };
 
@@ -2010,7 +2008,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       },
       (err) => {
         setIsResolvingAddress(false);
-        setErrorMsg("Không thể lấy vị trí: " + (err.message || "Vui lòng cho phép quyền truy cập vị trí trên trình duyệt"));
+        setErrorMsg("Không thể lấy vị trí. Vui lòng cho phép quyền truy cập vị trí trên trình duyệt.");
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );

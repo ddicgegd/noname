@@ -4,6 +4,7 @@
  */
 
 import { getApiBaseUrl, getUnifiedAccessToken, unifiedFetch } from "../lib/api";
+import { getAppErrorMessage } from "../components/ui/AppErrorNotice";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 import { getOrderStatusTheme } from "../lib/orderStatusTheme";
 
@@ -415,23 +416,23 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   });
 
   if (!gqlResponse.ok) {
-    throw new Error(`Lỗi kết nối GraphQL Gateway (${gqlResponse.status})`);
+    throw new Error("Lỗi hệ thống. Vui lòng thử lại sau.");
   }
 
   const gqlResult = await gqlResponse.json();
 
   if (gqlResult.errors?.length) {
     const errorMsg = gqlResult.errors.map((e: any) => e.message).join("; ");
-    throw new Error(errorMsg || "Lỗi tạo đơn hàng qua GraphQL");
+    throw new Error(getAppErrorMessage(errorMsg || "Lỗi tạo đơn hàng"));
   }
 
   const createOrderRes = gqlResult.data?.createOrder;
   if (!createOrderRes) {
-    throw new Error("Không nhận được dữ liệu phản hồi từ GraphQL Gateway");
+    throw new Error("Lỗi hệ thống. Vui lòng thử lại sau.");
   }
 
   if (createOrderRes.status?.code && createOrderRes.status.code >= 400) {
-    throw new Error(createOrderRes.status.message || `Đặt hàng thất bại (Mã lỗi ${createOrderRes.status.code})`);
+    throw new Error(getAppErrorMessage(createOrderRes.status.message || createOrderRes.status.code));
   }
 
   return {
@@ -505,7 +506,7 @@ export async function getMyOrders(params: MyOrdersQueryParams): Promise<MyOrders
   });
 
   if (!restRes.ok) {
-    throw new Error(`Không thể tải danh sách đơn hàng (${restRes.status})`);
+    throw new Error("Không thể tải danh sách đơn hàng.");
   }
 
   return restRes.json();
@@ -552,7 +553,7 @@ export async function getOrderDetail(orderNumber: string): Promise<OrderDto> {
   });
 
   if (!restRes.ok) {
-    throw new Error(`Không thể lấy chi tiết đơn hàng ${orderNumber} (${restRes.status})`);
+    throw new Error("Không thể lấy chi tiết đơn hàng.");
   }
 
   const result = await restRes.json();

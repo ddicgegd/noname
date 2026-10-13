@@ -11,3 +11,5 @@ debug_outputs/
 
 
 .worktrees/
+.idea/
+.audit/

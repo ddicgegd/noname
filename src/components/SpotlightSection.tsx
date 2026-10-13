@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useMotionValue, useSpring } from "motion/react";
+import { motion } from "motion/react";
 import CTAButton from "./CTAButton";
 import { Particles } from "./ui/particles";
 import { BlurVignette } from "./ui/blur-vignette";
@@ -39,52 +39,29 @@ export default function SpotlightSection({
     onBgTextChange?.(newVal);
   };
   
-  // High performance MotionValues & Springs for text parallax (bypasses React state loop for 120fps fluid movement)
-  const xValue = useMotionValue(0);
-  const yValue = useMotionValue(0);
-  
-  // A tuned organic spring configuration (medium stiffness, custom damping for pleasant rebound feeling)
-  const springX = useSpring(xValue, { stiffness: 65, damping: 22, mass: 0.9 });
-  const springY = useSpring(yValue, { stiffness: 65, damping: 22, mass: 0.9 });
-  
-  // Refs for tracking dynamic configuration values inside the RAF loop and event handlers without closure lag
-  const intensityRef = useRef(intensity);
-  const floatRangeRef = useRef(floatRange);
-
-  useEffect(() => {
-    intensityRef.current = intensity;
-    
-    // Immediately update displacement when slider value changes even if mouse is still
-    if (containerRef.current && targetMouseRef.current.x !== -999) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const ndx = (targetMouseRef.current.x - centerX) / (centerX || 1);
-      const ndy = (targetMouseRef.current.y - centerY) / (centerY || 1);
-      
-      const maxDisplacementX = -45 * (intensity / 100);
-      const maxDisplacementY = -18 * (intensity / 100);
-      
-      xValue.set(ndx * maxDisplacementX);
-      yValue.set(ndy * maxDisplacementY);
-    }
-  }, [intensity]);
-
-  useEffect(() => {
-    floatRangeRef.current = floatRange;
-  }, [floatRange]);
+  const revealImgRef = useRef<HTMLDivElement>(null);
+  const spotlightRadiusRef = useRef(260);
 
   // Track target and lerped coordinates
   const targetMouseRef = useRef({ x: -999, y: -999 });
   const smoothMouseRef = useRef({ x: -999, y: -999 });
-  
-  const [smoothCoords, setSmoothCoords] = useState({ x: -999, y: -999 });
-  const [spotlightRadius, setSpotlightRadius] = useState(260);
+
+  const applyMask = (x: number, y: number, r: number) => {
+    if (revealImgRef.current) {
+      const mask = `radial-gradient(circle ${r}px at ${x}px ${y}px, black 0%, black 40%, rgba(0,0,0,0.75) 60%, rgba(0,0,0,0.4) 75%, rgba(0,0,0,0.12) 88%, transparent 100%)`;
+      revealImgRef.current.style.webkitMaskImage = mask;
+      revealImgRef.current.style.maskImage = mask;
+    }
+  };
 
   // Responsive spotlight radius adjustments
   useEffect(() => {
     const handleResize = () => {
-      setSpotlightRadius(window.innerWidth < 768 ? 160 : 260);
+      const r = window.innerWidth < 768 ? 160 : 260;
+      spotlightRadiusRef.current = r;
+      if (smoothMouseRef.current.x !== -999) {
+        applyMask(smoothMouseRef.current.x, smoothMouseRef.current.y, r);
+      }
     };
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -106,23 +83,8 @@ export default function SpotlightSection({
     // On the first hover or interaction, initialize the smooth coordinates instantly to avoid a slow glide from (-999, -999)
     if (smoothMouseRef.current.x === -999) {
       smoothMouseRef.current = { ...targetMouseRef.current };
-      setSmoothCoords({ ...targetMouseRef.current });
+      applyMask(smoothMouseRef.current.x, smoothMouseRef.current.y, spotlightRadiusRef.current);
     }
-
-    // High performance parallax calculation relative to center of the section
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-
-    // Normalize coordinates relative to center (-1 to 1)
-    const ndx = (mouseX - centerX) / (centerX || 1);
-    const ndy = (mouseY - centerY) / (centerY || 1);
-
-    // Apply scale multiplier with negative value to create physical depth parallax (background moves opposite to cursor)
-    const maxDisplacementX = -45 * (intensityRef.current / 100);
-    const maxDisplacementY = -18 * (intensityRef.current / 100);
-
-    xValue.set(ndx * maxDisplacementX);
-    yValue.set(ndy * maxDisplacementY);
   };
 
   useEffect(() => {
@@ -134,7 +96,7 @@ export default function SpotlightSection({
         const initialY = rect.height / 2;
         targetMouseRef.current = { x: initialX, y: initialY };
         smoothMouseRef.current = { x: initialX, y: initialY };
-        setSmoothCoords({ x: initialX, y: initialY });
+        applyMask(initialX, initialY, spotlightRadiusRef.current);
       }
     };
 
@@ -180,7 +142,7 @@ export default function SpotlightSection({
             x: smooth.x + vx,
             y: smooth.y + vy,
           };
-          setSmoothCoords({ ...smoothMouseRef.current });
+          applyMask(smoothMouseRef.current.x, smoothMouseRef.current.y, spotlightRadiusRef.current);
         }
       }
       animationFrameId = requestAnimationFrame(loop);
@@ -200,14 +162,6 @@ export default function SpotlightSection({
   // Split headline text for staged word reveal
   const headlineText = "I build compelling visual stories & motion that make ideas shine.";
   const words = headlineText.split(" ");
-
-  // Custom css mask styles mapped to local coordinates
-  const maskStyle = {
-    WebkitMaskImage: `radial-gradient(circle ${spotlightRadius}px at ${smoothCoords.x}px ${smoothCoords.y}px, black 0%, black 40%, rgba(0,0,0,0.75) 60%, rgba(0,0,0,0.4) 75%, rgba(0,0,0,0.12) 88%, transparent 100%)`,
-    maskImage: `radial-gradient(circle ${spotlightRadius}px at ${smoothCoords.x}px ${smoothCoords.y}px, black 0%, black 40%, rgba(0,0,0,0.75) 60%, rgba(0,0,0,0.4) 75%, rgba(0,0,0,0.12) 88%, transparent 100%)`,
-    WebkitMaskSize: "100% 100%",
-    maskSize: "100% 100%",
-  };
 
   return (
     <main
@@ -230,28 +184,15 @@ export default function SpotlightSection({
         refresh
       />
 
-      {/* Base background layer with Blur Vignette and Video */}
+      {/* Base background layer with Blur Vignette and Figma Poster */}
       <BlurVignette
         radius="0px"
         inset="0px"
         transitionLength="160px"
         blur="20px"
+        useBackdropFilter={false}
         className="absolute top-[30vh] md:top-0 left-0 right-0 bottom-0 z-20 pointer-events-none"
       >
-        {/* Background Video from context */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-90"
-        >
-          <source
-            src="https://cdn.pixabay.com/video/2023/10/19/185726-876210695_large.mp4"
-            type="video/mp4"
-          />
-        </video>
-
         {/* Base background image layer */}
         <motion.div
           className="hero-base-img absolute inset-0 bg-cover bg-no-repeat bg-[position:60%_center] md:bg-center mix-blend-multiply"
@@ -269,11 +210,13 @@ export default function SpotlightSection({
 
         {/* Reveal spotlight background image layer */}
         <div
+          ref={revealImgRef}
           id="reveal-img"
           className="hero-reveal-img absolute inset-0 bg-cover bg-no-repeat bg-[position:60%_center] md:bg-center transition-opacity duration-300"
           style={{
             backgroundImage: `url('https://soft-zoom-63098134.figma.site/_assets/v11/6be2165e31648955b4e071f4cf2a50bc572b9bfd.png?w=1536')`,
-            ...maskStyle,
+            WebkitMaskSize: "100% 100%",
+            maskSize: "100% 100%",
           }}
         />
       </BlurVignette>

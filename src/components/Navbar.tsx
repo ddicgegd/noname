@@ -54,8 +54,8 @@ export interface GroupedCartItem {
 }
 
 interface NavbarProps {
-  currentPage: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response";
-  onNavigate: (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response") => void;
+  currentPage: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response" | "bevel" | "404";
+  onNavigate: (page: "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response" | "bevel" | "404" | "cart") => void;
   cartItems: CartItem[];
   onRemoveCartItem?: (id: string | string[]) => void;
   onAddToCart?: (itemName: string, itemPrice: string) => void;
@@ -277,35 +277,15 @@ const COSMIC_STARS_DATA = [
 const AnimatedFlame = () => (
   <div className="relative flex items-center justify-center size-3.5 mr-0.5 shrink-0">
     {/* Ambient heat pulse aura */}
-    <motion.div
-      animate={{
-        scale: [1, 1.3, 1],
-        opacity: [0.35, 0.75, 0.35],
-      }}
-      transition={{
-        duration: 1.1,
-        repeat: Infinity,
-        ease: "easeInOut",
-      }}
-      className="absolute inset-0 bg-gradient-to-t from-[#FF4D24] via-amber-400 to-yellow-300 rounded-full blur-[2.5px] pointer-events-none"
+    <div
+      className="absolute inset-0 bg-gradient-to-t from-[#FF4D24] via-amber-400 to-yellow-300 rounded-full blur-[2.5px] pointer-events-none animate-flame-pulse"
     />
 
     {/* SVG Real Fire Flame with multi-layer flickering embers */}
-    <motion.svg
+    <svg
       viewBox="0 0 24 24"
       fill="none"
-      className="size-3.5 relative z-10 filter drop-shadow-[0_0_2.5px_rgba(255,100,0,0.85)]"
-      animate={{
-        scaleY: [1, 1.18, 0.94, 1.2, 1],
-        scaleX: [1, 0.93, 1.05, 0.92, 1],
-        rotate: [-1.5, 2, -2, 2.5, -1.5],
-      }}
-      transition={{
-        duration: 0.8,
-        repeat: Infinity,
-        repeatType: "mirror",
-        ease: "easeInOut",
-      }}
+      className="size-3.5 relative z-10 filter drop-shadow-[0_0_2.5px_rgba(255,100,0,0.85)] animate-flame-flicker"
     >
       <defs>
         <linearGradient id="flameOuterGrad" x1="0%" y1="100%" x2="0%" y2="0%">
@@ -327,53 +307,21 @@ const AnimatedFlame = () => (
       />
 
       {/* Inner Hot Core Flame */}
-      <motion.path
+      <path
         d="M12 11C10.8 12.5 10 14.5 10 16.5C10 18.8 11.2 20.5 13 20.5C14.8 20.5 16 18.5 15.5 16.5C15 15.5 14.2 14.8 13.5 14.2C13.8 15 13.5 15.8 13 16C13 14 12.5 12.5 12 11Z"
         fill="url(#flameInnerGrad)"
-        animate={{
-          scaleY: [1, 1.25, 0.9, 1.3, 1],
-          opacity: [0.85, 1, 0.75, 1, 0.85],
-        }}
-        transition={{
-          duration: 0.55,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
+        className="animate-flame-core"
       />
-    </motion.svg>
+    </svg>
 
     {/* Spark Particle 1 */}
-    <motion.div
-      animate={{
-        y: [-1, -6, -11],
-        x: [0, 2, -1],
-        opacity: [0, 1, 0],
-        scale: [0.5, 1, 0.2],
-      }}
-      transition={{
-        duration: 1,
-        repeat: Infinity,
-        delay: 0.1,
-        ease: "easeOut",
-      }}
-      className="absolute top-0.5 size-1 bg-yellow-300 rounded-full shadow-[0_0_2px_#FF5500] pointer-events-none"
+    <div
+      className="absolute top-0.5 size-1 bg-yellow-300 rounded-full shadow-[0_0_2px_#FF5500] pointer-events-none animate-flame-spark-1"
     />
 
     {/* Spark Particle 2 */}
-    <motion.div
-      animate={{
-        y: [0, -5, -9],
-        x: [0, -2, 1],
-        opacity: [0, 0.9, 0],
-        scale: [0.4, 0.9, 0.2],
-      }}
-      transition={{
-        duration: 0.85,
-        repeat: Infinity,
-        delay: 0.45,
-        ease: "easeOut",
-      }}
-      className="absolute top-1 size-0.5 bg-orange-400 rounded-full shadow-[0_0_2px_#FF5500] pointer-events-none"
+    <div
+      className="absolute top-1 size-0.5 bg-orange-400 rounded-full shadow-[0_0_2px_#FF5500] pointer-events-none animate-flame-spark-2"
     />
   </div>
 );
@@ -1428,7 +1376,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                   setShowCartMenu(false);
                   setShowAccountMenu(false);
                   setShowProductMegaMenu(false);
-                  setTimeout(() => searchInputRef.current?.focus(), 50);
+                  setTimeout(() => searchInputRef.current?.focus(), 280);
                 } else if (searchQuery.trim() === "") {
                   setIsSearchExpanded(false);
                 } else {
@@ -1493,9 +1441,9 @@ const resolveProductMetadata = (skuOrName: string) => {
           <AnimatePresence>
             {isSearchExpanded && (
               <motion.div 
-                initial={{ opacity: 0, clipPath: "circle(0% at 24px -20px)", filter: "blur(10px)" }}
-                animate={{ opacity: 1, clipPath: "circle(160% at 24px -20px)", filter: "blur(0px)" }}
-                exit={{ opacity: 0, clipPath: "circle(0% at 24px -20px)", filter: "blur(10px)" }}
+                initial={{ opacity: 0, clipPath: "circle(0% at 24px -20px)" }}
+                animate={{ opacity: 1, clipPath: "circle(160% at 24px -20px)" }}
+                exit={{ opacity: 0, clipPath: "circle(0% at 24px -20px)" }}
                 transition={{ type: "spring", stiffness: 250, damping: 28, mass: 0.8 }}
                 className="absolute left-0 top-[calc(100%+14px)] w-[330px] sm:w-[360px] rounded-2xl ring-1 ring-slate-900/[0.04] bg-white/[0.93] backdrop-blur-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_0_0_rgba(255,255,255,1)] p-3 sm:p-3.5 z-50 origin-top-left overflow-hidden text-slate-900 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
               >
@@ -1537,59 +1485,27 @@ const resolveProductMetadata = (skuOrName: string) => {
 
                         {/* 2. Luminous Burning Category Tag & Arrow */}
                         <div className="flex items-center shrink-0 gap-1.5">
-                          <motion.div
-                            animate={{
-                              boxShadow: [
-                                "0 0 6px rgba(255,77,36,0.2), 0 0 12px rgba(255,140,0,0.1), inset 0 1px 0 rgba(255,255,255,0.9)",
-                                "0 0 10px rgba(255,77,36,0.38), 0 0 18px rgba(255,140,0,0.2), inset 0 1px 0 rgba(255,255,255,0.95)",
-                                "0 0 6px rgba(255,77,36,0.2), 0 0 12px rgba(255,140,0,0.1), inset 0 1px 0 rgba(255,255,255,0.9)"
-                              ]
-                            }}
-                            transition={{
-                              duration: 1.8,
-                              repeat: Infinity,
-                              delay: idx * 0.3,
-                              ease: "easeInOut"
-                            }}
-                            className="relative inline-flex items-center justify-center px-2.5 py-[2.5px] rounded-full bg-gradient-to-r from-orange-500/[0.14] via-[#FF4D24]/[0.08] to-amber-500/[0.06] border-t border-t-white/95 border-b border-b-[#FF4D24]/30 border-x border-x-[#FF4D24]/18 select-none overflow-visible"
+                          <div
+                            style={{ animationDelay: `${idx * 0.3}s` }}
+                            className="relative inline-flex items-center justify-center px-2.5 py-[2.5px] rounded-full bg-gradient-to-r from-orange-500/[0.14] via-[#FF4D24]/[0.08] to-amber-500/[0.06] border-t border-t-white/95 border-b border-b-[#FF4D24]/30 border-x border-x-[#FF4D24]/18 select-none overflow-visible animate-tag-glow"
                           >
                             {/* Ambient heat aura layer */}
-                            <motion.div
-                              animate={{
-                                opacity: [0.25, 0.55, 0.25],
-                                scale: [0.98, 1.04, 0.98]
-                              }}
-                              transition={{
-                                duration: 1.5,
-                                repeat: Infinity,
-                                delay: idx * 0.3,
-                                ease: "easeInOut"
-                              }}
-                              className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/15 via-orange-500/10 to-yellow-500/8 blur-[3px] pointer-events-none"
+                            <div
+                              style={{ animationDelay: `${idx * 0.3}s` }}
+                              className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500/15 via-orange-500/10 to-yellow-500/8 blur-[3px] pointer-events-none animate-tag-aura"
                             />
 
                             {/* Floating spark rising from tag */}
-                            <motion.div
-                              animate={{
-                                y: [0, -6, -12],
-                                x: [0, 2, 3],
-                                opacity: [0, 0.85, 0],
-                                scale: [0.3, 0.75, 0.15]
-                              }}
-                              transition={{
-                                duration: 1.3,
-                                repeat: Infinity,
-                                delay: 0.2 + idx * 0.25,
-                                ease: "easeOut"
-                              }}
-                              className="absolute -top-0.5 right-2 size-0.5 rounded-full bg-yellow-300 shadow-[0_0_2px_#FF5500] pointer-events-none"
+                            <div
+                              style={{ animationDelay: `${0.2 + idx * 0.25}s` }}
+                              className="absolute -top-0.5 right-2 size-0.5 rounded-full bg-yellow-300 shadow-[0_0_2px_#FF5500] pointer-events-none animate-tag-spark"
                             />
 
                             {/* Fiery Tag Text */}
                             <span className="relative z-10 font-sans font-bold text-[10.5px] bg-gradient-to-r from-[#E02600] via-[#FF4D24] to-[#FF8A00] bg-clip-text text-transparent tracking-tight drop-shadow-[0_1px_0_rgba(255,255,255,0.8)]">
                               {item.tag}
                             </span>
-                          </motion.div>
+                          </div>
 
                           <div className="w-0 group-hover:w-4 overflow-hidden opacity-0 group-hover:opacity-100 transition-all duration-150 ease-out flex items-center justify-end">
                             <ArrowRight size={14} className="text-[#FF4D24] stroke-[2.4] drop-shadow-[0_0_4px_rgba(255,77,36,0.4)]" />
@@ -2250,7 +2166,7 @@ const resolveProductMetadata = (skuOrName: string) => {
                 <User size={16} className="stroke-[2.5]" />
               )}
             </div>
-            <span className={`font-semibold text-sm text-inherit tracking-tight transition-all duration-300 truncate ${isSearchExpanded ? 'max-w-[80px] sm:max-w-[110px] md:max-w-[140px]' : 'max-w-[130px] sm:max-w-[180px]'}`}>
+            <span className={`font-semibold text-sm text-inherit tracking-tight transition-[max-width] duration-300 truncate ${isSearchExpanded ? 'max-w-[80px] sm:max-w-[110px] md:max-w-[140px]' : 'max-w-[130px] sm:max-w-[180px]'}`}>
               {displayName}
             </span>
           </button>

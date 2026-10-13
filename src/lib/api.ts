@@ -437,7 +437,7 @@ export async function apiRequest<T = any>(
         } else if (response.status === 404) {
           friendlyMsg = "Không tìm thấy tài khoản hoặc dữ liệu trên hệ thống.";
         } else {
-          friendlyMsg = "Đã có lỗi xảy ra từ máy chủ. Vui lòng thử lại sau.";
+          friendlyMsg = "Lỗi hệ thống. Vui lòng thử lại sau.";
         }
       }
 
@@ -488,11 +488,7 @@ export async function apiRequest<T = any>(
     }
     return await response.json();
   } catch (error) {
-    console.warn(
-      `[API Connection Info] URL: ${targetUrl} không thể kết nối. ` +
-      `Điều này thường xảy ra nếu backend Spring Boot cục bộ (${baseUrl}) chưa chạy.`,
-      error
-    );
+    console.warn(`[API Connection Info] Không thể kết nối tới ${targetUrl}:`, error);
     throw error;
   }
 }

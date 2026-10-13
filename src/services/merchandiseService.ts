@@ -1,5 +1,6 @@
 import type { Product, ProductAttributeOption } from "../lib/productCatalog";
 import { getUnifiedAccessToken, unifiedFetch } from "../lib/api";
+import { getAppErrorMessage } from "../components/ui/AppErrorNotice";
 
 export interface ProductSearchFilter {
   keyword?: string;
@@ -69,12 +70,12 @@ async function localGraphqlRequest<T>(query: string, variables?: Record<string, 
   });
 
   if (!response.ok) {
-    throw new Error(`Merchandise GraphQL request failed (${response.status})`);
+    throw new Error("Lỗi hệ thống. Vui lòng thử lại sau.");
   }
 
   const payload = await response.json();
   if (payload.errors?.length) {
-    throw new Error(payload.errors.map((error: any) => error.message).join("; "));
+    throw new Error(getAppErrorMessage(payload.errors.map((error: any) => error.message).join("; ")));
   }
 
   return payload.data;

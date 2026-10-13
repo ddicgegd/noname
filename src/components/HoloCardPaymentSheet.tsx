@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import HoloCard from "./HoloCard";
 import { cn } from "@/lib/utils";
+import { getAppErrorMessage } from "./ui/AppErrorNotice";
 import type { UserSubscription, PaymentMethod } from "../types/subscription";
 import {
   registerGooglePaySubscription,
@@ -231,8 +232,7 @@ export default function HoloCardPaymentSheet({
       }, 3500);
       timersRef.current.push(t);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMessage(msg);
+      setErrorMessage(getAppErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }

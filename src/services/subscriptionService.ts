@@ -4,6 +4,7 @@
  */
 
 import { getApiBaseUrl, getUnifiedAccessToken } from "../lib/api";
+import { getAppErrorMessage } from "../components/ui/AppErrorNotice";
 import {
   ApiResponse,
   GooglePayWebRegisterRequest,
@@ -41,7 +42,7 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   });
 
   if (!response.ok) {
-    throw new Error(`Không thể lấy danh sách gói (HTTP ${response.status})`);
+    throw new Error("Lỗi hệ thống. Vui lòng thử lại sau.");
   }
 
   const json: ApiResponse<SubscriptionPlan[]> = await response.json();
@@ -65,7 +66,7 @@ export async function getMySubscription(): Promise<UserSubscription | null> {
   });
 
   if (!response.ok) {
-    throw new Error(`Không thể lấy thông tin gói hiện tại (HTTP ${response.status})`);
+    throw new Error("Lỗi hệ thống. Vui lòng thử lại sau.");
   }
 
   const json: ApiResponse<UserSubscription | null> = await response.json();
@@ -94,12 +95,7 @@ export async function registerGooglePaySubscription(
   const json = await response.json();
 
   if (!response.ok) {
-    const errorMsg =
-      json.detail ||
-      json.status?.message ||
-      json.title ||
-      "Đăng ký qua Google Pay thất bại";
-    throw new Error(errorMsg);
+    throw new Error(getAppErrorMessage(json.detail || json.status?.message || json.title || response.status));
   }
 
   return json.data;
@@ -127,12 +123,7 @@ export async function purchaseOneTimeSubscription(
   const json = await response.json();
 
   if (!response.ok) {
-    const errorMsg =
-      json.detail ||
-      json.status?.message ||
-      json.title ||
-      "Thanh toán mua gói 1 lần thất bại";
-    throw new Error(errorMsg);
+    throw new Error(getAppErrorMessage(json.detail || json.status?.message || json.title || response.status));
   }
 
   return json.data;
@@ -161,9 +152,7 @@ export async function cancelSubscription(
   const json = await response.json();
 
   if (!response.ok) {
-    const errorMsg =
-      json.detail || json.status?.message || "Hủy gia hạn gói thất bại";
-    throw new Error(errorMsg);
+    throw new Error(getAppErrorMessage(json.detail || json.status?.message || response.status));
   }
 
   return json.data;

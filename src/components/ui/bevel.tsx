@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const bevelVariants = cva(
-  "transition-all duration-200 select-none",
+  "transition-colors duration-200 select-none",
   {
     variants: {
       variant: {
