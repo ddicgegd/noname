@@ -13,20 +13,20 @@ import { cn } from "@/lib/utils";
 const INITIAL_PLANS: PricingPlan[] = [
   {
     id: "free",
-    planCode: "ANH_KIM",
-    name: "Gói Ánh Kim",
-    price: "30.000₫",
-    period: "/tháng",
-    priceAmount: 30000,
-    freeTrialDays: 7,
+    planCode: "SILVER_3M",
+    name: "Gói Bạc",
+    price: "320.000₫",
+    period: "/3 tháng",
+    priceAmount: 320000,
+    freeTrialDays: 30,
     targetRank: "SILVER",
     features: [
-      "7 ngày dùng thử miễn phí",
+      "30 ngày dùng thử miễn phí",
       "Giỏ hàng 100 sản phẩm",
       "Hạng hội viên Bạc (Silver)",
       "Hỗ trợ cộng đồng 24/7",
     ],
-    buttonText: "Dùng thử 7 ngày",
+    buttonText: "Dùng thử 30 ngày",
     bgGradient: "",
     hoverBorderColor: "rgba(0,0,0,0.15)",
     checkIconColor: "text-primary",
@@ -38,20 +38,21 @@ const INITIAL_PLANS: PricingPlan[] = [
   },
   {
     id: "pro",
-    planCode: "MA_THUAT",
-    name: "Gói Ma Thuật",
-    price: "120.000₫",
-    period: "/tháng",
-    priceAmount: 120000,
-    freeTrialDays: 0,
-    targetRank: "DIAMOND",
+    planCode: "PLATINUM_12M",
+    name: "Gói Bạch Kim",
+    price: "990.000₫",
+    period: "/năm",
+    priceAmount: 990000,
+    freeTrialDays: 30,
+    targetRank: "PLATINUM",
     features: [
+      "30 ngày dùng thử miễn phí",
       "Chiết khấu 3% toàn bộ đơn hàng",
       "Giỏ hàng không giới hạn",
       "Miễn phí vận chuyển toàn quốc",
-      "Hạng hội viên Kim Cương (Diamond)",
+      "Hạng hội viên Bạch Kim (Platinum)",
     ],
-    buttonText: "Nâng cấp Kim Cương",
+    buttonText: "Nâng cấp Bạch Kim",
     isPopular: true,
     bgGradient: "",
     hoverBorderColor: "rgba(0,0,0,0.15)",
@@ -80,12 +81,13 @@ export default function PricingSection() {
             const matched = apiPlans.find(
               (ap) =>
                 ap.planCode === p.planCode ||
-                (p.id === "free" && ap.planCode === "ANH_KIM") ||
-                (p.id === "pro" && ap.planCode === "MA_THUAT")
+                (p.id === "free" && ap.planCode === "SILVER_3M") ||
+                (p.id === "pro" && ap.planCode === "PLATINUM_12M")
             );
             if (!matched) return p;
             return {
               ...p,
+              planCode: matched.planCode,
               name: matched.name,
               price: `${matched.priceAmount.toLocaleString("vi-VN")}₫`,
               priceAmount: matched.priceAmount,

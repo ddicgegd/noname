@@ -5,7 +5,6 @@
 
 import React, { useEffect, useRef, type MouseEvent, type CSSProperties } from "react";
 import { Check } from "lucide-react";
-import { useReducedMotion } from "motion/react";
 import { type PricingPlan } from "./HoloCardPaymentSheet";
 
 export interface HoloCardProps {
@@ -27,7 +26,6 @@ export function HoloCard({
   overridePeriod,
   className,
 }: HoloCardProps) {
-  const shouldReduceMotion = useReducedMotion();
   const wrapRef = useRef<HTMLDivElement>(null); // perspective wrapper
   const cardRef = useRef<HTMLDivElement>(null); // tilting card
   const foilRef = useRef<HTMLDivElement>(null); // foil overlay
@@ -148,6 +146,7 @@ export function HoloCard({
     tgt.current.ry = 0;
     tgt.current.active = 0;
   };
+
   const currentPrice = overridePrice ?? plan.price;
   const currentPeriod = overridePeriod ?? plan.period;
   const defaultBoxShadow = `${plan.glowColor} 0px ${compact ? 14 : 20}px ${compact ? 28 : 36}px -8px, rgba(0,0,0,0.06) 0px 4px 16px`;
@@ -184,6 +183,7 @@ export function HoloCard({
           <div className={`absolute inset-0 ${plan.bgGradient} pointer-events-none rounded-2xl`} />
         ) : null}
 
+        {/* Foil sheen */}
         <div
           ref={foilRef}
           className="absolute inset-0 pointer-events-none rounded-2xl opacity-0"
@@ -286,4 +286,5 @@ export function HoloCard({
     </div>
   );
 }
+
 export default HoloCard;

@@ -1,0 +1,123 @@
+initiative: subscription-api-integration
+version: "1.0.0"
+runtime: herdr
+initiative_branch: feat/subscription-real-api-integration
+
+nodes:
+  - id: T001
+    slug: real-endpoint-verification
+    name: "Kiểm thử & Khảo sát Hợp đồng Endpoint Thật (Live Backend API Verification)"
+    status: DONE
+    depends_on: []
+    file_boundaries:
+      read:
+        - "C:/Users/ddicg/orca/erp_springboot-experiment/src/main/java/com/ddicg/erp/modules/subscription/controller/SubscriptionController.java"
+        - "C:/Users/ddicg/orca/erp_springboot-experiment/src/main/java/com/ddicg/erp/modules/subscription/service/SubscriptionService.java"
+        - "C:/Users/ddicg/orca/erp_springboot-experiment/src/main/resources/db/migration/V22__seed_default_subscription_plans.sql"
+        - "C:/Users/ddicg/orca/erp_springboot-experiment/docs/specs/google-pay-web-and-fineract-subscription.md"
+      creates:
+        - "docs/plan-herdr/subscription-api-integration/tasks/T001-real-endpoint-verification/session-log.md"
+      modifies: []
+    rules:
+      - BR-SUB-01
+      - BR-SUB-02
+    acceptance_evidence:
+      - "Xác minh trạng thái kết nối cổng 8080 và 8443"
+      - "Đối soát toàn bộ HTTP method, request payload và response DTO của 5 endpoints"
+
+  - id: T002
+    slug: cleanup-dead-code
+    name: "Lập Kế Hoạch & Đào Thải Code Rác Cục Bộ (Dead Code Removal)"
+    status: DONE
+    depends_on:
+      - T001
+    file_boundaries:
+      read:
+        - "src/services/subscriptionService.ts"
+        - "src/components/HoloCardPaymentSheet.tsx"
+        - "src/components/PricingSection.tsx"
+      creates:
+        - "docs/plan-herdr/subscription-api-integration/tasks/T002-cleanup-dead-code/session-log.md"
+      modifies:
+        - "src/services/subscriptionService.ts"
+        - "src/components/HoloCardPaymentSheet.tsx"
+    rules:
+      - BR-SUB-01
+      - BR-SUB-03
+    acceptance_evidence:
+      - "Xóa hoàn toàn TEST_USER_ACCESS_TOKEN khỏi subscriptionService.ts"
+      - "Xóa token giả tok_gpay_wallet_... và transaction client tự chế"
+      - "Loại bỏ mã gói hardcode ANH_KIM và MA_THUAT"
+
+  - id: T003
+    slug: update-fe-endpoints
+    name: "Cập Nhật & Chuẩn Hóa Endpoint Layer ở Frontend (subscriptionService.ts)"
+    status: DONE
+    depends_on:
+      - T002
+    file_boundaries:
+      read:
+        - "src/types/subscription.ts"
+        - "src/lib/api.ts"
+        - "src/components/ui/AppErrorNotice.tsx"
+      creates:
+        - "docs/plan-herdr/subscription-api-integration/tasks/T003-update-fe-endpoints/session-log.md"
+      modifies:
+        - "src/services/subscriptionService.ts"
+        - "src/types/subscription.ts"
+    rules:
+      - BR-SUB-01
+      - BR-SUB-03
+      - BR-SUB-05
+    acceptance_evidence:
+      - "subscriptionService.ts gọi chính xác các endpoint thật với kiểu dữ liệu đầy đủ"
+      - "Fallback an toàn khi chưa đăng nhập (kích hoạt đăng nhập thay vì dùng token test)"
+      - "Toàn bộ lỗi được bọc qua getAppErrorMessage"
+
+  - id: T004
+    slug: integrate-fe-sheet-cta
+    name: "Tích Hợp Nút CTA, Tối Ưu Khung 767x413px & Đồng Bộ Mã Gói (UI Polish)"
+    status: DONE
+    depends_on:
+      - T003
+    file_boundaries:
+      read:
+        - "src/components/HoloCard.tsx"
+      creates:
+        - "docs/plan-herdr/subscription-api-integration/tasks/T004-integrate-fe-sheet-cta/session-log.md"
+      modifies:
+        - "src/components/HoloCardPaymentSheet.tsx"
+        - "src/components/PricingSection.tsx"
+    rules:
+      - BR-SUB-01
+      - BR-SUB-02
+      - BR-SUB-04
+    acceptance_evidence:
+      - "Nút CTA h-11 xuất hiện ở chân cột phải, gắn hàm handlePay và hiển thị nhãn động"
+      - "4 thẻ phương thức thanh toán nén về min-h-[48px] sm:min-h-[50px] và gap-2"
+      - "Không xuất hiện thanh cuộn trên container 767x413px"
+      - "PricingSection.tsx map chính xác SILVER_3M và PLATINUM_12M theo chu kỳ"
+
+  - id: T005
+    slug: e2e-integration-validation
+    name: "Kiểm Thử Tích Hợp Toàn Trình & Nghiệm Thu Trực Quan (E2E Validation)"
+    status: DONE
+    depends_on:
+      - T004
+    file_boundaries:
+      read:
+        - "src/components/HoloCardPaymentSheet.tsx"
+        - "src/services/subscriptionService.ts"
+      creates:
+        - "docs/plan-herdr/subscription-api-integration/tasks/T005-e2e-integration-validation/session-log.md"
+      modifies: []
+    rules:
+      - BR-SUB-01
+      - BR-SUB-02
+      - BR-SUB-03
+      - BR-SUB-04
+      - BR-SUB-05
+    acceptance_evidence:
+      - "Kiểm tra build TypeScript (npx tsc --noEmit) không có lỗi"
+      - "Kiểm tra render thực tế trên trình duyệt localhost:3000 đạt chuẩn thẩm mỹ và 0% scrollbar"
+      - "Kiểm tra trạng thái loading spinner và phản hồi thành công"

@@ -13,19 +13,16 @@ import {
   UserSubscription,
 } from "../types/subscription";
 
-export const TEST_USER_ACCESS_TOKEN =
-  "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlcjAxQGV4YW1wbGUuY29tIiwiaWF0IjoxNzkxMzU3OTMzLCJleHAiOjE3OTE0NDQzMzN9.H0bS8sNeela6lOHsJtvUgZDpFfR44nkGtBVpFFuyNJM";
-
 /**
- * Lấy Access Token hợp lệ: Ưu tiên token thật của user đang đăng nhập;
- * nếu chưa đăng nhập, tự động dùng token test để trải nghiệm kiểm thử ngay lập tức.
+ * Lấy Access Token hợp lệ từ phiên đăng nhập thực tế của người dùng.
+ * Trả về chuỗi rỗng nếu người dùng chưa đăng nhập để kích hoạt luồng yêu cầu đăng nhập.
  */
 export function getEffectiveAccessToken(): string {
   const unified = getUnifiedAccessToken();
   if (unified && unified.trim().length > 0) {
-    return unified;
+    return unified.trim();
   }
-  return TEST_USER_ACCESS_TOKEN;
+  return "";
 }
 
 /**
@@ -42,7 +39,12 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   });
 
   if (!response.ok) {
-    throw new Error("Lỗi hệ thống. Vui lòng thử lại sau.");
+    let errorDetail: any = response.status;
+    try {
+      const errJson = await response.json();
+      errorDetail = errJson.detail || errJson.message || errJson.status?.message || errJson.title || response.status;
+    } catch (_) {}
+    throw new Error(getAppErrorMessage(errorDetail));
   }
 
   const json: ApiResponse<SubscriptionPlan[]> = await response.json();
@@ -56,6 +58,9 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
 export async function getMySubscription(): Promise<UserSubscription | null> {
   const baseUrl = getApiBaseUrl();
   const token = getEffectiveAccessToken();
+  if (!token) {
+    return null;
+  }
 
   const response = await fetch(`${baseUrl}/api/v1/subscriptions/my`, {
     method: "GET",
@@ -66,7 +71,15 @@ export async function getMySubscription(): Promise<UserSubscription | null> {
   });
 
   if (!response.ok) {
-    throw new Error("Lỗi hệ thống. Vui lòng thử lại sau.");
+    if (response.status === 401 || response.status === 403) {
+      return null;
+    }
+    let errorDetail: any = response.status;
+    try {
+      const errJson = await response.json();
+      errorDetail = errJson.detail || errJson.message || errJson.status?.message || errJson.title || response.status;
+    } catch (_) {}
+    throw new Error(getAppErrorMessage(errorDetail));
   }
 
   const json: ApiResponse<UserSubscription | null> = await response.json();
@@ -82,6 +95,9 @@ export async function registerGooglePaySubscription(
 ): Promise<UserSubscription> {
   const baseUrl = getApiBaseUrl();
   const token = getEffectiveAccessToken();
+  if (!token) {
+    throw new Error(getAppErrorMessage("Vui lòng đăng nhập tài khoản trước khi thực hiện giao dịch."));
+  }
 
   const response = await fetch(`${baseUrl}/api/v1/subscriptions/google-pay/register`, {
     method: "POST",
@@ -92,10 +108,10 @@ export async function registerGooglePaySubscription(
     body: JSON.stringify(payload),
   });
 
-  const json = await response.json();
+  const json = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(getAppErrorMessage(json.detail || json.status?.message || json.title || response.status));
+    throw new Error(getAppErrorMessage(json.detail || json.message || json.status?.message || json.title || response.status));
   }
 
   return json.data;
@@ -110,6 +126,9 @@ export async function purchaseOneTimeSubscription(
 ): Promise<UserSubscription> {
   const baseUrl = getApiBaseUrl();
   const token = getEffectiveAccessToken();
+  if (!token) {
+    throw new Error(getAppErrorMessage("Vui lòng đăng nhập tài khoản trước khi thực hiện giao dịch."));
+  }
 
   const response = await fetch(`${baseUrl}/api/v1/subscriptions/purchase-onetime`, {
     method: "POST",
@@ -120,17 +139,45 @@ export async function purchaseOneTimeSubscription(
     body: JSON.stringify(payload),
   });
 
-  const json = await response.json();
+  const json = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(getAppErrorMessage(json.detail || json.status?.message || json.title || response.status));
+    throw new Error(getAppErrorMessage(json.detail || json.message || json.status?.message || json.title || response.status));
   }
 
   return json.data;
 }
 
 /**
- * 5. POST /api/v1/subscriptions/{id}/cancel
+ * 5. POST /api/v1/subscriptions/{id}/renew
+ * Kích hoạt gia hạn trừ tiền định kỳ MIT và hạch toán tự động vào Fineract
+ */
+export async function renewSubscription(id: number): Promise<boolean> {
+  const baseUrl = getApiBaseUrl();
+  const token = getEffectiveAccessToken();
+  if (!token) {
+    throw new Error(getAppErrorMessage("Vui lòng đăng nhập tài khoản trước khi thực hiện giao dịch."));
+  }
+
+  const response = await fetch(`${baseUrl}/api/v1/subscriptions/${id}/renew`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const json = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(getAppErrorMessage(json.detail || json.message || json.status?.message || response.status));
+  }
+
+  return json.data ?? true;
+}
+
+/**
+ * 6. POST /api/v1/subscriptions/{id}/cancel
  * Hủy tự động gia hạn gói
  */
 export async function cancelSubscription(
@@ -139,6 +186,9 @@ export async function cancelSubscription(
 ): Promise<UserSubscription> {
   const baseUrl = getApiBaseUrl();
   const token = getEffectiveAccessToken();
+  if (!token) {
+    throw new Error(getAppErrorMessage("Vui lòng đăng nhập tài khoản trước khi thực hiện giao dịch."));
+  }
 
   const response = await fetch(`${baseUrl}/api/v1/subscriptions/${id}/cancel`, {
     method: "POST",
@@ -149,10 +199,10 @@ export async function cancelSubscription(
     body: JSON.stringify({ reason: reason || "Hủy gia hạn gói" }),
   });
 
-  const json = await response.json();
+  const json = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(getAppErrorMessage(json.detail || json.status?.message || response.status));
+    throw new Error(getAppErrorMessage(json.detail || json.message || json.status?.message || response.status));
   }
 
   return json.data;

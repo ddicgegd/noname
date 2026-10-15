@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { test } from "vitest";
 import { STORAGE_KEYS } from "./storageKeys";
 import {
   getApiBaseUrl,
@@ -196,7 +197,6 @@ async function runTests() {
   console.log("=== TOÀN BỘ 8/8 TEST CASES ĐÃ ĐẠT CHUẨN THÀNH CÔNG ===");
 }
 
-runTests().catch((err) => {
-  console.error("TEST FAILED:", err);
-  process.exit(1);
+test("API Endpoint Suite", async () => {
+  await runTests();
 });

@@ -12,15 +12,21 @@ import {
   Check,
   AlertCircle,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import HoloCard from "./HoloCard";
 import { cn } from "@/lib/utils";
+import { getUnifiedAccessToken } from "../lib/api";
 import { getAppErrorMessage } from "./ui/AppErrorNotice";
 import type { UserSubscription, PaymentMethod } from "../types/subscription";
 import {
   registerGooglePaySubscription,
   purchaseOneTimeSubscription,
 } from "../services/subscriptionService";
+import {
+  requestGooglePayPayment,
+  isGooglePayCanceledError,
+} from "../services/googlePayService";
 export interface PricingPlan {
   id: string;
   planCode?: string;
@@ -267,30 +273,62 @@ export default function HoloCardPaymentSheet({
   const quarterlyAmount = baseMonthlyAmount * 3;
   const yearlyAmount = Math.round(baseMonthlyAmount * 12 * 0.8);
 
+  const quarterlyPrice = `${quarterlyAmount.toLocaleString("vi-VN")}₫`;
+  const quarterlyPeriod = "/3 tháng";
+  const yearlyPrice = `${yearlyAmount.toLocaleString("vi-VN")}₫`;
+  const yearlyPeriod = "/năm (tiết kiệm 20%)";
+
   const displayPrice =
-    billingCycle === "quarterly"
-      ? `${quarterlyAmount.toLocaleString("vi-VN")}₫`
-      : `${yearlyAmount.toLocaleString("vi-VN")}₫`;
+    billingCycle === "quarterly" ? quarterlyPrice : yearlyPrice;
 
   const displayPeriod =
-    billingCycle === "quarterly" ? "/3 tháng" : "/năm (tiết kiệm 20%)";
+    billingCycle === "quarterly" ? quarterlyPeriod : yearlyPeriod;
+
+  const selectedMethodObj = PAYMENT_METHODS.find((m) => m.id === selectedMethod);
+  const methodName = selectedMethodObj ? selectedMethodObj.name : "Cổng thanh toán";
+  const ctaButtonLabel =
+    selectedMethod === "gpay"
+      ? "Dùng thử miễn phí với Google Pay"
+      : `Thanh toán ${displayPrice} qua ${methodName}`;
 
   const handlePay = async () => {
     if (isProcessing || isSuccess) return;
     setIsProcessing(true);
     setErrorMessage(null);
 
-    const planCode = activePlan.planCode || (activePlan.id === "pro" ? "MA_THUAT" : "ANH_KIM");
+    const token = getUnifiedAccessToken();
+    if (!token) {
+      setIsProcessing(false);
+      setErrorMessage("Vui lòng đăng nhập tài khoản trước khi thực hiện thanh toán gói dịch vụ.");
+      return;
+    }
+
+    const planCode =
+      activePlan.planCode ||
+      (billingCycle === "yearly" ? "PLATINUM_12M" : "SILVER_3M");
     const cycleLabel = billingCycle === "yearly" ? "1 năm (-20%)" : "3 tháng";
+
+    const calculatedAmount = billingCycle === "yearly" ? yearlyAmount : quarterlyAmount;
+    const finalAmount =
+      activePlan.priceAmount && activePlan.priceAmount > 0
+        ? activePlan.priceAmount
+        : (calculatedAmount > 0 ? calculatedAmount : 990000);
 
     try {
       if (selectedMethod === "gpay") {
+        const gpayResult = await requestGooglePayPayment({
+          priceAmount: finalAmount,
+          currencyCode: "VND",
+          merchantName: "Orca ERP",
+        });
+
         const res = await registerGooglePaySubscription({
           planCode,
-          paymentToken: "tok_gpay_wallet_" + Date.now(),
-          cardNetwork: "VISA",
-          lastFour: "4242",
+          paymentToken: gpayResult.paymentToken,
+          cardNetwork: gpayResult.cardNetwork,
+          lastFour: gpayResult.lastFour,
         });
+
         setSuccessInfo({
           planName: res.planName || activePlan.name,
           expiryTime: res.expiryTime,
@@ -304,7 +342,7 @@ export default function HoloCardPaymentSheet({
         const res = await purchaseOneTimeSubscription({
           planCode,
           paymentMethod: method,
-          transactionReference: `${method}_TXN_${Date.now()}`,
+          transactionReference: "TXN_PENDING_GATEWAY",
           note: `Thanh toán gói ${activePlan.name} chu kỳ ${cycleLabel}`,
         });
         setSuccessInfo({
@@ -319,6 +357,10 @@ export default function HoloCardPaymentSheet({
       }, 3500);
       timersRef.current.push(t);
     } catch (err: unknown) {
+      if (isGooglePayCanceledError(err)) {
+        setIsProcessing(false);
+        return;
+      }
       setErrorMessage(getAppErrorMessage(err));
     } finally {
       setIsProcessing(false);
@@ -481,7 +523,7 @@ export default function HoloCardPaymentSheet({
                     }}
                     role="radiogroup"
                     aria-label="Phương thức thanh toán"
-                    className="flex-1 flex flex-col justify-between gap-2.5 sm:gap-3 h-full"
+                    className="flex-1 flex flex-col justify-between gap-2 sm:gap-2.5 h-full"
                     style={{ perspective: "1000px", transformStyle: "preserve-3d" }}
                   >
                     {PAYMENT_METHODS.map((m, idx) => {
@@ -542,7 +584,7 @@ export default function HoloCardPaymentSheet({
                           }
                           whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
                           className={cn(
-                            "group relative px-3.5 sm:px-4 py-2.5 sm:py-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-colors duration-150 select-none flex-1 min-h-[58px] sm:min-h-[64px]",
+                            "group relative px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-colors duration-150 select-none flex-1 min-h-[48px] sm:min-h-[50px]",
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
                             isSelected
                               ? "bg-sky-50/80 dark:bg-sky-950/45 border-sky-400/90 dark:border-sky-500/80 ring-1 ring-sky-400/40 shadow-[0_8px_20px_-4px_rgba(56,189,248,0.22),0_2px_6px_rgba(0,0,0,0.06)]"
@@ -610,6 +652,31 @@ export default function HoloCardPaymentSheet({
                     })}
                   </motion.div>
                 </div>
+
+                {/* Checkout CTA Button - Tactile 3D Bevel Standard */}
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={handlePay}
+                  className={cn(
+                    "w-full h-11 sm:h-12 rounded-2xl font-bold font-sans text-sm tracking-tight",
+                    "flex items-center justify-center gap-2 select-none cursor-pointer transition-all duration-200 mt-2.5 shrink-0",
+                    "shadow-[0_4px_14px_rgba(56,189,248,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)]",
+                    "active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none",
+                    selectedMethod === "gpay"
+                      ? "bg-gradient-to-b from-[#1a73e8] via-[#1557b0] to-[#0d47a1] text-white border-t border-t-white/40 hover:brightness-105"
+                      : "bg-gradient-to-b from-sky-400 via-sky-500 to-sky-600 text-white border-t border-t-white/50 hover:brightness-105"
+                  )}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      <span>Đang xử lý giao dịch...</span>
+                    </>
+                  ) : (
+                    <span>{ctaButtonLabel}</span>
+                  )}
+                </button>
 
                 {/* Error Banner */}
                 {errorMessage && (

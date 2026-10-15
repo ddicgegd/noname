@@ -28,13 +28,14 @@ export type PaymentMethod =
   | 'CREDIT_CARD'
   | 'MOMO'
   | 'PAYPAL'
-  | 'COD';
+  | 'COD'
+  | 'GOOGLE_PAY';
 
 export interface SubscriptionPlan {
   id: number;
-  planCode: 'ANH_KIM' | 'MA_THUAT' | string;
+  planCode: 'SILVER_3M' | 'GOLD_6M' | 'PLATINUM_12M' | string;
   name: string;
-  targetRank: 'MEMBER' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND';
+  targetRank: 'MEMBER' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND' | string;
   billingPeriodMonths: number;
   freeTrialDays: number;
   priceAmount: number;
@@ -46,9 +47,9 @@ export interface SubscriptionPlan {
 export interface UserSubscription {
   id: number;
   userId: number;
-  planId: number;
+  planId?: number;
   planCode: string;
-  planName: string;
+  planName?: string;
   targetRank: string;
   billingPeriodMonths: number;
   subscriptionState: SubscriptionState;
@@ -69,10 +70,22 @@ export interface GooglePayWebRegisterRequest {
 export interface OneTimePurchaseRequest {
   planCode: string;
   paymentMethod: PaymentMethod;
-  transactionReference?: string;
+  transactionReference: string;
   note?: string;
 }
 
 export interface CancelSubscriptionRequest {
   reason?: string;
+}
+
+export interface GooglePayRequestOptions {
+  priceAmount: number;
+  currencyCode?: string;
+  merchantName?: string;
+}
+
+export interface ExtractedTokenPayload {
+  paymentToken: string;
+  cardNetwork: string;
+  lastFour: string;
 }
