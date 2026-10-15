@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Mail, Lock, User, ArrowRight, ArrowLeft, Eye, EyeOff, ShieldCheck, CheckCircle, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Info, Shield, Cpu, RefreshCw, Check, Loader2, Settings, Key, Terminal, Server, ChevronDown, ChevronUp, X } from "lucide-react";
 import {
@@ -158,31 +158,36 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [hoveredField, setHoveredField] = useState<string | null>(null);
   const [isVerifyingManualToken, setIsVerifyingManualToken] = useState(false);
   const { showToast } = useToast();
-  const setToastNotification = (data: { id?: string; type?: "error" | "success" | "info" | "warning"; title?: string; message: string } | null) => {
+  const lastEmittedToastRef = useRef<string>("");
+
+  const setToastNotification = useCallback((data: { id?: string; type?: "error" | "success" | "info" | "warning"; title?: string; message: string } | null) => {
     if (data && data.message) {
+      lastEmittedToastRef.current = data.message.trim();
       showToast(data.message, data.type || "info", data.title);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
-    if (errorMsg) {
+    if (errorMsg && errorMsg.trim() !== lastEmittedToastRef.current) {
+      lastEmittedToastRef.current = errorMsg.trim();
       setToastNotification({
         id: Date.now().toString(),
         type: "error",
         message: errorMsg,
       });
     }
-  }, [errorMsg]);
+  }, [errorMsg, setToastNotification]);
 
   useEffect(() => {
-    if (successMsg) {
+    if (successMsg && successMsg.trim() !== lastEmittedToastRef.current) {
+      lastEmittedToastRef.current = successMsg.trim();
       setToastNotification({
         id: Date.now().toString(),
         type: "success",
         message: successMsg,
       });
     }
-  }, [successMsg]);
+  }, [successMsg, setToastNotification]);
 
   // Mouse position for spotlight effect on the card
   const cardRef = useRef<HTMLDivElement>(null);
@@ -626,6 +631,21 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
       setIsSignUp(false);
       setIsVerifyingMode(false);
       setRecoveryMode("NONE");
+    }
+
+    // Check for OAuth / Auth error message stored in sessionStorage or query params
+    const storedError = sessionStorage.getItem("auth_error_message");
+    if (storedError) {
+      sessionStorage.removeItem("auth_error_message");
+      setErrorMsg(storedError);
+    } else {
+      const oauthError = searchParams.get("error") || searchParams.get("oauth_error");
+      if (oauthError) {
+        const errorText = oauthError === "access_denied"
+          ? "Bạn đã hủy liên kết đăng nhập với tài khoản Google."
+          : `Đăng nhập không thành công (${oauthError}).`;
+        setErrorMsg(errorText);
+      }
     }
   }, []);
 
@@ -1230,6 +1250,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     setErrorMsg("");
     setSuccessMsg("");
     setFieldErrors({});
+    lastEmittedToastRef.current = "";
 
     // Client-side validation
     if (isSignUp) {
@@ -1408,7 +1429,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
               if (url.startsWith("/o") || url.startsWith("/order") || pendingAction.actionId === "BUY_NOW") {
                 onNavigate("order");
                 return;
-              } else if (url.startsWith("/profile")) {
+              } else if (url.startsWith("/profile") || url.startsWith("/m") || url.startsWith("/account")) {
                 onNavigate("profile");
                 return;
               } else if (url.startsWith("/p") || url.startsWith("/product")) {
@@ -1424,7 +1445,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
             if (redirectTarget === "/o" || redirectTarget === "order") {
               onNavigate("order");
               return;
-            } else if (redirectTarget === "/profile" || redirectTarget === "profile") {
+            } else if (redirectTarget === "/profile" || redirectTarget === "profile" || redirectTarget === "/m" || redirectTarget === "m") {
               onNavigate("profile");
               return;
             } else if (redirectTarget === "/p" || redirectTarget === "product") {
@@ -1477,10 +1498,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
         }
 
         // General business/system error — only show if no field errors
-        const cleanReason =
-          extracted?.message && extracted.message.trim().length > 0
-            ? extracted.message.trim()
-            : getAppErrorMessage(err);
+        const cleanReason = getAppErrorMessage(extracted?.message || err);
 
         if (Object.keys(rawFieldErrors).length === 0) {
           setErrorMsg(cleanReason);
@@ -1509,11 +1527,14 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
     }
   };
 
-  const handleSocialLogin = (platform: "Google" | "GitHub") => {
-    showToast(`Đang khởi tạo liên kết bảo mật với tài khoản ${platform}...`, "info");
-    if (platform === "Google") {
-      window.location.href = getApiBaseUrl() + "/api/auth/oauth2/authorize/google";
+  const handleGoogleLogin = () => {
+    if (typeof window !== "undefined") {
+      const currentPath = window.location.pathname;
+      const target = (currentPath === "/a" || currentPath === "/auth" || currentPath === "") ? "/" : currentPath;
+      sessionStorage.setItem("auth_return_url", target);
     }
+    showToast("Đang khởi tạo liên kết bảo mật với tài khoản Google...", "info");
+    window.location.href = getApiBaseUrl() + "/api/auth/oauth2/authorize/google";
   };
 
   return (
@@ -2949,10 +2970,11 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                 </div>
 
                 {/* Social login buttons */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="w-full">
                   <button
-                    onClick={() => handleSocialLogin("Google")}
-                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
@@ -2960,16 +2982,7 @@ export default function RegisterPage({ onNavigate }: RegisterPageProps) {
                       <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"></path>
                       <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
                     </svg>
-                    <span>Google</span>
-                  </button>
-                  <button
-                    onClick={() => handleSocialLogin("GitHub")}
-                    className="flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 text-slate-700 text-xs font-semibold shadow-[0_2px_8px_-1px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-1px_1px_rgba(0,0,0,0.02)] active:scale-[0.98] transition-all duration-200 cursor-pointer outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
-                    </svg>
-                    <span>GitHub</span>
+                    <span>Tiếp tục với Google</span>
                   </button>
                 </div>
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import {
@@ -46,12 +46,14 @@ export interface HoloCardPaymentSheetProps {
   plan: PricingPlan | null;
   isOpen: boolean;
   onClose: () => void;
+  originRect?: DOMRect | null;
 }
 
 interface PaymentOption {
   id: string;
   name: string;
   badge?: string;
+  timeTag?: string;
   icon: React.ReactNode;
   detail: string;
   account?: string;
@@ -76,6 +78,7 @@ const PAYMENT_METHODS: PaymentOption[] = [
     id: "gpay",
     name: "Google Pay",
     badge: "Ưu tiên",
+    timeTag: "#0s_Tức_thì",
     icon: <GooglePayLogo />,
     detail: "Google Wallet & Thẻ liên kết",
     account: "Visa / Mastercard quốc tế",
@@ -84,6 +87,7 @@ const PAYMENT_METHODS: PaymentOption[] = [
     id: "momo",
     name: "Ví MoMo",
     badge: "Phổ biến",
+    timeTag: "#1_Chạm",
     icon: (
       <div className="w-5 h-5 rounded-md bg-[#A50064] text-white flex items-center justify-center font-bold text-[10px]">
         M
@@ -95,6 +99,7 @@ const PAYMENT_METHODS: PaymentOption[] = [
   {
     id: "card",
     name: "Thẻ Quốc Tế",
+    timeTag: "#3D_Secure",
     icon: <CreditCard className="w-4 h-4 text-sky-500" />,
     detail: "Hỗ trợ Visa, Mastercard, JCB toàn cầu",
     account: "•••• 4242 (Hết hạn 08/28)",
@@ -103,6 +108,7 @@ const PAYMENT_METHODS: PaymentOption[] = [
     id: "vnpay",
     name: "VNPay QR",
     badge: "Không phí",
+    timeTag: "#Quét_10s",
     icon: <QrCode className="w-4 h-4 text-emerald-500" />,
     detail: "Quét mã qua 40+ ứng dụng ngân hàng",
     account: "VietQR liên ngân hàng",
@@ -113,6 +119,7 @@ export default function HoloCardPaymentSheet({
   plan,
   isOpen,
   onClose,
+  originRect,
 }: HoloCardPaymentSheetProps) {
   const [billingCycle, setBillingCycle] = useState<"quarterly" | "yearly">("quarterly");
   const [selectedMethod, setSelectedMethod] = useState<string>("gpay");
@@ -125,12 +132,92 @@ export default function HoloCardPaymentSheet({
   const shouldReduceMotion = useReducedMotion();
   const timersRef = useRef<number[]>([]);
 
-  // Retain last active plan for exit animations
+  // Retain last active plan and originRect for exit animations
   const activePlanRef = useRef<PricingPlan | null>(plan);
   if (plan) {
     activePlanRef.current = plan;
   }
   const activePlan = plan ?? activePlanRef.current;
+
+  const originRectRef = useRef<DOMRect | null>(originRect ?? null);
+  if (originRect) {
+    originRectRef.current = originRect;
+  }
+  const activeOriginRect = originRect ?? originRectRef.current;
+
+  // FLIP Morphing Variants (First, Last, Invert, Play)
+  const flipDialogVariants = useMemo(() => {
+    return {
+      initial: (origin: DOMRect | null | undefined) => {
+        if (!origin || shouldReduceMotion) {
+          return { opacity: 0, scale: 0.94, y: 20 };
+        }
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+        const targetW = isMobile ? window.innerWidth : Math.min(window.innerWidth - 32, 768);
+        const targetH = isMobile ? 500 : 380;
+        const targetCenterX = window.innerWidth / 2;
+        const targetCenterY = isMobile
+          ? window.innerHeight - targetH / 2
+          : window.innerHeight / 2;
+
+        const originCenterX = origin.left + origin.width / 2;
+        const originCenterY = origin.top + origin.height / 2;
+
+        return {
+          x: originCenterX - targetCenterX,
+          y: originCenterY - targetCenterY,
+          scaleX: Math.max(0.35, Math.min(1.4, origin.width / targetW)),
+          scaleY: Math.max(0.35, Math.min(1.4, origin.height / targetH)),
+          opacity: 0.85,
+        };
+      },
+      animate: {
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+        opacity: 1,
+        transition: {
+          type: "spring",
+          stiffness: 340,
+          damping: 28,
+          mass: 0.85,
+        },
+      },
+      exit: (origin: DOMRect | null | undefined) => {
+        if (!origin || shouldReduceMotion) {
+          return {
+            opacity: 0,
+            scale: 0.95,
+            y: 16,
+            transition: { duration: 0.2, ease: "easeIn" },
+          };
+        }
+        const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+        const targetW = isMobile ? window.innerWidth : Math.min(window.innerWidth - 32, 768);
+        const targetH = isMobile ? 500 : 380;
+        const targetCenterX = window.innerWidth / 2;
+        const targetCenterY = isMobile
+          ? window.innerHeight - targetH / 2
+          : window.innerHeight / 2;
+
+        const originCenterX = origin.left + origin.width / 2;
+        const originCenterY = origin.top + origin.height / 2;
+
+        return {
+          x: originCenterX - targetCenterX,
+          y: originCenterY - targetCenterY,
+          scaleX: Math.max(0.35, Math.min(1.4, origin.width / targetW)),
+          scaleY: Math.max(0.35, Math.min(1.4, origin.height / targetH)),
+          opacity: 0,
+          transition: {
+            duration: 0.22,
+            ease: [0.32, 0, 0.67, 0],
+          },
+        };
+      },
+    };
+  }, [shouldReduceMotion]);
 
   // Hydration guard
   useEffect(() => {
@@ -241,7 +328,7 @@ export default function HoloCardPaymentSheet({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex flex-col justify-end sm:items-center sm:pb-6 pointer-events-none">
+        <div className="fixed inset-0 z-[100] flex flex-col justify-end sm:items-center sm:justify-center sm:p-4 pointer-events-none">
           {/* Backdrop with iOS blur */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -252,40 +339,18 @@ export default function HoloCardPaymentSheet({
             aria-hidden="true"
           />
 
-          {/* Floating Glass Deck / Bottom Sheet Dialog */}
+          {/* Floating Glass Deck / Bottom Sheet Dialog with FLIP Morphing */}
           <motion.div
             role="dialog"
             aria-modal="true"
             aria-labelledby="holo-payment-title"
-            initial={
-              shouldReduceMotion
-                ? { opacity: 0 }
-                : { y: "calc(100% + 56px)" }
-            }
-            animate={
-              shouldReduceMotion
-                ? { opacity: 1 }
-                : {
-                    y: 0,
-                    transition: {
-                      duration: 0.3,
-                      ease: [0.16, 1, 0.3, 1],
-                    },
-                  }
-            }
-            exit={
-              shouldReduceMotion
-                ? { opacity: 0 }
-                : {
-                    y: "calc(100% + 56px)",
-                    transition: {
-                      duration: 0.22,
-                      ease: [0.4, 0, 0.2, 1],
-                    },
-                  }
-            }
+            custom={activeOriginRect}
+            variants={flipDialogVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
             className={cn(
-              "pointer-events-auto relative z-10 w-full max-w-3xl",
+              "pointer-events-auto relative z-10 w-full max-w-3xl origin-center",
               "bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl",
               "rounded-t-3xl sm:rounded-3xl",
               "border border-white/70 dark:border-white/15",
@@ -294,7 +359,7 @@ export default function HoloCardPaymentSheet({
               "flex flex-col"
             )}
             style={{
-              willChange: "transform",
+              willChange: "transform, opacity",
               boxShadow: `0 20px 50px -10px ${activePlan.glowColor}, 0 0 0 1px rgba(255,255,255,0.6)`,
             }}
           >
@@ -314,7 +379,13 @@ export default function HoloCardPaymentSheet({
             {/* Deck Body: 2 Columns */}
             <div className="p-4 sm:p-5.5 grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-5 items-stretch">
               {/* Left Column: Interactive Hologram Card */}
-              <div className="md:col-span-5 h-full flex flex-col">
+              <motion.div
+                initial={shouldReduceMotion ? { opacity: 1 } : { scale: 0.96 }}
+                animate={{ scale: 1 }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { scale: 0.96, transition: { duration: 0.15 } }}
+                transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                className="md:col-span-5 h-full flex flex-col"
+              >
                 <HoloCard
                   plan={activePlan}
                   compact
@@ -322,75 +393,103 @@ export default function HoloCardPaymentSheet({
                   overridePrice={displayPrice}
                   overridePeriod={displayPeriod}
                 />
-              </div>
+              </motion.div>
 
-              {/* Right Column: Top-anchored & Bottom-anchored */}
-              <div className="md:col-span-7 flex flex-col justify-between h-full pt-0.5">
-                <div className="space-y-3">
-                  {/* Billing Cycle Section - Compact Segmented Control with Optical Bevel */}
-                  <div
-                    role="radiogroup"
-                    aria-label="Kỳ thanh toán"
-                    className="relative grid grid-cols-2 p-1 rounded-full bg-neutral-200/80 dark:bg-black/35 border-black/[0.08] dark:border-white/10 shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.12),inset_0_0.5px_1px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.85)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6),0_1px_0_rgba(255,255,255,0.08)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
+              {/* Right Column: Expanded 3D Payment Methods Deck */}
+              <motion.div
+                initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: 24, filter: "blur(4px)" }}
+                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: 16, filter: "blur(2px)", transition: { duration: 0.15 } }}
+                transition={{ delay: 0.08, duration: 0.28, ease: "easeOut" }}
+                className="md:col-span-7 flex flex-col h-full pt-0.5"
+              >
+                {/* Billing Cycle Section - Compact Segmented Control with Optical Bevel */}
+                <div
+                  role="radiogroup"
+                  aria-label="Kỳ thanh toán"
+                  className="relative grid grid-cols-2 p-1 rounded-full bg-neutral-200/80 dark:bg-black/35 border-black/[0.08] dark:border-white/10 shadow-[inset_0_1.5px_2.5px_rgba(0,0,0,0.12),inset_0_0.5px_1px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,0.85)] dark:shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6),0_1px_0_rgba(255,255,255,0.08)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05] shrink-0 mb-2.5 sm:mb-3"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={billingCycle === "quarterly"}
+                    onClick={() => setBillingCycle("quarterly")}
+                    className={cn(
+                      "relative py-1.5 px-3 rounded-full text-xs font-semibold transition-colors cursor-pointer select-none text-center z-10 flex items-center justify-center",
+                      billingCycle === "quarterly"
+                        ? "text-neutral-900 dark:text-white"
+                        : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
+                    )}
                   >
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={billingCycle === "quarterly"}
-                      onClick={() => setBillingCycle("quarterly")}
-                      className={cn(
-                        "relative py-1.5 px-3 rounded-full text-xs font-semibold transition-colors cursor-pointer select-none text-center z-10 flex items-center justify-center",
-                        billingCycle === "quarterly"
-                          ? "text-neutral-900 dark:text-white"
-                          : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
-                      )}
-                    >
-                      {billingCycle === "quarterly" && (
-                        <motion.div
-                          layoutId="billing-pill-active"
-                          transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] dark:border-t-white/30 border-black/[0.04] dark:border-white/10 -z-10 outline-none focus:outline-none focus-visible:outline-none"
-                        />
-                      )}
-                      <span>3 tháng</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={billingCycle === "yearly"}
-                      onClick={() => setBillingCycle("yearly")}
-                      className={cn(
-                        "relative py-1.5 px-3 rounded-full text-xs font-semibold transition-colors cursor-pointer select-none text-center z-10 flex items-center justify-center gap-1.5",
-                        billingCycle === "yearly"
-                          ? "text-neutral-900 dark:text-white"
-                          : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
-                      )}
-                    >
-                      {billingCycle === "yearly" && (
-                        <motion.div
-                          layoutId="billing-pill-active"
-                          transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] dark:border-t-white/30 border-black/[0.04] dark:border-white/10 -z-10 outline-none focus:outline-none focus-visible:outline-none"
-                        />
-                      )}
-                      <span>1 năm</span>
-                      <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
-                        -20%
-                      </span>
-                    </button>
-                  </div>
+                    {billingCycle === "quarterly" && (
+                      <motion.div
+                        layoutId="billing-pill-active"
+                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                        className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] dark:border-t-white/30 border-black/[0.04] dark:border-white/10 -z-10 outline-none focus:outline-none focus-visible:outline-none"
+                      />
+                    )}
+                    <span>3 tháng</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={billingCycle === "yearly"}
+                    onClick={() => setBillingCycle("yearly")}
+                    className={cn(
+                      "relative py-1.5 px-3 rounded-full text-xs font-semibold transition-colors cursor-pointer select-none text-center z-10 flex items-center justify-center gap-1.5",
+                      billingCycle === "yearly"
+                        ? "text-neutral-900 dark:text-white"
+                        : "text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
+                    )}
+                  >
+                    {billingCycle === "yearly" && (
+                      <motion.div
+                        layoutId="billing-pill-active"
+                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                        className="absolute inset-0 bg-white dark:bg-neutral-700 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.09),0_1px_2px_rgba(0,0,0,0.05)] dark:border-t-white/30 border-black/[0.04] dark:border-white/10 -z-10 outline-none focus:outline-none focus-visible:outline-none"
+                      />
+                    )}
+                    <span>1 năm</span>
+                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                      -20%
+                    </span>
+                  </button>
+                </div>
 
-                  {/* Payment Methods */}
-                  <div
+                {/* Payment Methods Deck Body - Vertical Top-to-Bottom Cascade Animation with Zero-Clipping */}
+                <div className="relative flex-1 flex flex-col min-h-0 p-1 sm:p-1.5 overflow-visible">
+                  {/* Payment Methods - Top-to-bottom cascade entrance on tag switch */}
+                  <motion.div
+                    key={billingCycle}
+                    initial={
+                      shouldReduceMotion
+                        ? { opacity: 0 }
+                        : {
+                            y: -14,
+                            opacity: 0.4,
+                          }
+                    }
+                    animate={{
+                      y: 0,
+                      opacity: 1,
+                    }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 28,
+                      mass: 0.75,
+                    }}
                     role="radiogroup"
                     aria-label="Phương thức thanh toán"
-                    className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+                    className="flex-1 flex flex-col justify-between gap-2.5 sm:gap-3 h-full"
+                    style={{ perspective: "1000px", transformStyle: "preserve-3d" }}
                   >
-                    {PAYMENT_METHODS.map((m) => {
+                    {PAYMENT_METHODS.map((m, idx) => {
                       const isSelected = selectedMethod === m.id;
                       return (
-                        <div
+                        <motion.div
                           key={m.id}
+                          layout
                           role="radio"
                           aria-checked={isSelected}
                           tabIndex={0}
@@ -401,51 +500,120 @@ export default function HoloCardPaymentSheet({
                               setSelectedMethod(m.id);
                             }
                           }}
+                          initial={
+                            shouldReduceMotion
+                              ? undefined
+                              : {
+                                  y: -16 - idx * 4,
+                                  opacity: 0.3,
+                                }
+                          }
+                          animate={{
+                            y: isSelected ? -2 : 0,
+                            opacity: isSelected ? 1 : 0.88,
+                            scale: isSelected ? 1.018 : 0.985,
+                            zIndex: isSelected ? 20 : 10 - idx,
+                          }}
+                          transition={{
+                            default: {
+                              type: "spring",
+                              stiffness: 420,
+                              damping: 26,
+                            },
+                            y: {
+                              type: "spring",
+                              stiffness: 420,
+                              damping: 26,
+                              delay: idx * 0.035,
+                            },
+                            opacity: {
+                              duration: 0.22,
+                              delay: idx * 0.025,
+                            },
+                          }}
+                          whileHover={
+                            shouldReduceMotion
+                              ? undefined
+                              : {
+                                  scale: isSelected ? 1.022 : 1.01,
+                                  y: isSelected ? -3 : -1.5,
+                                  transition: { type: "spring", stiffness: 450, damping: 25 },
+                                }
+                          }
+                          whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
                           className={cn(
-                            "p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer transition-all duration-150 select-none",
+                            "group relative px-3.5 sm:px-4 py-2.5 sm:py-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-colors duration-150 select-none flex-1 min-h-[58px] sm:min-h-[64px]",
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
                             isSelected
-                              ? "bg-sky-50/70 dark:bg-sky-950/40 border-sky-400/80 dark:border-sky-500/70 ring-1 ring-sky-400/30 shadow-xs"
-                              : "bg-white/60 dark:bg-white/5 border-black/5 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
+                              ? "bg-sky-50/80 dark:bg-sky-950/45 border-sky-400/90 dark:border-sky-500/80 ring-1 ring-sky-400/40 shadow-[0_8px_20px_-4px_rgba(56,189,248,0.22),0_2px_6px_rgba(0,0,0,0.06)]"
+                              : "bg-white/60 dark:bg-white/5 border-black/5 dark:border-white/10 hover:bg-white/90 dark:hover:bg-white/10 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
                           )}
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-lg bg-neutral-100/80 dark:bg-neutral-800/80 flex items-center justify-center shrink-0">
+                          <div className="flex items-center gap-3 min-w-0 flex-1 relative z-10">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center shrink-0">
                               {m.icon}
                             </div>
-                            <div className="min-w-0">
-                              <div className="text-xs font-semibold truncate text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs sm:text-sm font-semibold truncate text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
                                 <span>{m.name}</span>
                                 {m.badge && (
-                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-neutral-200/70 dark:bg-neutral-700/70 text-neutral-600 dark:text-neutral-300">
+                                  <span className="text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neutral-200/70 dark:bg-neutral-700/70 text-neutral-600 dark:text-neutral-300">
                                     {m.badge}
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
+                              <div className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
                                 {m.account ?? m.detail}
                               </div>
                             </div>
                           </div>
 
-                          <div
-                            className={cn(
-                              "w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors",
-                              isSelected
-                                ? "bg-sky-500 text-white shadow-xs"
-                                : "border border-neutral-300 dark:border-neutral-600"
+                          <div className="flex items-center gap-2.5 shrink-0 relative z-10">
+                            {m.timeTag && (
+                              <motion.span
+                                animate={{ scale: isSelected ? 1.04 : 1 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 22 }}
+                                className={cn(
+                                  "relative px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-tight select-none border transition-all duration-200",
+                                  isSelected
+                                    ? cn(
+                                        "bg-gradient-to-b from-sky-400/25 via-sky-500/20 to-sky-600/30",
+                                        "border-sky-400/60 text-sky-700 dark:text-sky-300",
+                                        "shadow-[0_2px_8px_rgba(56,189,248,0.35),0_0_0_1px_rgba(56,189,248,0.2),inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.07)]",
+                                        "dark:shadow-[0_2px_10px_rgba(56,189,248,0.4),0_0_0_1px_rgba(56,189,248,0.25),inset_0_1px_0_rgba(255,255,255,0.2),inset_0_-1px_1px_rgba(0,0,0,0.3)]"
+                                      )
+                                    : cn(
+                                        "bg-gradient-to-b from-white via-neutral-50 to-neutral-200/90 dark:from-neutral-800 dark:via-neutral-800/90 dark:to-neutral-900",
+                                        "border-black/[0.08] dark:border-white/10 text-neutral-600 dark:text-neutral-300",
+                                        "shadow-[0_2px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.07)]",
+                                        "dark:shadow-[0_2px_4px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_1px_rgba(0,0,0,0.3)]"
+                                      )
+                                )}
+                              >
+                                {m.timeTag}
+                              </motion.span>
                             )}
-                          >
-                            {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+
+                            <div
+                              className={cn(
+                                "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-200",
+                                isSelected
+                                  ? "bg-sky-500 text-white shadow-xs scale-105"
+                                  : "border border-neutral-300 dark:border-neutral-600"
+                              )}
+                            >
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
                           </div>
-                        </div>
+                        </motion.div>
                       );
                     })}
-                  </div>
+                  </motion.div>
                 </div>
+
                 {/* Error Banner */}
                 {errorMessage && (
-                  <div className="mt-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300">
+                  <div className="mt-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300 shrink-0">
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
                     <div className="flex-1">
                       <div className="font-semibold">Thanh toán chưa thành công</div>
@@ -456,7 +624,7 @@ export default function HoloCardPaymentSheet({
 
                 {/* Success Banner */}
                 {isSuccess && successInfo && (
-                  <div className="mt-2.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-2.5 text-xs text-emerald-700 dark:text-emerald-300">
+                  <div className="mt-2.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-2.5 text-xs text-emerald-700 dark:text-emerald-300 shrink-0">
                     <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
                     <div className="flex-1">
                       <div className="font-semibold">Kích hoạt thành công {successInfo.planName}!</div>
@@ -468,37 +636,7 @@ export default function HoloCardPaymentSheet({
                     </div>
                   </div>
                 )}
-
-                {/* Action CTA Button - Bottom Anchored & Bevel Effect */}
-                <div className="mt-auto pt-3">
-                  <button
-                    type="button"
-                    disabled={isProcessing || isSuccess}
-                    onClick={handlePay}
-                    className={cn(
-                      "w-full py-3 px-5 rounded-xl font-bold text-sm tracking-wide select-none text-white",
-                      "flex items-center justify-center cursor-pointer",
-                      "border border-black/[0.04] dark:border-white/[0.05] outline-none focus:outline-none focus-visible:outline-none",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2",
-                      "transition-all duration-200 active:scale-[0.985] active:brightness-95",
-                      isSuccess
-                        ? "bg-emerald-600 shadow-[0_4px_14px_rgba(16,185,129,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
-                        : activePlan.id === "free"
-                        ? "bg-gradient-to-b from-[#38BDF8] to-[#0284C7] shadow-[0_4px_14px_rgba(14,165,233,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] hover:brightness-105 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
-                        : "bg-gradient-to-b from-[#FF5E3A] to-[#E03A12] shadow-[0_4px_14px_rgba(255,94,58,0.35),inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_1px_rgba(0,0,0,0.12)] hover:brightness-105 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
-                      isProcessing && "opacity-85 cursor-wait"
-                    )}
-                  >
-                    {isProcessing ? (
-                       <span>Đang kết nối...</span>
-                     ) : isSuccess ? (
-                       <span>Thành công!</span>
-                     ) : (
-                       <span>Thanh toán</span>
-                     )}
-                   </button>
-                </div>
-              </div>
+              </motion.div>
             </div>
           </motion.div>
         </div>

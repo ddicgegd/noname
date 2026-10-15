@@ -1,5 +1,5 @@
 import type { Product, ProductAttributeOption } from "../lib/productCatalog";
-import { getUnifiedAccessToken, unifiedFetch } from "../lib/api";
+import { getUnifiedAccessToken, unifiedFetch, resolveMediaUrl } from "../lib/api";
 import { getAppErrorMessage } from "../components/ui/AppErrorNotice";
 
 export interface ProductSearchFilter {
@@ -105,20 +105,25 @@ function calculateDiscountPercent(price?: number | null, salePrice?: number | nu
   return Math.round(((price - salePrice) / price) * 100);
 }
 
-function deriveCategory(categoryName?: string | null, index = 0): Product["category"] {
+function deriveCategory(categoryName?: string | null): string {
   const raw = (categoryName || "").toLowerCase();
-  if (raw.includes("storage") || raw.includes("s3") || raw.includes("database") || raw.includes("home")) return "storage";
-  if (raw.includes("network") || raw.includes("cdn") || raw.includes("edge")) return "network";
-  if (raw.includes("compute") || raw.includes("gpu") || raw.includes("server") || raw.includes("electronics")) return "compute";
-  if (raw.includes("ai") || raw.includes("model")) return "ai";
-  return (["ai", "compute", "storage", "network"] as const)[index % 4];
+  if (raw.includes("thoại") || raw.includes("phone") || raw.includes("mobile")) return "phone";
+  if (raw.includes("game") || raw.includes("chơi game") || raw.includes("console")) return "gaming";
+  if (raw.includes("storage") || raw.includes("s3") || raw.includes("database") || raw.includes("lưu trữ")) return "storage";
+  if (raw.includes("network") || raw.includes("cdn") || raw.includes("edge") || raw.includes("mạng")) return "network";
+  if (raw.includes("compute") || raw.includes("gpu") || raw.includes("server") || raw.includes("máy chủ")) return "compute";
+  if (raw.includes("ai") || raw.includes("model") || raw.includes("trí tuệ")) return "ai";
+  return categoryName ? categoryName.trim() : "general";
 }
 
-function getCategoryVisual(category: Product["category"]) {
+function getCategoryVisual(category: string) {
+  if (category === "phone") return { icon: "smartphone", iconColor: "text-blue-500", bgColor: "bg-blue-500/10" };
+  if (category === "gaming") return { icon: "gamepad", iconColor: "text-purple-500", bgColor: "bg-purple-500/10" };
   if (category === "compute") return { icon: "developer_board", iconColor: "text-sky-500", bgColor: "bg-sky-500/10" };
   if (category === "storage") return { icon: "database", iconColor: "text-purple-500", bgColor: "bg-purple-500/10" };
   if (category === "network") return { icon: "router", iconColor: "text-emerald-500", bgColor: "bg-emerald-500/10" };
-  return { icon: "psychology", iconColor: "text-primary", bgColor: "bg-primary/10" };
+  if (category === "ai") return { icon: "psychology", iconColor: "text-primary", bgColor: "bg-primary/10" };
+  return { icon: "package", iconColor: "text-slate-500", bgColor: "bg-slate-500/10" };
 }
 
 function normalizeAttribute(attribute: any, index: number): ProductAttributeOption {
@@ -139,19 +144,19 @@ function normalizeAttribute(attribute: any, index: number): ProductAttributeOpti
 
 function normalizeProduct(product: any, index: number): Product {
   const sku = product?.skuInfo?.sku || product?.sku?.sku || product?.sku;
-  const category = deriveCategory(product?.categoryName, index);
+  const category = deriveCategory(product?.categoryName);
   const visual = getCategoryVisual(category);
   const mediaUrls = Array.isArray(product?.mediaItems)
-    ? product.mediaItems.map((media: any) => media?.url).filter(Boolean)
+    ? product.mediaItems.map((media: any) => resolveMediaUrl(media?.url)).filter(Boolean)
     : Array.isArray(product?.mediaUrls)
-      ? product.mediaUrls.filter(Boolean)
+      ? product.mediaUrls.map((url: string) => resolveMediaUrl(url)).filter(Boolean)
       : [];
 
   const rawPrice = product?.salePrice ?? product?.price;
   const oldPrice = product?.price && product?.salePrice && product.price > product.salePrice
     ? formatVndFromApiPrice(product.price)
     : undefined;
-  const price = formatVndFromApiPrice(rawPrice) || "5.000.000đ";
+  const price = formatVndFromApiPrice(rawPrice);
   const discountPercent = calculateDiscountPercent(product?.price, product?.salePrice)
     ?? (typeof product?.discountPercent === "number" ? product.discountPercent : undefined);
 
@@ -162,7 +167,7 @@ function normalizeProduct(product: any, index: number): Product {
   ].filter((spec): spec is { label: string; value: string } => Boolean(spec));
 
   return {
-    id: String(sku || product?.id || `api-product-${index}`),
+    id: String(sku || product?.id || `product-${index}`),
     sku: sku ? String(sku) : undefined,
     status: product?.status,
     categoryName: product?.categoryName,
@@ -174,12 +179,12 @@ function normalizeProduct(product: any, index: number): Product {
     tag: discountPercent && discountPercent > 0 ? "Popular" : undefined,
     tagType: discountPercent && discountPercent > 0 ? "popular" : undefined,
     ...visual,
-    desc: product?.categoryName ? `${product.name || sku} - ${product.categoryName}` : product?.name || "Sản phẩm từ API",
-    price,
+    desc: product?.categoryName ? `${product.name || sku} - ${product.categoryName}` : (product?.name || ""),
+    price: price || "Liên hệ",
     oldPrice,
     discount: discountPercent && discountPercent > 0 ? `Giảm ${Math.round(discountPercent)}%` : undefined,
     bgColor: visual.bgColor,
-    longDesc: product?.description || product?.categoryName || product?.name || "Sản phẩm từ hệ thống merchandise.",
+    longDesc: product?.description || product?.categoryName || product?.name || "",
     specs,
     mediaUrls,
   };

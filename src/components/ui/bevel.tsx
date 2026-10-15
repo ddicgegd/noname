@@ -19,6 +19,9 @@ const bevelVariants = cva(
         // Khung thẻ Card nổi khối 3D
         card: "bg-gradient-to-b from-white/90 via-white/75 to-white/60 backdrop-blur-2xl shadow-[0_10px_30px_-5px_rgba(0,0,0,0.06),0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.03)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
         
+        // Khung thông báo Toast nổi khối quang học 3D (Floating Bevel Toast)
+        toast: "bg-gradient-to-b from-white/95 via-white/85 to-white/70 dark:from-zinc-900/95 dark:via-zinc-900/85 dark:to-zinc-950/80 backdrop-blur-2xl backdrop-saturate-200 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18),0_4px_12px_-2px_rgba(255,77,36,0.08),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.08]",
+
         // Khung vỏ lớn bao toàn bộ section (Shell container)
         shell: "bg-gradient-to-b from-white/60 via-white/40 to-white/20 backdrop-blur-2xl shadow-[0_12px_40px_-8px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
 

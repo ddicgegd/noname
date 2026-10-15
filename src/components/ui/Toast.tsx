@@ -14,6 +14,8 @@ import {
   Mail,
   X,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Bevel, BevelButton, bevelVariants } from "./bevel";
 
 export type ToastType = "success" | "info" | "warning" | "error";
 
@@ -65,9 +67,26 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts([]);
   }, []);
 
+  const lastToastRef = useRef<{ message: string; type: ToastType; time: number; id: string } | null>(null);
+
   const showToast = useCallback(
     (message: string, type: ToastType = "success", title?: string, duration: number = 4200): string => {
-      const id = Date.now().toString() + "-" + Math.random().toString(36).substring(2, 6);
+      const cleanMessage = (message || "").trim();
+      if (!cleanMessage) return "";
+
+      const now = Date.now();
+      // Deduplicate: If an identical toast (same message & type) was triggered within 1500ms, ignore duplicate invocation
+      if (
+        lastToastRef.current &&
+        lastToastRef.current.message === cleanMessage &&
+        lastToastRef.current.type === type &&
+        now - lastToastRef.current.time < 1500
+      ) {
+        return lastToastRef.current.id;
+      }
+
+      const id = now.toString() + "-" + Math.random().toString(36).substring(2, 6);
+      lastToastRef.current = { message: cleanMessage, type, time: now, id };
 
       if (duration > 0) {
         const timer = setTimeout(() => {
@@ -78,8 +97,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
       // Stacked deck: maximum 3 items, newest sits on top and shrinks previous items
       setToasts((prev) => {
-        const trimmed = prev.slice(-2);
-        return [...trimmed, { id, message, type, title, duration }];
+        // If already present in the active stack, replace and refresh it with new timer
+        const filtered = prev.filter((t) => {
+          if (t.message.trim() === cleanMessage && t.type === type) {
+            const oldTimer = timersRef.current.get(t.id);
+            if (oldTimer) {
+              clearTimeout(oldTimer);
+              timersRef.current.delete(t.id);
+            }
+            return false;
+          }
+          return true;
+        });
+        const trimmed = filtered.slice(-2);
+        return [...trimmed, { id, message: cleanMessage, type, title, duration }];
       });
 
       return id;
@@ -128,9 +159,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 exit={{ x: 160, opacity: 0, scale: 0.92 }}
                 transition={{ type: "spring", stiffness: 380, damping: 28 }}
                 style={{ zIndex, transformOrigin: "top center" }}
-                className={`absolute top-0 right-0 w-full flex items-center justify-between gap-3 overflow-visible rounded-2xl border-t border-t-white/95 border-b border-b-slate-400/40 border-x border-x-white/70 dark:border-white/20 bg-white/75 dark:bg-zinc-900/80 p-3.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),0_10px_25px_-5px_rgba(255,77,36,0.12),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-2xl backdrop-saturate-200 select-none text-left ${
+                className={cn(
+                  "absolute top-0 right-0 w-full flex items-center justify-between gap-3 overflow-visible rounded-2xl p-3.5 text-left",
+                  bevelVariants({ variant: "toast", size: "none" }),
                   isFront ? "pointer-events-auto" : "pointer-events-none"
-                }`}
+                )}
               >
                 {/* Ambient tint overlay identical to bottom bar */}
                 <div
@@ -140,7 +173,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
                 {/* Left Content: Badge Icon and Message */}
                 <div className="relative z-10 flex items-center gap-3 min-w-0 pr-1 flex-1">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-orange-50 to-orange-100/60 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_4px_rgba(255,77,36,0.08)] shrink-0 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
+                  {/* Tactical Bevel Badge Icon Container */}
+                  <Bevel
+                    variant="tactile-light"
+                    size="none"
+                    className="size-8 rounded-xl flex items-center justify-center shrink-0 border border-black/[0.04] dark:border-white/[0.05]"
+                  >
                     {toast.type === "error" ? (
                       <AlertCircle className="w-4 h-4 text-[#FF4D24] stroke-[2.2]" />
                     ) : toast.type === "warning" ? (
@@ -156,7 +194,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     ) : (
                       <CheckCircle2 className="w-4 h-4 text-[#FF4D24] stroke-[2.4]" />
                     )}
-                  </div>
+                  </Bevel>
 
                   <div className="flex flex-col min-w-0">
                     {toast.title && (
@@ -176,15 +214,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
 
-                {/* Dismiss button */}
-                <button
+                {/* Dismiss button with BevelButton */}
+                <BevelButton
                   type="button"
+                  variant="subtle"
+                  size="none"
                   onClick={() => dismissToast(toast.id)}
-                  className="relative z-10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100/60 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer shrink-0 ml-1"
+                  className="relative z-10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 size-7 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
                   title="Đóng thông báo"
                 >
                   <X className="w-3.5 h-3.5" />
-                </button>
+                </BevelButton>
               </motion.div>
             );
           })}

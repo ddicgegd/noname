@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
-  User, Lock, Mail, ChevronDown, ChevronUp, CheckCircle, 
+  User, Lock, Mail, CheckCircle, 
   Eye, EyeOff, AlertCircle, RefreshCw, Loader2, ArrowRight, ArrowLeft, Phone,
   Shield, Check, X, Sliders, ShoppingBag, ClipboardList, Truck, Package, PackageOpen, 
   MapPin, Clock, CreditCard, ChevronRight, HelpCircle, Plus, Trash2, Edit3,
   Smartphone, Laptop, Globe, Key, Keyboard, Building2, Home, Sparkles, Wallet, ExternalLink,
-  ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy, Activity, Code2,
+  ShieldCheck, ArrowUpRight, Compass, Navigation, Terminal, Copy,
   LocateFixed, Map as LucideMap, Search, CheckCircle2, Layers, Bookmark, ShoppingCart, Crown,
-  Camera, Upload, Calendar, Wifi, Settings2, Pencil, ShieldAlert, Cake, PartyPopper,
-  Server, RotateCcw, AlertTriangle
+  Camera, Upload, Calendar, Pencil, ShieldAlert, Cake, PartyPopper,
+  AlertTriangle
 } from "lucide-react";
 import { BirthdayDatePicker } from "./ui/BirthdayDatePicker";
 import { useToast } from "./ui/Toast";
 import { getAppErrorMessage } from "./ui/AppErrorNotice";
-import { apiRequest, unifiedFetch, getUnifiedAccessToken, getApiBaseUrl, setApiBaseUrl, resetApiBaseUrl, pingEndpoint, PingResult } from "../lib/api";
+import { unifiedFetch, getUnifiedAccessToken, resolveMediaUrl } from "../lib/api";
 import { 
   updateMyProfile, 
   uploadAvatar, 
@@ -300,17 +300,49 @@ function saveTutorialDismissedForAccount(accountKey: string, dismissed: boolean)
 
 export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const { showToast } = useToast();
-  // Authentication status
-  const [token, setToken] = useState<string>("");
-  const [user, setUser] = useState<any>(null);
+  // Authentication status - Synchronously initialized to prevent unauthenticated card flash
+  const [token, setToken] = useState<string>(() => {
+    try {
+      return getUnifiedAccessToken();
+    } catch {
+      return "";
+    }
+  });
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || 
+                     localStorage.getItem("horizon_current_user") ||
+                     localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed?.user || parsed;
+      }
+    } catch {}
+    return null;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(() => {
     try {
-      return !(localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem("horizon_current_user"));
+      const hasUser = !!(localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem("horizon_current_user"));
+      const hasToken = !!getUnifiedAccessToken();
+      return !hasUser && !hasToken;
     } catch {
       return true;
     }
   });
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+
+  // Auto redirect to #login if unauthenticated on /m
+  useEffect(() => {
+    const currentToken = getUnifiedAccessToken();
+    const stored = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || 
+                   localStorage.getItem("horizon_current_user") ||
+                   localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+    if (!currentToken && !stored) {
+      sessionStorage.setItem("auth_redirect_target", "/m");
+      window.location.hash = "login";
+      onNavigate("auth");
+    }
+  }, [onNavigate]);
 
   // Accounts Center Modal Trigger State & Active Tab
   const [isAccountsCenterOpen, setIsAccountsCenterOpen] = useState<boolean>(false);
@@ -366,88 +398,6 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     }
   };
 
-  // API Gateway & Ping Probe State & Handlers
-  const [apiEndpointUrl, setApiEndpointUrl] = useState<string>(() => getApiBaseUrl());
-  const [customInputUrl, setCustomInputUrl] = useState<string>(() => getApiBaseUrl());
-  const [isPinging, setIsPinging] = useState<boolean>(false);
-  const [pingResult, setPingResult] = useState<PingResult | null>(null);
-  const [endpointValidationError, setEndpointValidationError] = useState<string>("");
-  const [isEndpointDrawerOpen, setIsEndpointDrawerOpen] = useState<boolean>(false);
-
-  // Synchronize endpoint state across tabs and windows
-  useEffect(() => {
-    const syncEndpoint = () => {
-      const current = getApiBaseUrl();
-      setApiEndpointUrl(current);
-      setCustomInputUrl(current);
-    };
-    window.addEventListener("api-base-url-changed", syncEndpoint);
-    window.addEventListener("storage", syncEndpoint);
-    return () => {
-      window.removeEventListener("api-base-url-changed", syncEndpoint);
-      window.removeEventListener("storage", syncEndpoint);
-    };
-  }, []);
-
-  const handlePingTest = async (target?: string) => {
-    try {
-      setIsPinging(true);
-      const urlToPing = target || apiEndpointUrl;
-      const res = await pingEndpoint(urlToPing);
-      setPingResult(res);
-      if (res.success) {
-        showToast(`Kết nối máy chủ thành công (${res.latencyMs}ms)`, "success");
-      } else {
-        showToast(`Không thể kết nối tới endpoint: ${res.error || "Máy chủ không phản hồi"}`, "error");
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setPingResult({ success: false, latencyMs: 0, error: msg });
-      showToast(`Lỗi kiểm tra kết nối: ${msg}`, "error");
-    } finally {
-      setIsPinging(false);
-    }
-  };
-
-  const handleApplyEndpoint = async () => {
-    const trimmed = customInputUrl.trim();
-    if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-      const err = "URL Endpoint phải bắt đầu bằng http:// hoặc https://";
-      setEndpointValidationError(err);
-      showToast(err, "error");
-      return;
-    }
-    setEndpointValidationError("");
-    try {
-      setApiBaseUrl(trimmed);
-      const normalized = getApiBaseUrl();
-      setApiEndpointUrl(normalized);
-      setCustomInputUrl(normalized);
-      showToast(`Đã áp dụng API Endpoint mới: ${normalized}`, "success");
-      await handlePingTest(normalized);
-      loadDeviceSessions();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Không thể áp dụng endpoint";
-      setEndpointValidationError(msg);
-      showToast(msg, "error");
-    }
-  };
-
-  const handleResetEndpoint = () => {
-    resetApiBaseUrl();
-    const defaultUrl = getApiBaseUrl();
-    setApiEndpointUrl(defaultUrl);
-    setCustomInputUrl(defaultUrl);
-    setEndpointValidationError("");
-    setPingResult(null);
-    showToast("Đã khôi phục API Endpoint về mặc định hệ thống.", "info");
-    loadDeviceSessions();
-  };
-
-  const handlePresetSelect = (presetUrl: string) => {
-    setCustomInputUrl(presetUrl);
-    setEndpointValidationError("");
-  };
   // Navigation Tutorial banner state & active keypress indicator (per-account permanent persistence)
   const [showNavTutorial, setShowNavTutorial] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -758,8 +708,18 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [editGender, setEditGender] = useState<string>("");
   const [editDateOfBirth, setEditDateOfBirth] = useState<string>("");
   const [editAvatarUrl, setEditAvatarUrl] = useState<string>("");
+  const [avatarImgError, setAvatarImgError] = useState<boolean>(false);
+  const [editAvatarImgError, setEditAvatarImgError] = useState<boolean>(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState<boolean>(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setAvatarImgError(false);
+  }, [user?.avatarUrl]);
+
+  useEffect(() => {
+    setEditAvatarImgError(false);
+  }, [editAvatarUrl, user?.avatarUrl]);
 
 
   const [lastSyncTime, setLastSyncTime] = useState<string>("");
@@ -1155,9 +1115,20 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     };
   }, [selectedOrderId, activeOrder?.id, scrollToEndpoint]);
 
-  // On mount, load token, validate user, and seed/load order data
+  // On mount and auth change, load token, validate user, and seed/load order data
   useEffect(() => {
     loadProfileAndOrders();
+
+    const handleAuthChange = () => {
+      loadProfileAndOrders();
+    };
+
+    window.addEventListener("user-auth-change", handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+    return () => {
+      window.removeEventListener("user-auth-change", handleAuthChange);
+      window.removeEventListener("storage", handleAuthChange);
+    };
   }, []);
 
   // Smart Interval Polling for active order tracking & background refresh
@@ -2307,22 +2278,23 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           <div className="h-5 min-h-[20px] invisible pointer-events-none select-none" aria-hidden="true" />
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {!isLoading && token && user ? (
+            {!isLoading && (token || user) ? (
               /* Unified User Info & Title when logged in */
               <div className="flex items-center gap-4">
-                {user.avatarUrl ? (
+                {(user?.avatarUrl && !avatarImgError) ? (
                   <img 
-                    src={user.avatarUrl} 
+                    src={resolveMediaUrl(user.avatarUrl)} 
                     alt={user.fullName || "User Avatar"} 
                     className="w-14 h-14 rounded-full object-cover shadow-[0_4px_12px_rgba(0,0,0,0.15)] border-2 border-white ring-4 ring-indigo-50/80 shrink-0 select-none"
+                    onError={() => setAvatarImgError(true)}
                   />
                 ) : (
                   <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)] shrink-0 select-none ring-4 ring-indigo-50/80 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
-                    {user.fullName ? user.fullName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : "H")}
+                    {user?.fullName ? user.fullName.charAt(0).toUpperCase() : (user?.username ? user.username.charAt(0).toUpperCase() : "H")}
                   </div>
                 )}
                 <div className="space-y-1.5">
-                  <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">{user.fullName || "Hội viên Horizon"}</h1>
+                  <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">{user?.fullName || "Hội viên Horizon"}</h1>
                   <div className="flex items-center">
                     {(() => {
                       const rankInfo = getMembershipRankInfo(user);
@@ -2345,7 +2317,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
             )}
 
             {/* Top Toolbar actions (Only shown when authenticated) */}
-            {!isLoading && token && user && (
+            {!isLoading && (token || user) && (
               <div className="flex items-center gap-3 self-start md:self-auto">
                 <button 
                   onClick={() => {
@@ -2379,7 +2351,7 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               Đang đồng bộ dữ liệu dịch vụ...
             </p>
           </div>
-        ) : !token || !user ? (
+        ) : (!token && !user) ? (
           /* Empty / Not logged-in dashboard */
           <div className="max-w-md mx-auto bg-gradient-to-b from-white/95 via-white/85 to-white/70 backdrop-blur-2xl rounded-3xl p-8 text-center space-y-6 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
             <div className="w-12 h-12 rounded-full bg-gradient-to-b from-rose-50 to-rose-100 flex items-center justify-center mx-auto text-red-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_2px_6px_rgba(225,29,72,0.1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
@@ -2392,10 +2364,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
               </p>
             </div>
             <button
-              onClick={() => { window.location.hash = "login"; onNavigate("auth"); }}
+              onClick={() => {
+                sessionStorage.setItem("auth_redirect_target", "/m");
+                window.location.hash = "login";
+                onNavigate("auth");
+              }}
               className="w-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] hover:brightness-105 active:scale-95 text-white text-xs font-bold py-3.5 rounded-2xl transition-all cursor-pointer shadow-[0_4px_16px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
             >
-              Đăng ký / Đăng nhập ngay ↗
+              Đăng nhập ngay ↗
             </button>
           </div>
         ) : (
@@ -3338,11 +3314,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                         <div className="flex items-center gap-3.5">
                           {/* Avatar with live upload & hover action */}
                           <div className="relative group shrink-0 w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shadow-[0_8px_20px_-4px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.3)] ring-2 ring-slate-900/5 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
-                            {(editAvatarUrl || user?.avatarUrl) ? (
+                            {((editAvatarUrl || user?.avatarUrl) && !editAvatarImgError) ? (
                               <img 
-                                src={editAvatarUrl || user?.avatarUrl} 
+                                src={resolveMediaUrl(editAvatarUrl || user?.avatarUrl)} 
                                 alt={user?.fullName || "Avatar"} 
                                 className="w-full h-full object-cover block"
+                                onError={() => setEditAvatarImgError(true)}
                               />
                             ) : (
                               <div className="w-full h-full bg-gradient-to-tr from-slate-900 via-indigo-950 to-[#FF4D24]/90 text-white flex items-center justify-center font-display font-black text-xl sm:text-2xl select-none">
@@ -4018,251 +3995,16 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
 
 
 
-                {/* TAB 5: System Settings, API Gateway & Active Sessions */}
+                {/* TAB 5: Thiết bị & Phiên hoạt động (Active Sessions) */}
                 {activeModalTab === "sessions" && (
                   <div className="space-y-4 flex-1 flex flex-col min-h-0">
                     
-                    {/* 1. API Gateway & Network Ping Probe Control Card (Bevel Glassmorphism) */}
-                    <div className="p-4 sm:p-5 bg-gradient-to-b from-white via-white/95 to-slate-50/80 rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-slate-900/5 text-left space-y-3.5 shrink-0 relative overflow-hidden outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
-                      {/* Ambient corner glow */}
-                      <div className="absolute top-0 right-0 w-64 h-32 bg-gradient-to-br from-indigo-500/5 via-sky-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
-
-                      {/* Header with Title, Status Badge & Ping Probe Button */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_3px_10px_rgba(99,102,241,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
-                            <Server className="w-5 h-5 stroke-[2.2]" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="text-sm font-black text-slate-900 leading-tight">
-                                API Gateway & Kết Nối Hệ Thống
-                              </h4>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]">
-                                <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                                TLS 1.3 • Bearer
-                              </span>
-                            </div>
-                            <p className="text-[11.5px] text-slate-500 mt-0.5">
-                              Cấu hình phân giải Endpoint máy chủ và giám sát đường truyền
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
-                          {/* Live Status Badge */}
-                          {isPinging ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200/90 px-2.5 py-1 rounded-xl shadow-sm">
-                              <RefreshCw className="w-3 h-3 animate-spin text-amber-600" />
-                              Đang đo độ trễ...
-                            </span>
-                          ) : pingResult ? (
-                            pingResult.success ? (
-                              <span
-                                className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-xl border shadow-sm ${
-                                  pingResult.latencyMs < 100
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/90"
-                                    : pingResult.latencyMs <= 300
-                                    ? "bg-amber-50 text-amber-700 border-amber-200/90"
-                                    : "bg-rose-50 text-rose-700 border-rose-200/90"
-                                }`}
-                              >
-                                <span
-                                  className={`w-2 h-2 rounded-full ${
-                                    pingResult.latencyMs < 100
-                                      ? "bg-emerald-500 animate-pulse"
-                                      : pingResult.latencyMs <= 300
-                                      ? "bg-amber-500"
-                                      : "bg-rose-500"
-                                  }`}
-                                />
-                                {pingResult.latencyMs} ms
-                                <span className="text-[10px] font-normal opacity-75 hidden sm:inline">
-                                  ({pingResult.latencyMs < 100 ? "Tuyệt vời" : pingResult.latencyMs <= 300 ? "Bình thường" : "Độ trễ cao"})
-                                </span>
-                              </span>
-                            ) : (
-                              <span
-                                className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200/90 px-2.5 py-1 rounded-xl shadow-sm"
-                                title={pingResult.error || "Không thể kết nối"}
-                              >
-                                <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
-                                Không thể kết nối
-                              </span>
-                            )
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-slate-100/90 border border-slate-200 px-2.5 py-1 rounded-xl">
-                              <span className="w-2 h-2 rounded-full bg-slate-400" />
-                              Sẵn sàng
-                            </span>
-                          )}
-
-                          {/* Ping Probe Trigger Button */}
-                          <button
-                            type="button"
-                            onClick={() => handlePingTest()}
-                            disabled={isPinging}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-700 hover:text-indigo-600 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
-                            title="Đo độ trễ tới Endpoint qua API /api/health"
-                          >
-                            <Activity className={`w-3.5 h-3.5 text-indigo-500 ${isPinging ? "animate-spin" : ""}`} />
-                            <span>{isPinging ? "Đang ping..." : "Kiểm tra Ping"}</span>
-                          </button>
-
-                          {/* URL Configuration Drawer Trigger Button (ADR-002 & USER_UPDATE_FEATURES_SPEC.md 4.2) */}
-                          <button
-                            type="button"
-                            onClick={() => setIsEndpointDrawerOpen(prev => !prev)}
-                            className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer border active:scale-95 ${
-                              isEndpointDrawerOpen
-                                ? "bg-indigo-50 text-indigo-700 border-indigo-200 shadow-inner"
-                                : "bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-700 hover:text-indigo-600 shadow-[0_1px_3px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
-                            }`}
-                            title="Mở rộng khung tùy chỉnh URL Endpoint máy chủ"
-                          >
-                            <Settings2 className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>{isEndpointDrawerOpen ? "Đóng cấu hình" : "Cấu hình URL"}</span>
-                            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isEndpointDrawerOpen ? "rotate-180" : ""}`} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Active Gateway URL Indicator */}
-                      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50/90 border border-slate-200/80 rounded-xl text-xs relative z-10">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
-                            Endpoint Đang Kích Hoạt:
-                          </span>
-                          <span className="font-mono text-indigo-700 font-semibold truncate select-all" title={apiEndpointUrl}>
-                            {apiEndpointUrl}
-                          </span>
-                        </div>
-                        <span className="text-[10.5px] font-medium text-slate-400 shrink-0 hidden sm:inline">
-                          Mặc định: http://localhost:8080
-                        </span>
-                      </div>
-
-                      {/* Endpoint Customization Controls & Presets Drawer (Collapsible) */}
-                      <AnimatePresence initial={false}>
-                        {isEndpointDrawerOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                            className="space-y-2.5 relative z-10 overflow-hidden pt-1"
-                          >
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                              <div className="relative flex-1">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                                  <Wifi className="w-4 h-4" />
-                                </div>
-                                <input
-                                  type="text"
-                                  value={customInputUrl}
-                                  onChange={(e) => {
-                                    setCustomInputUrl(e.target.value);
-                                    if (endpointValidationError) setEndpointValidationError("");
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      handleApplyEndpoint();
-                                    }
-                                  }}
-                                  placeholder="http://localhost:8080 hoặc https://api.yourdomain.com"
-                                  className={`w-full pl-9 pr-3 py-2 text-xs font-mono bg-white border rounded-xl shadow-inner focus:outline-none focus:ring-2 transition-all ${
-                                    endpointValidationError
-                                      ? "border-rose-400 focus:ring-rose-500/20 text-rose-700"
-                                      : "border-slate-200/90 focus:outline-none focus:ring-0 focus:border-transparent text-slate-800"
-                                  }`}
-                                />
-                              </div>
-
-                              {/* Apply & Reset Buttons */}
-                              <div className="flex items-center gap-2 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={handleApplyEndpoint}
-                                  disabled={isPinging}
-                                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-700 shadow-[0_2px_8px_rgba(99,102,241,0.35),inset_0_1px_0_rgba(255,255,255,0.3)] hover:brightness-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50 outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]"
-                                >
-                                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                                  <span>Áp dụng Endpoint</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={handleResetEndpoint}
-                                  className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 active:scale-95 transition-all cursor-pointer"
-                                  title="Khôi phục URL về mặc định hệ thống"
-                                >
-                                  <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                                  <span className="hidden sm:inline">Khôi phục mặc định</span>
-                                </button>
-                              </div>
-                            </div>
-
-                            {endpointValidationError && (
-                              <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium">
-                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                <span>{endpointValidationError}</span>
-                              </div>
-                            )}
-
-                            {/* 1-Click Presets */}
-                            <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                              <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
-                                <Sparkles className="w-3 h-3 text-amber-500" />
-                                Cài đặt nhanh (1-Click):
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handlePresetSelect("http://localhost:8080")}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer active:scale-95 border ${
-                                  customInputUrl.trim() === "http://localhost:8080"
-                                    ? "bg-indigo-50 text-indigo-700 border-indigo-300 font-bold shadow-sm"
-                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                }`}
-                              >
-                                <Server className="w-3 h-3 text-indigo-500" />
-                                Spring Boot Local (:8080)
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handlePresetSelect("http://localhost:3000")}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer active:scale-95 border ${
-                                  customInputUrl.trim() === "http://localhost:3000"
-                                    ? "bg-indigo-50 text-indigo-700 border-indigo-300 font-bold shadow-sm"
-                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                }`}
-                              >
-                                <Code2 className="w-3 h-3 text-sky-500" />
-                                Express BFF (:3000)
-                              </button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-
-                    {/* 2. Subtle, Low-Profile Telemetry Metadata Bar */}
+                    {/* Status Bar */}
                     <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-slate-50/90 border border-slate-200/70 rounded-xl text-xs text-slate-500 select-none shrink-0">
                       <div className="flex items-center gap-3.5 flex-wrap min-w-0">
                         <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
                           <Laptop className="w-3.5 h-3.5 text-slate-400" />
                           <span>{deviceSessions.length} phiên đang kết nối</span>
-                        </span>
-                        <span className="text-slate-300 font-mono">•</span>
-                        <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>TLS 1.3 • Redis Sync</span>
-                        </span>
-                        <span className="text-slate-300 font-mono">•</span>
-                        <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
-                          <Globe className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Việt Nam (VN)</span>
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -4455,14 +4197,14 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
                       <div className="relative z-10 min-w-0">
                         <div className="flex items-center gap-2">
                           <h5 className="font-sans font-black text-xs sm:text-[13px] text-slate-900 tracking-tight leading-none">
-                            Bảo mật phiên phân tán đa nền tảng
+                            Bảo mật tài khoản & phiên hoạt động
                           </h5>
                           <span className="text-[9px] font-extrabold font-mono px-1.5 py-0.2 rounded-full bg-orange-500/10 text-[#FF4D24] border border-orange-200/70 uppercase">
                             Bảo mật
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-normal">
-                          Khi bạn chọn đăng xuất thiết bị, toàn bộ token xác thực trên Redis Gateway BFF sẽ bị thu hồi ngay lập tức.
+                          Khi bạn chọn đăng xuất thiết bị, toàn bộ phiên đăng nhập của thiết bị đó sẽ bị vô hiệu hóa ngay lập tức để bảo vệ an toàn cho tài khoản.
                         </p>
                       </div>
                     </div>

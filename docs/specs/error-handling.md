@@ -2,12 +2,14 @@
 
 ## 1. Mục tiêu & Nguyên tắc cốt lõi
 - **Tuyệt đối không rò rỉ chi tiết kỹ thuật ra UI**: Nghiêm cấm hiển thị hostname (`localhost:8080`, cổng port, IP), từ khóa kiến trúc (`backend`, `Spring Boot`, `Core Banking`, `GraphQL Gateway`, `WebSocket Gateway`), hoặc raw stack trace/error codes ra giao diện người dùng cuối.
-- **Chuẩn hóa thông điệp**: Mọi sự cố kết nối, lỗi mạng, lỗi máy chủ nội bộ (HTTP 500, 502, 503, 504, `Failed to fetch`, `ECONNREFUSED`) đều hiển thị thông điệp đồng nhất:
+- **Chuẩn hóa sự cố hệ thống (5xx & Network)**: Mọi sự cố kết nối, lỗi mạng, lỗi máy chủ nội bộ (HTTP 500, 502, 503, 504, `Failed to fetch`, `ECONNREFUSED`) đều hiển thị thông điệp đồng nhất:
   > **"Lỗi hệ thống. Vui lòng thử lại sau."**
-- **Deterministic Resolution (Không dùng `||` fallback hay Regex bóc tách chuỗi)**: Mọi tầng UI và Service phân giải lỗi qua `resolveAppError(error)` / `getAppErrorMessage(error)` từ `src/components/ui/AppErrorNotice.tsx`.
+- **Bảo toàn thông điệp nghiệp vụ (4xx Business Messages)**: Các lỗi nghiệp vụ từ người dùng (HTTP 400, 401, 403, 404, 409) có thông điệp cụ thể từ Backend (ProblemDetail `detail` như *"Email đã tồn tại."*, *"Mã xác thực không hợp lệ"*, v.v.) phải được bảo toàn nguyên vẹn để người dùng biết chính xác nguyên nhân, không được ghi đè bằng chuỗi thông báo chung chung.
+- **Độ phản hồi thông báo (Notification Re-triggering)**: Khi người dùng thử lại hành động (retry submit) mà vẫn phát sinh lỗi, hệ thống phải kích hoạt lại thông báo (Toast) để phản hồi người dùng, không được chặn nuốt vĩnh viễn các lần sau.
+- **Deterministic Resolution**: Mọi tầng UI và Service phân giải lỗi qua `resolveAppError(error)` / `getAppErrorMessage(error)` từ `src/components/ui/AppErrorNotice.tsx`.
 
 ## 2. Bảng mã lỗi chuẩn (`APP_ERROR_MAP`)
-| Mã lỗi | HTTP Status | Tiêu đề | Thông báo hiển thị |
+| Mã lỗi | HTTP Status | Tiêu đề | Thông báo mặc định (Fallback khi không có business detail) |
 | :--- | :--- | :--- | :--- |
 | `NETWORK_OFFLINE` | 0 | Lỗi hệ thống | Lỗi hệ thống. Vui lòng thử lại sau. |
 | `UNAUTHORIZED` | 401 | Hết phiên đăng nhập | Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại. |

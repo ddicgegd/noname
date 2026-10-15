@@ -8,6 +8,7 @@ import { motion } from "motion/react";
 import HoloCardPaymentSheet, { type PricingPlan } from "./HoloCardPaymentSheet";
 import { HoloCard } from "./HoloCard";
 import { getSubscriptionPlans } from "../services/subscriptionService";
+import { cn } from "@/lib/utils";
 
 const INITIAL_PLANS: PricingPlan[] = [
   {
@@ -26,14 +27,14 @@ const INITIAL_PLANS: PricingPlan[] = [
       "Hỗ trợ cộng đồng 24/7",
     ],
     buttonText: "Dùng thử 7 ngày",
-    bgGradient: "bg-gradient-to-b from-[#38BDF8]/10 to-transparent",
-    hoverBorderColor: "rgba(56,189,248,0.55)",
+    bgGradient: "",
+    hoverBorderColor: "rgba(0,0,0,0.15)",
     checkIconColor: "text-primary",
     buttonClass:
       "w-full bg-gradient-to-b from-white/90 via-white/75 to-white/55 backdrop-blur-md shadow-[0_2px_6px_-1px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.04)] text-black rounded-xl py-3.5 font-sans font-semibold hover:bg-primary hover:text-white transition-all duration-300 active:scale-95 cursor-pointer select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     foilTint: "#5cc8ff",
     glowColor: "rgba(56,189,248,0.30)",
-    rimColor: "rgba(56,189,248,0.9)",
+    rimColor: "transparent",
   },
   {
     id: "pro",
@@ -52,20 +53,21 @@ const INITIAL_PLANS: PricingPlan[] = [
     ],
     buttonText: "Nâng cấp Kim Cương",
     isPopular: true,
-    bgGradient: "bg-gradient-to-b from-[#C084FC]/20 to-[#FF9A9E]/20",
-    hoverBorderColor: "rgba(192,132,252,0.55)",
+    bgGradient: "",
+    hoverBorderColor: "rgba(0,0,0,0.15)",
     checkIconColor: "text-black",
     buttonClass:
       "w-full bg-gradient-to-b from-[#FF5E3A] via-[#FF4D24] to-[#E03A12] shadow-[0_4px_16px_rgba(255,77,36,0.35),0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.45)] text-white rounded-xl py-3.5 font-sans font-semibold hover:brightness-105 active:scale-95 transition-all duration-300 cursor-pointer select-none outline-none focus:outline-none focus-visible:outline-none border border-black/[0.04] dark:border-white/[0.05]",
     foilTint: "#c084fc",
     glowColor: "rgba(192,132,252,0.32)",
-    rimColor: "rgba(192,132,252,0.95)",
+    rimColor: "transparent",
   },
 ];
 
 
 export default function PricingSection() {
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
+  const [originRect, setOriginRect] = useState<DOMRect | null>(null);
   const [plans, setPlans] = useState<PricingPlan[]>(INITIAL_PLANS);
 
   useEffect(() => {
@@ -107,7 +109,19 @@ export default function PricingSection() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl lg:max-w-5xl mx-auto justify-center">
           {plans.map((plan) => (
             <div key={plan.id} className="contents">
-              <HoloCard plan={plan} onSelect={setSelectedPlan} />
+              <HoloCard
+                plan={plan}
+                className={cn(
+                  "transition-all duration-300",
+                  selectedPlan?.id === plan.id
+                    ? "opacity-20 scale-[0.98] pointer-events-none"
+                    : "opacity-100 scale-100"
+                )}
+                onSelect={(p, rect) => {
+                  setOriginRect(rect ?? null);
+                  setSelectedPlan(p);
+                }}
+              />
             </div>
           ))}
         </div>
@@ -133,11 +147,15 @@ export default function PricingSection() {
           </button>
         </motion.div>
 
-        {/* Hologram Card Payment Sheet (Style B - Floating Glass Deck) */}
+        {/* Hologram Card Payment Sheet with FLIP Morphing */}
         <HoloCardPaymentSheet
           plan={selectedPlan}
+          originRect={originRect}
           isOpen={!!selectedPlan}
-          onClose={() => setSelectedPlan(null)}
+          onClose={() => {
+            setSelectedPlan(null);
+            setOriginRect(null);
+          }}
         />
       </div>
     </section>

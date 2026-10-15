@@ -124,6 +124,7 @@ const ReviewCard = ({
 export default function ShowcaseSection() {
   const sectionRef = React.useRef<HTMLElement>(null);
   const [isInView, setIsInView] = React.useState(false);
+  const [isPaused, setIsPaused] = React.useState(true);
 
   React.useEffect(() => {
     const el = sectionRef.current;
@@ -144,10 +145,24 @@ export default function ShowcaseSection() {
   return (
     <section ref={sectionRef} id="showcase" className="py-12 bg-transparent relative overflow-hidden">
       <div 
+        role="region"
+        aria-label="Đánh giá từ khách hàng"
+        tabIndex={0}
+        onClick={() => setIsPaused((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsPaused((prev) => !prev);
+          }
+        }}
         className={cn(
-          "relative flex w-full flex-col items-center justify-center gap-2.5 overflow-hidden",
-          !isInView && "[&_.animate-marquee-magic]:[animation-play-state:paused]"
+          "relative flex w-full flex-col items-center justify-center gap-2.5 overflow-hidden cursor-pointer select-none",
+          (isPaused || !isInView) && "marquee-paused"
         )}
+        style={{
+          "--marquee-play-state": isPaused || !isInView ? "paused" : "running",
+        } as React.CSSProperties}
+        title={isPaused ? "Nhấp để tiếp tục hoạt ảnh" : "Nhấp để tạm dừng hoạt ảnh"}
       >
         {/* Row 1 */}
         <Marquee pauseOnHover className="[--duration:28s] [--gap:0.75rem]">

@@ -421,9 +421,22 @@ export async function apiRequest<T = any>(
       const extracted = errorData !== null ? extractBackendMessage(errorData) : null;
 
       let friendlyMsg = "";
-      if (extracted !== null) {
+      if (response.status >= 500) {
+        friendlyMsg = "Lỗi hệ thống. Vui lòng thử lại sau.";
+      } else if (extracted !== null) {
         if (typeof extracted.message === "string" && extracted.message.trim().length > 0) {
-          friendlyMsg = extracted.message.trim();
+          const rawMsg = extracted.message.trim();
+          const lowerRaw = rawMsg.toLowerCase();
+          if (
+            lowerRaw.includes("unexpected error") ||
+            lowerRaw.includes("internal server") ||
+            lowerRaw.includes("please try again later") ||
+            lowerRaw.includes("an error occurred")
+          ) {
+            friendlyMsg = "Lỗi hệ thống. Vui lòng thử lại sau.";
+          } else {
+            friendlyMsg = rawMsg;
+          }
         }
       }
 
@@ -491,4 +504,33 @@ export async function apiRequest<T = any>(
     console.warn(`[API Connection Info] Không thể kết nối tới ${targetUrl}:`, error);
     throw error;
   }
+}
+
+/**
+ * Chuẩn hóa URL tài nguyên hình ảnh (Avatar, Product, Banner)
+ * - Nếu rỗng: trả về chuỗi rỗng ""
+ * - Nếu đã là URL tuyệt đối (http://, https://, data:, blob:): giữ nguyên
+ * - Nếu là Object Key hoặc đường dẫn tương đối (abc.jpg, /api/images/abc.jpg):
+ *   chuẩn hóa thành URL endpoint công khai /api/images/{fileName}
+ */
+export function resolveMediaUrl(rawUrl?: string | null): string {
+  if (!rawUrl || typeof rawUrl !== "string") return "";
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return "";
+
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  ) {
+    return trimmed;
+  }
+
+  const cleanName = trimmed
+    .replace(/^\/+/, "")
+    .replace(/^api\/images\//, "")
+    .replace(/^api\/merchandise\/view-image\//, "");
+
+  return `/api/images/${cleanName}`;
 }

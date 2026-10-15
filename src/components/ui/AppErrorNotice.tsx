@@ -155,7 +155,6 @@ export function resolveAppError(error: unknown): AppErrorInfo {
       lower.includes("econnrefused") ||
       lower.includes("connection refused") ||
       lower.includes("không thể kết nối") ||
-      lower.includes("backend") ||
       lower.includes("localhost") ||
       lower.includes("spring boot") ||
       lower.includes("core banking") ||
@@ -169,22 +168,20 @@ export function resolveAppError(error: unknown): AppErrorInfo {
     ) {
       return APP_ERROR_MAP.NETWORK_OFFLINE;
     }
-    if (lower.includes("401") || lower.includes("unauthorized") || lower.includes("hết hạn")) {
-      return APP_ERROR_MAP.UNAUTHORIZED;
-    }
-    if (lower.includes("403") || lower.includes("forbidden") || lower.includes("quyền")) {
-      return APP_ERROR_MAP.FORBIDDEN;
-    }
-    if (lower.includes("404") || lower.includes("not found")) {
-      return APP_ERROR_MAP.NOT_FOUND;
-    }
-    if (lower.includes("409") || lower.includes("conflict") || lower.includes("đã tồn tại")) {
-      return APP_ERROR_MAP.CONFLICT;
-    }
     if (lower.includes("503") || lower.includes("502") || lower.includes("504") || lower.includes("unavailable")) {
       return APP_ERROR_MAP.SERVICE_UNAVAILABLE;
     }
-    if (lower.includes("500") || lower.includes("internal server") || lower.includes("lỗi máy chủ")) {
+    if (
+      lower.includes("500") ||
+      lower.includes("internal server") ||
+      lower.includes("lỗi máy chủ") ||
+      lower.includes("unexpected error") ||
+      lower.includes("an unexpected error") ||
+      lower.includes("please try again later") ||
+      lower.includes("could not execute statement") ||
+      lower.includes("nullpointerexception") ||
+      lower.includes("sqlgrammarexception")
+    ) {
       return APP_ERROR_MAP.INTERNAL_SERVER_ERROR;
     }
     return {
@@ -197,26 +194,14 @@ export function resolveAppError(error: unknown): AppErrorInfo {
   if (typeof error === "object") {
     const errObj = error as any;
 
-    // Kiểm tra status code
     const status = typeof errObj.status === "number" ? errObj.status : undefined;
-    if (status === 401) return APP_ERROR_MAP.UNAUTHORIZED;
-    if (status === 403) return APP_ERROR_MAP.FORBIDDEN;
-    if (status === 400) {
-      if (typeof errObj.detail === "string" && errObj.detail.trim()) {
-        return { ...APP_ERROR_MAP.BAD_REQUEST, message: errObj.detail.trim() };
-      }
-      return APP_ERROR_MAP.BAD_REQUEST;
-    }
-    if (status === 404) return APP_ERROR_MAP.NOT_FOUND;
-    if (status === 409) return APP_ERROR_MAP.CONFLICT;
-    if (status === 500) return APP_ERROR_MAP.INTERNAL_SERVER_ERROR;
-    if (status === 502 || status === 503 || status === 504) return APP_ERROR_MAP.SERVICE_UNAVAILABLE;
-
-    // Kiểm tra lỗi mạng / mất kết nối (TypeError, AbortError, status 0)
     const errName = typeof errObj.name === "string" ? errObj.name : "";
     const errMsg = typeof errObj.message === "string" ? errObj.message : "";
     const lowerMsg = errMsg.toLowerCase();
+    const detailStr = typeof errObj.detail === "string" ? errObj.detail.trim() : "";
+    const lowerDetail = detailStr.toLowerCase();
 
+    // 1. Kiểm tra lỗi mạng / mất kết nối (TypeError, AbortError, status 0)
     if (
       status === 0 ||
       errName === "TypeError" ||
@@ -226,42 +211,71 @@ export function resolveAppError(error: unknown): AppErrorInfo {
       lowerMsg.includes("network error") ||
       lowerMsg.includes("econnrefused") ||
       lowerMsg.includes("connection refused") ||
-      lowerMsg.includes("backend") ||
-      lowerMsg.includes("localhost") ||
-      lowerMsg.includes("spring boot") ||
-      lowerMsg.includes("core banking") ||
-      lowerMsg.includes("graphql") ||
-      lowerMsg.includes("gateway") ||
-      lowerMsg.includes("máy chủ") ||
-      lowerMsg.includes("websocket") ||
-      lowerMsg.includes("offline") ||
-      lowerMsg.includes("http://") ||
-      lowerMsg.includes("https://")
+      lowerMsg.includes("offline")
     ) {
       return APP_ERROR_MAP.NETWORK_OFFLINE;
     }
 
-    // Kiểm tra errorCode cụ thể từ backend
-    const errorCode = typeof errObj.errorCode === "string" ? errObj.errorCode.toUpperCase() : "";
-    if (errorCode === "UNAUTHORIZED" || errorCode === "AUTH_401") return APP_ERROR_MAP.UNAUTHORIZED;
-    if (errorCode === "FORBIDDEN" || errorCode === "AUTH_403") return APP_ERROR_MAP.FORBIDDEN;
-    if (errorCode === "VALIDATION_FAILED" || errorCode === "BAD_REQUEST") return APP_ERROR_MAP.BAD_REQUEST;
-    if (errorCode === "NOT_FOUND") return APP_ERROR_MAP.NOT_FOUND;
-    if (errorCode === "CONFLICT") return APP_ERROR_MAP.CONFLICT;
-    if (errorCode === "SERVICE_UNAVAILABLE" || errorCode === "SYS_503") return APP_ERROR_MAP.SERVICE_UNAVAILABLE;
-    if (errorCode === "INTERNAL_SERVER_ERROR" || errorCode === "SYS_500") return APP_ERROR_MAP.INTERNAL_SERVER_ERROR;
+    // 2. Kiểm tra lỗi máy chủ nội bộ / 5xx
+    if (
+      (status && status >= 500) ||
+      lowerMsg.includes("internal server") ||
+      lowerMsg.includes("unexpected error") ||
+      lowerMsg.includes("please try again later") ||
+      lowerDetail.includes("internal server") ||
+      lowerDetail.includes("unexpected error") ||
+      lowerDetail.includes("please try again later") ||
+      errObj.errorCode === "INTERNAL_SERVER_ERROR" ||
+      errObj.errorCode === "SYS_500"
+    ) {
+      if (status === 502 || status === 503 || status === 504 || errObj.errorCode === "SERVICE_UNAVAILABLE" || errObj.errorCode === "SYS_503") {
+        return APP_ERROR_MAP.SERVICE_UNAVAILABLE;
+      }
+      return APP_ERROR_MAP.INTERNAL_SERVER_ERROR;
+    }
 
-    // Thông báo chi tiết nghiệp vụ từ backend nếu có
-    if (typeof errObj.detail === "string" && errObj.detail.trim()) {
+    // 3. Ưu tiên bảo toàn thông điệp nghiệp vụ (detail hoặc message) từ Backend nếu là lỗi 4xx
+    const businessMessage = detailStr || (errMsg && !lowerMsg.includes("[object object]") ? errMsg : "");
+    if (businessMessage) {
+      let code: AppErrorCode = "BAD_REQUEST";
+      let title = "Yêu cầu không hợp lệ";
+      let badge = "MÃ 400";
+
+      if (status === 401 || errObj.errorCode === "UNAUTHORIZED" || errObj.errorCode === "AUTH_401") {
+        code = "UNAUTHORIZED";
+        title = errObj.title || "Lỗi xác thực";
+        badge = "MÃ 401";
+      } else if (status === 403 || errObj.errorCode === "FORBIDDEN" || errObj.errorCode === "AUTH_403") {
+        code = "FORBIDDEN";
+        title = errObj.title || "Không có quyền truy cập";
+        badge = "MÃ 403";
+      } else if (status === 404 || errObj.errorCode === "NOT_FOUND") {
+        code = "NOT_FOUND";
+        title = errObj.title || "Không tìm thấy dữ liệu";
+        badge = "MÃ 404";
+      } else if (status === 409 || errObj.errorCode === "CONFLICT") {
+        code = "CONFLICT";
+        title = errObj.title || "Dữ liệu bị trùng lặp";
+        badge = "MÃ 409";
+      } else if (status) {
+        badge = `MÃ ${status}`;
+      }
+
       return {
-        ...APP_ERROR_MAP.UNKNOWN_ERROR,
-        message: errObj.detail.trim(),
+        code,
+        status,
+        title,
+        message: businessMessage,
+        badge,
       };
     }
 
-    if (errMsg && !lowerMsg.includes("[object object]")) {
-      return resolveAppError(errMsg);
-    }
+    // 4. Fallback về bảng mã lỗi mặc định khi Backend không có thông điệp cụ thể
+    if (status === 401 || errObj.errorCode === "UNAUTHORIZED" || errObj.errorCode === "AUTH_401") return APP_ERROR_MAP.UNAUTHORIZED;
+    if (status === 403 || errObj.errorCode === "FORBIDDEN" || errObj.errorCode === "AUTH_403") return APP_ERROR_MAP.FORBIDDEN;
+    if (status === 400 || errObj.errorCode === "VALIDATION_FAILED" || errObj.errorCode === "BAD_REQUEST") return APP_ERROR_MAP.BAD_REQUEST;
+    if (status === 404 || errObj.errorCode === "NOT_FOUND") return APP_ERROR_MAP.NOT_FOUND;
+    if (status === 409 || errObj.errorCode === "CONFLICT") return APP_ERROR_MAP.CONFLICT;
   }
 
   return APP_ERROR_MAP.UNKNOWN_ERROR;

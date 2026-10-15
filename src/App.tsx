@@ -19,6 +19,7 @@ const ProfilePage = lazy(() => import("./components/ProfilePage"));
 const TermsPage = lazy(() => import("./components/TermsPage"));
 const OrderPage = lazy(() => import("./components/OrderPage"));
 const EmailActionResponsePage = lazy(() => import("./components/EmailActionResponsePage"));
+const OAuth2CallbackPage = lazy(() => import("./components/OAuth2CallbackPage"));
 const AntiAverage404Page = lazy(() => import("./components/AntiAverage404Page"));
 const AmbientUploadCard = lazy(() => import("./components/AmbientUploadCard"));
 import { GenieCartFlyProvider } from "./components/ui/genie-cart-fly";
@@ -67,7 +68,7 @@ interface RisingStar {
   duration: number;
 }
 
-export type AppPage = "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response" | "bevel" | "404";
+export type AppPage = "landing" | "product" | "order" | "auth" | "auth-report" | "profile" | "terms" | "email-response" | "oauth2-callback" | "bevel" | "404";
 
 export default function App() {
   const getPageFromPath = (path: string): AppPage => {
@@ -82,6 +83,9 @@ export default function App() {
     if (["/o", "/order", "/orders", "/checkout", "/shipping", "/cart"].includes(cleanPath)) return "order";
     if (["/auth-report", "/diagnostic", "/diagnostics"].includes(cleanPath)) return "auth-report";
     if (["/bevel", "/iconly", "/button-demo"].includes(cleanPath)) return "bevel";
+    if (cleanPath === "/auth/callback") {
+      return "oauth2-callback";
+    }
     // Strict RFC 4122 UUID v4 Token validator: matches UUID.randomUUID().toString() from backend
     const hasValidToken = (): boolean => {
       if (typeof window === "undefined") return false;
@@ -99,7 +103,7 @@ export default function App() {
       return isValidEmailActionToken(rawToken);
     };
 
-    if (["/email-response", "/email-action", "/auth-response", "/auth/response", "/auth/callback", "/auth/activate", "/credential-change/activate", "/credential-change"].includes(cleanPath)) {
+    if (["/email-response", "/email-action", "/auth-response", "/auth/response", "/auth/activate", "/credential-change/activate", "/credential-change"].includes(cleanPath)) {
       if (hasValidToken()) {
         return "email-response";
       }
@@ -492,7 +496,7 @@ export default function App() {
         <SplashScreen />
 
       {/* 2. Synchronized Top Floating Glassmorphism Navbar */}
-      {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && currentPage !== "email-response" && currentPage !== "404" && (
+      {currentPage !== "auth" && currentPage !== "auth-report" && currentPage !== "terms" && currentPage !== "email-response" && currentPage !== "oauth2-callback" && currentPage !== "404" && (
         <Navbar 
           currentPage={currentPage}
           onNavigate={navigate}
@@ -595,6 +599,18 @@ export default function App() {
           >
             <Suspense fallback={null}>
               <EmailActionResponsePage onNavigate={navigate} />
+            </Suspense>
+          </motion.div>
+        ) : currentPage === "oauth2-callback" ? (
+          <motion.div
+            key="oauth2-callback"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+          >
+            <Suspense fallback={null}>
+              <OAuth2CallbackPage onNavigate={navigate} />
             </Suspense>
           </motion.div>
         ) : currentPage === "profile" ? (

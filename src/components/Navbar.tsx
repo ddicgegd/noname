@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Separator } from "@/components/ui/separator";
 import { Bevel, BevelDivider } from "@/components/ui/bevel";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
-import { getUnifiedAccessToken } from "@/lib/api";
+import { getUnifiedAccessToken, resolveMediaUrl } from "@/lib/api";
 import { getMe } from "@/services/authService";
 import { createAuthAction, savePendingAction } from "@/lib/authAction";
 import { addToCart as apiAddToCart, removeCartItem as apiRemoveCartItem, updateCartItemQuantity as apiUpdateCartQuantity } from "@/services/cartService";
@@ -330,7 +330,12 @@ export default function Navbar({ currentPage, onNavigate, cartItems, onRemoveCar
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showCartMenu, setShowCartMenu] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
+  const [avatarImgError, setAvatarImgError] = useState(false);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    setAvatarImgError(false);
+  }, [loggedInUser?.avatarUrl]);
   
   // Search state
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -2155,8 +2160,14 @@ const resolveProductMetadata = (skuOrName: string) => {
             {/* Elegant Circle Avatar */}
             <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden shrink-0 bg-slate-950/5 text-[#111111]/80 transition-colors">
               {loggedInUser ? (
-                loggedInUser.avatarUrl ? (
-                  <img src={loggedInUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                (loggedInUser.avatarUrl && !avatarImgError) ? (
+                  <img 
+                    src={resolveMediaUrl(loggedInUser.avatarUrl)} 
+                    alt="Avatar" 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer" 
+                    onError={() => setAvatarImgError(true)}
+                  />
                 ) : (
                   <span className="font-black text-xs text-[#FF4D24]">
                     {avatarInitial}
@@ -2187,8 +2198,14 @@ const resolveProductMetadata = (skuOrName: string) => {
                 {/* User Quick Info Header Card */}
                 <div className="p-2.5 bg-neutral-50/80 rounded-2xl border border-neutral-200/70 flex items-center gap-2.5 relative overflow-hidden">
                   <div className="size-10 rounded-full bg-gradient-to-tr from-[#FF4D24] to-[#FF7C4A] flex items-center justify-center text-white font-bold text-sm shadow-sm ring-2 ring-white shrink-0 select-none overflow-hidden">
-                    {loggedInUser?.avatarUrl ? (
-                      <img src={loggedInUser.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt="Avatar" />
+                    {(loggedInUser?.avatarUrl && !avatarImgError) ? (
+                      <img 
+                        src={resolveMediaUrl(loggedInUser.avatarUrl)} 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer" 
+                        alt="Avatar" 
+                        onError={() => setAvatarImgError(true)}
+                      />
                     ) : (
                       avatarInitial
                     )}
@@ -2215,7 +2232,6 @@ const resolveProductMetadata = (skuOrName: string) => {
                     onClick={() => {
                       setShowAccountMenu(false);
                       if (typeof window !== "undefined") {
-                        window.history.pushState(null, "", "/a");
                         window.dispatchEvent(new CustomEvent("close-accounts-center"));
                       }
                       onNavigate("profile");

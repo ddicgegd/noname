@@ -3,7 +3,7 @@
  * Handles Login, Registration, Account Recovery, Password Reset, Username/Password Changes.
  */
 
-import { apiRequest } from "../lib/api";
+import { apiRequest, getClientDeviceInfo } from "../lib/api";
 import { ApiResponse } from "../types/api";
 import { 
   UserLoginRequest, 
@@ -48,10 +48,14 @@ export async function verifyEmail(token: string): Promise<ApiResponse<any>> {
   });
 }
 
-export async function exchangeOAuth2Ticket(ticket: string): Promise<ApiResponse<AuthDataResponse>> {
+export async function exchangeOAuth2Ticket(ticket: string, deviceInfo?: any): Promise<ApiResponse<AuthDataResponse>> {
+  const finalDeviceInfo = deviceInfo || (typeof window !== "undefined" ? getClientDeviceInfo() : undefined);
   return await apiRequest<ApiResponse<AuthDataResponse>>("/api/auth/oauth2/token", {
     method: "POST",
-    body: JSON.stringify({ ticket: ticket.trim() }),
+    body: JSON.stringify({
+      ticket: ticket.trim(),
+      deviceInfo: finalDeviceInfo
+    }),
   });
 }
 

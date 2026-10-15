@@ -13,6 +13,7 @@ import { getProductColorOptions, type ProductColorOption } from "../lib/productC
 import { searchAttributesForProductSku, searchProductsForCatalog, searchCategoriesForCatalog, type CategoryItem } from "../services/merchandiseService";
 import { createOrder, type CreateOrderInput } from "../services/orderService";
 import { STORAGE_KEYS } from "../lib/storageKeys";
+import { resolveMediaUrl } from "../lib/api";
 import { createAuthAction, savePendingAction } from "../lib/authAction";
 import { getCachedCart, subscribeToCartUpdates, addToCart } from "../services/cartService";
 import {
@@ -82,425 +83,17 @@ import {
   Loader2Icon,
   Trash2Icon,
   ClockIcon,
+  SmartphoneIcon,
+  Gamepad2Icon,
 } from "lucide-react";
 
-const PRODUCTS: Product[] = [
-  {
-    id: "nexus-ai",
-    name: "Nexus AI",
-    category: "ai",
-    tag: "New",
-    tagType: "new",
-    icon: "psychology",
-    iconColor: "text-primary",
-    desc: "Advanced language processing models tailored for enterprise applications.",
-    price: "$0.02 / 1K tokens",
-    bgColor: "bg-primary/10",
-    longDesc: "Nexus AI delivers ultra-low latency, fine-tuned language intelligence for secure production workloads. Designed to integrate natively with your databases and knowledge bases to offer high-context automation, reasoning, and smart classification with military-grade safety alignments.",
-    specs: [
-      { label: "Context Window", value: "128K tokens" },
-      { label: "Fine-Tuning support", value: "Available (LoRA, Full)" },
-      { label: "Security", value: "VPC Endpoints & Encryption" },
-    ],
-  },
-  {
-    id: "aero-compute",
-    name: "Aero Compute",
-    category: "compute",
-    tag: "Popular",
-    tagType: "popular",
-    icon: "memory",
-    iconColor: "text-sky-500",
-    desc: "High-performance virtual machines with dedicated GPUs for intense workloads.",
-    price: "$0.45 / hr",
-    bgColor: "bg-sky-500/10",
-    longDesc: "Aero Compute provides state-of-the-art virtualized compute nodes equipped with modern high-bandwidth enterprise GPUs. Experience seamless autoscaling, instantaneous startup times, and tailored network interfaces optimized for large-scale graphics rendering, machine learning training, and complex numerical simulations.",
-    specs: [
-      { label: "vCPU Options", value: "Up to 128 Cores" },
-      { label: "GPU Memory", value: "24GB - 80GB VRAM" },
-      { label: "Local NVMe", value: "Up to 3.2TB" },
-    ],
-  },
-  {
-    id: "glacier-storage",
-    name: "Glacier Storage",
-    category: "storage",
-    icon: "database",
-    iconColor: "text-purple-500",
-    desc: "Ultra-durable object storage for archival and long-term data retention.",
-    price: "$0.004 / GB",
-    bgColor: "bg-purple-500/10",
-    longDesc: "Glacier Storage is the ultimate destination for cold data storage, backup archives, and regulatory compliance logs. Engineered for 99.999999999% durability, it offers instantaneous retrieval options and zero upfront egress fees for typical emergency restore patterns.",
-    specs: [
-      { label: "Durability SLA", value: "11 Nines (99.999999999%)" },
-      { label: "Retrieval Time", value: "Configurable (Expedited: 1-5m)" },
-      { label: "API Compatibility", value: "S3 compatible API" },
-    ],
-  },
-  {
-    id: "mesh-network",
-    name: "Mesh Network",
-    category: "network",
-    tag: "Updated",
-    tagType: "updated",
-    icon: "lan",
-    iconColor: "text-emerald-500",
-    desc: "Global, low-latency content delivery network with edge computing capabilities.",
-    price: "$0.08 / GB",
-    bgColor: "bg-emerald-500/10",
-    longDesc: "Mesh Network accelerates your APIs and static assets on our global fiber-optic backbone spanning over 120 edge nodes. Run light-weight serverless scripts on the edge to localize content delivery, translate headers, filter bad requests, and cache assets closer to your visitors.",
-    specs: [
-      { label: "Global Edge Nodes", value: "120+ Edge Locations" },
-      { label: "Anycast IP routing", value: "Supported" },
-      { label: "Edge Functions", value: "JavaScript/WASM support" },
-    ],
-  },
-  {
-    id: "vision-ai",
-    name: "Vision AI",
-    category: "ai",
-    tag: "New",
-    tagType: "new",
-    icon: "visibility",
-    iconColor: "text-primary",
-    desc: "Real-time object detection, classification, and visual analysis engine.",
-    price: "$0.005 / image",
-    bgColor: "bg-primary/10",
-    longDesc: "Vision AI provides robust computer vision APIs for identifying faces, text, objects, and sophisticated spatial dynamics in images and video streams. Designed for high-throughput retail intelligence, automated safety monitoring, and secure content moderation platforms.",
-    specs: [
-      { label: "FPS Capacity", value: "Up to 60 FPS live streaming" },
-      { label: "Supported Formats", value: "PNG, JPEG, WebP, MP4, H.264" },
-      { label: "Accuracy Rate", value: "99.4% on standard benchmarks" },
-    ],
-  },
-  {
-    id: "tensor-tpu",
-    name: "Tensor TPU Cluster",
-    category: "compute",
-    tag: "Popular",
-    tagType: "popular",
-    icon: "developer_board",
-    iconColor: "text-sky-500",
-    desc: "Accelerated matrix processors optimized for training massive neural networks.",
-    price: "$1.20 / hr",
-    bgColor: "bg-sky-500/10",
-    longDesc: "Unleash supercomputing power with our multi-pod Tensor TPU nodes. Specifically designed to speed up heavy matrix multiplications inherent in transformer-based models and complex generative AI frameworks. Includes native integration with TensorFlow, PyTorch, and JAX.",
-    specs: [
-      { label: "Flops Performance", value: "Up to 250 TFLOPS" },
-      { label: "Interconnect", value: "Ultra-fast multi-pod fabric" },
-      { label: "Framework support", value: "PyTorch, JAX, TensorFlow" },
-    ],
-  },
-  {
-    id: "chrono-db",
-    name: "Chrono DB",
-    category: "storage",
-    icon: "schedule",
-    iconColor: "text-purple-500",
-    desc: "High-performance time-series database for industrial IoT and application metrics.",
-    price: "$15.00 / million writes",
-    bgColor: "bg-purple-500/10",
-    longDesc: "Chrono DB is engineered specifically to capture, process, and analyze hyper-frequent metrics and industrial sensor telemetry. Features advanced downsampling, compression ratios of up to 90%, and SQL-like analytical query support for complex interval computations.",
-    specs: [
-      { label: "Write Throughput", value: "10M+ metrics per second" },
-      { label: "Query Language", value: "ChronoSQL & PromQL support" },
-      { label: "Storage Compacting", value: "Automated daily schedules" },
-    ],
-  },
-  {
-    id: "edge-gateway",
-    name: "Edge Gateway",
-    category: "network",
-    icon: "router",
-    iconColor: "text-emerald-500",
-    desc: "Managed application entry point providing load balancing, TLS termination and DDoS shield.",
-    price: "$0.015 / GB routed",
-    bgColor: "bg-emerald-500/10",
-    longDesc: "Edge Gateway provides a highly resilient, unified gateway for routing all incoming internet traffic. Integrated with enterprise-tier DDoS protections, custom domain SSL/TLS certificate issuing, and configurable smart routing rules with health checks.",
-    specs: [
-      { label: "SSL Handshake Time", value: "Under 10ms at Edge" },
-      { label: "DDoS Mitigation", value: "Up to 2Tbps shielding" },
-      { label: "Custom Domain Routing", value: "Unlimited backends" },
-    ],
-  },
-  {
-    id: "audiosynth-ai",
-    name: "AudioSynth AI",
-    category: "ai",
-    tag: "Updated",
-    tagType: "updated",
-    icon: "graphic_eq",
-    iconColor: "text-primary",
-    desc: "Ultra-realistic text-to-speech engine and generative sound design tool.",
-    price: "$0.015 / min",
-    bgColor: "bg-primary/10",
-    longDesc: "Create lifelike vocal performances, translate podcasts with emotional persistence, or generate unique cinematic backgrounds with AudioSynth AI. Includes over 40 standard accents and premium custom-voice cloning support via brief 10-second reference samples.",
-    specs: [
-      { label: "Sample Rate Output", value: "48kHz high-fidelity WAV" },
-      { label: "Voice Library Size", value: "150+ premade voices" },
-      { label: "Latent Response", value: "Real-time streaming (~120ms)" },
-    ],
-  },
-  {
-    id: "quantum-vm",
-    name: "Quantum Core VM",
-    category: "compute",
-    icon: "grain",
-    iconColor: "text-sky-500",
-    desc: "Next-gen virtual instances designed for complex physical and molecular modeling.",
-    price: "$3.50 / hr",
-    bgColor: "bg-sky-500/10",
-    longDesc: "Quantum Core VMs represent our highest tier of specialized computational machines. Utilizing advanced multi-threading instruction sets and liquid-cooled hardware substrates, these VMs deliver unmatched speed for molecular structural simulation, financial modeling, and cryptographic workloads.",
-    specs: [
-      { label: "Instruction Sets", value: "AVX-512 & AMX accelerator" },
-      { label: "RAM Allocation", value: "Up to 2TB DDR5" },
-      { label: "SLA Guarantee", value: "99.999% uptime" },
-    ],
-  },
-  {
-    id: "nebula-block",
-    name: "Nebula Block",
-    category: "storage",
-    tag: "Popular",
-    tagType: "popular",
-    icon: "hard_drive",
-    iconColor: "text-purple-500",
-    desc: "Persistent solid-state block storage designed for virtual machine boot disks.",
-    price: "$0.08 / GB-month",
-    bgColor: "bg-purple-500/10",
-    longDesc: "Nebula Block provides ultra-fast, network-attached SSD disks with fully configurable IOPS allocation. Perfect for booting systems quickly, running read-intensive databases, or serving complex operational file systems with automated hourly block-level snapshots.",
-    specs: [
-      { label: "Max IOPS", value: "Up to 256,000 IOPS" },
-      { label: "Throughput Limit", value: "1,200 MB/s per volume" },
-      { label: "Snapshot System", value: "Incremental, background-scheduled" },
-    ],
-  },
-  {
-    id: "secure-vpn",
-    name: "Secure VPN Tunnel",
-    category: "network",
-    icon: "vpn_key",
-    iconColor: "text-emerald-500",
-    desc: "Highly-encrypted private tunnels to safely link multi-region VPC instances together.",
-    price: "$0.05 / connection-hr",
-    bgColor: "bg-emerald-500/10",
-    longDesc: "Establish impenetrable tunnels between on-premise infrastructure and your cloud private VPCs. Employs modern WireGuard protocols to maintain incredibly low performance overhead while preserving top-tier packet security, zero-knowledge logging, and dynamic traffic routing.",
-    specs: [
-      { label: "Protocol Base", value: "WireGuard & OpenVPN" },
-      { label: "Throughput Capacity", value: "10 Gbps per tunnel" },
-      { label: "Log Policy", value: "Strict zero-knowledge audit" },
-    ],
-  },
-  {
-    id: "autotranslate-ai",
-    name: "AutoTranslate AI",
-    category: "ai",
-    icon: "translate",
-    iconColor: "text-primary",
-    desc: "Context-aware document and stream translator supporting over 140 languages.",
-    price: "$10.00 / million chars",
-    bgColor: "bg-primary/10",
-    longDesc: "Translate complex technical documentation, legal agreements, and real-time support chats with absolute confidence. AutoTranslate AI parses local idioms, slang, and technical terminology to preserve context, tone, and formatting constraints across global pipelines.",
-    specs: [
-      { label: "Language Catalog", value: "142 fully supported languages" },
-      { label: "Doc Formats", value: "PDF, Office, HTML, Markdown" },
-      { label: "API Latency", value: "Average under 85ms" },
-    ],
-  },
-  {
-    id: "edge-compute",
-    name: "Edge Compute Units",
-    category: "compute",
-    tag: "New",
-    tagType: "new",
-    icon: "cell_tower",
-    iconColor: "text-sky-500",
-    desc: "Serverless function execution right at the user's geographical point of ingress.",
-    price: "$0.15 / million execution",
-    bgColor: "bg-sky-500/10",
-    longDesc: "Edge Compute Units let you deploy standard lightweight JavaScript or WASM snippets directly to over 150 edge nodes globally. Process user authentication, dynamically rewrite headers, check session states, and load configurations closer to your end-users with single-digit millisecond latency.",
-    specs: [
-      { label: "Max Memory", value: "128MB per runtime" },
-      { label: "Cold Start Uptime", value: "Zero (Instant run)" },
-      { label: "Standard Support", value: "Node, Bun, Rust-WASM" },
-    ],
-  },
-  {
-    id: "object-stream",
-    name: "Object Stream Store",
-    category: "storage",
-    icon: "cloud_sync",
-    iconColor: "text-purple-500",
-    desc: "Low-latency streaming object directory built for heavy video and file ingestion.",
-    price: "$0.012 / GB-month",
-    bgColor: "bg-purple-500/10",
-    longDesc: "Object Stream Store is designed to absorb colossal file payloads with simultaneous multi-part file chunks. Ideal for backing video-on-demand services, surveillance systems, dynamic media libraries, and machine learning pipelines that read large raw asset packs directly.",
-    specs: [
-      { label: "Multipart Upload", value: "Supported natively" },
-      { label: "Read Latency", value: "Sub-15ms globally" },
-      { label: "Access Standard", value: "HTTP/3 and gRPC" },
-    ],
-  },
-  {
-    id: "load-balancer",
-    name: "Load Balancer Plus",
-    category: "network",
-    icon: "account_tree",
-    iconColor: "text-emerald-500",
-    desc: "Intelligent Layer-7 load balancing with smart weighted traffic distribution rules.",
-    price: "$0.025 / hr",
-    bgColor: "bg-emerald-500/10",
-    longDesc: "Distribute incoming client requests evenly across your active compute pools. Automatically detect unhealthy backend instances, swap healthy nodes in real time, and implement advanced canary releases or green-blue deployments using intuitive percent-weighted routing configs.",
-    specs: [
-      { label: "Supported Protocols", value: "HTTP, HTTPS, HTTP/2, gRPC, TCP, UDP" },
-      { label: "Health-check Period", value: "Down to 1 second" },
-      { label: "IP Persistence", value: "Supported via cookies" },
-    ],
-  },
-  {
-    id: "code-copilot",
-    name: "CodeCopilot AI",
-    category: "ai",
-    tag: "Popular",
-    tagType: "popular",
-    icon: "terminal",
-    iconColor: "text-primary",
-    desc: "AI coding companion built to assist developers write high-quality code in real-time.",
-    price: "$19.00 / seat-month",
-    bgColor: "bg-primary/10",
-    longDesc: "Integrate a world-class coding AI right into your IDE. CodeCopilot suggests full multi-line code implementations, documents complex function blocks, detects security vulnerabilities, and builds high-quality unit tests dynamically as you type.",
-    specs: [
-      { label: "IDE Extensions", value: "VS Code, JetBrains, Vim/NeoVim" },
-      { label: "Languages", value: "TS, JS, Python, Go, Rust, Java, C++" },
-      { label: "Audit Standards", value: "OWASP Top 10 automated check" },
-    ],
-  },
-  {
-    id: "dedicated-bare",
-    name: "BareMetal Server",
-    category: "compute",
-    icon: "dns",
-    iconColor: "text-sky-500",
-    desc: "Raw, unvirtualized hardware servers dedicated strictly to high-security systems.",
-    price: "$1.85 / hr",
-    bgColor: "bg-sky-500/10",
-    longDesc: "For systems requiring maximum raw performance without virtualization hypervisor overhead. Our BareMetal servers offer direct access to state-of-the-art server hardware, high-performance network lanes, and local hardware disk arrays with custom operating system control.",
-    specs: [
-      { label: "CPU Core Range", value: "64 to 256 physical cores" },
-      { label: "Root Access", value: "Full IPMI & serial console" },
-      { label: "Network Bandwidth", value: "Dedicated 100 Gbps port" },
-    ],
-  },
-  {
-    id: "aurora-sql",
-    name: "Relational Aurora SQL",
-    category: "storage",
-    tag: "Updated",
-    tagType: "updated",
-    icon: "dataset",
-    iconColor: "text-purple-500",
-    desc: "Fully-managed serverless Postgres-compatible relational database with global sync.",
-    price: "$0.10 / core-hr",
-    bgColor: "bg-purple-500/10",
-    longDesc: "Aurora SQL gives you the scale of cloud databases with the absolute familiarity and strict consistency of standard PostgreSQL. Automatically scales computational allocations based on live queries, and maintains read-replicas across three separate geographic regions.",
-    specs: [
-      { label: "Postgres Compatibility", value: "Full PostgreSQL 16+ support" },
-      { label: "Storage Autoscaling", value: "Up to 128TB per instance" },
-      { label: "Read-Replication Uptime", value: "Average under 20ms sync lag" },
-    ],
-  },
-  {
-    id: "anycast-dns",
-    name: "Anycast Traffic DNS",
-    category: "network",
-    icon: "language",
-    iconColor: "text-emerald-500",
-    desc: "Lightning-fast domain registration and DNS hosting utilizing worldwide distributed Anycast nodes.",
-    price: "$0.40 / million requests",
-    bgColor: "bg-emerald-500/10",
-    longDesc: "Get your domain resolved instantly. Our global Anycast network coordinates query traffic across multiple geographic positions to minimize response times, bypass regional network congestion, and defend against targeted domain resolution attacks.",
-    specs: [
-      { label: "Propagation Speed", value: "Global change in under 60 seconds" },
-      { label: "DDoS Mitigation", value: "Always-on automated defense" },
-      { label: "API Configuration", value: "REST and Terraform provider" },
-    ],
-  },
-  {
-    id: "deepmind-agent",
-    name: "DeepMind Agent",
-    category: "ai",
-    tag: "New",
-    tagType: "new",
-    icon: "smart_toy",
-    iconColor: "text-primary",
-    desc: "Autonomous smart agents designed to operate complex multi-step browser workflows.",
-    price: "$0.08 / step run",
-    bgColor: "bg-primary/10",
-    longDesc: "Deploy intelligent virtual workers capable of using external software systems, browsing documentation, extracting data from internal corporate dashboards, executing terminal scripts, and automating repetitive business operations safely with natural language prompts.",
-    specs: [
-      { label: "Max Run Duration", value: "Up to 3 hours per agent run" },
-      { label: "Security Layer", value: "Isolated secure sandbox container" },
-      { label: "Integration", value: "Webhooks, Slack, API triggers" },
-    ],
-  },
-  {
-    id: "micro-k8s",
-    name: "MicroContainer Cluster",
-    category: "compute",
-    icon: "grid_view",
-    iconColor: "text-sky-500",
-    desc: "Fully managed, auto-repairing Kubernetes nodes designed for lightweight microservices.",
-    price: "$0.09 / cluster-hr",
-    bgColor: "bg-sky-500/10",
-    longDesc: "Our managed MicroContainer clusters remove the complex burden of deploying and operating container networks. Simply point us to your Docker image definitions, configure ingress routes, and let our auto-repairing system manage scaling, node recycling, and zero-downtime updates.",
-    specs: [
-      { label: "Control Plane", value: "Fully managed and highly available" },
-      { label: "Node Auto-healing", value: "Enabled by default" },
-      { label: "Ingress Integration", value: "Integrated with Mesh Network" },
-    ],
-  },
-  {
-    id: "redis-cache",
-    name: "In-Memory Cache (Redis)",
-    category: "storage",
-    icon: "speed",
-    iconColor: "text-purple-500",
-    desc: "Ultra-fast Redis databases optimized for session storage and frequent database query caching.",
-    price: "$0.03 / GB-hr",
-    bgColor: "bg-purple-500/10",
-    longDesc: "Supercharge your application speeds by storing dynamic session details, rate limiting states, and heavy database query results directly in blazing-fast managed memory clusters. Fully compatible with native Redis commands, pub/sub architecture, and persistence modes.",
-    specs: [
-      { label: "Read Response Latency", value: "Sub-millisecond guaranteed" },
-      { label: "Clustering Options", value: "Up to 10 shard nodes" },
-      { label: "Encryption", value: "TLS-encrypted in transit and rest" },
-    ],
-  },
-  {
-    id: "cdn-express",
-    name: "CDN Express",
-    category: "network",
-    tag: "Popular",
-    tagType: "popular",
-    icon: "bolt",
-    iconColor: "text-emerald-500",
-    desc: "Ultra-fast asset delivery pipeline with automatic image optimization and instant cache purges.",
-    price: "$0.05 / GB delivered",
-    bgColor: "bg-emerald-500/10",
-    longDesc: "Instantly stream static resources, media, and fonts to your global users. CDN Express automatically compresses images into next-gen formats, pre-gzip streams, and provides an API-first cache purging engine that executes across all edge nodes in under 150 milliseconds.",
-    specs: [
-      { label: "Cache Purge Speed", value: "Under 150ms globally" },
-      { label: "Media Optimization", value: "Auto-WebP and progressive format" },
-      { label: "HTTP Version", value: "Full HTTP/3 native fallback" },
-    ],
-  }
-];
 
 const getProductImage = (product: Product | { id: string; category?: string; mediaUrls?: string[]; imageUrl?: string; name?: string }) => {
   if (product.mediaUrls && product.mediaUrls.length > 0 && product.mediaUrls[0]) {
-    return product.mediaUrls[0];
+    return resolveMediaUrl(product.mediaUrls[0]);
   }
   if ((product as any).imageUrl) {
-    return (product as any).imageUrl;
+    return resolveMediaUrl((product as any).imageUrl);
   }
   const idLower = (product.id || "").toLowerCase();
   const nameLower = ((product as any).name || "").toLowerCase();
@@ -538,48 +131,26 @@ const getProductImage = (product: Product | { id: string; category?: string; med
 };
 
 const getProductVNDDetails = (productOrId: string | Product) => {
-  const mappings: Record<string, { present: string; old?: string; discount?: string; smember?: string }> = {
-    "nexus-ai": { present: "12.500.000đ", old: "14.000.000đ", discount: "Giảm 10%" },
-    "aero-compute": { present: "33.890.000đ", old: "34.990.000đ", discount: "Giảm 3%", smember: "Smember giảm đến 339.000đ" },
-    "glacier-storage": { present: "450.000đ", old: "500.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 15.000đ" },
-    "mesh-network": { present: "2.150.000đ", old: "2.500.000đ", discount: "Giảm 14%" },
-    "vision-ai": { present: "8.900.000đ", old: "9.900.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 99.000đ" },
-    "tensor-tpu": { present: "48.990.000đ", old: "52.000.000đ", discount: "Giảm 5%", smember: "Smember giảm đến 489.000đ" },
-    "chrono-db": { present: "15.200.000đ", old: "16.500.000đ", discount: "Giảm 7%" },
-    "edge-gateway": { present: "3.600.000đ", old: "4.000.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 36.000đ" },
-    "audiosynth-ai": { present: "7.200.000đ", old: "8.000.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 72.000đ" },
-    "quantum-vm": { present: "29.500.000đ", old: "32.000.000đ", discount: "Giảm 8%", smember: "Smember giảm đến 295.000đ" },
-    "nebula-block": { present: "5.800.000đ", old: "6.500.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 58.000đ" },
-    "secure-vpn": { present: "1.150.000đ", old: "1.300.000đ", discount: "Giảm 11%", smember: "Smember giảm đến 15.000đ" },
-    "autotranslate-ai": { present: "4.900.000đ", old: "5.500.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 49.000đ" },
-    "edge-compute": { present: "6.350.000đ", old: "6.800.000đ", discount: "Giảm 6%", smember: "Smember giảm đến 63.000đ" },
-    "object-stream": { present: "2.890.000đ", old: "3.200.000đ", discount: "Giảm 9%", smember: "Smember giảm đến 28.000đ" },
-    "load-balancer": { present: "9.500.000đ", old: "10.500.000đ", discount: "Giảm 9%", smember: "Smember giảm đến 95.000đ" },
-    "code-copilot": { present: "4.120.000đ", old: "4.500.000đ", discount: "Giảm 8%", smember: "Smember giảm đến 41.000đ" },
-    "dedicated-bare": { present: "85.900.000đ", old: "90.000.000đ", discount: "Giảm 5%", smember: "Smember giảm đến 859.000đ" },
-    "aurora-sql": { present: "18.600.000đ", old: "20.000.000đ", discount: "Giảm 7%", smember: "Smember giảm đến 186.000đ" }
-  };
-
-  const id = typeof productOrId === "string" ? productOrId : productOrId.id;
-  const fallback = mappings[id] || { present: "5.000.000đ", old: "5.500.000đ", discount: "Giảm 10%", smember: "Smember giảm đến 50.000đ" };
-
   if (typeof productOrId === "string") {
-    return fallback;
+    return {
+      present: "",
+      old: "",
+      discount: "",
+      smember: ""
+    };
   }
 
   return {
-    present: productOrId.price?.endsWith("đ") ? productOrId.price : fallback.present,
-    old: productOrId.oldPrice ?? fallback.old ?? "",
-    discount: productOrId.discount ?? fallback.discount ?? "",
-    smember: productOrId.smember ?? fallback.smember ?? ""
+    present: productOrId.price || "",
+    old: productOrId.oldPrice ?? "",
+    discount: productOrId.discount ?? "",
+    smember: productOrId.smember ?? ""
   };
 };
 
 const getProductHashSku = (product: Product) => {
   return product.sku || product.specs.find((spec) => spec.label === "Mã SKU Sản phẩm")?.value || product.id;
 };
-
-const MAIN_GRID_PRODUCTS = PRODUCTS.filter((product) => product.id === "tensor-tpu");
 
 const getCurrentHashSku = () => decodeURIComponent(window.location.hash.slice(1).trim());
 
@@ -680,7 +251,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
 
     const matchedCloudProduct = catalogProducts.find((product) =>
       getProductHashSku(product).toLowerCase() === activeHashSku.toLowerCase()
-    ) || PRODUCTS.find((product) => getProductHashSku(product).toLowerCase() === activeHashSku.toLowerCase());
+    );
 
     if (matchedCloudProduct) {
       if (!selectedProduct || selectedProduct.id !== matchedCloudProduct.id || selectedProduct.name === selectedProduct.sku) {
@@ -716,33 +287,6 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
     return () => {
       cancelled = true;
     };
-  }, [activeHashSku, catalogProducts, selectedProduct]);
-
-  useEffect(() => {
-    if (!activeHashSku || selectedProduct) return;
-
-    const matchedProduct = catalogProducts.find((product) => getProductHashSku(product).toLowerCase() === activeHashSku.toLowerCase())
-      || PRODUCTS.find((product) => getProductHashSku(product).toLowerCase() === activeHashSku.toLowerCase());
-    if (matchedProduct) {
-      setSelectedProduct(matchedProduct);
-      return;
-    }
-
-    setSelectedProduct({
-      id: activeHashSku,
-      sku: activeHashSku,
-      name: activeHashSku,
-      category: "compute",
-      icon: "developer_board",
-      iconColor: "text-sky-500",
-      desc: activeHashSku,
-      price: "5.000.000đ",
-      oldPrice: "5.500.000đ",
-      discount: "Giảm 10%",
-      bgColor: "bg-sky-500/10",
-      longDesc: "Sản phẩm từ hệ thống merchandise.",
-      specs: [{ label: "Mã SKU Sản phẩm", value: activeHashSku }]
-    });
   }, [activeHashSku, catalogProducts, selectedProduct]);
 
   useEffect(() => {
@@ -972,7 +516,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
     return () => window.removeEventListener("scroll", handleScroll);
   }, [hasMoreCatalogProducts, handleLoadMore]);
 
-  const comparedProducts = comparedProductIds.map(id => catalogProducts.find(p => p.id === id) || PRODUCTS.find(p => p.id === id)).filter((p): p is Product => !!p);
+  const comparedProducts = comparedProductIds.map(id => catalogProducts.find(p => p.id === id)).filter((p): p is Product => !!p);
   const { showToast } = useToast();
   const [countdownTime, setCountdownTime] = useState({ hours: 4, minutes: 25, seconds: 12 });
 
@@ -992,7 +536,7 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
           const allBookmarked =
             comparedProductIds.length > 0 &&
             comparedProductIds.every((id) => {
-              const p = catalogProducts.find((prod) => prod.id === id) || PRODUCTS.find((prod) => prod.id === id);
+              const p = catalogProducts.find((prod) => prod.id === id);
               const sku = p?.sku || id;
               return bookmarkedSkus.has(sku);
             });
@@ -1172,6 +716,8 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
   const getReadableCategoryLabel = (raw: string): string => {
     const clean = raw.trim().toLowerCase();
     if (clean === "all") return "Tất cả sản phẩm";
+    if (clean === "cat-phone" || clean === "phone" || clean === "điện thoại") return "Điện thoại";
+    if (clean === "cat-gaming" || clean === "gaming" || clean === "thiết bị chơi game") return "Thiết bị chơi game";
     if (clean === "ai") return "AI & Trí tuệ nhân tạo";
     if (clean === "compute") return "Máy chủ & GPU Compute";
     if (clean === "storage") return "Lưu trữ dữ liệu Cloud";
@@ -1186,7 +732,9 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
         ...apiCategories.map((c) => {
           const lower = c.name.toLowerCase();
           let Icon = LayersIcon;
-          if (lower.includes("ai") || lower.includes("model") || lower.includes("trí tuệ")) Icon = BrainCircuitIcon;
+          if (lower.includes("thoại") || lower.includes("phone")) Icon = SmartphoneIcon;
+          else if (lower.includes("game") || lower.includes("chơi game")) Icon = Gamepad2Icon;
+          else if (lower.includes("ai") || lower.includes("model") || lower.includes("trí tuệ")) Icon = BrainCircuitIcon;
           else if (lower.includes("gpu") || lower.includes("server") || lower.includes("compute") || lower.includes("máy chủ")) Icon = ServerIcon;
           else if (lower.includes("storage") || lower.includes("s3") || lower.includes("data") || lower.includes("lưu trữ")) Icon = DatabaseIcon;
           else if (lower.includes("cdn") || lower.includes("network") || lower.includes("edge") || lower.includes("mạng")) Icon = NetworkIcon;
@@ -1220,7 +768,9 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
         ...Array.from(uniqueCategoryMap.entries()).map(([key, val]) => {
           const lower = val.label.toLowerCase();
           let Icon = LayersIcon;
-          if (lower.includes("ai") || lower.includes("model") || lower.includes("trí tuệ")) Icon = BrainCircuitIcon;
+          if (lower.includes("thoại") || lower.includes("phone")) Icon = SmartphoneIcon;
+          else if (lower.includes("game") || lower.includes("chơi game")) Icon = Gamepad2Icon;
+          else if (lower.includes("ai") || lower.includes("model") || lower.includes("trí tuệ")) Icon = BrainCircuitIcon;
           else if (lower.includes("gpu") || lower.includes("server") || lower.includes("compute") || lower.includes("máy chủ")) Icon = ServerIcon;
           else if (lower.includes("storage") || lower.includes("s3") || lower.includes("data") || lower.includes("lưu trữ")) Icon = DatabaseIcon;
           else if (lower.includes("cdn") || lower.includes("network") || lower.includes("edge") || lower.includes("mạng")) Icon = NetworkIcon;
@@ -1247,16 +797,16 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
 
   const getCategoryCount = (catId: string, sku?: string) => {
     if (catId === "all") return catalogProducts.length;
-    if (sku) {
-      const matchSku = catalogProducts.filter((p) => p.sku === sku || p.categoryName?.toLowerCase() === sku.toLowerCase());
-      if (matchSku.length > 0) return matchSku.length;
-    }
-    return catalogProducts.filter(
-      (p) =>
+    return catalogProducts.filter((p) => {
+      if (sku && (p.sku === sku || p.categoryName?.toLowerCase() === sku.toLowerCase())) return true;
+      if (catId === "cat-phone") return p.category === "phone" || p.categoryName?.toLowerCase().includes("thoại");
+      if (catId === "cat-gaming") return p.category === "gaming" || p.categoryName?.toLowerCase().includes("game");
+      return (
         p.category === catId ||
         p.categoryName?.toLowerCase() === catId.toLowerCase() ||
         p.sku === catId
-    ).length;
+      );
+    }).length;
   };
 
   // Filter products dynamically based on GraphQL Gateway endpoint criteria
@@ -1266,7 +816,9 @@ export default function ProductPage({ cartItems, onAddToCart, onRemoveCartItem, 
       activeCategory === "all" ||
       product.category === activeCategory ||
       product.categoryName?.toLowerCase() === activeCategory.toLowerCase() ||
-      product.sku === activeCategory;
+      product.sku === activeCategory ||
+      (activeCategory === "cat-phone" && (product.category === "phone" || product.categoryName?.toLowerCase().includes("thoại"))) ||
+      (activeCategory === "cat-gaming" && (product.category === "gaming" || product.categoryName?.toLowerCase().includes("game")));
 
     // 2. Price range filter (Endpoint: minPrice / maxPrice)
     const priceNum = parseNumericPrice(product);
@@ -3622,79 +3174,16 @@ function ProductDetailModal({ product, cartItems, onClose, onAddToCart, onRemove
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, isSpecsExpanded, showSpecsPopup]);
 
-  const cloudSpecSections: ProductSpecSection[] = [
-    {
-      id: "man-hinh",
-      title: "Màn hình",
-      items: [
-        { label: "Công nghệ màn hình", value: "Màn hình Retina Luôn Bật với OLED góc rộng và LTPO3 Tốc độ làm mới 1Hz" },
-        { label: "Độ phân giải", value: "422 x 514 pixel" },
-        { label: "Độ sáng tối đa", value: "Lên đến 3000 nit" },
-        { label: "Độ sáng tối thiểu", value: "1 nit" },
-      ]
-    },
-    {
-      id: "thiet-ke",
-      title: "Thiết kế",
-      items: [
-        { label: "Chất liệu mặt kính", value: "Màn hình bằng kính sapphire phẳng" },
-        { label: "Chất liệu viền", value: "Titanium" },
-        { label: "Đường kính mặt", value: "49 mm" },
-        { label: "Thiết kế", value: "Mặt vuông" },
-        { label: "Trọng lượng", value: "61.8 gram" },
-      ]
-    },
-    {
-      id: "day-deo",
-      title: "Dây đeo",
-      items: [
-        { label: "Chất liệu dây", value: "Cao su" },
-        { label: "Độ dài dây", value: "Không công bố" },
-        { label: "Bề rộng dây", value: "Không công bố" },
-        { label: "Kích thước cổ tay phù hợp", value: "Vừa với cổ tay cỡ 13 - 21 cm" },
-        { label: "Có thể thay dây", value: "Có" },
-      ]
-    },
-    {
-      id: "tinh-nang",
-      title: "Tính năng",
-      items: [
-        { label: "Nghe, gọi", value: "Nghe gọi qua eSim" },
-        { label: "Sức khỏe", value: "Đo ECG, SpO2, đo nhịp tim liên tục, nhiệt độ cơ thể, theo dõi giấc ngủ" },
-        { label: "Cảm biến an toàn", value: "Phát hiện té ngã, Phát hiện va chạm xe, Còi báo động 86 decibel" },
-        { label: "Khác", value: "Hỗ trợ điều khiển bằng cử chỉ chạm hai lần ngón tay (Double Tap)" },
-      ]
-    },
-    {
-      id: "cau-hinh",
-      title: "Cấu hình",
-      items: [
-        { label: "Chip xử lý", value: "S10 SiP với bộ xử lý lõi kép 64-bit nhanh hơn" },
-        { label: "Bộ nhớ trong", value: "64 GB" },
-        { label: "Kết nối", value: "Wi-Fi 4, Bluetooth 5.3, Ultra Wideband (UWB) thế hệ thứ hai" },
-      ]
-    },
-    {
-      id: "pin",
-      title: "Pin",
-      items: [
-        { label: "Thời lượng pin", value: "Lên đến 36 giờ sử dụng bình thường / Lên đến 72 giờ ở Chế độ Nguồn Điện Thấp" },
-        { label: "Sạc nhanh", value: "Sạc nhanh trong 45 phút đạt 80% pin" },
-      ]
-    },
-    {
-      id: "thong-tin-khac",
-      title: "Thông tin khác",
-      items: [
-        { label: "Chống nước & Bụi", value: "Chống nước ở độ sâu 100m (bơi, lặn với ống thở, lặn với bình dưỡng khí lên đến 40m), Đạt chuẩn chống bụi IP6X" },
-        { label: "Hệ điều hành", value: "watchOS 11" },
-        { label: "Năm ra mắt", value: "2024" },
-      ]
-    }
-  ];
+  const defaultSpecSections: ProductSpecSection[] = product.specs?.length > 0
+    ? [{
+        id: "thong-tin-chung",
+        title: "Thông số chung",
+        items: product.specs.map((s) => ({ label: s.label, value: s.value }))
+      }]
+    : [];
 
   const apiSpecSections = getApiSpecificationSections(selectedAttribute);
-  const specSections: ProductSpecSection[] = apiSpecSections.length > 0 ? apiSpecSections : cloudSpecSections;
+  const specSections: ProductSpecSection[] = apiSpecSections.length > 0 ? apiSpecSections : defaultSpecSections;
 
   const [activeTab, setActiveTab] = useState(() => specSections[0]?.id || "man-hinh");
   const contentRef = useRef<HTMLDivElement>(null);

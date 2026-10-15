@@ -7,7 +7,7 @@ export interface Product {
   rating?: number;
   viewCount?: number;
   totalSoldQuantity?: number;
-  category: "ai" | "compute" | "storage" | "network";
+  category: string;
   tag?: string;
   tagType?: "new" | "popular" | "updated";
   icon: string;

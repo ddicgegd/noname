@@ -213,9 +213,15 @@ html, body {
 }
 .animate-marquee-magic {
   animation: marquee-magic var(--duration, 40s) linear infinite;
+  animation-play-state: var(--marquee-play-state, running);
 }
 .animate-marquee-magic-vertical {
   animation: marquee-magic-vertical var(--duration, 40s) linear infinite;
+  animation-play-state: var(--marquee-play-state, running);
+}
+.marquee-paused .animate-marquee-magic,
+.marquee-paused .animate-marquee-magic-vertical {
+  animation-play-state: paused !important;
 }
 
 @theme inline {

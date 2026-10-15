@@ -5,11 +5,12 @@
 
 import React, { useEffect, useRef, type MouseEvent, type CSSProperties } from "react";
 import { Check } from "lucide-react";
+import { useReducedMotion } from "motion/react";
 import { type PricingPlan } from "./HoloCardPaymentSheet";
 
 export interface HoloCardProps {
   plan: PricingPlan;
-  onSelect?: (plan: PricingPlan) => void;
+  onSelect?: (plan: PricingPlan, rect?: DOMRect) => void;
   compact?: boolean;
   hideButton?: boolean;
   overridePrice?: string;
@@ -26,11 +27,11 @@ export function HoloCard({
   overridePeriod,
   className,
 }: HoloCardProps) {
+  const shouldReduceMotion = useReducedMotion();
   const wrapRef = useRef<HTMLDivElement>(null); // perspective wrapper
   const cardRef = useRef<HTMLDivElement>(null); // tilting card
   const foilRef = useRef<HTMLDivElement>(null); // foil overlay
   const glintRef = useRef<HTMLDivElement>(null); // specular dot
-  const rimRef = useRef<HTMLDivElement>(null); // top rim
 
   // Animation state — direct DOM manipulation for 60fps performance
   const raf = useRef<number>(0);
@@ -44,9 +45,8 @@ export function HoloCard({
     const card = cardRef.current;
     const foil = foilRef.current;
     const glint = glintRef.current;
-    const rim = rimRef.current;
     const wrap = wrapRef.current;
-    if (!card || !foil || !glint || !rim || !wrap) return;
+    if (!card || !foil || !glint || !wrap) return;
 
     let isVisible = true;
     let observer: IntersectionObserver | null = null;
@@ -92,19 +92,11 @@ export function HoloCard({
       glint.style.backgroundPosition = `${effectPx.toFixed(1)}% ${effectPy.toFixed(1)}%`;
       glint.style.opacity = lerp(0.06, 0.187, a).toFixed(3);
 
-      // --- Rim light ---
-      rim.style.opacity = (0.2 + a * 0.55).toFixed(3);
-
-      // --- External Drop Shadow & Borders (around and beneath the frame) ---
+      // --- External Drop Shadow (around and beneath the frame) ---
       const spread = lerp(compact ? 14 : 20, compact ? 24 : 36, a).toFixed(0);
       const blur = lerp(compact ? 28 : 36, compact ? 44 : 54, a).toFixed(0);
       card.style.boxShadow = `${plan.glowColor} 0px ${spread}px ${blur}px -8px, rgba(0,0,0,0.06) 0px 4px 16px`;
 
-      if (a > 0.02) {
-        card.style.borderColor = plan.hoverBorderColor;
-      } else {
-        card.style.borderColor = defaultBorderColor;
-      }
       raf.current = requestAnimationFrame(tick);
     };
 
@@ -158,8 +150,6 @@ export function HoloCard({
   };
   const currentPrice = overridePrice ?? plan.price;
   const currentPeriod = overridePeriod ?? plan.period;
-  const defaultBorderColor =
-    plan.id === "free" ? "rgba(56, 189, 248, 0.35)" : "rgba(192, 132, 252, 0.4)";
   const defaultBoxShadow = `${plan.glowColor} 0px ${compact ? 14 : 20}px ${compact ? 28 : 36}px -8px, rgba(0,0,0,0.06) 0px 4px 16px`;
 
   return (
@@ -174,21 +164,26 @@ export function HoloCard({
       {/* The card — tilt applied via direct DOM style */}
       <div
         ref={cardRef}
-        onClick={() => onSelect?.(plan)}
+        onClick={(e) => {
+          const rect = cardRef.current?.getBoundingClientRect() ?? e.currentTarget.getBoundingClientRect();
+          onSelect?.(plan, rect);
+        }}
         className={`${
           compact ? "p-4 sm:p-5 min-h-[320px] sm:min-h-[330px]" : "p-8 sm:p-10 min-h-[550px]"
         } bg-white/50 dark:bg-neutral-900/40 backdrop-blur-xl rounded-2xl flex flex-col relative overflow-hidden h-full ${
           onSelect ? "cursor-pointer" : ""
-        } border`}
+        } border border-black/[0.08] dark:border-white/[0.08] hover:border-black/20 dark:hover:border-white/20 transition-colors`}
         style={{
           transformStyle: "preserve-3d",
-          borderColor: defaultBorderColor,
           boxShadow: defaultBoxShadow,
-          willChange: "transform, box-shadow, border-color",
+          willChange: "transform, box-shadow",
         }}
       >
         {/* Base gradient */}
-        <div className={`absolute inset-0 ${plan.bgGradient} pointer-events-none rounded-2xl`} />
+        {plan.bgGradient ? (
+          <div className={`absolute inset-0 ${plan.bgGradient} pointer-events-none rounded-2xl`} />
+        ) : null}
+
         <div
           ref={foilRef}
           className="absolute inset-0 pointer-events-none rounded-2xl opacity-0"
@@ -229,16 +224,6 @@ export function HoloCard({
               "radial-gradient(circle 80px at 50% 50%, rgba(255,255,255,0.7), transparent 65%)",
             backgroundSize: "100% 100%",
             backgroundRepeat: "no-repeat",
-          }}
-        />
-
-        {/* Top rim light — 1px bright edge */}
-        <div
-          ref={rimRef}
-          className="absolute inset-x-6 top-0 h-px pointer-events-none rounded-t-2xl"
-          style={{
-            opacity: 0.2,
-            background: `linear-gradient(90deg, transparent, ${plan.rimColor} 35%, ${plan.rimColor} 65%, transparent)`,
           }}
         />
 
